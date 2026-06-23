@@ -22,6 +22,8 @@ const EXT_BY_MIME = {
   "audio/mpeg": "mp3",
   "audio/amr": "amr",
   "audio/mp4": "m4a",
+  "video/mp4": "mp4",
+  "video/3gpp": "3gp",
   "application/pdf": "pdf",
 };
 
@@ -97,7 +99,7 @@ async function processarEntry(entry) {
 
         if (tipo === "text") {
           db.insertMessage({ ...base, type: "text", body: msg.text?.body });
-        } else if (tipo === "image" || tipo === "audio" || tipo === "document") {
+        } else if (tipo === "image" || tipo === "audio" || tipo === "video" || tipo === "document") {
           const media = msg[tipo];
           try {
             const { buffer, mimeType } = await wa.downloadMedia(media.id);

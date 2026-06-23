@@ -95,6 +95,9 @@ async function carregarMensagens() {
       if (m.body) conteudo += `<div>${escapeHtml(m.body)}</div>`;
     } else if (m.type === "audio" && m.media_path) {
       conteudo = `<audio controls src="${m.media_path}"></audio>`;
+    } else if (m.type === "video" && m.media_path) {
+      conteudo = `<video controls src="${m.media_path}" style="max-width:240px;border-radius:6px;display:block;"></video>`;
+      if (m.body) conteudo += `<div>${escapeHtml(m.body)}</div>`;
     } else {
       conteudo = escapeHtml(m.body || `[${m.type}]`);
     }
