@@ -47,6 +47,64 @@ porém, ficam seguros no Turso, independente de reinícios.
 
 ---
 
+## Como adicionar um novo número de WhatsApp Business
+
+Todos os números configurados usam o mesmo `ACCESS_TOKEN` (desde que pertençam à mesma
+conta de negócios/WABA). Só é preciso achar o `PHONE_NUMBER_ID` do número novo e atualizar
+uma variável de ambiente — nenhuma mudança de código é necessária.
+
+1. **Achar o `PHONE_NUMBER_ID` do número novo**: no Gerenciador do WhatsApp
+   (business.facebook.com → Contas do WhatsApp → escolha a conta → aba "Phone numbers"),
+   clique no número e veja "Identificação do número de telefone".
+2. **Verificar se está `CONNECTED`** na Cloud API (não "Offline"/"Disconnected"). Para checar:
+   ```bash
+   curl "https://graph.facebook.com/v21.0/{WABA_ID}/phone_numbers?fields=id,display_phone_number,status" \
+     -H "Authorization: Bearer {ACCESS_TOKEN}"
+   ```
+   Se aparecer `"status":"DISCONNECTED"`, o número precisa ser registrado antes de usar:
+   ```bash
+   # 1. Pede um código por SMS/voz
+   curl -X POST "https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/request_code" \
+     -H "Authorization: Bearer {ACCESS_TOKEN}" -d "code_method=SMS" -d "language=pt_BR"
+
+   # 2. Confirma o código recebido
+   curl -X POST "https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/verify_code" \
+     -H "Authorization: Bearer {ACCESS_TOKEN}" -d "code=123456"
+
+   # 3. Registra (pin pode ser qualquer numero de 6 digitos se a verificacao em duas etapas estiver desativada)
+   curl -X POST "https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/register" \
+     -H "Authorization: Bearer {ACCESS_TOKEN}" -d "messaging_product=whatsapp" -d "pin=123456"
+   ```
+3. **Inscrever o app para receber webhooks desse WABA** (só precisa fazer uma vez por WABA,
+   não por número — se o número novo já é da mesma conta dos outros, pule este passo):
+   ```bash
+   curl -X POST "https://graph.facebook.com/v21.0/{WABA_ID}/subscribed_apps" \
+     -H "Authorization: Bearer {ACCESS_TOKEN}"
+   ```
+4. **Atualizar a variável `PHONE_NUMBERS_JSON` no Render**, adicionando o novo número à lista:
+   ```json
+   [
+     {"id":"524457590747945","label":"Felizcred (principal)"},
+     {"id":"518007084723311","label":"felizcred n"},
+     {"id":"NOVO_PHONE_NUMBER_ID","label":"Nome que quiser"}
+   ]
+   ```
+5. Salvar — o Render redeploya automaticamente, e uma nova aba aparece no painel.
+
+---
+
+## Estado atual do projeto (resumo)
+
+- Backend Node puro (`server.js`) + `db.js` (Turso) + `whatsapp.js` (chamadas à Graph API)
+- Deploy no **Render** (free tier), repositório em `github.com/salvadorfelipee-creator/meuwhats`
+- Histórico de conversas no **Turso** (permanente); mídias (fotos/áudios/vídeos) só no disco
+  do Render (não permanente — ver aviso acima)
+- Dois números WhatsApp Business conectados, com abas no painel
+- Pendente/possível próximo passo: mensagem automática com botões para conversas inativas
+  há mais de 24h (ainda não implementada — decisão de igual/diferente por número em aberto)
+
+---
+
 ## Rodar localmente
 
 ```bash
