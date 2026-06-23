@@ -6,61 +6,145 @@
 <title>Painel WhatsApp</title>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: system-ui, sans-serif; background: #f0f2f5; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #f0f2f5;
+    color: #111b21;
+  }
   #app { display: flex; height: 100vh; }
 
-  #conversas { width: 320px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; flex-shrink: 0; }
-  #conversas h2 { padding: 16px; margin: 0; background: #075e54; color: #fff; font-size: 18px; }
-  .conversa { padding: 12px 16px; border-bottom: 1px solid #eee; cursor: pointer; }
-  .conversa:hover { background: #f5f5f5; }
-  .conversa.ativa { background: #e8f5e9; }
-  .conversa .nome { font-weight: 600; }
-  .conversa .telefone { font-size: 12px; color: #666; }
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  #conversas { width: 360px; background: #fff; border-right: 1px solid #e9edef; display: flex; flex-direction: column; flex-shrink: 0; }
+  #conversas-header { padding: 16px; background: #075e54; color: #fff; font-size: 19px; font-weight: 600; }
+  #busca-wrap { padding: 8px 12px; border-bottom: 1px solid #e9edef; }
+  #busca { width: 100%; padding: 8px 12px; border: none; border-radius: 8px; background: #f0f2f5; outline: none; font-size: 14px; }
+  #lista-conversas { overflow-y: auto; flex: 1; }
 
-  #conversa-atual { flex: 1; display: flex; flex-direction: column; }
-  #mensagens { flex: 1; overflow-y: auto; padding: 16px; background: #ece5dd; }
-  .msg { max-width: 60%; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; line-height: 1.4; }
-  .msg.in { background: #fff; margin-right: auto; }
-  .msg.out { background: #d9fdd3; margin-left: auto; }
-  .msg img { max-width: 240px; border-radius: 6px; display: block; }
-  .msg audio { display: block; }
-  .msg .hora { font-size: 11px; color: #888; margin-top: 4px; text-align: right; }
+  .conversa { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f0f2f5; cursor: pointer; }
+  .conversa:hover { background: #f5f6f6; }
+  .conversa.ativa { background: #e9edef; }
+  .avatar { width: 44px; height: 44px; border-radius: 50%; background: #075e54; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; flex-shrink: 0; }
+  .conversa-info { flex: 1; min-width: 0; }
+  .conversa-linha1 { display: flex; justify-content: space-between; align-items: baseline; }
+  .conversa-nome { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conversa-hora { font-size: 12px; color: #667781; flex-shrink: 0; margin-left: 8px; }
+  .conversa-preview { font-size: 13px; color: #667781; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  #form-resposta { display: flex; padding: 12px; background: #fff; border-top: 1px solid #ddd; }
-  #texto-resposta { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
-  #form-resposta button { margin-left: 8px; padding: 10px 18px; border: none; border-radius: 20px; background: #075e54; color: #fff; cursor: pointer; }
+  /* ── Área da conversa ────────────────────────────────────── */
+  #conversa-atual { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #chat-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #f0f2f5; border-bottom: 1px solid #e9edef; }
+  #chat-header .nome { font-weight: 600; font-size: 15px; }
+  #chat-header .telefone { font-size: 12px; color: #667781; }
 
-  #vazio { display: flex; align-items: center; justify-content: center; flex: 1; color: #888; }
+  #mensagens {
+    flex: 1; overflow-y: auto; padding: 20px 8%;
+    background-color: #efeae2;
+    background-image: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.02));
+  }
+  .data-divisor { text-align: center; margin: 16px 0; }
+  .data-divisor span { background: #fff; padding: 5px 12px; border-radius: 8px; font-size: 12px; color: #54656f; box-shadow: 0 1px 1px rgba(0,0,0,0.08); }
+
+  .msg { max-width: 65%; margin-bottom: 8px; padding: 6px 9px 8px; border-radius: 8px; line-height: 1.4; font-size: 14.5px; box-shadow: 0 1px 1px rgba(0,0,0,0.08); position: relative; }
+  .msg.in { background: #fff; margin-right: auto; border-top-left-radius: 0; }
+  .msg.out { background: #d9fdd3; margin-left: auto; border-top-right-radius: 0; }
+  .msg img { max-width: 260px; border-radius: 6px; display: block; margin-bottom: 4px; }
+  .msg audio { display: block; margin-bottom: 4px; }
+  .msg video { max-width: 260px; border-radius: 6px; display: block; margin-bottom: 4px; }
+  .msg .texto { white-space: pre-wrap; word-break: break-word; }
+  .msg .hora { font-size: 11px; color: #667781; margin-top: 2px; text-align: right; }
+  .msg.out .hora { color: #4a8e3d; }
+
+  /* ── Composer ─────────────────────────────────────────────── */
+  #form-resposta { display: flex; gap: 8px; padding: 12px 16px; background: #f0f2f5; border-top: 1px solid #e9edef; }
+  #texto-resposta { flex: 1; padding: 11px 16px; border: none; border-radius: 22px; outline: none; font-size: 14.5px; }
+  #form-resposta button { padding: 0 22px; border: none; border-radius: 22px; background: #00a884; color: #fff; cursor: pointer; font-weight: 600; }
+  #form-resposta button:hover { background: #029873; }
+
+  #vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: #667781; background: #f8f9fa; gap: 8px; }
+  #vazio .icone { font-size: 64px; opacity: 0.3; }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="conversas">
-    <h2>Conversas</h2>
+    <div id="conversas-header">Conversas</div>
+    <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
     <div id="lista-conversas"></div>
   </div>
   <div id="conversa-atual" style="display:none;">
+    <div id="chat-header">
+      <div class="avatar" id="chat-avatar"></div>
+      <div>
+        <div class="nome" id="chat-nome"></div>
+        <div class="telefone" id="chat-telefone"></div>
+      </div>
+    </div>
     <div id="mensagens"></div>
     <form id="form-resposta">
       <input id="texto-resposta" placeholder="Digite uma mensagem..." autocomplete="off" />
       <button type="submit">Enviar</button>
     </form>
   </div>
-  <div id="vazio">Selecione uma conversa</div>
+  <div id="vazio">
+    <div class="icone">💬</div>
+    <div>Selecione uma conversa para começar</div>
+  </div>
 </div>
 
 <script>
 let telefoneAtual = null;
+let conversasCache = [];
+
+function iniciais(nomeOuTelefone) {
+  const s = (nomeOuTelefone || "").trim();
+  if (!s) return "?";
+  const partes = s.split(" ").filter(Boolean);
+  if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
+}
+
+function previewTexto(m) {
+  if (!m) return "";
+  const rotulos = { image: "📷 Foto", audio: "🎵 Áudio", video: "🎬 Vídeo", document: "📄 Documento" };
+  if (m.last_type && m.last_type !== "text") return rotulos[m.last_type] || m.last_body || `[${m.last_type}]`;
+  return m.last_body || "";
+}
+
+function formatarHoraCurta(ts) {
+  const d = new Date(ts);
+  const hoje = new Date();
+  const mesmoDia = d.toDateString() === hoje.toDateString();
+  if (mesmoDia) return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
 
 async function carregarConversas() {
   const res = await fetch("/painel/api/conversations");
-  const conversas = await res.json();
+  conversasCache = await res.json();
+  renderizarConversas();
+}
+
+function renderizarConversas() {
+  const filtro = document.getElementById("busca").value.trim().toLowerCase();
   const lista = document.getElementById("lista-conversas");
   lista.innerHTML = "";
-  for (const c of conversas) {
+  const filtradas = conversasCache.filter((c) =>
+    (c.name || "").toLowerCase().includes(filtro) || c.phone.includes(filtro)
+  );
+  for (const c of filtradas) {
     const div = document.createElement("div");
     div.className = "conversa" + (c.phone === telefoneAtual ? " ativa" : "");
-    div.innerHTML = `<div class="nome">${c.name || c.phone}</div><div class="telefone">${c.phone}</div>`;
+    div.innerHTML = `
+      <div class="avatar">${iniciais(c.name || c.phone)}</div>
+      <div class="conversa-info">
+        <div class="conversa-linha1">
+          <span class="conversa-nome">${escapeHtml(c.name || c.phone)}</span>
+          <span class="conversa-hora">${formatarHoraCurta(c.last_message_at)}</span>
+        </div>
+        <div class="conversa-preview">${escapeHtml(previewTexto(c))}</div>
+      </div>
+    `;
     div.onclick = () => selecionarConversa(c.phone);
     lista.appendChild(div);
   }
@@ -68,41 +152,69 @@ async function carregarConversas() {
 
 function selecionarConversa(phone) {
   telefoneAtual = phone;
+  const conversa = conversasCache.find((c) => c.phone === phone);
   document.getElementById("conversa-atual").style.display = "flex";
   document.getElementById("vazio").style.display = "none";
-  carregarConversas();
+  document.getElementById("chat-avatar").textContent = iniciais(conversa?.name || phone);
+  document.getElementById("chat-nome").textContent = conversa?.name || phone;
+  document.getElementById("chat-telefone").textContent = conversa?.name ? phone : "";
+  renderizarConversas();
   carregarMensagens();
 }
 
-function formatarHora(ts) {
-  return new Date(ts).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+function formatarHoraMsg(ts) {
+  return new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
+
+function formatarDivisorData(ts) {
+  const d = new Date(ts);
+  const hoje = new Date();
+  const ontem = new Date(hoje);
+  ontem.setDate(hoje.getDate() - 1);
+  if (d.toDateString() === hoje.toDateString()) return "Hoje";
+  if (d.toDateString() === ontem.toDateString()) return "Ontem";
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+const STATUS_LABEL = { sent: "enviada", delivered: "entregue", read: "lida", failed: "falhou" };
 
 async function carregarMensagens() {
   if (!telefoneAtual) return;
   const res = await fetch(`/painel/api/conversations/${encodeURIComponent(telefoneAtual)}/messages`);
   const mensagens = await res.json();
   const div = document.getElementById("mensagens");
-  const estavaNoFim = div.scrollTop + div.clientHeight >= div.scrollHeight - 20;
+  const estavaNoFim = div.scrollTop + div.clientHeight >= div.scrollHeight - 30;
+
   div.innerHTML = "";
+  let ultimaData = null;
   for (const m of mensagens) {
+    const diaAtual = new Date(m.created_at).toDateString();
+    if (diaAtual !== ultimaData) {
+      ultimaData = diaAtual;
+      const divisor = document.createElement("div");
+      divisor.className = "data-divisor";
+      divisor.innerHTML = `<span>${formatarDivisorData(m.created_at)}</span>`;
+      div.appendChild(divisor);
+    }
+
     const bolha = document.createElement("div");
     bolha.className = "msg " + m.direction;
 
     let conteudo = "";
     if (m.type === "image" && m.media_path) {
       conteudo = `<img src="${m.media_path}" />`;
-      if (m.body) conteudo += `<div>${escapeHtml(m.body)}</div>`;
+      if (m.body) conteudo += `<div class="texto">${escapeHtml(m.body)}</div>`;
     } else if (m.type === "audio" && m.media_path) {
       conteudo = `<audio controls src="${m.media_path}"></audio>`;
     } else if (m.type === "video" && m.media_path) {
-      conteudo = `<video controls src="${m.media_path}" style="max-width:240px;border-radius:6px;display:block;"></video>`;
-      if (m.body) conteudo += `<div>${escapeHtml(m.body)}</div>`;
+      conteudo = `<video controls src="${m.media_path}"></video>`;
+      if (m.body) conteudo += `<div class="texto">${escapeHtml(m.body)}</div>`;
     } else {
-      conteudo = escapeHtml(m.body || `[${m.type}]`);
+      conteudo = `<div class="texto">${escapeHtml(m.body || `[${m.type}]`)}</div>`;
     }
 
-    bolha.innerHTML = conteudo + `<div class="hora">${formatarHora(m.created_at)}${m.direction === "out" && m.status ? " · " + m.status : ""}</div>`;
+    const statusTxt = m.direction === "out" && m.status ? " · " + (STATUS_LABEL[m.status] || m.status) : "";
+    bolha.innerHTML = conteudo + `<div class="hora">${formatarHoraMsg(m.created_at)}${statusTxt}</div>`;
     div.appendChild(bolha);
   }
   if (estavaNoFim || mensagens.length) div.scrollTop = div.scrollHeight;
@@ -111,6 +223,8 @@ async function carregarMensagens() {
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
+
+document.getElementById("busca").addEventListener("input", renderizarConversas);
 
 document.getElementById("form-resposta").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -124,6 +238,7 @@ document.getElementById("form-resposta").addEventListener("submit", async (e) =>
     body: JSON.stringify({ text: texto }),
   });
   carregarMensagens();
+  carregarConversas();
 });
 
 carregarConversas();

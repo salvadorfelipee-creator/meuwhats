@@ -73,7 +73,13 @@ async function updateStatusByWaId(waMessageId, status) {
 
 async function listConversations() {
   await ready;
-  const result = await client.execute(`SELECT * FROM conversations ORDER BY last_message_at DESC`);
+  const result = await client.execute(`
+    SELECT c.*,
+      (SELECT type FROM messages m WHERE m.phone = c.phone ORDER BY m.created_at DESC LIMIT 1) AS last_type,
+      (SELECT body FROM messages m WHERE m.phone = c.phone ORDER BY m.created_at DESC LIMIT 1) AS last_body
+    FROM conversations c
+    ORDER BY c.last_message_at DESC
+  `);
   return result.rows;
 }
 
