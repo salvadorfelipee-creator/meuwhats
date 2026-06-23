@@ -17,6 +17,9 @@
   /* ── Sidebar ─────────────────────────────────────────────── */
   #conversas { width: 360px; background: #fff; border-right: 1px solid #e9edef; display: flex; flex-direction: column; flex-shrink: 0; }
   #conversas-header { padding: 16px; background: #075e54; color: #fff; font-size: 19px; font-weight: 600; }
+  #abas-numeros { display: flex; background: #075e54; padding: 0 8px; gap: 4px; }
+  .aba-numero { padding: 8px 14px; color: #cfe9e5; font-size: 13px; cursor: pointer; border-bottom: 3px solid transparent; }
+  .aba-numero.ativa { color: #fff; border-bottom-color: #00a884; font-weight: 600; }
   #busca-wrap { padding: 8px 12px; border-bottom: 1px solid #e9edef; }
   #busca { width: 100%; padding: 8px 12px; border: none; border-radius: 8px; background: #f0f2f5; outline: none; font-size: 14px; }
   #lista-conversas { overflow-y: auto; flex: 1; }
@@ -69,6 +72,7 @@
 <div id="app">
   <div id="conversas">
     <div id="conversas-header">Conversas</div>
+    <div id="abas-numeros"></div>
     <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
     <div id="lista-conversas"></div>
   </div>
@@ -95,6 +99,35 @@
 <script>
 let telefoneAtual = null;
 let conversasCache = [];
+let numeros = [];
+let numeroAtivoId = null;
+
+async function carregarNumeros() {
+  const res = await fetch("/painel/api/numbers");
+  numeros = await res.json();
+  if (!numeroAtivoId && numeros.length) numeroAtivoId = numeros[0].id;
+  renderizarAbas();
+}
+
+function renderizarAbas() {
+  const wrap = document.getElementById("abas-numeros");
+  wrap.innerHTML = "";
+  for (const n of numeros) {
+    const div = document.createElement("div");
+    div.className = "aba-numero" + (n.id === numeroAtivoId ? " ativa" : "");
+    div.textContent = n.label || n.id;
+    div.onclick = () => {
+      if (numeroAtivoId === n.id) return;
+      numeroAtivoId = n.id;
+      telefoneAtual = null;
+      document.getElementById("conversa-atual").style.display = "none";
+      document.getElementById("vazio").style.display = "flex";
+      renderizarAbas();
+      carregarConversas();
+    };
+    wrap.appendChild(div);
+  }
+}
 
 function iniciais(nomeOuTelefone) {
   const s = (nomeOuTelefone || "").trim();
@@ -120,7 +153,8 @@ function formatarHoraCurta(ts) {
 }
 
 async function carregarConversas() {
-  const res = await fetch("/painel/api/conversations");
+  if (!numeroAtivoId) return;
+  const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}`);
   conversasCache = await res.json();
   renderizarConversas();
 }
@@ -179,8 +213,8 @@ function formatarDivisorData(ts) {
 const STATUS_LABEL = { sent: "enviada", delivered: "entregue", read: "lida", failed: "falhou" };
 
 async function carregarMensagens() {
-  if (!telefoneAtual) return;
-  const res = await fetch(`/painel/api/conversations/${encodeURIComponent(telefoneAtual)}/messages`);
+  if (!telefoneAtual || !numeroAtivoId) return;
+  const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/${encodeURIComponent(telefoneAtual)}/messages`);
   const mensagens = await res.json();
   const div = document.getElementById("mensagens");
   const estavaNoFim = div.scrollTop + div.clientHeight >= div.scrollHeight - 30;
@@ -230,9 +264,9 @@ document.getElementById("form-resposta").addEventListener("submit", async (e) =>
   e.preventDefault();
   const input = document.getElementById("texto-resposta");
   const texto = input.value.trim();
-  if (!texto || !telefoneAtual) return;
+  if (!texto || !telefoneAtual || !numeroAtivoId) return;
   input.value = "";
-  await fetch(`/painel/api/conversations/${encodeURIComponent(telefoneAtual)}/reply`, {
+  await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/${encodeURIComponent(telefoneAtual)}/reply`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text: texto }),
@@ -241,7 +275,7 @@ document.getElementById("form-resposta").addEventListener("submit", async (e) =>
   carregarConversas();
 });
 
-carregarConversas();
+carregarNumeros().then(carregarConversas);
 setInterval(() => {
   carregarConversas();
   carregarMensagens();

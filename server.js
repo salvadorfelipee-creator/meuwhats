@@ -11,6 +11,12 @@ const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "meu_token_secreto";
 const PAINEL_USER = process.env.PAINEL_USER || "admin";
 const PAINEL_PASS = process.env.PAINEL_PASS || "admin";
 
+const PHONE_NUMBERS = process.env.PHONE_NUMBERS_JSON
+  ? JSON.parse(process.env.PHONE_NUMBERS_JSON)
+  : process.env.PHONE_NUMBER_ID
+  ? [{ id: process.env.PHONE_NUMBER_ID, label: "Principal" }]
+  : [];
+
 const MEDIA_DIR = path.join(__dirname, "media");
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
@@ -80,6 +86,7 @@ async function processarEntry(entry) {
       const value = change.value || {};
       const contatos = value.contacts || [];
       const mensagens = value.messages || [];
+      const businessNumberId = value.metadata?.phone_number_id;
 
       for (const msg of mensagens) {
         const de = msg.from;
@@ -87,10 +94,11 @@ async function processarEntry(entry) {
         const nome = contatos.find((c) => c.wa_id === de)?.profile?.name;
         const quando = Number(msg.timestamp) * 1000 || Date.now();
 
-        await db.upsertConversation(de, nome, quando);
+        await db.upsertConversation(de, businessNumberId, nome, quando);
 
         const base = {
           phone: de,
+          business_number_id: businessNumberId,
           direction: "in",
           wa_message_id: msg.id,
           created_at: quando,
@@ -169,34 +177,45 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, html, { "Content-Type": "text/html; charset=utf-8" });
     }
 
-    // GET /painel/api/conversations — lista de conversas
-    if (req.method === "GET" && path_ === "/painel/api/conversations") {
+    // GET /painel/api/numbers — lista de números configurados
+    if (req.method === "GET" && path_ === "/painel/api/numbers") {
       if (!requireAuth(req, res)) return;
-      return send(res, 200, await db.listConversations());
+      return send(res, 200, PHONE_NUMBERS);
     }
 
-    // GET /painel/api/conversations/:phone/messages — mensagens de uma conversa
-    const matchMessages = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/messages$/);
+    // GET /painel/api/conversations/:businessId — lista de conversas de um número
+    const matchConversations = path_.match(/^\/painel\/api\/conversations\/([^/]+)$/);
+    if (req.method === "GET" && matchConversations) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchConversations[1]);
+      return send(res, 200, await db.listConversations(businessId));
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/messages — mensagens de uma conversa
+    const matchMessages = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/messages$/);
     if (req.method === "GET" && matchMessages) {
       if (!requireAuth(req, res)) return;
-      const phone = decodeURIComponent(matchMessages[1]);
-      return send(res, 200, await db.listMessages(phone));
+      const businessId = decodeURIComponent(matchMessages[1]);
+      const phone = decodeURIComponent(matchMessages[2]);
+      return send(res, 200, await db.listMessages(phone, businessId));
     }
 
-    // POST /painel/api/conversations/:phone/reply — responder uma conversa
-    const matchReply = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/reply$/);
+    // POST /painel/api/conversations/:businessId/:phone/reply — responder uma conversa
+    const matchReply = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/reply$/);
     if (req.method === "POST" && matchReply) {
       if (!requireAuth(req, res)) return;
-      const phone = decodeURIComponent(matchReply[1]);
+      const businessId = decodeURIComponent(matchReply[1]);
+      const phone = decodeURIComponent(matchReply[2]);
       const body = await parseBody(req);
       if (!body.text || !body.text.trim()) return send(res, 400, { error: "Texto vazio" });
 
-      const result = await wa.sendText(phone, body.text);
+      const result = await wa.sendText(businessId, phone, body.text);
       const waId = result.messages?.[0]?.id || null;
       const now = Date.now();
-      await db.upsertConversation(phone, null, now);
+      await db.upsertConversation(phone, businessId, null, now);
       await db.insertMessage({
         phone,
+        business_number_id: businessId,
         direction: "out",
         type: "text",
         body: body.text,

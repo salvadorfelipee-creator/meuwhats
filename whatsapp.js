@@ -2,7 +2,6 @@ const https = require("https");
 
 const GRAPH_VERSION = "v21.0";
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
-const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
 
 function graphRequest(method, hostname, requestPath, { headers = {}, body } = {}) {
   return new Promise((resolve, reject) => {
@@ -33,11 +32,11 @@ function graphRequest(method, hostname, requestPath, { headers = {}, body } = {}
   });
 }
 
-async function sendText(to, text) {
+async function sendText(fromPhoneNumberId, to, text) {
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
-    `/${GRAPH_VERSION}/${PHONE_NUMBER_ID}/messages`,
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
     {
       body: {
         messaging_product: "whatsapp",

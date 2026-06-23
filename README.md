@@ -11,6 +11,7 @@ com um painel web simples para ver conversas, fotos, áudios e responder.
 - Baixa e guarda mídias localmente (pasta `media/`)
 - Guarda histórico (conversas e mensagens) no **Turso** (SQLite hospedado, gratuito)
 - Painel web em `/painel` (protegido por usuário/senha) para ver conversas e responder
+- Suporta **múltiplos números de WhatsApp Business** ao mesmo tempo, com abas no painel
 - Atualiza status de entrega/leitura das mensagens enviadas
 
 ⚠️ **Sobre mídias (fotos/áudios/vídeos)**: os arquivos em si ainda ficam só no disco local
@@ -27,7 +28,8 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `PORT`           | Porta do servidor                                       | `3000`                |
 | `VERIFY_TOKEN`   | Token de verificação do webhook (Meta)                  | `meu_token_secreto`  |
 | `ACCESS_TOKEN`   | Token de acesso da API do WhatsApp (permanente)         | —                     |
-| `PHONE_NUMBER_ID`| ID do número de telefone do WhatsApp Business            | —                     |
+| `PHONE_NUMBER_ID`| ID de um único número (use isso OU `PHONE_NUMBERS_JSON`) | —                     |
+| `PHONE_NUMBERS_JSON` | Lista de números em JSON: `[{"id":"123","label":"Principal"},{"id":"456","label":"Outro"}]` | —  |
 | `PAINEL_USER`    | Usuário para acessar o painel `/painel`                 | `admin`               |
 | `PAINEL_PASS`    | Senha para acessar o painel `/painel`                   | `admin`               |
 | `TURSO_DATABASE_URL` | URL do banco no Turso (turso.tech)                  | —                     |
@@ -68,12 +70,13 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 
 ## Rotas
 
-| Rota                                              | Descrição                                  |
-|----------------------------------------------------|---------------------------------------------|
-| `GET /webhook`                                      | Verificação do Meta                         |
-| `POST /webhook`                                     | Recebe mensagens/status                     |
-| `GET /painel`                                       | Painel web (auth)                           |
-| `GET /painel/api/conversations`                     | Lista conversas (auth)                      |
-| `GET /painel/api/conversations/:phone/messages`     | Mensagens de uma conversa (auth)            |
-| `POST /painel/api/conversations/:phone/reply`       | Envia resposta de texto (auth)              |
-| `GET /media/:arquivo`                               | Serve uma mídia salva (auth)                |
+| Rota                                                          | Descrição                                  |
+|----------------------------------------------------------------|---------------------------------------------|
+| `GET /webhook`                                                  | Verificação do Meta                         |
+| `POST /webhook`                                                 | Recebe mensagens/status                     |
+| `GET /painel`                                                   | Painel web (auth)                           |
+| `GET /painel/api/numbers`                                       | Lista números configurados (auth)           |
+| `GET /painel/api/conversations/:businessId`                     | Lista conversas de um número (auth)         |
+| `GET /painel/api/conversations/:businessId/:phone/messages`     | Mensagens de uma conversa (auth)            |
+| `POST /painel/api/conversations/:businessId/:phone/reply`       | Envia resposta de texto (auth)              |
+| `GET /media/:arquivo`                                           | Serve uma mídia salva (auth)                |
