@@ -1,8 +1,8 @@
-const Database = require("better-sqlite3");
+const { DatabaseSync } = require("node:sqlite");
 const path = require("path");
 
-const db = new Database(path.join(__dirname, "data.db"));
-db.pragma("journal_mode = WAL");
+const db = new DatabaseSync(path.join(__dirname, "data.db"));
+db.exec("PRAGMA journal_mode = WAL");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS conversations (
@@ -39,19 +39,24 @@ function upsertConversation(phone, name, when) {
 }
 
 function insertMessage(msg) {
-  const info = db
+  const {
+    phone,
+    direction,
+    type,
+    body = null,
+    media_path = null,
+    media_mime = null,
+    status = null,
+    wa_message_id = null,
+    created_at,
+  } = msg;
+  const result = db
     .prepare(
       `INSERT INTO messages (phone, direction, type, body, media_path, media_mime, status, wa_message_id, created_at)
-       VALUES (@phone, @direction, @type, @body, @media_path, @media_mime, @status, @wa_message_id, @created_at)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run({
-      media_path: null,
-      media_mime: null,
-      status: null,
-      wa_message_id: null,
-      ...msg,
-    });
-  return info.lastInsertRowid;
+    .run(phone, direction, type, body, media_path, media_mime, status, wa_message_id, created_at);
+  return result.lastInsertRowid;
 }
 
 function updateStatusByWaId(waMessageId, status) {
