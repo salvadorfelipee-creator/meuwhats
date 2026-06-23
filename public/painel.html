@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Painel WhatsApp</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #f0f2f5; }
+  #app { display: flex; height: 100vh; }
+
+  #conversas { width: 320px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; flex-shrink: 0; }
+  #conversas h2 { padding: 16px; margin: 0; background: #075e54; color: #fff; font-size: 18px; }
+  .conversa { padding: 12px 16px; border-bottom: 1px solid #eee; cursor: pointer; }
+  .conversa:hover { background: #f5f5f5; }
+  .conversa.ativa { background: #e8f5e9; }
+  .conversa .nome { font-weight: 600; }
+  .conversa .telefone { font-size: 12px; color: #666; }
+
+  #conversa-atual { flex: 1; display: flex; flex-direction: column; }
+  #mensagens { flex: 1; overflow-y: auto; padding: 16px; background: #ece5dd; }
+  .msg { max-width: 60%; margin-bottom: 10px; padding: 8px 12px; border-radius: 8px; line-height: 1.4; }
+  .msg.in { background: #fff; margin-right: auto; }
+  .msg.out { background: #d9fdd3; margin-left: auto; }
+  .msg img { max-width: 240px; border-radius: 6px; display: block; }
+  .msg audio { display: block; }
+  .msg .hora { font-size: 11px; color: #888; margin-top: 4px; text-align: right; }
+
+  #form-resposta { display: flex; padding: 12px; background: #fff; border-top: 1px solid #ddd; }
+  #texto-resposta { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+  #form-resposta button { margin-left: 8px; padding: 10px 18px; border: none; border-radius: 20px; background: #075e54; color: #fff; cursor: pointer; }
+
+  #vazio { display: flex; align-items: center; justify-content: center; flex: 1; color: #888; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="conversas">
+    <h2>Conversas</h2>
+    <div id="lista-conversas"></div>
+  </div>
+  <div id="conversa-atual" style="display:none;">
+    <div id="mensagens"></div>
+    <form id="form-resposta">
+      <input id="texto-resposta" placeholder="Digite uma mensagem..." autocomplete="off" />
+      <button type="submit">Enviar</button>
+    </form>
+  </div>
+  <div id="vazio">Selecione uma conversa</div>
+</div>
+
+<script>
+let telefoneAtual = null;
+
+async function carregarConversas() {
+  const res = await fetch("/painel/api/conversations");
+  const conversas = await res.json();
+  const lista = document.getElementById("lista-conversas");
+  lista.innerHTML = "";
+  for (const c of conversas) {
+    const div = document.createElement("div");
+    div.className = "conversa" + (c.phone === telefoneAtual ? " ativa" : "");
+    div.innerHTML = `<div class="nome">${c.name || c.phone}</div><div class="telefone">${c.phone}</div>`;
+    div.onclick = () => selecionarConversa(c.phone);
+    lista.appendChild(div);
+  }
+}
+
+function selecionarConversa(phone) {
+  telefoneAtual = phone;
+  document.getElementById("conversa-atual").style.display = "flex";
+  document.getElementById("vazio").style.display = "none";
+  carregarConversas();
+  carregarMensagens();
+}
+
+function formatarHora(ts) {
+  return new Date(ts).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+async function carregarMensagens() {
+  if (!telefoneAtual) return;
+  const res = await fetch(`/painel/api/conversations/${encodeURIComponent(telefoneAtual)}/messages`);
+  const mensagens = await res.json();
+  const div = document.getElementById("mensagens");
+  const estavaNoFim = div.scrollTop + div.clientHeight >= div.scrollHeight - 20;
+  div.innerHTML = "";
+  for (const m of mensagens) {
+    const bolha = document.createElement("div");
+    bolha.className = "msg " + m.direction;
+
+    let conteudo = "";
+    if (m.type === "image" && m.media_path) {
+      conteudo = `<img src="${m.media_path}" />`;
+      if (m.body) conteudo += `<div>${escapeHtml(m.body)}</div>`;
+    } else if (m.type === "audio" && m.media_path) {
+      conteudo = `<audio controls src="${m.media_path}"></audio>`;
+    } else {
+      conteudo = escapeHtml(m.body || `[${m.type}]`);
+    }
+
+    bolha.innerHTML = conteudo + `<div class="hora">${formatarHora(m.created_at)}${m.direction === "out" && m.status ? " · " + m.status : ""}</div>`;
+    div.appendChild(bolha);
+  }
+  if (estavaNoFim || mensagens.length) div.scrollTop = div.scrollHeight;
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+document.getElementById("form-resposta").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("texto-resposta");
+  const texto = input.value.trim();
+  if (!texto || !telefoneAtual) return;
+  input.value = "";
+  await fetch(`/painel/api/conversations/${encodeURIComponent(telefoneAtual)}/reply`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text: texto }),
+  });
+  carregarMensagens();
+});
+
+carregarConversas();
+setInterval(() => {
+  carregarConversas();
+  carregarMensagens();
+}, 5000);
+</script>
+</body>
+</html>
