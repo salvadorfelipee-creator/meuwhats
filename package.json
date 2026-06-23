@@ -1,0 +1,12 @@
+{
+  "name": "whatsapp-webhook",
+  "version": "1.0.0",
+  "description": "Webhook mínimo para API oficial do WhatsApp (Meta)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
