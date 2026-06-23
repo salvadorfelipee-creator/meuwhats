@@ -7,16 +7,16 @@ com um painel web simples para ver conversas, fotos, áudios e responder.
 
 ## Funcionalidades
 
-- Recebe mensagens (texto, imagem, áudio, documento) via webhook
+- Recebe mensagens (texto, imagem, áudio, vídeo, documento) via webhook
 - Baixa e guarda mídias localmente (pasta `media/`)
-- Guarda histórico em SQLite (`data.db`)
+- Guarda histórico (conversas e mensagens) no **Turso** (SQLite hospedado, gratuito)
 - Painel web em `/painel` (protegido por usuário/senha) para ver conversas e responder
 - Atualiza status de entrega/leitura das mensagens enviadas
 
-⚠️ **Importante sobre o histórico**: o arquivo `data.db` e a pasta `media/` ficam no disco
-local do servidor. No plano free do Render, esse disco **não é garantido como permanente** —
-pode ser perdido quando o serviço reinicia ou é redeployado. Para histórico realmente
-permanente seria necessário um banco de dados externo (ex: Render PostgreSQL).
+⚠️ **Sobre mídias (fotos/áudios/vídeos)**: os arquivos em si ainda ficam só no disco local
+do servidor (pasta `media/`), que no plano free do Render não é permanente — podem ser
+perdidos se o serviço reiniciar/redeployar. O **texto e os metadados** das conversas,
+porém, ficam seguros no Turso, independente de reinícios.
 
 ---
 
@@ -30,6 +30,8 @@ permanente seria necessário um banco de dados externo (ex: Render PostgreSQL).
 | `PHONE_NUMBER_ID`| ID do número de telefone do WhatsApp Business            | —                     |
 | `PAINEL_USER`    | Usuário para acessar o painel `/painel`                 | `admin`               |
 | `PAINEL_PASS`    | Senha para acessar o painel `/painel`                   | `admin`               |
+| `TURSO_DATABASE_URL` | URL do banco no Turso (turso.tech)                  | —                     |
+| `TURSO_AUTH_TOKEN`   | Token de autenticação do banco no Turso             | —                     |
 
 ⚠️ Defina `PAINEL_USER`/`PAINEL_PASS` com valores próprios — o painel mostra suas conversas.
 

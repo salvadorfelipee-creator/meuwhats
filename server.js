@@ -87,7 +87,7 @@ async function processarEntry(entry) {
         const nome = contatos.find((c) => c.wa_id === de)?.profile?.name;
         const quando = Number(msg.timestamp) * 1000 || Date.now();
 
-        db.upsertConversation(de, nome, quando);
+        await db.upsertConversation(de, nome, quando);
 
         const base = {
           phone: de,
@@ -98,7 +98,7 @@ async function processarEntry(entry) {
         };
 
         if (tipo === "text") {
-          db.insertMessage({ ...base, type: "text", body: msg.text?.body });
+          await db.insertMessage({ ...base, type: "text", body: msg.text?.body });
         } else if (tipo === "image" || tipo === "audio" || tipo === "video" || tipo === "document") {
           const media = msg[tipo];
           try {
@@ -106,7 +106,7 @@ async function processarEntry(entry) {
             const ext = EXT_BY_MIME[mimeType] || "bin";
             const filename = safeFilename(msg.id, ext);
             fs.writeFileSync(path.join(MEDIA_DIR, filename), buffer);
-            db.insertMessage({
+            await db.insertMessage({
               ...base,
               type: tipo,
               body: media.caption || null,
@@ -115,17 +115,17 @@ async function processarEntry(entry) {
             });
           } catch (err) {
             console.error("Erro ao baixar mídia:", err.message);
-            db.insertMessage({ ...base, type: tipo, body: "[mídia indisponível]" });
+            await db.insertMessage({ ...base, type: tipo, body: "[mídia indisponível]" });
           }
         } else {
-          db.insertMessage({ ...base, type: tipo, body: `[mensagem do tipo ${tipo}]` });
+          await db.insertMessage({ ...base, type: tipo, body: `[mensagem do tipo ${tipo}]` });
         }
 
         console.log(`📩 [${new Date(quando).toLocaleString("pt-BR")}] ${de} (${tipo})`);
       }
 
       for (const status of value.statuses || []) {
-        db.updateStatusByWaId(status.id, status.status);
+        await db.updateStatusByWaId(status.id, status.status);
         console.log(`✅ Status: ${status.status} — para ${status.recipient_id}`);
       }
     }
@@ -172,7 +172,7 @@ const server = http.createServer(async (req, res) => {
     // GET /painel/api/conversations — lista de conversas
     if (req.method === "GET" && path_ === "/painel/api/conversations") {
       if (!requireAuth(req, res)) return;
-      return send(res, 200, db.listConversations());
+      return send(res, 200, await db.listConversations());
     }
 
     // GET /painel/api/conversations/:phone/messages — mensagens de uma conversa
@@ -180,7 +180,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && matchMessages) {
       if (!requireAuth(req, res)) return;
       const phone = decodeURIComponent(matchMessages[1]);
-      return send(res, 200, db.listMessages(phone));
+      return send(res, 200, await db.listMessages(phone));
     }
 
     // POST /painel/api/conversations/:phone/reply — responder uma conversa
@@ -194,8 +194,8 @@ const server = http.createServer(async (req, res) => {
       const result = await wa.sendText(phone, body.text);
       const waId = result.messages?.[0]?.id || null;
       const now = Date.now();
-      db.upsertConversation(phone, null, now);
-      db.insertMessage({
+      await db.upsertConversation(phone, null, now);
+      await db.insertMessage({
         phone,
         direction: "out",
         type: "text",
