@@ -5,16 +5,70 @@ const client = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
-const ready = client.batch(
-  [
-    `CREATE TABLE IF NOT EXISTS conversations (
+function defaultBusinessNumberId() {
+  if (process.env.PHONE_NUMBERS_JSON) {
+    const list = JSON.parse(process.env.PHONE_NUMBERS_JSON);
+    if (list[0]?.id) return list[0].id;
+  }
+  return process.env.PHONE_NUMBER_ID || "";
+}
+
+async function migrarTabelaLegada(tabela, colunasOriginais, criarNova, colunasParaCopiar) {
+  const info = await client.execute(`PRAGMA table_info(${tabela})`);
+  const colunas = info.rows.map((r) => r.name);
+  if (colunas.length === 0 || colunas.includes("business_number_id")) return;
+
+  const legada = `${tabela}_legado`;
+  await client.execute(`ALTER TABLE ${tabela} RENAME TO ${legada}`);
+  await client.execute(criarNova);
+  await client.execute({
+    sql: `INSERT INTO ${tabela} (${colunasParaCopiar.join(", ")})
+          SELECT ${colunasParaCopiar.map((c) => (c === "business_number_id" ? "?" : c)).join(", ")}
+          FROM ${legada}`,
+    args: [defaultBusinessNumberId()],
+  });
+  await client.execute(`DROP TABLE ${legada}`);
+}
+
+const ready = (async () => {
+  await client.execute(`CREATE TABLE IF NOT EXISTS conversations (
+    phone TEXT NOT NULL,
+    business_number_id TEXT NOT NULL,
+    name TEXT,
+    last_message_at INTEGER,
+    PRIMARY KEY (phone, business_number_id)
+  )`);
+  await client.execute(`CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    business_number_id TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    type TEXT NOT NULL,
+    body TEXT,
+    media_path TEXT,
+    media_mime TEXT,
+    status TEXT,
+    wa_message_id TEXT,
+    created_at INTEGER NOT NULL
+  )`);
+
+  await migrarTabelaLegada(
+    "conversations",
+    [],
+    `CREATE TABLE conversations (
       phone TEXT NOT NULL,
       business_number_id TEXT NOT NULL,
       name TEXT,
       last_message_at INTEGER,
       PRIMARY KEY (phone, business_number_id)
     )`,
-    `CREATE TABLE IF NOT EXISTS messages (
+    ["phone", "business_number_id", "name", "last_message_at"]
+  );
+
+  await migrarTabelaLegada(
+    "messages",
+    [],
+    `CREATE TABLE messages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       phone TEXT NOT NULL,
       business_number_id TEXT NOT NULL,
@@ -27,11 +81,12 @@ const ready = client.batch(
       wa_message_id TEXT,
       created_at INTEGER NOT NULL
     )`,
-    `CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone, business_number_id)`,
-    `CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_message_id)`,
-  ],
-  "write"
-);
+    ["phone", "business_number_id", "direction", "type", "body", "media_path", "media_mime", "status", "wa_message_id", "created_at"]
+  );
+
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone, business_number_id)`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_message_id)`);
+})();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
   await ready;
