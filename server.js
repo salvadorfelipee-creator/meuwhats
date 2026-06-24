@@ -311,6 +311,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 404, "Not found");
     }
 
+    // GET /privacidade — política de privacidade (pública, sem auth)
+    if (req.method === "GET" && path_ === "/privacidade") {
+      const html = fs.readFileSync(path.join(__dirname, "public", "privacidade.html"));
+      return send(res, 200, html, { "Content-Type": "text/html; charset=utf-8" });
+    }
+
     // GET /painel — página do painel
     if (req.method === "GET" && path_ === "/painel") {
       if (!requireAuth(req, res)) return;
