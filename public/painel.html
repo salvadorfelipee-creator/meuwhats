@@ -95,6 +95,7 @@
       </span>
     </div>
     <div id="abas-numeros"></div>
+    <div id="instagram-perfil" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #e9edef; font-size:13px; color:#54656f;"></div>
     <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
     <div id="lista-conversas"></div>
   </div>
@@ -370,7 +371,23 @@ document.getElementById("massa-enviar").addEventListener("click", async () => {
   carregarConversas();
 });
 
+async function carregarPerfilInstagram() {
+  const div = document.getElementById("instagram-perfil");
+  try {
+    const res = await fetch("/painel/api/instagram/perfil");
+    const perfil = await res.json();
+    if (!perfil.username) return;
+    div.innerHTML = `
+      <img src="${perfil.profile_picture_url}" style="width:24px;height:24px;border-radius:50%;" />
+      <span>Instagram conectado: <strong>@${escapeHtml(perfil.username)}</strong> (${escapeHtml(perfil.account_type || "")})</span>
+    `;
+  } catch {
+    // sem Instagram configurado ainda — não mostra nada
+  }
+}
+
 carregarNumeros().then(carregarConversas);
+carregarPerfilInstagram();
 setInterval(() => {
   carregarConversas();
   carregarMensagens();

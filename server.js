@@ -422,6 +422,16 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { resultados });
     }
 
+    // GET /painel/api/instagram/perfil — perfil do Instagram conectado
+    if (req.method === "GET" && path_ === "/painel/api/instagram/perfil") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await ig.getPerfil());
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // POST /painel/api/instagram/reset-boasvindas — limpa quem já recebeu boas-vindas (uso em testes)
     if (req.method === "POST" && path_ === "/painel/api/instagram/reset-boasvindas") {
       if (!requireAuth(req, res)) return;

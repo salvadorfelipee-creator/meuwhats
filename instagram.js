@@ -32,6 +32,15 @@ function graphRequest(method, requestPath, body) {
   });
 }
 
+async function getPerfil() {
+  const { status, json } = await graphRequest(
+    "GET",
+    `/${GRAPH_VERSION}/${ACCOUNT_ID}?fields=username,account_type,profile_picture_url`
+  );
+  if (status >= 400) throw new Error(`Falha ao obter perfil do Instagram: ${JSON.stringify(json)}`);
+  return json;
+}
+
 async function sendDM(recipientId, text) {
   const { status, json } = await graphRequest("POST", `/${GRAPH_VERSION}/${ACCOUNT_ID}/messages`, {
     recipient: { id: recipientId },
@@ -41,4 +50,4 @@ async function sendDM(recipientId, text) {
   return json;
 }
 
-module.exports = { sendDM };
+module.exports = { sendDM, getPerfil };
