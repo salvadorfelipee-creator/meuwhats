@@ -79,6 +79,39 @@ function safeFilename(waMessageId, ext) {
   return `${safe}.${ext}`;
 }
 
+function normalizar(s) {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+// Respostas automáticas para os botões de resposta rápida do template aviso_taxa_clt
+const RESPOSTAS_BOTAO = {
+  "quero saber mais":
+    "Para simular o consignado CLT precisamos de alguns dados para gerar a autorização, após enviar é só aguardar que um atendente irá vir te atender. Enquanto aguarda, visite nosso site www.felizcred.com.br",
+  "nao quero receber mais":
+    "Não iremos mais enviar mensagem e fique à vontade para nos chamar quando precisar!",
+};
+
+async function enviarRespostaAutomatica(businessNumberId, phone, texto) {
+  const result = await wa.sendText(businessNumberId, phone, texto);
+  const waId = result.messages?.[0]?.id || null;
+  const now = Date.now();
+  await db.upsertConversation(phone, businessNumberId, null, now);
+  await db.insertMessage({
+    phone,
+    business_number_id: businessNumberId,
+    direction: "out",
+    type: "text",
+    body: texto,
+    wa_message_id: waId,
+    status: "sent",
+    created_at: now,
+  });
+}
+
 // ─── PROCESSAR MENSAGENS RECEBIDAS ───────────────────────────────────────────
 async function processarEntry(entry) {
   for (const e of entry) {
@@ -107,6 +140,17 @@ async function processarEntry(entry) {
 
         if (tipo === "text") {
           await db.insertMessage({ ...base, type: "text", body: msg.text?.body });
+        } else if (tipo === "button") {
+          const textoBotao = msg.button?.text || msg.button?.payload || "";
+          await db.insertMessage({ ...base, type: "button", body: textoBotao });
+          const resposta = RESPOSTAS_BOTAO[normalizar(textoBotao)];
+          if (resposta) {
+            try {
+              await enviarRespostaAutomatica(businessNumberId, de, resposta);
+            } catch (err) {
+              console.error("Erro ao enviar resposta automática:", err.message);
+            }
+          }
         } else if (tipo === "image" || tipo === "audio" || tipo === "video" || tipo === "document") {
           const media = msg[tipo];
           try {
