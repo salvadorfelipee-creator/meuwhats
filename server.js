@@ -416,6 +416,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { resultados });
     }
 
+    // POST /painel/api/instagram/reset-boasvindas — limpa quem já recebeu boas-vindas (uso em testes)
+    if (req.method === "POST" && path_ === "/painel/api/instagram/reset-boasvindas") {
+      if (!requireAuth(req, res)) return;
+      const removidos = await db.instagramLimparSaudados();
+      return send(res, 200, { ok: true, removidos });
+    }
+
     // GET /media/:filename — servir arquivo de mídia
     const matchMedia = path_.match(/^\/media\/([a-zA-Z0-9_.-]+)$/);
     if (req.method === "GET" && matchMedia) {

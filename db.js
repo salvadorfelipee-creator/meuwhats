@@ -183,6 +183,12 @@ async function instagramMarcarSaudado(userId) {
   });
 }
 
+async function instagramLimparSaudados() {
+  await ready;
+  const result = await client.execute(`DELETE FROM instagram_dm_contacts`);
+  return result.rowsAffected;
+}
+
 module.exports = {
   upsertConversation,
   insertMessage,
@@ -191,4 +197,5 @@ module.exports = {
   listMessages,
   instagramJaFoiSaudado,
   instagramMarcarSaudado,
+  instagramLimparSaudados,
 };
