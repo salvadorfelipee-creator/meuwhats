@@ -66,12 +66,30 @@
 
   #vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: #667781; background: #f8f9fa; gap: 8px; }
   #vazio .icone { font-size: 64px; opacity: 0.3; }
+
+  /* ── Envio em massa ──────────────────────────────────────── */
+  #btn-massa { background: transparent; border: none; color: #fff; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  #btn-massa:hover { background: rgba(255,255,255,0.15); }
+  #modal-massa { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 10; }
+  .modal-conteudo { background: #fff; border-radius: 10px; padding: 20px 24px; width: 480px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
+  .modal-conteudo h3 { margin: 0 0 14px; }
+  .modal-conteudo label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+  .modal-conteudo input, .modal-conteudo textarea { width: 100%; padding: 8px 10px; border: 1px solid #d1d7db; border-radius: 6px; font-size: 13.5px; font-family: inherit; resize: vertical; }
+  .modal-conteudo textarea { min-height: 70px; }
+  .modal-botoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .modal-botoes button { padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  #massa-cancelar { background: #f0f2f5; }
+  #massa-enviar { background: #00a884; color: #fff; }
+  #massa-resultado { margin-top: 12px; font-size: 13px; color: #54656f; }
 </style>
 </head>
 <body>
 <div id="app">
   <div id="conversas">
-    <div id="conversas-header">Conversas</div>
+    <div id="conversas-header" style="display:flex; align-items:center; justify-content:space-between;">
+      <span>Conversas</span>
+      <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
+    </div>
     <div id="abas-numeros"></div>
     <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
     <div id="lista-conversas"></div>
@@ -93,6 +111,25 @@
   <div id="vazio">
     <div class="icone">💬</div>
     <div>Selecione uma conversa para começar</div>
+  </div>
+</div>
+
+<div id="modal-massa">
+  <div class="modal-conteudo">
+    <h3>Envio em massa (template)</h3>
+    <label>Nome do template (aprovado na Meta)</label>
+    <input id="massa-template" value="aviso_taxa_clt" />
+    <label>Idioma</label>
+    <input id="massa-idioma" value="pt_BR" />
+    <label>Texto do template — use {{1}} onde fica o nome (só para guardar no histórico, não é enviado)</label>
+    <textarea id="massa-preview">Olá {{1}}! Temos uma novidade para você: a taxa para CLT mudou para 3,98%. Fale com a gente para saber mais.</textarea>
+    <label>Contatos — um por linha: telefone,nome (nome é opcional)</label>
+    <textarea id="massa-contatos" placeholder="5511999999999,João&#10;5511888888888"></textarea>
+    <div class="modal-botoes">
+      <button id="massa-cancelar" type="button">Cancelar</button>
+      <button id="massa-enviar" type="button">Enviar</button>
+    </div>
+    <div id="massa-resultado"></div>
   </div>
 </div>
 
@@ -272,6 +309,50 @@ document.getElementById("form-resposta").addEventListener("submit", async (e) =>
     body: JSON.stringify({ text: texto }),
   });
   carregarMensagens();
+  carregarConversas();
+});
+
+document.getElementById("btn-massa").addEventListener("click", () => {
+  document.getElementById("massa-resultado").textContent = "";
+  document.getElementById("modal-massa").style.display = "flex";
+});
+
+document.getElementById("massa-cancelar").addEventListener("click", () => {
+  document.getElementById("modal-massa").style.display = "none";
+});
+
+document.getElementById("massa-enviar").addEventListener("click", async () => {
+  const template = document.getElementById("massa-template").value.trim();
+  const idioma = document.getElementById("massa-idioma").value.trim() || "pt_BR";
+  const bodyPreview = document.getElementById("massa-preview").value;
+  const linhas = document.getElementById("massa-contatos").value.split("\n").map((l) => l.trim()).filter(Boolean);
+  const contacts = linhas.map((l) => {
+    const [phone, name] = l.split(",").map((s) => (s || "").trim());
+    return { phone, name };
+  });
+
+  const resDiv = document.getElementById("massa-resultado");
+  if (!template || !numeroAtivoId || !contacts.length) {
+    resDiv.textContent = "Preencha o template e ao menos um contato.";
+    return;
+  }
+
+  resDiv.textContent = `Enviando para ${contacts.length} contato(s)...`;
+  const res = await fetch(`/painel/api/broadcast/${encodeURIComponent(numeroAtivoId)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ template, language: idioma, contacts, bodyPreview }),
+  });
+  const data = await res.json();
+  if (data.error) {
+    resDiv.textContent = data.error;
+    return;
+  }
+  const resultados = data.resultados || [];
+  const sucesso = resultados.filter((r) => r.ok).length;
+  const falhas = resultados.filter((r) => !r.ok);
+  resDiv.innerHTML = `${sucesso} enviada(s) com sucesso.` +
+    (falhas.length ? `<br>${falhas.length} falharam: ` + falhas.map((f) => `${escapeHtml(f.phone)} (${escapeHtml(f.error || "")})`).join(", ") : "");
   carregarConversas();
 });
 

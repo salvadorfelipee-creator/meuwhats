@@ -13,6 +13,7 @@ com um painel web simples para ver conversas, fotos, áudios e responder.
 - Painel web em `/painel` (protegido por usuário/senha) para ver conversas e responder
 - Suporta **múltiplos números de WhatsApp Business** ao mesmo tempo, com abas no painel
 - Atualiza status de entrega/leitura das mensagens enviadas
+- Envio em massa via **Template de Mensagem** (botão 📢 no painel), para contatos que ainda não conversaram
 
 ⚠️ **Sobre mídias (fotos/áudios/vídeos)**: os arquivos em si ainda ficam só no disco local
 do servidor (pasta `media/`), que no plano free do Render não é permanente — podem ser
@@ -93,6 +94,38 @@ uma variável de ambiente — nenhuma mudança de código é necessária.
 
 ---
 
+## Envio em massa (Template de Mensagem)
+
+A API oficial do WhatsApp **não permite texto livre para quem não te escreveu nas últimas 24h**.
+Para avisar uma lista de contatos novos (ex: divulgar uma taxa, promoção etc.), é preciso usar
+um **Template de Mensagem** pré-aprovado pela Meta.
+
+### 1. Criar o template na Meta
+
+No Gerenciador do WhatsApp (business.facebook.com → Contas do WhatsApp → escolha a conta →
+**Modelos de mensagem** → Criar modelo):
+
+- **Categoria**: Marketing (mais barata que Utilidade/Autenticação)
+- **Nome**: ex. `aviso_taxa_clt` (sem espaços, minúsculo)
+- **Idioma**: Português (BR)
+- **Corpo**: ex. `Olá {{1}}! Temos uma novidade para você: a taxa para CLT mudou para 3,98%. Fale com a gente para saber mais.`
+- Envie para aprovação (geralmente minutos a algumas horas)
+
+### 2. Usar no painel
+
+1. Escolha a aba do número que vai enviar
+2. Clique no botão 📢 (canto superior da lista de conversas)
+3. Preencha: nome do template, idioma, o texto do template (com `{{1}}` no lugar do nome —
+   isso é só para salvar bonito no histórico, não é enviado de novo) e a lista de contatos,
+   um por linha, no formato `telefone,nome` (nome é opcional)
+4. Clique em **Enviar** — o sistema manda um a um (com uma pequena pausa entre cada) e mostra
+   quantos enviaram com sucesso e quais falharam
+
+⚠️ Cada número de WhatsApp Business tem um **limite diário de mensagens iniciadas** (cresce
+conforme a "qualidade"/uso do número — começa em 250/dia). Evite listas gigantes de uma vez só.
+
+---
+
 ## Estado atual do projeto (resumo)
 
 - Backend Node puro (`server.js`) + `db.js` (Turso) + `whatsapp.js` (chamadas à Graph API)
@@ -100,6 +133,7 @@ uma variável de ambiente — nenhuma mudança de código é necessária.
 - Histórico de conversas no **Turso** (permanente); mídias (fotos/áudios/vídeos) só no disco
   do Render (não permanente — ver aviso acima)
 - Dois números WhatsApp Business conectados, com abas no painel
+- Envio em massa via template implementado (botão 📢 no painel)
 - Pendente/possível próximo passo: mensagem automática com botões para conversas inativas
   há mais de 24h (ainda não implementada — decisão de igual/diferente por número em aberto)
 
@@ -137,4 +171,5 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `GET /painel/api/conversations/:businessId`                     | Lista conversas de um número (auth)         |
 | `GET /painel/api/conversations/:businessId/:phone/messages`     | Mensagens de uma conversa (auth)            |
 | `POST /painel/api/conversations/:businessId/:phone/reply`       | Envia resposta de texto (auth)              |
+| `POST /painel/api/broadcast/:businessId`                        | Envio em massa via template (auth)          |
 | `GET /media/:arquivo`                                           | Serve uma mídia salva (auth)                |

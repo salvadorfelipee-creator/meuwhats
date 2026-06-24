@@ -226,6 +226,55 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // POST /painel/api/broadcast/:businessId — envio em massa via template
+    const matchBroadcast = path_.match(/^\/painel\/api\/broadcast\/([^/]+)$/);
+    if (req.method === "POST" && matchBroadcast) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchBroadcast[1]);
+      const body = await parseBody(req);
+      const { template, language, contacts, bodyPreview } = body;
+      if (!template || !Array.isArray(contacts) || !contacts.length) {
+        return send(res, 400, { error: "Informe o template e ao menos um contato" });
+      }
+
+      const resultados = [];
+      for (const contato of contacts) {
+        const phone = (contato.phone || "").replace(/\D/g, "");
+        const nome = (contato.name || "").trim();
+        if (!phone) {
+          resultados.push({ phone: contato.phone || "", ok: false, error: "telefone inválido" });
+          continue;
+        }
+        try {
+          const components = nome
+            ? [{ type: "body", parameters: [{ type: "text", text: nome }] }]
+            : undefined;
+          const result = await wa.sendTemplate(businessId, phone, template, language || "pt_BR", components);
+          const waId = result.messages?.[0]?.id || null;
+          const now = Date.now();
+          const texto = bodyPreview
+            ? bodyPreview.replace(/\{\{1\}\}/g, nome || "Cliente")
+            : `[template] ${template}`;
+          await db.upsertConversation(phone, businessId, nome || null, now);
+          await db.insertMessage({
+            phone,
+            business_number_id: businessId,
+            direction: "out",
+            type: "template",
+            body: texto,
+            wa_message_id: waId,
+            status: "sent",
+            created_at: now,
+          });
+          resultados.push({ phone, ok: true });
+        } catch (err) {
+          resultados.push({ phone, ok: false, error: err.message });
+        }
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      return send(res, 200, { resultados });
+    }
+
     // GET /media/:filename — servir arquivo de mídia
     const matchMedia = path_.match(/^\/media\/([a-zA-Z0-9_.-]+)$/);
     if (req.method === "GET" && matchMedia) {

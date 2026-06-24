@@ -51,6 +51,29 @@ async function sendText(fromPhoneNumberId, to, text) {
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, components) {
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        to,
+        type: "template",
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          ...(components ? { components } : {}),
+        },
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao enviar template: ${JSON.stringify(json)}`);
+  return json; // { messages: [{ id: "wamid..." }], ... }
+}
+
 async function getMediaInfo(mediaId) {
   const { status, buffer } = await graphRequest(
     "GET",
@@ -88,4 +111,4 @@ async function downloadMedia(mediaId) {
   return { buffer, mimeType: info.mime_type };
 }
 
-module.exports = { sendText, downloadMedia };
+module.exports = { sendText, sendTemplate, downloadMedia };
