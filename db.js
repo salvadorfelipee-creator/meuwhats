@@ -86,6 +86,11 @@ const ready = (async () => {
 
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone, business_number_id)`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_message_id)`);
+
+  const infoMessages = await client.execute(`PRAGMA table_info(messages)`);
+  if (!infoMessages.rows.some((r) => r.name === "error_message")) {
+    await client.execute(`ALTER TABLE messages ADD COLUMN error_message TEXT`);
+  }
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -122,11 +127,11 @@ async function insertMessage(msg) {
   return result.lastInsertRowid;
 }
 
-async function updateStatusByWaId(waMessageId, status) {
+async function updateStatusByWaId(waMessageId, status, errorMessage = null) {
   await ready;
   await client.execute({
-    sql: `UPDATE messages SET status = ? WHERE wa_message_id = ?`,
-    args: [status, waMessageId],
+    sql: `UPDATE messages SET status = ?, error_message = COALESCE(?, error_message) WHERE wa_message_id = ?`,
+    args: [status, errorMessage, waMessageId],
   });
 }
 

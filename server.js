@@ -177,8 +177,14 @@ async function processarEntry(entry) {
       }
 
       for (const status of value.statuses || []) {
-        await db.updateStatusByWaId(status.id, status.status);
-        console.log(`✅ Status: ${status.status} — para ${status.recipient_id}`);
+        const erro = status.errors?.[0];
+        const erroTexto = erro
+          ? `${erro.title || erro.code}${erro.error_data?.details ? " — " + erro.error_data.details : ""}`
+          : null;
+        await db.updateStatusByWaId(status.id, status.status, erroTexto);
+        console.log(
+          `✅ Status: ${status.status} — para ${status.recipient_id}` + (erroTexto ? ` (motivo: ${erroTexto})` : "")
+        );
       }
     }
   }

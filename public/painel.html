@@ -57,6 +57,7 @@
   .msg .texto { white-space: pre-wrap; word-break: break-word; }
   .msg .hora { font-size: 11px; color: #667781; margin-top: 2px; text-align: right; }
   .msg.out .hora { color: #4a8e3d; }
+  .msg .erro-msg { font-size: 12px; color: #d32f2f; margin-top: 4px; }
 
   /* ── Composer ─────────────────────────────────────────────── */
   #form-resposta { display: flex; gap: 8px; padding: 12px 16px; background: #f0f2f5; border-top: 1px solid #e9edef; }
@@ -285,7 +286,10 @@ async function carregarMensagens() {
     }
 
     const statusTxt = m.direction === "out" && m.status ? " · " + (STATUS_LABEL[m.status] || m.status) : "";
-    bolha.innerHTML = conteudo + `<div class="hora">${formatarHoraMsg(m.created_at)}${statusTxt}</div>`;
+    const erroHtml = m.status === "failed" && m.error_message
+      ? `<div class="erro-msg">⚠️ ${escapeHtml(m.error_message)}</div>`
+      : "";
+    bolha.innerHTML = conteudo + erroHtml + `<div class="hora">${formatarHoraMsg(m.created_at)}${statusTxt}</div>`;
     div.appendChild(bolha);
   }
   if (estavaNoFim || mensagens.length) div.scrollTop = div.scrollHeight;
