@@ -91,6 +91,11 @@ const ready = (async () => {
   if (!infoMessages.rows.some((r) => r.name === "error_message")) {
     await client.execute(`ALTER TABLE messages ADD COLUMN error_message TEXT`);
   }
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS instagram_dm_contacts (
+    instagram_user_id TEXT PRIMARY KEY,
+    welcomed_at INTEGER
+  )`);
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -160,10 +165,30 @@ async function listMessages(phone, businessNumberId) {
   return result.rows;
 }
 
+async function instagramJaFoiSaudado(userId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT 1 FROM instagram_dm_contacts WHERE instagram_user_id = ?`,
+    args: [userId],
+  });
+  return result.rows.length > 0;
+}
+
+async function instagramMarcarSaudado(userId) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO instagram_dm_contacts (instagram_user_id, welcomed_at) VALUES (?, ?)
+          ON CONFLICT(instagram_user_id) DO NOTHING`,
+    args: [userId, Date.now()],
+  });
+}
+
 module.exports = {
   upsertConversation,
   insertMessage,
   updateStatusByWaId,
   listConversations,
   listMessages,
+  instagramJaFoiSaudado,
+  instagramMarcarSaudado,
 };

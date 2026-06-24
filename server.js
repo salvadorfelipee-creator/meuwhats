@@ -4,12 +4,25 @@ const path = require("path");
 
 const db = require("./db");
 const wa = require("./whatsapp");
+const ig = require("./instagram");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "meu_token_secreto";
+const INSTAGRAM_VERIFY_TOKEN = process.env.INSTAGRAM_VERIFY_TOKEN || "meu_token_secreto_instagram";
 const PAINEL_USER = process.env.PAINEL_USER || "admin";
 const PAINEL_PASS = process.env.PAINEL_PASS || "admin";
+
+const INSTAGRAM_COMMENT_REPLY =
+  process.env.INSTAGRAM_COMMENT_REPLY ||
+  "Olá! 😊 Para saber mais, acesse www.felizcred.com.br ou fale com a gente pelo WhatsApp que está na nossa bio!";
+
+const INSTAGRAM_WELCOME_MESSAGE =
+  process.env.INSTAGRAM_WELCOME_MESSAGE ||
+  "Olá! 👋 Agradecemos por nos seguir!\n\n" +
+  "No nosso blog você encontra as principais novidades sobre empréstimo. Por aqui você também pode simular:\n\n" +
+  "💼 Consignado CLT\n💡 Empréstimo na conta de luz\n💰 Saque do FGTS\n🏛️ Empréstimo consignado do INSS\n\n" +
+  "É só responder essa mensagem que a gente te ajuda!";
 
 const PHONE_NUMBERS = process.env.PHONE_NUMBERS_JSON
   ? JSON.parse(process.env.PHONE_NUMBERS_JSON)
@@ -190,6 +203,60 @@ async function processarEntry(entry) {
   }
 }
 
+// ─── PROCESSAR EVENTOS DO INSTAGRAM ──────────────────────────────────────────
+async function handleInstagramComment(value) {
+  const userId = value.from?.id;
+  if (!userId) return;
+  try {
+    await ig.sendDM(userId, INSTAGRAM_COMMENT_REPLY);
+    console.log(`📸 Comentário de ${value.from?.username || userId} → DM enviada`);
+  } catch (err) {
+    console.error("Erro ao responder comentário do Instagram:", err.message);
+  }
+}
+
+async function handleInstagramMessaging(messaging) {
+  const senderId = messaging.sender?.id;
+  if (!senderId) return;
+
+  const isStoryReply = !!messaging.message?.reply_to?.story;
+  if (isStoryReply) {
+    try {
+      await ig.sendDM(senderId, INSTAGRAM_WELCOME_MESSAGE);
+      console.log(`📸 Reply de story de ${senderId} → DM enviada`);
+    } catch (err) {
+      console.error("Erro ao responder reply de story do Instagram:", err.message);
+    }
+    return;
+  }
+
+  const jaFoiSaudado = await db.instagramJaFoiSaudado(senderId);
+  if (jaFoiSaudado) return;
+
+  await db.instagramMarcarSaudado(senderId);
+  try {
+    await ig.sendDM(senderId, INSTAGRAM_WELCOME_MESSAGE);
+    console.log(`📸 Primeira DM de ${senderId} → boas-vindas enviada`);
+  } catch (err) {
+    console.error("Erro ao enviar boas-vindas do Instagram:", err.message);
+  }
+}
+
+async function processarEntryInstagram(entry) {
+  for (const e of entry) {
+    for (const change of e.changes || []) {
+      if (change.field === "comments") {
+        await handleInstagramComment(change.value || {});
+      }
+    }
+    for (const messaging of e.messaging || []) {
+      if (messaging.message) {
+        await handleInstagramMessaging(messaging);
+      }
+    }
+  }
+}
+
 // ─── SERVIDOR ─────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -215,6 +282,30 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       if (body.object === "whatsapp_business_account") {
         await processarEntry(body.entry || []);
+        return send(res, 200, "OK");
+      }
+      return send(res, 404, "Not found");
+    }
+
+    // GET /webhook/instagram — verificação do Meta
+    if (req.method === "GET" && path_ === "/webhook/instagram") {
+      const mode = url.searchParams.get("hub.mode");
+      const token = url.searchParams.get("hub.verify_token");
+      const challenge = url.searchParams.get("hub.challenge");
+
+      if (mode === "subscribe" && token === INSTAGRAM_VERIFY_TOKEN) {
+        console.log("✅ Webhook do Instagram verificado pelo Meta!");
+        return send(res, 200, challenge);
+      }
+      console.warn("❌ Verificação do Instagram falhou — token incorreto");
+      return send(res, 403, "Forbidden");
+    }
+
+    // POST /webhook/instagram — comentários e DMs recebidos
+    if (req.method === "POST" && path_ === "/webhook/instagram") {
+      const body = await parseBody(req);
+      if (body.object === "instagram") {
+        await processarEntryInstagram(body.entry || []);
         return send(res, 200, "OK");
       }
       return send(res, 404, "Not found");
