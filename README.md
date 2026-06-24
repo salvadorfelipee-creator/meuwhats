@@ -37,6 +37,7 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `TURSO_DATABASE_URL` | URL do banco no Turso (turso.tech)                  | —                     |
 | `TURSO_AUTH_TOKEN`   | Token de autenticação do banco no Turso             | —                     |
 | `INSTAGRAM_ACCESS_TOKEN` | Token de acesso da API do Instagram (Graph API) | —                     |
+| `INSTAGRAM_ACCOUNT_ID` | ID numérico da conta profissional do Instagram      | —                     |
 | `INSTAGRAM_VERIFY_TOKEN` | Token de verificação do webhook do Instagram    | `meu_token_secreto_instagram` |
 | `INSTAGRAM_COMMENT_REPLY` | Texto enviado por DM ao comentar em um post    | (ver seção Instagram) |
 | `INSTAGRAM_WELCOME_MESSAGE` | Texto de boas-vindas (primeira DM / reply de story) | (ver seção Instagram) |

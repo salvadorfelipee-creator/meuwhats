@@ -2,6 +2,7 @@ const https = require("https");
 
 const GRAPH_VERSION = "v21.0";
 const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
+const ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 
 function graphRequest(method, requestPath, body) {
   return new Promise((resolve, reject) => {
@@ -9,7 +10,7 @@ function graphRequest(method, requestPath, body) {
     const req = https.request(
       {
         method,
-        hostname: "graph.facebook.com",
+        hostname: "graph.instagram.com",
         path: requestPath,
         headers: {
           Authorization: `Bearer ${ACCESS_TOKEN}`,
@@ -32,7 +33,7 @@ function graphRequest(method, requestPath, body) {
 }
 
 async function sendDM(recipientId, text) {
-  const { status, json } = await graphRequest("POST", `/${GRAPH_VERSION}/me/messages`, {
+  const { status, json } = await graphRequest("POST", `/${GRAPH_VERSION}/${ACCOUNT_ID}/messages`, {
     recipient: { id: recipientId },
     message: { text },
   });
