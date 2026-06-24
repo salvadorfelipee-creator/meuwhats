@@ -89,7 +89,10 @@
   <div id="conversas">
     <div id="conversas-header" style="display:flex; align-items:center; justify-content:space-between;">
       <span>Conversas</span>
-      <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
+      <span>
+        <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
+        <button id="btn-reset-ig" title="Resetar quem já recebeu boas-vindas no Instagram (uso em testes)">📸🔄</button>
+      </span>
     </div>
     <div id="abas-numeros"></div>
     <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
@@ -319,6 +322,13 @@ document.getElementById("form-resposta").addEventListener("submit", async (e) =>
 document.getElementById("btn-massa").addEventListener("click", () => {
   document.getElementById("massa-resultado").textContent = "";
   document.getElementById("modal-massa").style.display = "flex";
+});
+
+document.getElementById("btn-reset-ig").addEventListener("click", async () => {
+  if (!confirm("Resetar quem já recebeu boas-vindas no Instagram? (uso recomendado só em testes)")) return;
+  const res = await fetch("/painel/api/instagram/reset-boasvindas", { method: "POST" });
+  const data = await res.json();
+  alert(`Removidos ${data.removidos} registro(s). Próxima DM de qualquer conta vai ser tratada como primeira vez.`);
 });
 
 document.getElementById("massa-cancelar").addEventListener("click", () => {
