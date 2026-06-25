@@ -41,6 +41,28 @@ async function getPerfil() {
   return json;
 }
 
+async function getInsightsUltimoPost() {
+  const { status, json } = await graphRequest(
+    "GET",
+    `/${GRAPH_VERSION}/${ACCOUNT_ID}/media?limit=1&fields=id,caption,permalink,timestamp`
+  );
+  if (status >= 400) throw new Error(`Falha ao listar publicações: ${JSON.stringify(json)}`);
+  const post = json.data?.[0];
+  if (!post) return null;
+
+  const { status: s2, json: insights } = await graphRequest(
+    "GET",
+    `/${GRAPH_VERSION}/${post.id}/insights?metric=reach,total_interactions`
+  );
+  if (s2 >= 400) throw new Error(`Falha ao obter insights: ${JSON.stringify(insights)}`);
+
+  const metricas = {};
+  for (const m of insights.data || []) {
+    metricas[m.name] = m.values?.[0]?.value;
+  }
+  return { ...post, ...metricas };
+}
+
 async function sendDM(recipientId, text) {
   const { status, json } = await graphRequest("POST", `/${GRAPH_VERSION}/${ACCOUNT_ID}/messages`, {
     recipient: { id: recipientId },
@@ -50,4 +72,4 @@ async function sendDM(recipientId, text) {
   return json;
 }
 
-module.exports = { sendDM, getPerfil };
+module.exports = { sendDM, getPerfil, getInsightsUltimoPost };

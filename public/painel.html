@@ -96,6 +96,7 @@
     </div>
     <div id="abas-numeros"></div>
     <div id="instagram-perfil" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #e9edef; font-size:13px; color:#54656f;"></div>
+    <div id="instagram-insights" style="padding:6px 12px; border-bottom:1px solid #e9edef; font-size:12px; color:#54656f;"></div>
     <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
     <div id="lista-conversas"></div>
   </div>
@@ -386,8 +387,21 @@ async function carregarPerfilInstagram() {
   }
 }
 
+async function carregarInsightsInstagram() {
+  const div = document.getElementById("instagram-insights");
+  try {
+    const res = await fetch("/painel/api/instagram/insights");
+    const post = await res.json();
+    if (!post || !post.id) return;
+    div.innerHTML = `Último post (${escapeHtml(post.caption ? post.caption.slice(0, 40) : post.id)}): 👀 alcance ${post.reach ?? "-"} · 💬 interações ${post.total_interactions ?? "-"}`;
+  } catch {
+    // sem insights disponíveis ainda
+  }
+}
+
 carregarNumeros().then(carregarConversas);
 carregarPerfilInstagram();
+carregarInsightsInstagram();
 setInterval(() => {
   carregarConversas();
   carregarMensagens();

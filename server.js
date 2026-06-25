@@ -432,6 +432,16 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // GET /painel/api/instagram/insights — métricas do último post
+    if (req.method === "GET" && path_ === "/painel/api/instagram/insights") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await ig.getInsightsUltimoPost());
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // POST /painel/api/instagram/reset-boasvindas — limpa quem já recebeu boas-vindas (uso em testes)
     if (req.method === "POST" && path_ === "/painel/api/instagram/reset-boasvindas") {
       if (!requireAuth(req, res)) return;
