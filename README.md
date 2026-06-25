@@ -147,29 +147,77 @@ Os textos têm um padrão no código, mas podem ser sobrescritos por variável d
 
 ### Como conseguir as credenciais (caminho oficial, sem risco de banimento)
 
-Tudo isso usa a **API oficial do Instagram via Graph API da Meta** — o mesmo tipo de
-integração usada pelo WhatsApp neste projeto, então é seguro e dentro dos termos da Meta
-(diferente de bots não-oficiais que automatizam ações simulando um navegador).
+Usamos a **API do Instagram com Login do Instagram** (`graph.instagram.com`), o fluxo mais novo
+da Meta — direto na conta profissional, sem precisar de Página do Facebook.
 
-1. **A conta do Instagram precisa ser Profissional** (Criador ou Empresa) e estar
-   **conectada a uma Página do Facebook** (Configurações do Instagram → Contas conectadas).
-2. No mesmo App em developers.facebook.com que já é usado para o WhatsApp, adicione o produto
-   **Instagram Graph API** (ou "Instagram" nas configurações do produto).
-3. Em **Permissões e recursos**, solicite/ative:
-   - `instagram_basic`
-   - `instagram_manage_messages`
-   - `instagram_manage_comments`
-   - `pages_messaging`
-   Enquanto o app estiver em modo de desenvolvimento, isso já funciona normalmente para
-   contas adicionadas como **testador** (Função de testador no painel do App) — não precisa
-   esperar a Revisão do App da Meta para uso próprio.
-4. Gere o **token de acesso** em Ferramentas → Explorador da API Graph (ou reaproveite o
-   token de sistema já criado para o WhatsApp, se o mesmo App tiver as permissões acima).
-5. Configure o webhook: App → **Webhooks** → produto **Instagram**:
-   - **URL de Callback**: `https://SEU_DOMINIO/webhook/instagram`
-   - **Token de Verificação**: o mesmo valor de `INSTAGRAM_VERIFY_TOKEN`
-   - Assine os campos: `comments` e `messages`
-6. Defina as variáveis de ambiente no Render: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_VERIFY_TOKEN`.
+1. A conta do Instagram precisa ser **Profissional** (Criador ou Empresa).
+2. No app em developers.facebook.com → **Casos de uso → API do Instagram → "Configuração da
+   API com login do Instagram"** (atenção: existe uma aba parecida "...com login do Facebook",
+   que é outro fluxo, não é essa).
+3. Passo 1 da tela: clique **"Add all required permissions"** (adiciona `instagram_business_basic`,
+   `instagram_business_manage_messages`, `instagram_business_manage_comments`). Adicione manualmente
+   também `instagram_business_content_publish` e `instagram_business_manage_insights` em
+   **Permissões e recursos** (não vêm no botão automático).
+4. Passo 2: em **Funções do app → Funções → Adicionar pessoas**, adicione a própria conta do
+   Instagram (e qualquer conta de teste) com a função **"Testador"** (a opção "Testador do
+   Instagram" é de uma API antiga/diferente — não usar). A conta convidada precisa aceitar o
+   convite pelo Instagram → Central de Contas → **Conexões de apps**.
+5. Ainda no passo 2, clique **"Adicionar conta"** para gerar o `INSTAGRAM_ACCESS_TOKEN`.
+6. Passo 3: configure o webhook — **URL de Callback**: `https://SEU_DOMINIO/webhook/instagram`,
+   **Token de Verificação**: o mesmo valor de `INSTAGRAM_VERIFY_TOKEN`.
+7. **Inscrever a conta nos campos do webhook** (passo que não aparece na UI, só via API —
+   sem isso nada chega no servidor):
+   ```bash
+   curl -X POST "https://graph.instagram.com/v21.0/{INSTAGRAM_ACCOUNT_ID}/subscribed_apps" \
+     -d "subscribed_fields=comments,messages" \
+     -d "access_token={INSTAGRAM_ACCESS_TOKEN}"
+   ```
+8. Para achar o `INSTAGRAM_ACCOUNT_ID`:
+   ```bash
+   curl "https://graph.instagram.com/v21.0/me?fields=id,username&access_token={INSTAGRAM_ACCESS_TOKEN}"
+   ```
+9. Defina no Render: `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_ACCOUNT_ID`, `INSTAGRAM_VERIFY_TOKEN`.
+
+⚠️ **Limitação conhecida**: mesmo com tudo configurado certo (inscrição confirmada, testadores
+aceitos, webhook validado), comentários/DMs de contas reais **não chegam** no servidor enquanto
+o app estiver em modo de desenvolvimento (Acesso Padrão) — confirmado testando exaustivamente
+(ver seção abaixo). Isso só é liberado depois que a Meta aprova o **Acesso Avançado** via
+Análise do App. Não é bug do código.
+
+---
+
+## Status da Análise do App (Instagram) — onde paramos
+
+**Já enviado para análise** (em 24/06/2026): `instagram_business_basic` +
+`instagram_business_manage_messages`. Aguardando resposta da Meta (pode levar dias).
+
+**Ainda não enviado** (faltava o contador de "chamada de API obrigatória" confirmar — *já
+testamos de verdade, só a Meta demora a registrar*; o aviso oficial diz até 24h, mas já passou
+disso uma vez sem atualizar):
+- `instagram_business_manage_comments`
+- `instagram_business_content_publish`
+- `instagram_business_manage_insights`
+
+### Próximos passos (em ordem)
+
+1. Checar em **Casos de uso → API do Instagram → Permissões e recursos** (ou na seção
+   **Testes**) se o contador dessas 3 permissões já mostra "1 de 1 chamada". Se sim, voltar em
+   **Permissões e recursos → "+ Adicionar"** nelas de novo pra abrir uma nova Análise só com
+   essas 3, reaproveitando os textos/vídeos que já preparamos (estão no histórico da conversa
+   anterior — pedir pro Claude resumir se precisar).
+2. Se o contador **continuar zerado por muito tempo** (já passou de 24h pelo menos uma vez):
+   refazer as chamadas de teste reais via curl (publicar foto, ler insights — comandos estão
+   no histórico) ou abrir um chamado no Suporte para Desenvolvedores da Meta.
+3. Confirmar se a primeira análise (`basic` + `manage_messages`) foi aprovada — checar em
+   **Casos de uso → Painel** ou notificação por e-mail.
+4. Depois de qualquer aprovação, **testar de novo** comentando/mandando DM de uma conta
+   qualquer (não precisa mais ser testadora) — esse é o teste real de que o Acesso Avançado
+   resolveu a entrega.
+5. Pendências menores nas Configurações do app, caso não tenham sido salvas: nome de exibição
+   "Felizcred" (estava genérico "App"), ícone do app (ainda é o ícone padrão de balão de
+   mensagem — falta a logo real da Felizcred em formato quadrado 512-1024px), URL dos Termos
+   de Serviço (`https://SEU_DOMINIO/termos`) e URL de exclusão de dados
+   (`https://SEU_DOMINIO/privacidade`) — ambas estavam apontando por engano para facebook.com.
 
 ---
 
@@ -180,9 +228,19 @@ integração usada pelo WhatsApp neste projeto, então é seguro e dentro dos te
 - Histórico de conversas no **Turso** (permanente); mídias (fotos/áudios/vídeos) só no disco
   do Render (não permanente — ver aviso acima)
 - Dois números WhatsApp Business conectados, com abas no painel
-- Envio em massa via template implementado (botão 📢 no painel)
-- Pendente/possível próximo passo: mensagem automática com botões para conversas inativas
-  há mais de 24h (ainda não implementada — decisão de igual/diferente por número em aberto)
+- Envio em massa via template implementado (botão 📢 no painel) — template `aviso_taxa_clt`
+  aprovado e testado
+- Resposta automática aos botões do template (`Quero saber mais` / `Não quero receber mais`)
+- Automações do Instagram implementadas no código (comentário→DM, story reply→DM, primeira
+  DM→boas-vindas), publicação e leitura de insights via API — mas a entrega de eventos reais
+  ainda depende da aprovação da Análise do App da Meta (ver seção "Status da Análise do App"
+  acima, é o item mais importante em aberto agora)
+- Páginas públicas de Política de Privacidade (`/privacidade`) e Termos de Uso (`/termos`)
+  publicadas, usadas na Análise do App
+- Pendente/possível próximo passo (mais antigo, não retomado ainda): mensagem automática com
+  botões para conversas inativas há mais de 24h no WhatsApp (decisão de igual/diferente por
+  número em aberto); automação de anúncios pagos via Marketing API (discutido, não iniciado —
+  precisa de conta de anúncios com cartão cadastrado e categoria especial de Crédito)
 
 ---
 
@@ -222,3 +280,8 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `GET /media/:arquivo`                                           | Serve uma mídia salva (auth)                |
 | `GET /webhook/instagram`                                        | Verificação do Meta (Instagram)             |
 | `POST /webhook/instagram`                                       | Recebe comentários/DMs do Instagram         |
+| `GET /privacidade`                                               | Política de privacidade (pública)           |
+| `GET /termos`                                                    | Termos de uso (pública)                     |
+| `GET /painel/api/instagram/perfil`                               | Perfil do Instagram conectado (auth)        |
+| `GET /painel/api/instagram/insights`                             | Métricas do último post (auth)              |
+| `POST /painel/api/instagram/reset-boasvindas`                    | Limpa quem já recebeu boas-vindas (auth)    |
