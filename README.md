@@ -188,36 +188,129 @@ Análise do App. Não é bug do código.
 
 ## Status da Análise do App (Instagram) — onde paramos
 
-**Já enviado para análise** (em 24/06/2026): `instagram_business_basic` +
-`instagram_business_manage_messages`. Aguardando resposta da Meta (pode levar dias).
+**Atualização (26/06/2026): usuário reportou que a Análise do App foi APROVADA.** Ainda não
+verificado nesta sessão *quais* permissões exatamente estão com Acesso Avançado agora (a
+primeira leva enviada foi `instagram_business_basic` + `instagram_business_manage_messages`;
+não está confirmado se `manage_comments`, `content_publish` e `manage_insights` também foram
+incluídas/aprovadas, ou se ainda dependem de uma segunda submissão).
 
-**Ainda não enviado** (faltava o contador de "chamada de API obrigatória" confirmar — *já
-testamos de verdade, só a Meta demora a registrar*; o aviso oficial diz até 24h, mas já passou
-disso uma vez sem atualizar):
-- `instagram_business_manage_comments`
-- `instagram_business_content_publish`
-- `instagram_business_manage_insights`
+### Próximos passos (em ordem) — começar por aqui na próxima conversa
 
-### Próximos passos (em ordem)
-
-1. Checar em **Casos de uso → API do Instagram → Permissões e recursos** (ou na seção
-   **Testes**) se o contador dessas 3 permissões já mostra "1 de 1 chamada". Se sim, voltar em
-   **Permissões e recursos → "+ Adicionar"** nelas de novo pra abrir uma nova Análise só com
-   essas 3, reaproveitando os textos/vídeos que já preparamos (estão no histórico da conversa
-   anterior — pedir pro Claude resumir se precisar).
-2. Se o contador **continuar zerado por muito tempo** (já passou de 24h pelo menos uma vez):
-   refazer as chamadas de teste reais via curl (publicar foto, ler insights — comandos estão
-   no histórico) ou abrir um chamado no Suporte para Desenvolvedores da Meta.
-3. Confirmar se a primeira análise (`basic` + `manage_messages`) foi aprovada — checar em
-   **Casos de uso → Painel** ou notificação por e-mail.
-4. Depois de qualquer aprovação, **testar de novo** comentando/mandando DM de uma conta
-   qualquer (não precisa mais ser testadora) — esse é o teste real de que o Acesso Avançado
-   resolveu a entrega.
+1. Confirmar no app (**Casos de uso → API do Instagram → Permissões e recursos**) quais
+   permissões estão marcadas como **Acesso Avançado** agora: `instagram_business_basic`,
+   `instagram_business_manage_messages`, `instagram_business_manage_comments`,
+   `instagram_business_content_publish`, `instagram_business_manage_insights`.
+2. Se `manage_comments`/`content_publish`/`manage_insights` ainda não tiverem sido enviadas
+   pra Análise (ficaram pendentes do contador de "chamada de API obrigatória" na sessão
+   anterior), checar se o contador já mostra "1 de 1" e, se sim, submeter uma segunda Análise
+   só com essas 3.
+3. **Testar de verdade** (esse é o teste decisivo): comentar em uma foto do Instagram com uma
+   conta qualquer (não precisa mais ser testadora) e mandar uma DM nova → confirmar que chega
+   no servidor (`/webhook/instagram`) e que a resposta automática é enviada.
+4. Se a entrega real funcionar, retomar o fluxo de publicação/insights (`ig.getPerfil()`,
+   `ig.getInsightsUltimoPost()`, `instagram.js`) sem a limitação de Acesso Padrão.
 5. Pendências menores nas Configurações do app, caso não tenham sido salvas: nome de exibição
    "Felizcred" (estava genérico "App"), ícone do app (ainda é o ícone padrão de balão de
    mensagem — falta a logo real da Felizcred em formato quadrado 512-1024px), URL dos Termos
    de Serviço (`https://SEU_DOMINIO/termos`) e URL de exclusão de dados
    (`https://SEU_DOMINIO/privacidade`) — ambas estavam apontando por engano para facebook.com.
+
+---
+
+## Campanhas de Anúncios (API de Marketing)
+
+Gerenciamento de campanhas pagas (Instagram/Facebook) via Marketing API, pedido direto no chat
+— sem formulário no painel. Módulo `ads.js`, rotas em `server.js`, visualização/controle no
+painel (botão 📊 — lista campanhas com gasto/impressões/cliques/CTR, pausa/ativa).
+
+### Configuração já feita
+
+- Caso de uso "Criar e gerenciar anúncios com a API de Marketing" adicionado ao app
+  (`ads_management`, `ads_read`) — **não precisou de Análise do App**, diferente do Instagram,
+  porque é a própria conta de anúncios do usuário (não de terceiros).
+- Conta de anúncios: `act_945463391448600` (pessoal, moeda BRL, cartão configurado).
+- Instagram `@felizcred` conectado a essa conta de anúncios (Business Manager → Contas do
+  Instagram → "Conectar ativos" → Contas de anúncios) — necessário para anunciar publicações
+  existentes do Instagram.
+- Token de acesso trocado por um de **longa duração** (60 dias, gerado em 26/06/2026 —
+  **expira por volta de 25/08/2026**). Pra renovar quando vencer: gerar um token curto em
+  **Casos de uso → Ferramentas → Obter token de acesso** (marcar `ads_management` e
+  `ads_read`) e trocar por um longo:
+  ```bash
+  curl "https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id={APP_ID}&client_secret={APP_SECRET}&fb_exchange_token={TOKEN_CURTO}"
+  ```
+- Variáveis no Render: `META_ADS_ACCESS_TOKEN`, `META_AD_ACCOUNT_ID` (`act_945463391448600`).
+
+### Como pedir uma campanha nova
+
+Não tem tela — basta pedir no chat (ex: "crie uma campanha de R$25/dia pra consignado CLT,
+foco em gerentes de supermercado SC/RS"). Toda campanha é **criada pausada**; revisão e
+ativação são manuais (painel → 📊, ou Gerenciador de Anúncios).
+
+### Como pesquisar público (cargo, interesse, localização)
+
+```bash
+curl -G "https://graph.facebook.com/v21.0/act_{AD_ACCOUNT_ID}/targetingsearch" \
+  --data-urlencode "q={termo}" \
+  --data-urlencode "type=adworktitle" \   # ou adinterest, adgeolocation
+  --data-urlencode "access_token={TOKEN}"
+```
+Tipos úteis: `adworktitle` (cargo autodeclarado), `adinterest` (interesses/comportamentos),
+`adgeolocation` (estado/cidade — usar `location_types=["region"]` pra estado).
+
+Antes de criar o conjunto de anúncios, testar o tamanho do público:
+```bash
+curl -G "https://graph.facebook.com/v21.0/act_{AD_ACCOUNT_ID}/delivery_estimate" \
+  --data-urlencode "optimization_goal=CONVERSATIONS" \
+  --data-urlencode "targeting_spec={JSON da segmentação}" \
+  --data-urlencode "access_token={TOKEN}"
+```
+
+### O que aprendemos sobre público de nicho (gerente de supermercado/mercearia, SC+RS)
+
+- O Meta **não tem** cargo "gerente de supermercado" nem targeting por rede/empregador
+  (testamos Koch, Angeloni, Bistek — nada relevante). O mais próximo é o cargo genérico
+  **"Gerente"** (id `137453372957907`, autodeclarado no perfil — não confundir com
+  comportamento "Administrador de Página sobre Varejo", que é perfil de pequeno
+  dono/comerciante, não de gerente contratado).
+- Interesses do setor: **Supermercado** (`6003061708328`), **Mercearia** (`6003174128015`),
+  **Frios** (`6003142965761`).
+- **E** (Gerente E interesse no setor, SC+RS) = público minúsculo, **~3 mil pessoas** — risco
+  real de não entregar.
+- **OU** (Gerente OU interesse no setor) = público gigante, **~3,2 a 3,7 milhões** —
+  praticamente igual a usar só os interesses soltos (provável causa da instabilidade nas
+  campanhas antigas: CSV mostrava custo por resultado de R$0,27 a R$56,79, com vários
+  "not_delivering").
+- Interesses de liderança/gestão/MBA genéricos são enormes (200-560 milhões, não ajudam a
+  filtrar) e como área de formação acadêmica são minúsculos no mundo todo (7-11 mil, não dão
+  volume). Nenhuma combinação resolve o meio-termo — é limitação real da plataforma pra esse
+  nicho, não falta de tentativa.
+- **Decisão tomada**: seguir com uma série de testes A/B aceitando alguma imprecisão de
+  público — a qualificação real do lead acontece **manualmente na conversa do WhatsApp**
+  (perguntar/confirmar se quem respondeu é de fato gerente de supermercado/mercearia ali, não
+  tentar resolver isso na segmentação do anúncio). Variantes definidas:
+  - **A**: público restrito (Gerente E Supermercado/Mercearia/Frios, SC+RS, ~3 mil) como
+    semente, com Expansão de Segmentação Detalhada do Meta ligada (deixa o algoritmo achar
+    parecidos além da definição literal).
+  - **B**: só localização (SC+RS) + idade 24-58, sem interesse/cargo nenhum — 100%
+    Advantage+, deixando o Meta otimizar livre pra "Conversas por mensagem".
+- Criativo: usar a publicação já existente do Instagram via `source_instagram_media_id`
+  (ex: `3588869927198956744`) em vez de subir imagem nova — exige o Instagram conectado à
+  conta de anúncios (já feito, ver acima).
+- A funcionalidade de **Audiência Salva** (`/saved_audiences`) está bloqueada pro app
+  ("Application does not have the capability") — não impede nada, só não dá pra salvar a
+  segmentação como objeto reutilizável; ela vai direto no conjunto de anúncios na hora de criar.
+
+### Pendente
+
+- Decidir orçamento diário de cada variante (A e B) e criar de fato campanha + conjuntos +
+  anúncios (pausados) via `ads.js` (`criarCampanha`, `criarConjuntoAnuncios`, `criarCreativo`
+  com `source_instagram_media_id`, `criarAnuncio`).
+- Ativar manualmente depois de revisar (painel → 📊 ou Gerenciador de Anúncios).
+- Mais adiante (não decidido ainda): testar Público Semelhante (Lookalike) a partir dos
+  contatos reais que já converteram no WhatsApp/Instagram — tende a performar melhor que
+  qualquer combinação manual de cargo/interesse, mas precisa de volume mínimo de contatos
+  (~100+) e ainda não foi avaliado se já temos isso no banco.
 
 ---
 
@@ -232,15 +325,19 @@ disso uma vez sem atualizar):
   aprovado e testado
 - Resposta automática aos botões do template (`Quero saber mais` / `Não quero receber mais`)
 - Automações do Instagram implementadas no código (comentário→DM, story reply→DM, primeira
-  DM→boas-vindas), publicação e leitura de insights via API — mas a entrega de eventos reais
-  ainda depende da aprovação da Análise do App da Meta (ver seção "Status da Análise do App"
-  acima, é o item mais importante em aberto agora)
+  DM→boas-vindas), publicação e leitura de insights via API — Análise do App **reportada como
+  aprovada** (26/06/2026), mas ainda falta confirmar quais permissões exatas e retestar entrega
+  real de comentário/DM (ver seção "Status da Análise do App", é o ponto de partida da próxima
+  conversa)
 - Páginas públicas de Política de Privacidade (`/privacidade`) e Termos de Uso (`/termos`)
   publicadas, usadas na Análise do App
+- Gerenciamento de campanhas de anúncios via API de Marketing implementado (`ads.js` + rotas +
+  botão 📊 no painel) — conta de anúncios e Instagram conectados e testados; pesquisa de
+  público (cargo/interesse/localização) feita e documentada na seção "Campanhas de Anúncios"
+  acima; falta decidir orçamento e criar de fato a campanha A/B (pausada)
 - Pendente/possível próximo passo (mais antigo, não retomado ainda): mensagem automática com
   botões para conversas inativas há mais de 24h no WhatsApp (decisão de igual/diferente por
-  número em aberto); automação de anúncios pagos via Marketing API (discutido, não iniciado —
-  precisa de conta de anúncios com cartão cadastrado e categoria especial de Crédito)
+  número em aberto)
 
 ---
 
