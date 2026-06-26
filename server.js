@@ -5,6 +5,7 @@ const path = require("path");
 const db = require("./db");
 const wa = require("./whatsapp");
 const ig = require("./instagram");
+const ads = require("./ads");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -453,6 +454,36 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       const removidos = await db.instagramLimparSaudados();
       return send(res, 200, { ok: true, removidos });
+    }
+
+    // GET /painel/api/ads/campanhas — lista campanhas com métricas
+    if (req.method === "GET" && path_ === "/painel/api/ads/campanhas") {
+      if (!requireAuth(req, res)) return;
+      try {
+        const campanhas = await ads.listarCampanhas();
+        const comInsights = await Promise.all(
+          campanhas.map(async (c) => ({
+            ...c,
+            insights: await ads.obterInsights(c.id).catch(() => null),
+          }))
+        );
+        return send(res, 200, { campanhas: comInsights });
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
+    // POST /painel/api/ads/:id/status — pausar/ativar campanha, conjunto ou anúncio
+    const matchAdsStatus = path_.match(/^\/painel\/api\/ads\/([a-zA-Z0-9_]+)\/status$/);
+    if (req.method === "POST" && matchAdsStatus) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        await ads.atualizarStatus(matchAdsStatus[1], body.status);
+        return send(res, 200, { ok: true });
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
     }
 
     // GET /media/:filename — servir arquivo de mídia

@@ -82,6 +82,18 @@
   #massa-cancelar { background: #f0f2f5; }
   #massa-enviar { background: #00a884; color: #fff; }
   #massa-resultado { margin-top: 12px; font-size: 13px; color: #54656f; }
+
+  /* ── Campanhas de anúncios ────────────────────────────────── */
+  #btn-ads { background: transparent; border: none; color: #fff; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+  #btn-ads:hover { background: rgba(255,255,255,0.15); }
+  #modal-ads { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 10; }
+  .ads-card { border: 1px solid #e9edef; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .ads-card-topo { display: flex; justify-content: space-between; align-items: center; }
+  .ads-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .ads-status.ACTIVE { background: #d9fdd3; color: #008069; }
+  .ads-status.PAUSED { background: #f0f2f5; color: #667781; }
+  .ads-metricas { font-size: 12px; color: #54656f; margin-top: 6px; }
+  .ads-card button { font-size: 12px; padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer; background: #00a884; color: #fff; }
 </style>
 </head>
 <body>
@@ -91,6 +103,7 @@
       <span>Conversas</span>
       <span>
         <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
+        <button id="btn-ads" title="Campanhas de anúncios">📊</button>
         <button id="btn-reset-ig" title="Resetar quem já recebeu boas-vindas no Instagram (uso em testes)">📸🔄</button>
       </span>
     </div>
@@ -136,6 +149,17 @@
       <button id="massa-enviar" type="button">Enviar</button>
     </div>
     <div id="massa-resultado"></div>
+  </div>
+</div>
+
+<div id="modal-ads">
+  <div class="modal-conteudo" style="width:640px;">
+    <h3>Campanhas de anúncios</h3>
+    <div id="ads-lista">Carregando...</div>
+    <div class="modal-botoes">
+      <button id="ads-atualizar" type="button">Atualizar</button>
+      <button id="ads-fechar" type="button">Fechar</button>
+    </div>
   </div>
 </div>
 
@@ -396,6 +420,72 @@ async function carregarInsightsInstagram() {
     div.innerHTML = `Último post (${escapeHtml(post.caption ? post.caption.slice(0, 40) : post.id)}): 👀 alcance ${post.reach ?? "-"} · 💬 interações ${post.total_interactions ?? "-"}`;
   } catch {
     // sem insights disponíveis ainda
+  }
+}
+
+document.getElementById("btn-ads").addEventListener("click", () => {
+  document.getElementById("modal-ads").style.display = "flex";
+  carregarCampanhas();
+});
+document.getElementById("ads-fechar").addEventListener("click", () => {
+  document.getElementById("modal-ads").style.display = "none";
+});
+document.getElementById("ads-atualizar").addEventListener("click", carregarCampanhas);
+
+function formatarMoeda(centavos) {
+  if (centavos === undefined || centavos === null) return "-";
+  return `R$ ${(Number(centavos) / 100).toFixed(2)}`;
+}
+
+async function alternarStatusAds(id, statusAtual) {
+  const novoStatus = statusAtual === "ACTIVE" ? "PAUSED" : "ACTIVE";
+  if (!confirm(`Mudar status para ${novoStatus}?`)) return;
+  await fetch(`/painel/api/ads/${id}/status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status: novoStatus }),
+  });
+  carregarCampanhas();
+}
+window.alternarStatusAds = alternarStatusAds;
+
+async function carregarCampanhas() {
+  const div = document.getElementById("ads-lista");
+  div.textContent = "Carregando...";
+  try {
+    const res = await fetch("/painel/api/ads/campanhas");
+    const data = await res.json();
+    if (data.error) {
+      div.textContent = `Erro: ${data.error}`;
+      return;
+    }
+    const campanhas = data.campanhas || [];
+    if (!campanhas.length) {
+      div.textContent = "Nenhuma campanha criada ainda.";
+      return;
+    }
+    div.innerHTML = campanhas.map((c) => {
+      const status = c.effective_status || c.status;
+      const ins = c.insights || {};
+      return `
+        <div class="ads-card">
+          <div class="ads-card-topo">
+            <strong>${escapeHtml(c.name)}</strong>
+            <span class="ads-status ${status === "ACTIVE" ? "ACTIVE" : "PAUSED"}">${escapeHtml(status)}</span>
+          </div>
+          <div class="ads-metricas">
+            Verba diária: ${formatarMoeda(c.daily_budget)} ·
+            Gasto: R$ ${ins.spend ?? "0"} · Impressões: ${ins.impressions ?? "-"} ·
+            Cliques: ${ins.clicks ?? "-"} · CTR: ${ins.ctr ?? "-"}%
+          </div>
+          <div style="margin-top:8px;">
+            <button onclick="alternarStatusAds('${c.id}','${status}')">${status === "ACTIVE" ? "Pausar" : "Ativar"}</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    div.textContent = `Erro ao carregar campanhas: ${err.message}`;
   }
 }
 
