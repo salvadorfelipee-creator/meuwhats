@@ -205,11 +205,21 @@ Análise do App. Não é bug do código.
 
 ## Status da Análise do App (Instagram) — onde paramos
 
-**Atualização (26/06/2026): usuário reportou que a Análise do App foi APROVADA.** Ainda não
-verificado nesta sessão *quais* permissões exatamente estão com Acesso Avançado agora (a
-primeira leva enviada foi `instagram_business_basic` + `instagram_business_manage_messages`;
-não está confirmado se `manage_comments`, `content_publish` e `manage_insights` também foram
-incluídas/aprovadas, ou se ainda dependem de uma segunda submissão).
+**Atualização (26/06/2026): CORRIGIDO — a Análise ainda está PENDENTE, não foi aprovada.**
+Uma anotação anterior nesta sessão dizia "aprovada" por engano (confusão entre "enviado" e
+"aprovado"). O alerta real do App Dashboard (aba **Alertas**) mostra: *"Análise do app: O app
+foi enviado e está com a análise pendente"* — status **Normal**, enviado ontem. Ou seja, ainda
+esperando a decisão da Meta sobre `instagram_business_basic` + `instagram_business_manage_messages`
+(a primeira leva enviada). `manage_comments`, `content_publish` e `manage_insights` continuam
+sem ter sido submetidas (ver próximos passos).
+
+**Descoberta importante**: o status de Acesso Avançado por permissão **não é exposto pela
+Graph API** — testado gerando um App Access Token (com App ID + Secret) e chamando
+`/{app-id}/permissions`, que retorna vazio. Isso só aparece na tela
+**Casos de uso → API do Instagram → Permissões e recursos** do App Dashboard — só o usuário
+consegue ver isso, não tem como confirmar por API. Por isso a rota de diagnóstico abaixo (que
+testa o *comportamento real* da API, não o *status declarado*) é o caminho mais confiável pra
+uma conversa nova confirmar progresso sem depender de prints.
 
 ### Como checar isso SEM precisar de token nem acesso ao painel da Meta
 
@@ -233,8 +243,12 @@ comando — ela não deve ficar escrita aqui nem em nenhum arquivo do repositór
 
 ### Próximos passos (em ordem) — começar por aqui na próxima conversa
 
+0. Checar a aba **Alertas** do App Dashboard (onde saiu o print "análise pendente") — se já
+   tiver virado aprovação/rejeição, pedir ao usuário pra mandar o texto/print novo antes de
+   continuar.
 1. Rodar o diagnóstico acima. Isso substitui ter que abrir o painel da Meta manualmente pra
-   conferir "Permissões e recursos".
+   conferir "Permissões e recursos" — funciona mesmo com a Análise ainda pendente (testa
+   acesso real, não o status declarado).
 2. Se `manage_comments`/`manage_messages` ainda derem `ok:false`: aí sim é preciso o **usuário**
    (não o Claude — não temos acesso à tela) ir em **Casos de uso → API do Instagram →
    Permissões e recursos** conferir se o contador de "chamada de API obrigatória" já fechou
@@ -363,10 +377,10 @@ curl -G "https://graph.facebook.com/v21.0/act_{AD_ACCOUNT_ID}/delivery_estimate"
   aprovado e testado
 - Resposta automática aos botões do template (`Quero saber mais` / `Não quero receber mais`)
 - Automações do Instagram implementadas no código (comentário→DM, story reply→DM, primeira
-  DM→boas-vindas), publicação e leitura de insights via API — Análise do App **reportada como
-  aprovada** (26/06/2026), mas ainda falta confirmar quais permissões exatas e retestar entrega
-  real de comentário/DM (ver seção "Status da Análise do App", é o ponto de partida da próxima
-  conversa)
+  DM→boas-vindas), publicação e leitura de insights via API — Análise do App **ainda
+  pendente** (enviada, sem decisão da Meta até 26/06/2026; ver seção "Status da Análise do
+  App", é o ponto de partida da próxima conversa). Rota `/painel/api/instagram/diagnostico`
+  criada pra checar acesso real sem precisar de prints do App Dashboard.
 - Páginas públicas de Política de Privacidade (`/privacidade`) e Termos de Uso (`/termos`)
   publicadas, usadas na Análise do App
 - Gerenciamento de campanhas de anúncios via API de Marketing implementado (`ads.js` + rotas +

@@ -1,5 +1,6 @@
 node_modules/
 .env
+CHAVES-LOCAL.md
 data.db
 data.db-journal
 data.db-wal
