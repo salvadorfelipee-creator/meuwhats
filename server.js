@@ -449,6 +449,17 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // GET /painel/api/instagram/diagnostico — testa, com o token já configurado no
+    // servidor, se cada permissão do Instagram está com Acesso Avançado de verdade
+    if (req.method === "GET" && path_ === "/painel/api/instagram/diagnostico") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await ig.diagnostico());
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // POST /painel/api/instagram/reset-boasvindas — limpa quem já recebeu boas-vindas (uso em testes)
     if (req.method === "POST" && path_ === "/painel/api/instagram/reset-boasvindas") {
       if (!requireAuth(req, res)) return;

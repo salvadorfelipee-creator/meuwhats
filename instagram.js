@@ -72,4 +72,53 @@ async function sendDM(recipientId, text) {
   return json;
 }
 
-module.exports = { sendDM, getPerfil, getInsightsUltimoPost };
+async function getComentariosUltimoPost() {
+  const { status, json } = await graphRequest("GET", `/${GRAPH_VERSION}/${ACCOUNT_ID}/media?limit=1&fields=id`);
+  if (status >= 400) throw new Error(`Falha ao listar publicações: ${JSON.stringify(json)}`);
+  const post = json.data?.[0];
+  if (!post) return [];
+  const { status: s2, json: comentarios } = await graphRequest("GET", `/${GRAPH_VERSION}/${post.id}/comments`);
+  if (s2 >= 400) throw new Error(`Falha ao ler comentários: ${JSON.stringify(comentarios)}`);
+  return comentarios.data || [];
+}
+
+async function getConversas() {
+  const { status, json } = await graphRequest("GET", `/${GRAPH_VERSION}/${ACCOUNT_ID}/conversations`);
+  if (status >= 400) throw new Error(`Falha ao ler conversas: ${JSON.stringify(json)}`);
+  return json.data || [];
+}
+
+// Testa, com o token já configurado no servidor, se cada permissão do Instagram
+// está liberada de verdade (Acesso Avançado) — sem precisar de telas da Meta nem
+// de repassar token nenhum. Usado pela rota /painel/api/instagram/diagnostico.
+async function diagnostico() {
+  const resultado = {};
+  try {
+    const perfil = await getPerfil();
+    resultado.basic = { ok: true, detalhe: `@${perfil.username}` };
+  } catch (err) {
+    resultado.basic = { ok: false, detalhe: err.message };
+  }
+  try {
+    const comentarios = await getComentariosUltimoPost();
+    resultado.manage_comments = { ok: true, detalhe: `${comentarios.length} comentário(s) lido(s) no último post` };
+  } catch (err) {
+    resultado.manage_comments = { ok: false, detalhe: err.message };
+  }
+  try {
+    const conversas = await getConversas();
+    resultado.manage_messages = { ok: true, detalhe: `${conversas.length} conversa(s) lida(s)` };
+  } catch (err) {
+    resultado.manage_messages = { ok: false, detalhe: err.message };
+  }
+  return resultado;
+}
+
+module.exports = {
+  sendDM,
+  getPerfil,
+  getInsightsUltimoPost,
+  getComentariosUltimoPost,
+  getConversas,
+  diagnostico,
+};

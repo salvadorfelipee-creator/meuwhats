@@ -41,8 +41,25 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `INSTAGRAM_VERIFY_TOKEN` | Token de verificação do webhook do Instagram    | `meu_token_secreto_instagram` |
 | `INSTAGRAM_COMMENT_REPLY` | Texto enviado por DM ao comentar em um post    | (ver seção Instagram) |
 | `INSTAGRAM_WELCOME_MESSAGE` | Texto de boas-vindas (primeira DM / reply de story) | (ver seção Instagram) |
+| `META_ADS_ACCESS_TOKEN` | Token de acesso da API de Marketing (campanhas de anúncios) | — |
+| `META_AD_ACCOUNT_ID` | ID da conta de anúncios, formato `act_XXXXXXXXX`        | —                     |
 
 ⚠️ Defina `PAINEL_USER`/`PAINEL_PASS` com valores próprios — o painel mostra suas conversas.
+
+### Segurança: nenhum valor de credencial vai neste arquivo
+
+Esta tabela lista só os **nomes** das variáveis — os **valores** ficam exclusivamente em
+Render → Environment, nunca no README nem em nenhum arquivo commitado. Isso é intencional:
+se um token vazasse no histórico do git, teria que ser revogado e trocado em todo lugar.
+
+Quando uma conversa nova do Claude precisar checar algo que depende de um desses tokens:
+- Se já existe uma rota no nosso servidor que faz a chamada por dentro (ex:
+  `/painel/api/instagram/diagnostico`, ver seção Instagram), use essa rota — só precisa da
+  senha do painel (`PAINEL_USER`/`PAINEL_PASS`), bem menos sensível que os tokens da Meta.
+- Se não existe rota pronta e a tarefa realmente exigir uma chamada direta à API da Meta
+  (Graph API), é esperado e correto pedir o valor ao usuário naquele momento do jeito que foi
+  feito nesta sessão (gerar token novo no painel da Meta, copiar e colar no chat) — **isso não
+  é uma falha do sistema de memória, é a forma correta de proceder.**
 
 ### Como obter `ACCESS_TOKEN` e `PHONE_NUMBER_ID`
 
@@ -194,26 +211,47 @@ primeira leva enviada foi `instagram_business_basic` + `instagram_business_manag
 não está confirmado se `manage_comments`, `content_publish` e `manage_insights` também foram
 incluídas/aprovadas, ou se ainda dependem de uma segunda submissão).
 
+### Como checar isso SEM precisar de token nem acesso ao painel da Meta
+
+O servidor já guarda `INSTAGRAM_ACCESS_TOKEN` como variável de ambiente no Render — uma
+conversa nova não precisa que o usuário repasse token nenhum pra testar se a Análise liberou
+o acesso de verdade. Existe uma rota de diagnóstico pronta pra isso:
+
+```bash
+curl -u USUARIO_DO_PAINEL:SENHA_DO_PAINEL https://SEU_DOMINIO/painel/api/instagram/diagnostico
+```
+
+Ela tenta, na hora, ler o perfil (`basic`), os comentários do último post
+(`manage_comments`) e as conversas (`manage_messages`) usando o token real do servidor, e
+devolve `{ ok: true/false, detalhe }` pra cada um. Se `manage_comments`/`manage_messages`
+vierem `ok:false` com erro de permissão, a Análise ainda não cobriu isso (ou não propagou).
+Se vierem `ok:true` com dados reais, a liberação funcionou — **não precisa mais pedir token a
+ninguém pra confirmar isso**.
+
+⚠️ Pedir ao usuário a credencial do painel (usuário/senha do Basic Auth) quando for rodar esse
+comando — ela não deve ficar escrita aqui nem em nenhum arquivo do repositório.
+
 ### Próximos passos (em ordem) — começar por aqui na próxima conversa
 
-1. Confirmar no app (**Casos de uso → API do Instagram → Permissões e recursos**) quais
-   permissões estão marcadas como **Acesso Avançado** agora: `instagram_business_basic`,
-   `instagram_business_manage_messages`, `instagram_business_manage_comments`,
-   `instagram_business_content_publish`, `instagram_business_manage_insights`.
-2. Se `manage_comments`/`content_publish`/`manage_insights` ainda não tiverem sido enviadas
-   pra Análise (ficaram pendentes do contador de "chamada de API obrigatória" na sessão
-   anterior), checar se o contador já mostra "1 de 1" e, se sim, submeter uma segunda Análise
-   só com essas 3.
-3. **Testar de verdade** (esse é o teste decisivo): comentar em uma foto do Instagram com uma
-   conta qualquer (não precisa mais ser testadora) e mandar uma DM nova → confirmar que chega
-   no servidor (`/webhook/instagram`) e que a resposta automática é enviada.
-4. Se a entrega real funcionar, retomar o fluxo de publicação/insights (`ig.getPerfil()`,
-   `ig.getInsightsUltimoPost()`, `instagram.js`) sem a limitação de Acesso Padrão.
-5. Pendências menores nas Configurações do app, caso não tenham sido salvas: nome de exibição
-   "Felizcred" (estava genérico "App"), ícone do app (ainda é o ícone padrão de balão de
-   mensagem — falta a logo real da Felizcred em formato quadrado 512-1024px), URL dos Termos
-   de Serviço (`https://SEU_DOMINIO/termos`) e URL de exclusão de dados
-   (`https://SEU_DOMINIO/privacidade`) — ambas estavam apontando por engano para facebook.com.
+1. Rodar o diagnóstico acima. Isso substitui ter que abrir o painel da Meta manualmente pra
+   conferir "Permissões e recursos".
+2. Se `manage_comments`/`manage_messages` ainda derem `ok:false`: aí sim é preciso o **usuário**
+   (não o Claude — não temos acesso à tela) ir em **Casos de uso → API do Instagram →
+   Permissões e recursos** conferir se o contador de "chamada de API obrigatória" já fechou
+   "1 de 1", e se sim, submeter uma segunda Análise só com as permissões que faltam
+   (`instagram_business_manage_comments`, `instagram_business_content_publish`,
+   `instagram_business_manage_insights`).
+3. Enquanto isso, pedir ao usuário pra comentar numa foto e mandar uma DM nova de qualquer
+   conta (não precisa mais ser testadora) — depois rodar o diagnóstico de novo pra confirmar
+   que passou a aparecer dado real.
+4. `content_publish` não tem um teste de só-leitura — só confirma publicando de fato (comando
+   de publicação real já documentado/testado anteriormente nesta conversa).
+5. Pendências de configuração do app que só o usuário pode editar (precisam de print pra eu
+   orientar, não tenho acesso à tela): nome de exibição "Felizcred" (estava genérico "App"),
+   ícone do app (ainda é o ícone padrão de balão de mensagem — falta logo real da Felizcred em
+   formato quadrado 512-1024px), URL dos Termos de Serviço (`https://SEU_DOMINIO/termos`) e
+   URL de exclusão de dados (`https://SEU_DOMINIO/privacidade`) — ambas estavam apontando por
+   engano para facebook.com.
 
 ---
 
@@ -382,3 +420,6 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `GET /painel/api/instagram/perfil`                               | Perfil do Instagram conectado (auth)        |
 | `GET /painel/api/instagram/insights`                             | Métricas do último post (auth)              |
 | `POST /painel/api/instagram/reset-boasvindas`                    | Limpa quem já recebeu boas-vindas (auth)    |
+| `GET /painel/api/instagram/diagnostico`                          | Testa basic/manage_comments/manage_messages de verdade, sem precisar de token (auth) |
+| `GET /painel/api/ads/campanhas`                                  | Lista campanhas de anúncios com métricas (auth) |
+| `POST /painel/api/ads/:id/status`                                | Pausa/ativa campanha, conjunto ou anúncio (auth) |
