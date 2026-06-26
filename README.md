@@ -43,6 +43,10 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `INSTAGRAM_WELCOME_MESSAGE` | Texto de boas-vindas (primeira DM / reply de story) | (ver seção Instagram) |
 | `META_ADS_ACCESS_TOKEN` | Token de acesso da API de Marketing (campanhas de anúncios) | — |
 | `META_AD_ACCOUNT_ID` | ID da conta de anúncios, formato `act_XXXXXXXXX`        | —                     |
+| `TELEGRAM_BOT_TOKEN` | Token do bot, gerado pelo @BotFather                        | —                     |
+| `TELEGRAM_WEBHOOK_SECRET` | Segredo opcional pra validar que o webhook vem do Telegram | — (sem validação) |
+| `TELEGRAM_START_MESSAGE` | Texto enviado ao receber `/start` (com botão de compartilhar contato) | (ver seção Telegram) |
+| `TELEGRAM_THANKS_MESSAGE` | Texto enviado depois que o usuário compartilha o contato | (ver seção Telegram) |
 
 ⚠️ Defina `PAINEL_USER`/`PAINEL_PASS` com valores próprios — o painel mostra suas conversas.
 
@@ -200,6 +204,42 @@ aceitos, webhook validado), comentários/DMs de contas reais **não chegam** no 
 o app estiver em modo de desenvolvimento (Acesso Padrão) — confirmado testando exaustivamente
 (ver seção abaixo). Isso só é liberado depois que a Meta aprova o **Acesso Avançado** via
 Análise do App. Não é bug do código.
+
+---
+
+## Automações do Telegram (captação de contatos)
+
+Bot do Telegram (Bot API, grátis, sem aprovação de negócio) usado só pra captar leads —
+não tem histórico de conversa no painel como o WhatsApp/Instagram, só a lista de contatos
+captados (tela **📨 Telegram**).
+
+Fluxo:
+1. Alguém abre o bot (link direto `t.me/seubot` ou com parâmetro de origem
+   `t.me/seubot?start=campanha123`, útil pra saber de qual anúncio/campanha veio) e aperta **Start**.
+2. O servidor responde com `TELEGRAM_START_MESSAGE` e um botão nativo "Compartilhar meu contato".
+3. Ao tocar no botão, o Telegram entrega o telefone direto (sem o usuário digitar nada) — o
+   servidor salva em `telegram_contacts` (telefone, nome, username, chat_id, parâmetro de
+   origem) e responde com `TELEGRAM_THANKS_MESSAGE`.
+
+### Como configurar
+
+1. Crie o bot conversando com **@BotFather** no Telegram: `/newbot` → escolha um nome e um
+   username terminado em `bot` → ele devolve o `TELEGRAM_BOT_TOKEN`.
+2. Defina `TELEGRAM_BOT_TOKEN` no Render (e `TELEGRAM_WEBHOOK_SECRET` se quiser, qualquer
+   string aleatória — usada só para o Telegram provar que a requisição é dele mesmo).
+3. Registre o webhook (uma vez só, depois do deploy — troque `{TELEGRAM_BOT_TOKEN}` e
+   `{TELEGRAM_WEBHOOK_SECRET}` pelos valores reais, e `SEU_DOMINIO` pela URL do Render):
+   ```bash
+   curl -X POST "https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook" \
+     -d "url=https://SEU_DOMINIO/webhook/telegram" \
+     -d "secret_token={TELEGRAM_WEBHOOK_SECRET}"
+   ```
+4. Teste abrindo `t.me/seubot` e apertando Start — o contato deve aparecer na aba 📨 Telegram
+   do painel.
+
+⚠️ Diferente do WhatsApp/Instagram, o bot **nunca pode iniciar conversa** com quem nunca apertou
+Start — a captação sempre depende de um clique inicial (anúncio, link na bio, QR code etc.),
+não dá pra mandar mensagem pra uma lista de contatos existente.
 
 ---
 
@@ -439,6 +479,8 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `GET /painel/api/instagram/conversas`                            | Lista conversas (DMs) do Instagram (auth)   |
 | `GET /painel/api/ads/campanhas`                                  | Lista campanhas de anúncios com métricas (auth) |
 | `POST /painel/api/ads/:id/status`                                | Pausa/ativa campanha, conjunto ou anúncio (auth) |
+| `POST /webhook/telegram`                                          | Recebe updates do bot do Telegram (`/start`, contato compartilhado) |
+| `GET /painel/api/telegram/contacts`                               | Lista contatos captados pelo bot do Telegram (auth) |
 
 ### Interface do painel (`public/painel.html`)
 
@@ -453,6 +495,8 @@ de ícones que troca entre três telas dentro da mesma página:
   `/comentarios` e `/conversas` criadas junto com esse redesign).
 - **📊 Ads Manager** — lista de campanhas (era um modal antes, agora é página própria),
   pausar/ativar.
+- **📨 Telegram** — lista de contatos (leads) captados pelo bot, com telefone, username e
+  parâmetro de origem (campanha) quando disponível.
 
 Se quiser ir além de HTML/CSS/JS puro no futuro (ex.: migrar para React/Tailwind/shadcn),
 isso é uma mudança de arquitetura grande (build step novo, mudar como `server.js` serve os

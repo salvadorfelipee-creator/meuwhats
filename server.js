@@ -6,13 +6,23 @@ const db = require("./db");
 const wa = require("./whatsapp");
 const ig = require("./instagram");
 const ads = require("./ads");
+const tg = require("./telegram");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "meu_token_secreto";
 const INSTAGRAM_VERIFY_TOKEN = process.env.INSTAGRAM_VERIFY_TOKEN || "meu_token_secreto_instagram";
+const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const PAINEL_USER = process.env.PAINEL_USER || "admin";
 const PAINEL_PASS = process.env.PAINEL_PASS || "admin";
+
+const TELEGRAM_START_MESSAGE =
+  process.env.TELEGRAM_START_MESSAGE ||
+  "Olá! 👋 Para continuar seu atendimento, toque no botão abaixo pra compartilhar seu contato.";
+
+const TELEGRAM_THANKS_MESSAGE =
+  process.env.TELEGRAM_THANKS_MESSAGE ||
+  "Recebemos seu contato, obrigado! Em breve alguém da nossa equipe vai falar com você. 🙌";
 
 const INSTAGRAM_COMMENT_REPLY =
   process.env.INSTAGRAM_COMMENT_REPLY ||
@@ -258,6 +268,53 @@ async function processarEntryInstagram(entry) {
   }
 }
 
+// ─── PROCESSAR UPDATES DO TELEGRAM ───────────────────────────────────────────
+async function processarUpdateTelegram(update) {
+  const msg = update.message;
+  if (!msg) return;
+  const chatId = msg.chat?.id;
+  if (!chatId) return;
+
+  if (msg.contact) {
+    const contato = msg.contact;
+    await db.telegramUpsertContact({
+      chat_id: String(chatId),
+      telegram_user_id: contato.user_id ? String(contato.user_id) : String(msg.from?.id || ""),
+      first_name: contato.first_name || msg.from?.first_name,
+      last_name: contato.last_name || msg.from?.last_name,
+      username: msg.from?.username,
+      phone: contato.phone_number,
+      created_at: Date.now(),
+    });
+    console.log(`📨 Contato do Telegram captado: ${contato.phone_number}`);
+    try {
+      await tg.sendMessage(chatId, TELEGRAM_THANKS_MESSAGE, tg.removerTeclado());
+    } catch (err) {
+      console.error("Erro ao confirmar contato no Telegram:", err.message);
+    }
+    return;
+  }
+
+  const texto = msg.text || "";
+  if (texto.startsWith("/start")) {
+    const startParam = texto.split(" ")[1] || null;
+    await db.telegramUpsertContact({
+      chat_id: String(chatId),
+      telegram_user_id: String(msg.from?.id || ""),
+      first_name: msg.from?.first_name,
+      last_name: msg.from?.last_name,
+      username: msg.from?.username,
+      start_param: startParam,
+      created_at: Date.now(),
+    });
+    try {
+      await tg.sendMessage(chatId, TELEGRAM_START_MESSAGE, tg.botaoCompartilharContato("📱 Compartilhar meu contato"));
+    } catch (err) {
+      console.error("Erro ao enviar boas-vindas no Telegram:", err.message);
+    }
+  }
+}
+
 // ─── SERVIDOR ─────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -310,6 +367,16 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, "OK");
       }
       return send(res, 404, "Not found");
+    }
+
+    // POST /webhook/telegram — updates do bot (mensagens, /start, contato compartilhado)
+    if (req.method === "POST" && path_ === "/webhook/telegram") {
+      if (TELEGRAM_WEBHOOK_SECRET && req.headers["x-telegram-bot-api-secret-token"] !== TELEGRAM_WEBHOOK_SECRET) {
+        return send(res, 401, "Unauthorized");
+      }
+      const body = await parseBody(req);
+      await processarUpdateTelegram(body);
+      return send(res, 200, "OK");
     }
 
     // GET /privacidade — política de privacidade (pública, sem auth)
@@ -515,6 +582,12 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         return send(res, 500, { error: err.message });
       }
+    }
+
+    // GET /painel/api/telegram/contacts — lista de contatos captados pelo bot
+    if (req.method === "GET" && path_ === "/painel/api/telegram/contacts") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.telegramListContacts());
     }
 
     // GET /media/:filename — servir arquivo de mídia

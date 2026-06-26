@@ -96,6 +96,17 @@ const ready = (async () => {
     instagram_user_id TEXT PRIMARY KEY,
     welcomed_at INTEGER
   )`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS telegram_contacts (
+    chat_id TEXT PRIMARY KEY,
+    telegram_user_id TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    username TEXT,
+    phone TEXT,
+    start_param TEXT,
+    created_at INTEGER NOT NULL
+  )`);
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -189,6 +200,37 @@ async function instagramLimparSaudados() {
   return result.rowsAffected;
 }
 
+async function telegramUpsertContact(c) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO telegram_contacts (chat_id, telegram_user_id, first_name, last_name, username, phone, start_param, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(chat_id) DO UPDATE SET
+            telegram_user_id = excluded.telegram_user_id,
+            first_name = COALESCE(excluded.first_name, telegram_contacts.first_name),
+            last_name = COALESCE(excluded.last_name, telegram_contacts.last_name),
+            username = COALESCE(excluded.username, telegram_contacts.username),
+            phone = COALESCE(excluded.phone, telegram_contacts.phone),
+            start_param = COALESCE(excluded.start_param, telegram_contacts.start_param)`,
+    args: [
+      c.chat_id,
+      c.telegram_user_id || null,
+      c.first_name || null,
+      c.last_name || null,
+      c.username || null,
+      c.phone || null,
+      c.start_param || null,
+      c.created_at,
+    ],
+  });
+}
+
+async function telegramListContacts() {
+  await ready;
+  const result = await client.execute(`SELECT * FROM telegram_contacts ORDER BY created_at DESC`);
+  return result.rows;
+}
+
 module.exports = {
   upsertConversation,
   insertMessage,
@@ -198,4 +240,6 @@ module.exports = {
   instagramJaFoiSaudado,
   instagramMarcarSaudado,
   instagramLimparSaudados,
+  telegramUpsertContact,
+  telegramListContacts,
 };

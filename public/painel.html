@@ -148,6 +148,7 @@
     <button class="nav-item active" data-view="whatsapp" title="WhatsApp">💬</button>
     <button class="nav-item" data-view="instagram" title="Instagram">📸</button>
     <button class="nav-item" data-view="ads" title="Ads Manager">📊</button>
+    <button class="nav-item" data-view="telegram" title="Telegram">📨</button>
   </nav>
 
   <!-- ── WhatsApp ─────────────────────────────────────────── -->
@@ -220,6 +221,19 @@
       <div class="cards-grid" id="ads-lista">Carregando...</div>
     </div>
   </div>
+
+  <!-- ── Telegram ─────────────────────────────────────────── -->
+  <div id="view-telegram" class="view">
+    <div class="page-wrap">
+      <div class="page-header">
+        <h2>Telegram — Contatos captados</h2>
+        <div class="page-header-acoes">
+          <button id="tg-atualizar" class="btn-primario">Atualizar</button>
+        </div>
+      </div>
+      <div class="cards-grid" id="tg-lista">Carregando...</div>
+    </div>
+  </div>
 </div>
 
 <div id="modal-massa">
@@ -256,6 +270,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     document.getElementById(`view-${btn.dataset.view}`).classList.add("ativa");
     if (btn.dataset.view === "instagram") carregarTudoInstagram();
     if (btn.dataset.view === "ads") carregarCampanhas();
+    if (btn.dataset.view === "telegram") carregarContatosTelegram();
   });
 });
 
@@ -660,6 +675,36 @@ async function carregarCampanhas() {
 }
 
 document.getElementById("ads-atualizar").addEventListener("click", carregarCampanhas);
+
+// ─── Telegram ───────────────────────────────────────────────────────────────
+async function carregarContatosTelegram() {
+  const div = document.getElementById("tg-lista");
+  div.textContent = "Carregando...";
+  try {
+    const res = await fetch("/painel/api/telegram/contacts");
+    const contatos = await res.json();
+    if (contatos.error) throw new Error(contatos.error);
+    if (!contatos.length) {
+      div.innerHTML = `<div class="card lista-vazia">Nenhum contato captado ainda.</div>`;
+      return;
+    }
+    div.innerHTML = contatos.map((c) => `
+      <div class="card">
+        <strong>${escapeHtml(`${c.first_name || ""} ${c.last_name || ""}`.trim() || "Sem nome")}</strong>
+        ${c.username ? `<div style="color:var(--text-muted);font-size:12px;">@${escapeHtml(c.username)}</div>` : ""}
+        <div style="margin-top:8px; font-size:13.5px;">${
+          c.phone ? "📞 " + escapeHtml(c.phone) : `<span style="color:var(--text-muted);">Ainda não compartilhou o telefone</span>`
+        }</div>
+        ${c.start_param ? `<div style="font-size:12px; color:var(--text-muted); margin-top:4px;">Origem: ${escapeHtml(c.start_param)}</div>` : ""}
+        <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">${formatarHoraIg(c.created_at)}</div>
+      </div>
+    `).join("");
+  } catch (err) {
+    div.innerHTML = `<div class="card ig-erro">Erro ao carregar contatos: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+document.getElementById("tg-atualizar").addEventListener("click", carregarContatosTelegram);
 
 carregarNumeros().then(carregarConversas);
 setInterval(() => {
