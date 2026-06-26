@@ -77,13 +77,19 @@ async function getComentariosUltimoPost() {
   if (status >= 400) throw new Error(`Falha ao listar publicações: ${JSON.stringify(json)}`);
   const post = json.data?.[0];
   if (!post) return [];
-  const { status: s2, json: comentarios } = await graphRequest("GET", `/${GRAPH_VERSION}/${post.id}/comments`);
+  const { status: s2, json: comentarios } = await graphRequest(
+    "GET",
+    `/${GRAPH_VERSION}/${post.id}/comments?fields=text,username,timestamp`
+  );
   if (s2 >= 400) throw new Error(`Falha ao ler comentários: ${JSON.stringify(comentarios)}`);
   return comentarios.data || [];
 }
 
 async function getConversas() {
-  const { status, json } = await graphRequest("GET", `/${GRAPH_VERSION}/${ACCOUNT_ID}/conversations`);
+  const { status, json } = await graphRequest(
+    "GET",
+    `/${GRAPH_VERSION}/${ACCOUNT_ID}/conversations?fields=participants,updated_time`
+  );
   if (status >= 400) throw new Error(`Falha ao ler conversas: ${JSON.stringify(json)}`);
   return json.data || [];
 }

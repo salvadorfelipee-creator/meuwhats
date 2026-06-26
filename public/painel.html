@@ -3,133 +3,222 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Painel WhatsApp</title>
+<title>Painel Felizcred</title>
 <style>
+  :root {
+    --bg: #FAF9F5;
+    --bg-alt: #F2F0E8;
+    --sidebar: #1F1E1D;
+    --sidebar-icon: #A8A6A0;
+    --accent: #D97757;
+    --accent-soft: #F4E3D9;
+    --text: #1F1E1D;
+    --text-muted: #6B6A66;
+    --border: #E8E6DE;
+    --card: #FFFFFF;
+    --radius: 12px;
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    background: #f0f2f5;
-    color: #111b21;
+    background: var(--bg);
+    color: var(--text);
   }
-  #app { display: flex; height: 100vh; }
+  h2, h3 { margin: 0; font-weight: 600; }
+  #app { display: flex; height: 100vh; overflow: hidden; }
 
-  /* ── Sidebar ─────────────────────────────────────────────── */
-  #conversas { width: 360px; background: #fff; border-right: 1px solid #e9edef; display: flex; flex-direction: column; flex-shrink: 0; }
-  #conversas-header { padding: 16px; background: #075e54; color: #fff; font-size: 19px; font-weight: 600; }
-  #abas-numeros { display: flex; background: #075e54; padding: 0 8px; gap: 4px; }
-  .aba-numero { padding: 8px 14px; color: #cfe9e5; font-size: 13px; cursor: pointer; border-bottom: 3px solid transparent; }
-  .aba-numero.ativa { color: #fff; border-bottom-color: #00a884; font-weight: 600; }
-  #busca-wrap { padding: 8px 12px; border-bottom: 1px solid #e9edef; }
-  #busca { width: 100%; padding: 8px 12px; border: none; border-radius: 8px; background: #f0f2f5; outline: none; font-size: 14px; }
+  /* ── Navegação lateral (ícones) ──────────────────────────── */
+  #nav-rail { width: 72px; background: var(--sidebar); display: flex; flex-direction: column; align-items: center; padding: 18px 0; gap: 6px; flex-shrink: 0; }
+  #nav-rail .brand { color: #fff; font-size: 18px; font-weight: 700; margin-bottom: 18px; }
+  .nav-item { width: 48px; height: 48px; border: none; background: transparent; border-radius: 10px; color: var(--sidebar-icon); font-size: 21px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s; }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+  .nav-item.active { background: var(--accent); color: #fff; }
+
+  /* ── Views (telas inteiras) ──────────────────────────────── */
+  .view { flex: 1; display: none; min-width: 0; overflow: hidden; }
+  .view.ativa { display: flex; }
+
+  .page-wrap { flex: 1; overflow-y: auto; padding: 28px 36px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .page-header h2 { font-size: 22px; }
+  .page-header-acoes { display: flex; gap: 8px; }
+
+  .btn-secundario { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-secundario:hover { background: var(--bg-alt); }
+  .btn-primario { background: var(--accent); border: none; color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-primario:hover { opacity: 0.9; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .lista-vazia { color: var(--text-muted); font-size: 13px; padding: 8px 0; }
+
+  /* ── WhatsApp: lista de conversas ────────────────────────── */
+  #conversas { width: 360px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  #conversas-header { padding: 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  #conversas-header span.titulo { font-size: 17px; font-weight: 700; }
+  #conversas-header .acoes button { background: transparent; border: none; color: var(--text-muted); font-size: 17px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
+  #conversas-header .acoes button:hover { background: var(--bg-alt); color: var(--text); }
+  #abas-numeros { display: flex; padding: 0 12px; gap: 4px; border-bottom: 1px solid var(--border); }
+  .aba-numero { padding: 9px 12px; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; }
+  .aba-numero.ativa { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  #busca-wrap { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  #busca { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-alt); outline: none; font-size: 14px; }
   #lista-conversas { overflow-y: auto; flex: 1; }
 
-  .conversa { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f0f2f5; cursor: pointer; }
-  .conversa:hover { background: #f5f6f6; }
-  .conversa.ativa { background: #e9edef; }
-  .avatar { width: 44px; height: 44px; border-radius: 50%; background: #075e54; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 16px; flex-shrink: 0; }
+  .conversa { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--bg-alt); cursor: pointer; }
+  .conversa:hover { background: var(--bg-alt); }
+  .conversa.ativa { background: var(--accent-soft); }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--sidebar); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; flex-shrink: 0; }
   .conversa-info { flex: 1; min-width: 0; }
   .conversa-linha1 { display: flex; justify-content: space-between; align-items: baseline; }
-  .conversa-nome { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .conversa-hora { font-size: 12px; color: #667781; flex-shrink: 0; margin-left: 8px; }
-  .conversa-preview { font-size: 13px; color: #667781; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conversa-nome { font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conversa-hora { font-size: 12px; color: var(--text-muted); flex-shrink: 0; margin-left: 8px; }
+  .conversa-preview { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* ── Área da conversa ────────────────────────────────────── */
+  /* ── WhatsApp: área da conversa ───────────────────────────── */
   #conversa-atual { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  #chat-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #f0f2f5; border-bottom: 1px solid #e9edef; }
+  #chat-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--border); }
   #chat-header .nome { font-weight: 600; font-size: 15px; }
-  #chat-header .telefone { font-size: 12px; color: #667781; }
+  #chat-header .telefone { font-size: 12px; color: var(--text-muted); }
 
-  #mensagens {
-    flex: 1; overflow-y: auto; padding: 20px 8%;
-    background-color: #efeae2;
-    background-image: linear-gradient(180deg, rgba(0,0,0,0.02), rgba(0,0,0,0.02));
-  }
+  #mensagens { flex: 1; overflow-y: auto; padding: 20px 8%; background: var(--bg); }
   .data-divisor { text-align: center; margin: 16px 0; }
-  .data-divisor span { background: #fff; padding: 5px 12px; border-radius: 8px; font-size: 12px; color: #54656f; box-shadow: 0 1px 1px rgba(0,0,0,0.08); }
+  .data-divisor span { background: var(--card); border: 1px solid var(--border); padding: 5px 12px; border-radius: 8px; font-size: 12px; color: var(--text-muted); }
 
-  .msg { max-width: 65%; margin-bottom: 8px; padding: 6px 9px 8px; border-radius: 8px; line-height: 1.4; font-size: 14.5px; box-shadow: 0 1px 1px rgba(0,0,0,0.08); position: relative; }
-  .msg.in { background: #fff; margin-right: auto; border-top-left-radius: 0; }
-  .msg.out { background: #d9fdd3; margin-left: auto; border-top-right-radius: 0; }
+  .msg { max-width: 65%; margin-bottom: 8px; padding: 7px 10px 9px; border-radius: 10px; line-height: 1.4; font-size: 14.5px; box-shadow: 0 1px 1px rgba(0,0,0,0.04); position: relative; }
+  .msg.in { background: var(--card); margin-right: auto; border: 1px solid var(--border); border-top-left-radius: 2px; }
+  .msg.out { background: var(--accent-soft); margin-left: auto; border-top-right-radius: 2px; }
   .msg img { max-width: 260px; border-radius: 6px; display: block; margin-bottom: 4px; }
   .msg audio { display: block; margin-bottom: 4px; }
   .msg video { max-width: 260px; border-radius: 6px; display: block; margin-bottom: 4px; }
   .msg .texto { white-space: pre-wrap; word-break: break-word; }
-  .msg .hora { font-size: 11px; color: #667781; margin-top: 2px; text-align: right; }
-  .msg.out .hora { color: #4a8e3d; }
-  .msg .erro-msg { font-size: 12px; color: #d32f2f; margin-top: 4px; }
+  .msg .hora { font-size: 11px; color: var(--text-muted); margin-top: 2px; text-align: right; }
+  .msg .erro-msg { font-size: 12px; color: #c0392b; margin-top: 4px; }
 
-  /* ── Composer ─────────────────────────────────────────────── */
-  #form-resposta { display: flex; gap: 8px; padding: 12px 16px; background: #f0f2f5; border-top: 1px solid #e9edef; }
-  #texto-resposta { flex: 1; padding: 11px 16px; border: none; border-radius: 22px; outline: none; font-size: 14.5px; }
-  #form-resposta button { padding: 0 22px; border: none; border-radius: 22px; background: #00a884; color: #fff; cursor: pointer; font-weight: 600; }
-  #form-resposta button:hover { background: #029873; }
+  #form-resposta { display: flex; gap: 8px; padding: 12px 16px; background: var(--card); border-top: 1px solid var(--border); }
+  #texto-resposta { flex: 1; padding: 11px 16px; border: 1px solid var(--border); border-radius: 22px; outline: none; font-size: 14.5px; background: var(--bg-alt); }
+  #form-resposta button { padding: 0 22px; border: none; border-radius: 22px; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
+  #form-resposta button:hover { opacity: 0.9; }
 
-  #vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: #667781; background: #f8f9fa; gap: 8px; }
+  #vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: var(--text-muted); background: var(--bg-alt); gap: 8px; }
   #vazio .icone { font-size: 64px; opacity: 0.3; }
 
-  /* ── Envio em massa ──────────────────────────────────────── */
-  #btn-massa { background: transparent; border: none; color: #fff; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
-  #btn-massa:hover { background: rgba(255,255,255,0.15); }
-  #modal-massa { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 10; }
-  .modal-conteudo { background: #fff; border-radius: 10px; padding: 20px 24px; width: 480px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
+  /* ── Modal envio em massa ─────────────────────────────────── */
+  #modal-massa { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 10; }
+  .modal-conteudo { background: var(--card); border-radius: 12px; padding: 20px 24px; width: 480px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
   .modal-conteudo h3 { margin: 0 0 14px; }
   .modal-conteudo label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
-  .modal-conteudo input, .modal-conteudo textarea { width: 100%; padding: 8px 10px; border: 1px solid #d1d7db; border-radius: 6px; font-size: 13.5px; font-family: inherit; resize: vertical; }
+  .modal-conteudo input, .modal-conteudo textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13.5px; font-family: inherit; resize: vertical; }
   .modal-conteudo textarea { min-height: 70px; }
   .modal-botoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   .modal-botoes button { padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
-  #massa-cancelar { background: #f0f2f5; }
-  #massa-enviar { background: #00a884; color: #fff; }
-  #massa-resultado { margin-top: 12px; font-size: 13px; color: #54656f; }
+  #massa-cancelar { background: var(--bg-alt); }
+  #massa-enviar { background: var(--accent); color: #fff; }
+  #massa-resultado { margin-top: 12px; font-size: 13px; color: var(--text-muted); }
 
-  /* ── Campanhas de anúncios ────────────────────────────────── */
-  #btn-ads { background: transparent; border: none; color: #fff; font-size: 18px; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
-  #btn-ads:hover { background: rgba(255,255,255,0.15); }
-  #modal-ads { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 10; }
-  .ads-card { border: 1px solid #e9edef; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
-  .ads-card-topo { display: flex; justify-content: space-between; align-items: center; }
-  .ads-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
-  .ads-status.ACTIVE { background: #d9fdd3; color: #008069; }
-  .ads-status.PAUSED { background: #f0f2f5; color: #667781; }
-  .ads-metricas { font-size: 12px; color: #54656f; margin-top: 6px; }
-  .ads-card button { font-size: 12px; padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer; background: #00a884; color: #fff; }
+  /* ── Instagram ────────────────────────────────────────────── */
+  #ig-perfil-card { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  #ig-perfil-card img { width: 52px; height: 52px; border-radius: 50%; }
+  #ig-perfil-card .nome { font-weight: 700; font-size: 16px; }
+  #ig-perfil-card .tipo { font-size: 12px; color: var(--text-muted); }
+  .stat-card .valor { font-size: 22px; font-weight: 700; }
+  .stat-card .rotulo { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .ig-item { padding: 10px 0; border-bottom: 1px solid var(--bg-alt); font-size: 13.5px; }
+  .ig-item:last-child { border-bottom: none; }
+  .ig-item .ig-item-topo { display: flex; justify-content: space-between; font-weight: 600; }
+  .ig-item .ig-item-hora { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+  .ig-item .ig-item-texto { color: var(--text-muted); margin-top: 2px; }
+  .ig-erro { color: #c0392b; font-size: 13px; }
+
+  /* ── Ads Manager ──────────────────────────────────────────── */
+  .ads-card-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .ads-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; flex-shrink: 0; }
+  .ads-status.ACTIVE { background: #DFF0DA; color: #2E7D32; }
+  .ads-status.PAUSED { background: var(--bg-alt); color: var(--text-muted); }
+  .ads-metricas { font-size: 12px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
+  .ads-card button { margin-top: 10px; font-size: 12px; padding: 5px 12px; border-radius: 6px; border: none; cursor: pointer; background: var(--accent); color: #fff; }
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="conversas">
-    <div id="conversas-header" style="display:flex; align-items:center; justify-content:space-between;">
-      <span>Conversas</span>
-      <span>
-        <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
-        <button id="btn-ads" title="Campanhas de anúncios">📊</button>
-        <button id="btn-reset-ig" title="Resetar quem já recebeu boas-vindas no Instagram (uso em testes)">📸🔄</button>
-      </span>
+  <nav id="nav-rail">
+    <div class="brand">FC</div>
+    <button class="nav-item active" data-view="whatsapp" title="WhatsApp">💬</button>
+    <button class="nav-item" data-view="instagram" title="Instagram">📸</button>
+    <button class="nav-item" data-view="ads" title="Ads Manager">📊</button>
+  </nav>
+
+  <!-- ── WhatsApp ─────────────────────────────────────────── -->
+  <div id="view-whatsapp" class="view ativa">
+    <div id="conversas">
+      <div id="conversas-header">
+        <span class="titulo">WhatsApp</span>
+        <span class="acoes">
+          <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
+        </span>
+      </div>
+      <div id="abas-numeros"></div>
+      <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
+      <div id="lista-conversas"></div>
     </div>
-    <div id="abas-numeros"></div>
-    <div id="instagram-perfil" style="display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid #e9edef; font-size:13px; color:#54656f;"></div>
-    <div id="instagram-insights" style="padding:6px 12px; border-bottom:1px solid #e9edef; font-size:12px; color:#54656f;"></div>
-    <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
-    <div id="lista-conversas"></div>
+    <div id="conversa-atual" style="display:none;">
+      <div id="chat-header">
+        <div class="avatar" id="chat-avatar"></div>
+        <div>
+          <div class="nome" id="chat-nome"></div>
+          <div class="telefone" id="chat-telefone"></div>
+        </div>
+      </div>
+      <div id="mensagens"></div>
+      <form id="form-resposta">
+        <input id="texto-resposta" placeholder="Digite uma mensagem..." autocomplete="off" />
+        <button type="submit">Enviar</button>
+      </form>
+    </div>
+    <div id="vazio">
+      <div class="icone">💬</div>
+      <div>Selecione uma conversa para começar</div>
+    </div>
   </div>
-  <div id="conversa-atual" style="display:none;">
-    <div id="chat-header">
-      <div class="avatar" id="chat-avatar"></div>
-      <div>
-        <div class="nome" id="chat-nome"></div>
-        <div class="telefone" id="chat-telefone"></div>
+
+  <!-- ── Instagram ────────────────────────────────────────── -->
+  <div id="view-instagram" class="view">
+    <div class="page-wrap">
+      <div class="page-header">
+        <h2>Instagram</h2>
+        <div class="page-header-acoes">
+          <button id="ig-reset-boasvindas" class="btn-secundario">Resetar boas-vindas</button>
+          <button id="ig-atualizar" class="btn-primario">Atualizar</button>
+        </div>
+      </div>
+      <div class="card" id="ig-perfil-card">Carregando perfil...</div>
+      <div class="cards-grid" id="ig-stats-grid"></div>
+      <div class="cols-2">
+        <div class="card">
+          <h3>Comentários do último post</h3>
+          <div id="ig-comentarios" style="margin-top:8px;">Carregando...</div>
+        </div>
+        <div class="card">
+          <h3>Conversas (DMs)</h3>
+          <div id="ig-conversas" style="margin-top:8px;">Carregando...</div>
+        </div>
       </div>
     </div>
-    <div id="mensagens"></div>
-    <form id="form-resposta">
-      <input id="texto-resposta" placeholder="Digite uma mensagem..." autocomplete="off" />
-      <button type="submit">Enviar</button>
-    </form>
   </div>
-  <div id="vazio">
-    <div class="icone">💬</div>
-    <div>Selecione uma conversa para começar</div>
+
+  <!-- ── Ads Manager ──────────────────────────────────────── -->
+  <div id="view-ads" class="view">
+    <div class="page-wrap">
+      <div class="page-header">
+        <h2>Ads Manager</h2>
+        <div class="page-header-acoes">
+          <button id="ads-atualizar" class="btn-primario">Atualizar</button>
+        </div>
+      </div>
+      <div class="cards-grid" id="ads-lista">Carregando...</div>
+    </div>
   </div>
 </div>
 
@@ -152,22 +241,23 @@
   </div>
 </div>
 
-<div id="modal-ads">
-  <div class="modal-conteudo" style="width:640px;">
-    <h3>Campanhas de anúncios</h3>
-    <div id="ads-lista">Carregando...</div>
-    <div class="modal-botoes">
-      <button id="ads-atualizar" type="button">Atualizar</button>
-      <button id="ads-fechar" type="button">Fechar</button>
-    </div>
-  </div>
-</div>
-
 <script>
 let telefoneAtual = null;
 let conversasCache = [];
 let numeros = [];
 let numeroAtivoId = null;
+
+// ─── Navegação entre views ─────────────────────────────────────────────────
+document.querySelectorAll(".nav-item").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".nav-item").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".view").forEach((v) => v.classList.remove("ativa"));
+    btn.classList.add("active");
+    document.getElementById(`view-${btn.dataset.view}`).classList.add("ativa");
+    if (btn.dataset.view === "instagram") carregarTudoInstagram();
+    if (btn.dataset.view === "ads") carregarCampanhas();
+  });
+});
 
 async function carregarNumeros() {
   const res = await fetch("/painel/api/numbers");
@@ -350,13 +440,6 @@ document.getElementById("btn-massa").addEventListener("click", () => {
   document.getElementById("modal-massa").style.display = "flex";
 });
 
-document.getElementById("btn-reset-ig").addEventListener("click", async () => {
-  if (!confirm("Resetar quem já recebeu boas-vindas no Instagram? (uso recomendado só em testes)")) return;
-  const res = await fetch("/painel/api/instagram/reset-boasvindas", { method: "POST" });
-  const data = await res.json();
-  alert(`Removidos ${data.removidos} registro(s). Próxima DM de qualquer conta vai ser tratada como primeira vez.`);
-});
-
 document.getElementById("massa-cancelar").addEventListener("click", () => {
   document.getElementById("modal-massa").style.display = "none";
 });
@@ -396,42 +479,131 @@ document.getElementById("massa-enviar").addEventListener("click", async () => {
   carregarConversas();
 });
 
+// ─── Instagram ──────────────────────────────────────────────────────────────
+function formatarHoraIg(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + " " +
+    d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
 async function carregarPerfilInstagram() {
-  const div = document.getElementById("instagram-perfil");
+  const div = document.getElementById("ig-perfil-card");
   try {
     const res = await fetch("/painel/api/instagram/perfil");
     const perfil = await res.json();
-    if (!perfil.username) return;
+    if (!perfil.username) {
+      div.innerHTML = `<span class="ig-erro">Instagram ainda não conectado.</span>`;
+      return;
+    }
     div.innerHTML = `
-      <img src="${perfil.profile_picture_url}" style="width:24px;height:24px;border-radius:50%;" />
-      <span>Instagram conectado: <strong>@${escapeHtml(perfil.username)}</strong> (${escapeHtml(perfil.account_type || "")})</span>
+      <img src="${perfil.profile_picture_url}" />
+      <div>
+        <div class="nome">@${escapeHtml(perfil.username)}</div>
+        <div class="tipo">${escapeHtml(perfil.account_type || "")}</div>
+      </div>
     `;
-  } catch {
-    // sem Instagram configurado ainda — não mostra nada
+  } catch (err) {
+    div.innerHTML = `<span class="ig-erro">Erro ao carregar perfil: ${escapeHtml(err.message)}</span>`;
   }
 }
 
 async function carregarInsightsInstagram() {
-  const div = document.getElementById("instagram-insights");
+  const div = document.getElementById("ig-stats-grid");
   try {
     const res = await fetch("/painel/api/instagram/insights");
     const post = await res.json();
-    if (!post || !post.id) return;
-    div.innerHTML = `Último post (${escapeHtml(post.caption ? post.caption.slice(0, 40) : post.id)}): 👀 alcance ${post.reach ?? "-"} · 💬 interações ${post.total_interactions ?? "-"}`;
-  } catch {
-    // sem insights disponíveis ainda
+    if (!post || !post.id) {
+      div.innerHTML = `<div class="card lista-vazia">Sem publicações para mostrar insights ainda.</div>`;
+      return;
+    }
+    div.innerHTML = `
+      <div class="card stat-card">
+        <div class="valor">${post.reach ?? "-"}</div>
+        <div class="rotulo">Alcance do último post</div>
+      </div>
+      <div class="card stat-card">
+        <div class="valor">${post.total_interactions ?? "-"}</div>
+        <div class="rotulo">Interações do último post</div>
+      </div>
+      <div class="card stat-card">
+        <div class="valor" style="font-size:14px; font-weight:600;">${escapeHtml(post.caption ? post.caption.slice(0, 60) : post.id)}</div>
+        <div class="rotulo">Legenda</div>
+      </div>
+    `;
+  } catch (err) {
+    div.innerHTML = `<div class="card ig-erro">Erro ao carregar insights: ${escapeHtml(err.message)}</div>`;
   }
 }
 
-document.getElementById("btn-ads").addEventListener("click", () => {
-  document.getElementById("modal-ads").style.display = "flex";
-  carregarCampanhas();
-});
-document.getElementById("ads-fechar").addEventListener("click", () => {
-  document.getElementById("modal-ads").style.display = "none";
-});
-document.getElementById("ads-atualizar").addEventListener("click", carregarCampanhas);
+async function carregarComentariosInstagram() {
+  const div = document.getElementById("ig-comentarios");
+  try {
+    const res = await fetch("/painel/api/instagram/comentarios");
+    const comentarios = await res.json();
+    if (comentarios.error) throw new Error(comentarios.error);
+    if (!comentarios.length) {
+      div.innerHTML = `<div class="lista-vazia">Nenhum comentário no último post.</div>`;
+      return;
+    }
+    div.innerHTML = comentarios.map((c) => `
+      <div class="ig-item">
+        <div class="ig-item-topo">
+          <span>${escapeHtml(c.username || "—")}</span>
+          <span class="ig-item-hora">${formatarHoraIg(c.timestamp)}</span>
+        </div>
+        <div class="ig-item-texto">${escapeHtml(c.text || "")}</div>
+      </div>
+    `).join("");
+  } catch (err) {
+    div.innerHTML = `<div class="ig-erro">${escapeHtml(err.message)}</div>`;
+  }
+}
 
+async function carregarConversasInstagram() {
+  const div = document.getElementById("ig-conversas");
+  try {
+    const res = await fetch("/painel/api/instagram/conversas");
+    const conversas = await res.json();
+    if (conversas.error) throw new Error(conversas.error);
+    if (!conversas.length) {
+      div.innerHTML = `<div class="lista-vazia">Nenhuma conversa por aqui ainda.</div>`;
+      return;
+    }
+    div.innerHTML = conversas.map((c) => {
+      const participante = (c.participants?.data || []).map((p) => p.username || p.name).filter(Boolean).join(", ");
+      return `
+        <div class="ig-item">
+          <div class="ig-item-topo">
+            <span>${escapeHtml(participante || c.id)}</span>
+            <span class="ig-item-hora">${formatarHoraIg(c.updated_time)}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    div.innerHTML = `<div class="ig-erro">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function carregarTudoInstagram() {
+  carregarPerfilInstagram();
+  carregarInsightsInstagram();
+  carregarComentariosInstagram();
+  carregarConversasInstagram();
+}
+
+document.getElementById("ig-atualizar").addEventListener("click", carregarTudoInstagram);
+
+document.getElementById("ig-reset-boasvindas").addEventListener("click", async () => {
+  if (!confirm("Resetar quem já recebeu boas-vindas no Instagram? (uso recomendado só em testes)")) return;
+  const res = await fetch("/painel/api/instagram/reset-boasvindas", { method: "POST" });
+  const data = await res.json();
+  alert(`Removidos ${data.removidos} registro(s). Próxima DM de qualquer conta vai ser tratada como primeira vez.`);
+});
+
+// ─── Ads Manager ────────────────────────────────────────────────────────────
 function formatarMoeda(centavos) {
   if (centavos === undefined || centavos === null) return "-";
   return `R$ ${(Number(centavos) / 100).toFixed(2)}`;
@@ -456,42 +628,40 @@ async function carregarCampanhas() {
     const res = await fetch("/painel/api/ads/campanhas");
     const data = await res.json();
     if (data.error) {
-      div.textContent = `Erro: ${data.error}`;
+      div.innerHTML = `<div class="card ig-erro">Erro: ${escapeHtml(data.error)}</div>`;
       return;
     }
     const campanhas = data.campanhas || [];
     if (!campanhas.length) {
-      div.textContent = "Nenhuma campanha criada ainda.";
+      div.innerHTML = `<div class="card lista-vazia">Nenhuma campanha criada ainda.</div>`;
       return;
     }
     div.innerHTML = campanhas.map((c) => {
       const status = c.effective_status || c.status;
       const ins = c.insights || {};
       return `
-        <div class="ads-card">
+        <div class="card ads-card">
           <div class="ads-card-topo">
             <strong>${escapeHtml(c.name)}</strong>
             <span class="ads-status ${status === "ACTIVE" ? "ACTIVE" : "PAUSED"}">${escapeHtml(status)}</span>
           </div>
           <div class="ads-metricas">
-            Verba diária: ${formatarMoeda(c.daily_budget)} ·
-            Gasto: R$ ${ins.spend ?? "0"} · Impressões: ${ins.impressions ?? "-"} ·
+            Verba diária: ${formatarMoeda(c.daily_budget)}<br>
+            Gasto: R$ ${ins.spend ?? "0"} · Impressões: ${ins.impressions ?? "-"}<br>
             Cliques: ${ins.clicks ?? "-"} · CTR: ${ins.ctr ?? "-"}%
           </div>
-          <div style="margin-top:8px;">
-            <button onclick="alternarStatusAds('${c.id}','${status}')">${status === "ACTIVE" ? "Pausar" : "Ativar"}</button>
-          </div>
+          <button onclick="alternarStatusAds('${c.id}','${status}')">${status === "ACTIVE" ? "Pausar" : "Ativar"}</button>
         </div>
       `;
     }).join("");
   } catch (err) {
-    div.textContent = `Erro ao carregar campanhas: ${err.message}`;
+    div.innerHTML = `<div class="card ig-erro">Erro ao carregar campanhas: ${escapeHtml(err.message)}</div>`;
   }
 }
 
+document.getElementById("ads-atualizar").addEventListener("click", carregarCampanhas);
+
 carregarNumeros().then(carregarConversas);
-carregarPerfilInstagram();
-carregarInsightsInstagram();
 setInterval(() => {
   carregarConversas();
   carregarMensagens();

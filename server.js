@@ -449,6 +449,26 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // GET /painel/api/instagram/comentarios — comentários do último post
+    if (req.method === "GET" && path_ === "/painel/api/instagram/comentarios") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await ig.getComentariosUltimoPost());
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
+    // GET /painel/api/instagram/conversas — lista de conversas (DMs) do Instagram
+    if (req.method === "GET" && path_ === "/painel/api/instagram/conversas") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await ig.getConversas());
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // GET /painel/api/instagram/diagnostico — testa, com o token já configurado no
     // servidor, se cada permissão do Instagram está com Acesso Avançado de verdade
     if (req.method === "GET" && path_ === "/painel/api/instagram/diagnostico") {

@@ -435,5 +435,25 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `GET /painel/api/instagram/insights`                             | Métricas do último post (auth)              |
 | `POST /painel/api/instagram/reset-boasvindas`                    | Limpa quem já recebeu boas-vindas (auth)    |
 | `GET /painel/api/instagram/diagnostico`                          | Testa basic/manage_comments/manage_messages de verdade, sem precisar de token (auth) |
+| `GET /painel/api/instagram/comentarios`                          | Comentários do último post (auth)           |
+| `GET /painel/api/instagram/conversas`                            | Lista conversas (DMs) do Instagram (auth)   |
 | `GET /painel/api/ads/campanhas`                                  | Lista campanhas de anúncios com métricas (auth) |
 | `POST /painel/api/ads/:id/status`                                | Pausa/ativa campanha, conjunto ou anúncio (auth) |
+
+### Interface do painel (`public/painel.html`)
+
+Redesenhado em 26/06/2026 para um layout minimalista (paleta neutra/terracota, sem
+dependências novas — continua HTML/CSS/JS puro, sem build step) com uma navegação lateral
+de ícones que troca entre três telas dentro da mesma página:
+
+- **💬 WhatsApp** — lista de conversas + chat (era a tela única antes), envio em massa
+  continua em modal.
+- **📸 Instagram** — perfil conectado, métricas do último post, comentários do último post
+  e lista de conversas (DMs), botão de resetar boas-vindas (usa as rotas
+  `/comentarios` e `/conversas` criadas junto com esse redesign).
+- **📊 Ads Manager** — lista de campanhas (era um modal antes, agora é página própria),
+  pausar/ativar.
+
+Se quiser ir além de HTML/CSS/JS puro no futuro (ex.: migrar para React/Tailwind/shadcn),
+isso é uma mudança de arquitetura grande (build step novo, mudar como `server.js` serve os
+arquivos) — converse com o usuário antes, não assuma.
