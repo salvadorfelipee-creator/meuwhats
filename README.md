@@ -498,6 +498,17 @@ de ícones que troca entre três telas dentro da mesma página:
 - **📨 Telegram** — lista de contatos (leads) captados pelo bot, com telefone, username e
   parâmetro de origem (campanha) quando disponível.
 
+**Notificações de mensagem nova (WhatsApp)** — botão 🔔 no cabeçalho da aba WhatsApp pede
+permissão de notificação do navegador (`Notification` API). Com permissão concedida, toda
+mensagem recebida (em qualquer um dos números configurados em `PHONE_NUMBERS_JSON`, mesmo
+o que não está com a aba aberta no momento) dispara uma notificação do navegador e marca um
+indicador visual (bolinha laranja) na aba do número e no ícone 💬 do menu lateral; clicar na
+notificação leva direto pra conversa. Implementado via polling de 5s (`verificarNovasMensagens`
+em `painel.html`) comparando `last_message_at`/`last_direction` de `/painel/api/conversations/:businessId`
+— precisou adicionar `last_direction` na query `listConversations` em `db.js` pra saber se a
+última mensagem foi recebida (não notifica para mensagens que você mesmo enviou). Funciona
+só com a aba do navegador aberta (sem service worker / push em segundo plano).
+
 Se quiser ir além de HTML/CSS/JS puro no futuro (ex.: migrar para React/Tailwind/shadcn),
 isso é uma mudança de arquitetura grande (build step novo, mudar como `server.js` serve os
 arquivos) — converse com o usuário antes, não assuma.
