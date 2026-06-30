@@ -157,7 +157,8 @@ async function listConversations(businessNumberId) {
     sql: `
       SELECT c.*,
         (SELECT type FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_type,
-        (SELECT body FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_body
+        (SELECT body FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_body,
+        (SELECT direction FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_direction
       FROM conversations c
       WHERE c.business_number_id = ?
       ORDER BY c.last_message_at DESC

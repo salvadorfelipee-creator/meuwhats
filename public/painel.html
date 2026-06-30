@@ -61,8 +61,13 @@
   #conversas-header .acoes button { background: transparent; border: none; color: var(--text-muted); font-size: 17px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
   #conversas-header .acoes button:hover { background: var(--bg-alt); color: var(--text); }
   #abas-numeros { display: flex; padding: 0 12px; gap: 4px; border-bottom: 1px solid var(--border); }
-  .aba-numero { padding: 9px 12px; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; }
+  .aba-numero { position: relative; padding: 9px 14px 9px 12px; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; }
   .aba-numero.ativa { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .aba-numero.tem-novas::after { content: ""; position: absolute; top: 6px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+  .nav-item { position: relative; }
+  .nav-item.tem-novas::after { content: ""; position: absolute; top: 4px; right: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--sidebar); }
+  #btn-notif.ativado { color: var(--accent); }
   #busca-wrap { padding: 10px 12px; border-bottom: 1px solid var(--border); }
   #busca { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-alt); outline: none; font-size: 14px; }
   #lista-conversas { overflow-y: auto; flex: 1; }
@@ -157,6 +162,7 @@
       <div id="conversas-header">
         <span class="titulo">WhatsApp</span>
         <span class="acoes">
+          <button id="btn-notif" title="Ativar notificações de novas mensagens">🔔</button>
           <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
         </span>
       </div>
@@ -286,10 +292,12 @@ function renderizarAbas() {
   wrap.innerHTML = "";
   for (const n of numeros) {
     const div = document.createElement("div");
-    div.className = "aba-numero" + (n.id === numeroAtivoId ? " ativa" : "");
+    div.className = "aba-numero" + (n.id === numeroAtivoId ? " ativa" : "") + (naoLidosPorNumero.has(n.id) ? " tem-novas" : "");
     div.textContent = n.label || n.id;
     div.onclick = () => {
-      if (numeroAtivoId === n.id) return;
+      naoLidosPorNumero.delete(n.id);
+      atualizarBadgeNav();
+      if (numeroAtivoId === n.id) { renderizarAbas(); return; }
       numeroAtivoId = n.id;
       telefoneAtual = null;
       document.getElementById("conversa-atual").style.display = "none";
@@ -299,6 +307,84 @@ function renderizarAbas() {
     };
     wrap.appendChild(div);
   }
+}
+
+// ─── Notificações de novas mensagens (nos dois números de WhatsApp) ────────
+let ultimaMsgConhecida = {}; // chave `${numeroId}|${phone}` -> last_message_at já visto
+let primeiraVerificacaoFeita = false;
+let naoLidosPorNumero = new Set();
+
+function atualizarBadgeNav() {
+  const navWhats = document.querySelector('.nav-item[data-view="whatsapp"]');
+  navWhats.classList.toggle("tem-novas", naoLidosPorNumero.size > 0);
+}
+
+function atualizarBotaoNotif() {
+  const btn = document.getElementById("btn-notif");
+  if (typeof Notification === "undefined") { btn.style.display = "none"; return; }
+  btn.classList.toggle("ativado", Notification.permission === "granted");
+  btn.title = Notification.permission === "granted"
+    ? "Notificações ativadas"
+    : "Ativar notificações de novas mensagens";
+}
+
+document.getElementById("btn-notif").addEventListener("click", () => {
+  if (typeof Notification === "undefined") return;
+  Notification.requestPermission().then(atualizarBotaoNotif);
+});
+
+function notificarNovaMensagem(numero, conversa) {
+  const olhandoAgora = numeroAtivoId === numero.id && telefoneAtual === conversa.phone && document.hasFocus();
+  if (olhandoAgora) return;
+
+  naoLidosPorNumero.add(numero.id);
+  renderizarAbas();
+  atualizarBadgeNav();
+
+  if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  const notif = new Notification(`${numero.label || numero.id} · ${conversa.name || conversa.phone}`, {
+    body: previewTexto(conversa) || "Nova mensagem",
+    tag: `wa-${numero.id}-${conversa.phone}`,
+  });
+  notif.onclick = () => {
+    window.focus();
+    document.querySelector('.nav-item[data-view="whatsapp"]').click();
+    naoLidosPorNumero.delete(numero.id);
+    if (numeroAtivoId !== numero.id) {
+      numeroAtivoId = numero.id;
+      telefoneAtual = null;
+      renderizarAbas();
+      carregarConversas().then(() => selecionarConversa(conversa.phone));
+    } else {
+      renderizarAbas();
+      selecionarConversa(conversa.phone);
+    }
+    atualizarBadgeNav();
+  };
+}
+
+async function verificarNovasMensagens() {
+  for (const n of numeros) {
+    let lista;
+    try {
+      const res = await fetch(`/painel/api/conversations/${encodeURIComponent(n.id)}`);
+      lista = await res.json();
+    } catch {
+      continue;
+    }
+    for (const c of lista) {
+      const chave = `${n.id}|${c.phone}`;
+      const visto = ultimaMsgConhecida[chave];
+      const ehNova = c.last_message_at && (!visto || c.last_message_at > visto);
+      if (ehNova) {
+        if (primeiraVerificacaoFeita && c.last_direction === "in") {
+          notificarNovaMensagem(n, c);
+        }
+        ultimaMsgConhecida[chave] = c.last_message_at;
+      }
+    }
+  }
+  primeiraVerificacaoFeita = true;
 }
 
 function iniciais(nomeOuTelefone) {
@@ -706,10 +792,12 @@ async function carregarContatosTelegram() {
 
 document.getElementById("tg-atualizar").addEventListener("click", carregarContatosTelegram);
 
-carregarNumeros().then(carregarConversas);
+atualizarBotaoNotif();
+carregarNumeros().then(carregarConversas).then(verificarNovasMensagens);
 setInterval(() => {
   carregarConversas();
   carregarMensagens();
+  verificarNovasMensagens();
 }, 5000);
 </script>
 </body>
