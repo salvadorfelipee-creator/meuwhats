@@ -443,7 +443,16 @@ mesma do link instagram.com/p/DHOOi8jxpzI):
 **Quinta-feira 09/07/2026 às 9h**: pausar a campanha de pior resultado (painel 📊 ou pedir no
 chat). Sexta: comparar todas e decidir a vencedora.
 
-### Status (06/07/2026): campanhas e conjuntos CRIADOS e ATIVOS — falta o usuário criar os anúncios
+### Status (06/07/2026 à noite): teste A/B COMPLETO e NO AR
+
+As 6 campanhas estão completas (campanha + conjunto + anúncio), ativas, com o primeiro
+anúncio já aprovado e os demais em revisão da Meta. O anúncio usa a publicação do Instagram
+DHOOi8jxpzI com botão de WhatsApp (criativo `1028074113254702`, criado pelo usuário no
+Gerenciador de Anúncios e **reaproveitado via API nos outros 5 conjuntos** — descoberta
+importante: o bloqueio de app em desenvolvimento vale só pra `POST /adcreatives`; criar
+`POST /ads` referenciando `creative_id` existente funciona normal).
+
+### Detalhe da criação original (mantido para referência)
 
 As 6 campanhas + conjuntos foram criados via API em 06/07/2026, **ativos**, orçamento
 R$5,80/dia cada, término automático 10/07/2026 23:59. **Sem anúncio dentro** (não roda nem
