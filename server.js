@@ -185,15 +185,15 @@ const FLUXO_BOTOES = {
   },
   gerente_menos2: {
     texto:
-      "Ótimo! Acredito que você possa ter algum valor a receber. Nesse caso, para realizarmos uma análise técnica " +
-      "do seu caso, direcionamos o atendimento a um escritório de advocacia parceiro, especializado no assunto.\n\n" +
+      "Ótimo! Acredito que você possa ter algum valor a receber. Nesse caso, para realizarmos uma análise técnica, " +
+      "direcionamos o atendimento a um escritório de advocacia parceiro, especializado no assunto.\n\n" +
       "Caso deseje falar com eles de forma GRATUITA e tirar suas dúvidas, posso encaminhar seu contato.",
     botoes: [{ id: "gerente_autorizo", title: "AUTORIZO" }],
   },
   gerente_autorizo: {
     texto:
       "Qual é o seu nome e de qual cidade você fala?\n\n" +
-      "Após informar, é só aguardar o contato deles — será através do número de WhatsApp (51) 2185-9884.",
+      "Após informar, é só aguardar o contato deles — será através do número de WhatsApp (47) 99978-2256.",
   },
   gerente_mais2: {
     texto:

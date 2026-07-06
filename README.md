@@ -172,7 +172,7 @@ Fluxo (cada botão tem um `id` que aponta pro próximo passo em `FLUXO_BOTOES`):
   `TRABALHO/TRABALHEI` ou `NUNCA TRABALHEI`
   - `TRABALHO/TRABALHEI` → pergunta se saiu do cargo há mais de 2 anos →
     - `NÃO PASSOU 2 ANOS` → oferece análise GRATUITA por escritório de advocacia parceiro →
-      botão `AUTORIZO` → pede nome e cidade e avisa que o contato virá do (51) 2185-9884
+      botão `AUTORIZO` → pede nome e cidade e avisa que o contato virá do (47) 99978-2256
     - `FAZ MAIS DE 2 ANOS` → explica que o direito prescreveu e oferece simular consignado CLT
   - `NUNCA TRABALHEI` → explica que não se aplica e oferece consignado CLT (taxa 4,98%)
 - **CONSIGNADO CLT** (`fluxo_clt`): **resposta provisória** ("aguarde um atendente") — o fluxo
