@@ -63,6 +63,15 @@ async function getInsightsUltimoPost() {
   return { ...post, ...metricas };
 }
 
+async function listarPublicacoes(limit = 25) {
+  const { status, json } = await graphRequest(
+    "GET",
+    `/${GRAPH_VERSION}/${ACCOUNT_ID}/media?limit=${limit}&fields=id,caption,permalink,timestamp,media_type`
+  );
+  if (status >= 400) throw new Error(`Falha ao listar publicações: ${JSON.stringify(json)}`);
+  return json.data || [];
+}
+
 async function sendDM(recipientId, text) {
   const { status, json } = await graphRequest("POST", `/${GRAPH_VERSION}/${ACCOUNT_ID}/messages`, {
     recipient: { id: recipientId },
@@ -124,6 +133,7 @@ module.exports = {
   sendDM,
   getPerfil,
   getInsightsUltimoPost,
+  listarPublicacoes,
   getComentariosUltimoPost,
   getConversas,
   diagnostico,

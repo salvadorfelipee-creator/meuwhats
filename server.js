@@ -631,6 +631,16 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // GET /painel/api/instagram/publicacoes — lista publicações (id, permalink) do Instagram
+    if (req.method === "GET" && path_ === "/painel/api/instagram/publicacoes") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await ig.listarPublicacoes());
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // GET /painel/api/instagram/conversas — lista de conversas (DMs) do Instagram
     if (req.method === "GET" && path_ === "/painel/api/instagram/conversas") {
       if (!requireAuth(req, res)) return;
