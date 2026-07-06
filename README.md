@@ -424,12 +424,30 @@ curl -G "https://graph.facebook.com/v21.0/act_{AD_ACCOUNT_ID}/delivery_estimate"
   ("Application does not have the capability") — não impede nada, só não dá pra salvar a
   segmentação como objeto reutilizável; ela vai direto no conjunto de anúncios na hora de criar.
 
+### Teste A/B definido em 06/07/2026 (substitui o desenho anterior de 2 variantes)
+
+6 campanhas, todas com **R$5,80/dia**, criadas **ativas**, rodando até **sexta 10/07/2026
+23:59** (horário de Brasília), objetivo Conversas por mensagem (WhatsApp), criativo da
+publicação existente do Instagram (`source_instagram_media_id: 3588869927198956744`,
+mesma do link instagram.com/p/DHOOi8jxpzI):
+
+| Campanha | Público |
+|---|---|
+| RS - Gerente - Homem | RS, homens 25+, cargo "Gerente" (`137453372957907`), sem interesses |
+| RS - Gerente - Mulher | RS, mulheres 25+, idem |
+| SC - Variante A - Homem | SC, homens 25+, Gerente **E** Supermercado/Mercearia/Frios, expansão ligada |
+| SC - Variante A - Mulher | SC, mulheres 25+, idem |
+| SC - Variante B - Homem | SC, homens 25+, sem cargo/interesse (Advantage+) |
+| SC - Variante B - Mulher | SC, mulheres 25+, idem |
+
+**Quinta-feira 09/07/2026 às 9h**: pausar a campanha de pior resultado (painel 📊 ou pedir no
+chat). Sexta: comparar todas e decidir a vencedora.
+
 ### Pendente
 
-- Decidir orçamento diário de cada variante (A e B) e criar de fato campanha + conjuntos +
-  anúncios (pausados) via `ads.js` (`criarCampanha`, `criarConjuntoAnuncios`, `criarCreativo`
-  com `source_instagram_media_id`, `criarAnuncio`).
-- Ativar manualmente depois de revisar (painel → 📊 ou Gerenciador de Anúncios).
+- Executar a criação das 6 campanhas acima via `ads.js` (`criarCampanha`,
+  `criarConjuntoAnuncios` com `lifetime`/`daily` + `end_time`, `criarCreativoDePublicacaoInstagram`,
+  `criarAnuncio`) — bloqueado só pelo usuário colar o `META_ADS_ACCESS_TOKEN` no chat.
 - Mais adiante (não decidido ainda): testar Público Semelhante (Lookalike) a partir dos
   contatos reais que já converteram no WhatsApp/Instagram — tende a performar melhor que
   qualquer combinação manual de cargo/interesse, mas precisa de volume mínimo de contatos

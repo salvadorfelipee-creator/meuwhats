@@ -76,8 +76,13 @@ function criarConjuntoAnuncios({
   nome,
   campanhaId,
   orcamentoDiarioCentavos,
+  orcamentoTotalCentavos, // orçamento total (lifetime) — exige inicio e fim
+  inicio, // start_time ISO 8601, ex: "2026-07-06T18:00:00-03:00"
+  fim, // end_time ISO 8601
   evento_cobranca = "IMPRESSIONS",
   meta_otimizacao = "LINK_CLICKS",
+  destino, // destination_type, ex: "WHATSAPP"
+  promotedObject, // ex: { page_id: "..." } para anúncios de WhatsApp
   targeting,
   status = "PAUSED",
 }) {
@@ -85,9 +90,14 @@ function criarConjuntoAnuncios({
     graphRequest("POST", `/${GRAPH_VERSION}/${AD_ACCOUNT_ID}/adsets`, {
       name: nome,
       campaign_id: campanhaId,
-      daily_budget: orcamentoDiarioCentavos,
+      ...(orcamentoDiarioCentavos ? { daily_budget: orcamentoDiarioCentavos } : {}),
+      ...(orcamentoTotalCentavos ? { lifetime_budget: orcamentoTotalCentavos } : {}),
+      ...(inicio ? { start_time: inicio } : {}),
+      ...(fim ? { end_time: fim } : {}),
       billing_event: evento_cobranca,
       optimization_goal: meta_otimizacao,
+      ...(destino ? { destination_type: destino } : {}),
+      ...(promotedObject ? { promoted_object: promotedObject } : {}),
       targeting,
       status,
     }),
@@ -111,6 +121,20 @@ function criarCreativo({ nome, pageId, instagramActorId, mensagem, link, imageHa
       object_story_spec,
     }),
     "Falha ao criar criativo"
+  );
+}
+
+// Criativo a partir de uma publicação já existente do Instagram (não sobe imagem nova).
+// Exige o Instagram conectado à conta de anúncios (já feito — ver README).
+function criarCreativoDePublicacaoInstagram({ nome, instagramMediaId, instagramUserId, callToAction }) {
+  return assertOk(
+    graphRequest("POST", `/${GRAPH_VERSION}/${AD_ACCOUNT_ID}/adcreatives`, {
+      name: nome,
+      source_instagram_media_id: instagramMediaId,
+      ...(instagramUserId ? { instagram_user_id: instagramUserId } : {}),
+      ...(callToAction ? { call_to_action: callToAction } : {}),
+    }),
+    "Falha ao criar criativo da publicação do Instagram"
   );
 }
 
@@ -170,6 +194,7 @@ module.exports = {
   criarCampanha,
   criarConjuntoAnuncios,
   criarCreativo,
+  criarCreativoDePublicacaoInstagram,
   criarAnuncio,
   listarCampanhas,
   listarConjuntos,
