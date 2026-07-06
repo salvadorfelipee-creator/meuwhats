@@ -66,7 +66,7 @@ async function getInsightsUltimoPost() {
 async function listarPublicacoes(limit = 25) {
   const { status, json } = await graphRequest(
     "GET",
-    `/${GRAPH_VERSION}/${ACCOUNT_ID}/media?limit=${limit}&fields=id,caption,permalink,timestamp,media_type`
+    `/${GRAPH_VERSION}/${ACCOUNT_ID}/media?limit=${limit}&fields=id,caption,permalink,timestamp,media_type,media_url`
   );
   if (status >= 400) throw new Error(`Falha ao listar publicações: ${JSON.stringify(json)}`);
   return json.data || [];
