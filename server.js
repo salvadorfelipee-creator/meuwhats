@@ -119,22 +119,99 @@ const RESPOSTAS_BOTAO = {
     "Não iremos mais enviar mensagem e fique à vontade para nos chamar quando precisar!",
 };
 
-async function enviarRespostaAutomatica(businessNumberId, phone, texto) {
-  const result = await wa.sendText(businessNumberId, phone, texto);
+async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes) {
+  const result = botoes
+    ? await wa.sendButtons(businessNumberId, phone, texto, botoes)
+    : await wa.sendText(businessNumberId, phone, texto);
   const waId = result.messages?.[0]?.id || null;
   const now = Date.now();
+  // No histórico do painel, os botões aparecem listados abaixo do texto
+  const bodySalvo = botoes ? `${texto}\n\n${botoes.map((b) => `🔘 ${b.title}`).join("\n")}` : texto;
   await db.upsertConversation(phone, businessNumberId, null, now);
   await db.insertMessage({
     phone,
     business_number_id: businessNumberId,
     direction: "out",
     type: "text",
-    body: texto,
+    body: bodySalvo,
     wa_message_id: waId,
     status: "sent",
     created_at: now,
   });
 }
+
+// ─── FLUXO DE MENSAGENS AUTOMÁTICAS COM BOTÕES ───────────────────────────────
+// Menu inicial enviado quando um contato manda mensagem e a conversa está
+// inativa há mais de 24h (ou é a primeira mensagem dele). Cada botão leva ao
+// próximo passo do fluxo, identificado pelo id do botão clicado.
+const HORAS_INATIVIDADE_MENU = 24;
+
+function saudacaoDoDia() {
+  const hora = Number(
+    new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }).format(new Date())
+  );
+  if (hora >= 5 && hora < 12) return "bom dia";
+  if (hora >= 12 && hora < 18) return "boa tarde";
+  return "boa noite";
+}
+
+function menuInicial() {
+  return {
+    texto: `Olá, ${saudacaoDoDia()}! Me chamo Felipe. Escolha uma das opções abaixo para iniciar o atendimento:`,
+    botoes: [
+      { id: "fluxo_gerente", title: "ANÚNCIO GERENTE" },
+      { id: "fluxo_clt", title: "CONSIGNADO CLT" },
+    ],
+  };
+}
+
+const FLUXO_BOTOES = {
+  fluxo_gerente: {
+    texto:
+      "Olá! Vejo que você clicou no nosso anúncio direcionado para GERENTE/SUPERVISOR. " +
+      "Preciso saber algumas informações antes de te direcionar ao atendimento especializado.",
+    botoes: [
+      { id: "gerente_trabalhou", title: "TRABALHO/TRABALHEI" },
+      { id: "gerente_nunca", title: "NUNCA TRABALHEI" },
+    ],
+  },
+  gerente_trabalhou: {
+    texto:
+      "Certo! Agora preciso saber: faz mais de 2 anos que você saiu do seu trabalho como GERENTE ou SUPERVISOR?",
+    botoes: [
+      { id: "gerente_menos2", title: "NÃO PASSOU 2 ANOS" },
+      { id: "gerente_mais2", title: "FAZ MAIS DE 2 ANOS" },
+    ],
+  },
+  gerente_menos2: {
+    texto:
+      "Ótimo! Acredito que você possa ter algum valor a receber. Nesse caso, para realizarmos uma análise técnica " +
+      "do seu caso, direcionamos o atendimento a um escritório de advocacia parceiro, especializado no assunto.\n\n" +
+      "Caso deseje falar com eles de forma GRATUITA e tirar suas dúvidas, posso encaminhar seu contato.",
+    botoes: [{ id: "gerente_autorizo", title: "AUTORIZO" }],
+  },
+  gerente_autorizo: {
+    texto:
+      "Qual é o seu nome e de qual cidade você fala?\n\n" +
+      "Após informar, é só aguardar o contato deles — será através do número de WhatsApp (51) 2185-9884.",
+  },
+  gerente_mais2: {
+    texto:
+      "No seu caso, como já passou mais de 2 anos, o direito de reaver algum valor pendente infelizmente já " +
+      "prescreveu. Ficamos à disposição!\n\nPodemos simular o consignado CLT, caso você deseje.",
+  },
+  gerente_nunca: {
+    texto:
+      "Nesse caso, infelizmente não é possível verificar, pois só se aplica a quem trabalha como gerente ou " +
+      "supervisor.\n\nGostaria de simular o empréstimo consignado CLT? Estamos com uma taxa de juros de 4,98%.",
+  },
+  // Resposta provisória — o fluxo completo do consignado CLT ainda vai ser definido
+  fluxo_clt: {
+    texto:
+      "Perfeito! Para simular o consignado CLT, é só aguardar um instante que um atendente vai falar com você.\n\n" +
+      "Enquanto isso, você pode conhecer nosso site: www.felizcred.com.br",
+  },
+};
 
 // ─── PROCESSAR MENSAGENS RECEBIDAS ───────────────────────────────────────────
 async function processarEntry(entry) {
@@ -150,6 +227,11 @@ async function processarEntry(entry) {
         const tipo = msg.type;
         const nome = contatos.find((c) => c.wa_id === de)?.profile?.name;
         const quando = Number(msg.timestamp) * 1000 || Date.now();
+
+        const conversaAnterior = await db.getConversation(de, businessNumberId);
+        const conversaInativa =
+          !conversaAnterior ||
+          quando - Number(conversaAnterior.last_message_at || 0) > HORAS_INATIVIDADE_MENU * 60 * 60 * 1000;
 
         await db.upsertConversation(de, businessNumberId, nome, quando);
 
@@ -175,6 +257,18 @@ async function processarEntry(entry) {
               console.error("Erro ao enviar resposta automática:", err.message);
             }
           }
+        } else if (tipo === "interactive") {
+          // Clique em um botão do fluxo automático (mensagens interativas)
+          const reply = msg.interactive?.button_reply || msg.interactive?.list_reply || {};
+          await db.insertMessage({ ...base, type: "button", body: reply.title || "[botão]" });
+          const passo = FLUXO_BOTOES[reply.id];
+          if (passo) {
+            try {
+              await enviarRespostaAutomatica(businessNumberId, de, passo.texto, passo.botoes);
+            } catch (err) {
+              console.error("Erro ao enviar passo do fluxo de botões:", err.message);
+            }
+          }
         } else if (tipo === "image" || tipo === "audio" || tipo === "video" || tipo === "document") {
           const media = msg[tipo];
           try {
@@ -195,6 +289,17 @@ async function processarEntry(entry) {
           }
         } else {
           await db.insertMessage({ ...base, type: tipo, body: `[mensagem do tipo ${tipo}]` });
+        }
+
+        // Menu inicial automático: conversa nova ou parada há mais de 24h
+        // (cliques em botão não contam — são continuação do fluxo, não conversa nova)
+        if (conversaInativa && tipo !== "button" && tipo !== "interactive") {
+          const menu = menuInicial();
+          try {
+            await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes);
+          } catch (err) {
+            console.error("Erro ao enviar menu inicial:", err.message);
+          }
         }
 
         console.log(`📩 [${new Date(quando).toLocaleString("pt-BR")}] ${de} (${tipo})`);

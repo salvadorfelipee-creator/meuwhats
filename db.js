@@ -121,6 +121,15 @@ async function upsertConversation(phone, businessNumberId, name, when) {
   });
 }
 
+async function getConversation(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM conversations WHERE phone = ? AND business_number_id = ?`,
+    args: [phone, businessNumberId],
+  });
+  return result.rows[0] || null;
+}
+
 async function insertMessage(msg) {
   await ready;
   const {
@@ -234,6 +243,7 @@ async function telegramListContacts() {
 
 module.exports = {
   upsertConversation,
+  getConversation,
   insertMessage,
   updateStatusByWaId,
   listConversations,

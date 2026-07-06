@@ -14,6 +14,7 @@ com um painel web simples para ver conversas, fotos, áudios e responder.
 - Suporta **múltiplos números de WhatsApp Business** ao mesmo tempo, com abas no painel
 - Atualiza status de entrega/leitura das mensagens enviadas
 - Envio em massa via **Template de Mensagem** (botão 📢 no painel), para contatos que ainda não conversaram
+- **Atendimento automático com botões**: menu inicial para conversa nova/inativa há 24h + fluxo de triagem do anúncio de gerente (ver seção abaixo)
 - Automações do **Instagram**: resposta automática a comentários, a replies de Story e boas-vindas na primeira DM
 
 ⚠️ **Sobre mídias (fotos/áudios/vídeos)**: os arquivos em si ainda ficam só no disco local
@@ -150,6 +151,36 @@ No Gerenciador do WhatsApp (business.facebook.com → Contas do WhatsApp → esc
 
 ⚠️ Cada número de WhatsApp Business tem um **limite diário de mensagens iniciadas** (cresce
 conforme a "qualidade"/uso do número — começa em 250/dia). Evite listas gigantes de uma vez só.
+
+---
+
+## Atendimento automático com botões (WhatsApp)
+
+Implementado em 06/07/2026 direto no código (`FLUXO_BOTOES` e `menuInicial()` em `server.js`),
+usando mensagens interativas da Cloud API (`whatsapp.js` → `sendButtons`, máx. 3 botões por
+mensagem, título de botão com até 20 caracteres). Não usa nenhuma ferramenta externa de fluxo.
+
+**Gatilho do menu inicial**: quando um contato manda qualquer mensagem (texto/mídia) e a
+conversa é nova **ou** está sem atividade há mais de 24h (`HORAS_INATIVIDADE_MENU`), o servidor
+responde com saudação conforme o horário de Brasília ("bom dia/boa tarde/boa noite") e dois
+botões. Vale para **todos os números** configurados. Cliques em botão não redisparam o menu.
+
+Fluxo (cada botão tem um `id` que aponta pro próximo passo em `FLUXO_BOTOES`):
+
+- **Menu**: "Olá, {saudação}! Me chamo Felipe..." → botões `ANÚNCIO GERENTE` / `CONSIGNADO CLT`
+- **ANÚNCIO GERENTE** (`fluxo_gerente`): triagem do anúncio de gerente/supervisor →
+  `TRABALHO/TRABALHEI` ou `NUNCA TRABALHEI`
+  - `TRABALHO/TRABALHEI` → pergunta se saiu do cargo há mais de 2 anos →
+    - `NÃO PASSOU 2 ANOS` → oferece análise GRATUITA por escritório de advocacia parceiro →
+      botão `AUTORIZO` → pede nome e cidade e avisa que o contato virá do (51) 2185-9884
+    - `FAZ MAIS DE 2 ANOS` → explica que o direito prescreveu e oferece simular consignado CLT
+  - `NUNCA TRABALHEI` → explica que não se aplica e oferece consignado CLT (taxa 4,98%)
+- **CONSIGNADO CLT** (`fluxo_clt`): **resposta provisória** ("aguarde um atendente") — o fluxo
+  completo dessa opção ainda vai ser definido pelo usuário.
+
+Depois do fim de cada ramo, quem assume é o atendimento humano pelo painel (não existe
+"atribuir conversa" como em ferramentas de fluxo — toda conversa já aparece no painel).
+No histórico do painel, as mensagens enviadas com botões mostram os botões como linhas "🔘".
 
 ---
 
@@ -427,9 +458,9 @@ curl -G "https://graph.facebook.com/v21.0/act_{AD_ACCOUNT_ID}/delivery_estimate"
   botão 📊 no painel) — conta de anúncios e Instagram conectados e testados; pesquisa de
   público (cargo/interesse/localização) feita e documentada na seção "Campanhas de Anúncios"
   acima; falta decidir orçamento e criar de fato a campanha A/B (pausada)
-- Pendente/possível próximo passo (mais antigo, não retomado ainda): mensagem automática com
-  botões para conversas inativas há mais de 24h no WhatsApp (decisão de igual/diferente por
-  número em aberto)
+- Atendimento automático com botões no WhatsApp implementado em 06/07/2026 (menu inicial para
+  conversa nova/inativa 24h + fluxo do anúncio de gerente — ver seção própria acima). Pendente:
+  o usuário vai definir o fluxo do botão CONSIGNADO CLT (hoje é resposta provisória).
 
 ---
 

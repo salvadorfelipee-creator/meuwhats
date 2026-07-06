@@ -51,6 +51,32 @@ async function sendText(fromPhoneNumberId, to, text) {
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+async function sendButtons(fromPhoneNumberId, to, bodyText, buttons) {
+  // buttons: [{ id, title }] — a API aceita no máximo 3 botões, título com até 20 caracteres
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: bodyText },
+          action: {
+            buttons: buttons.map((b) => ({ type: "reply", reply: { id: b.id, title: b.title } })),
+          },
+        },
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao enviar mensagem com botões: ${JSON.stringify(json)}`);
+  return json; // { messages: [{ id: "wamid..." }], ... }
+}
+
 async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, components) {
   const { status, buffer } = await graphRequest(
     "POST",
@@ -111,4 +137,4 @@ async function downloadMedia(mediaId) {
   return { buffer, mimeType: info.mime_type };
 }
 
-module.exports = { sendText, sendTemplate, downloadMedia };
+module.exports = { sendText, sendButtons, sendTemplate, downloadMedia };
