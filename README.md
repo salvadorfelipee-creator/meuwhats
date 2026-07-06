@@ -443,11 +443,54 @@ mesma do link instagram.com/p/DHOOi8jxpzI):
 **Quinta-feira 09/07/2026 às 9h**: pausar a campanha de pior resultado (painel 📊 ou pedir no
 chat). Sexta: comparar todas e decidir a vencedora.
 
-### Pendente
+### Status (06/07/2026): campanhas e conjuntos CRIADOS e ATIVOS — falta o usuário criar os anúncios
 
-- Executar a criação das 6 campanhas acima via `ads.js` (`criarCampanha`,
-  `criarConjuntoAnuncios` com `lifetime`/`daily` + `end_time`, `criarCreativoDePublicacaoInstagram`,
-  `criarAnuncio`) — bloqueado só pelo usuário colar o `META_ADS_ACCESS_TOKEN` no chat.
+As 6 campanhas + conjuntos foram criados via API em 06/07/2026, **ativos**, orçamento
+R$5,80/dia cada, término automático 10/07/2026 23:59. **Sem anúncio dentro** (não roda nem
+gasta até ter anúncio). IDs:
+
+| Campanha | ID campanha | ID conjunto |
+|---|---|---|
+| Felizcred RS - Gerente - Homem | 120248549614840006 | 120248549615270006 |
+| Felizcred RS - Gerente - Mulher | 120248549615530006 | 120248549616760006 |
+| Felizcred SC - A GerenteSetor - Homem | 120248549619110006 | 120248549620440006 |
+| Felizcred SC - A GerenteSetor - Mulher | 120248549620730006 | 120248549620850006 |
+| Felizcred SC - B Aberto - Homem | 120248549621090006 | 120248549621290006 |
+| Felizcred SC - B Aberto - Mulher | 120248549621820006 | 120248549622090006 |
+
+**Os anúncios em si o usuário cria no Gerenciador de Anúncios** (1 por conjunto, usando a
+publicação existente do Instagram DHOOi8jxpzI + botão WhatsApp, e duplicando para os demais
+conjuntos), porque a criação de criativos via API está bloqueada: **o app FELIZCRED está em
+modo de desenvolvimento e a Meta bloqueia `POST /adcreatives` de apps não publicados**
+(erro 1885183), inclusive com imagem própria. Publicar o app travou em "requisitos
+incompletos" (o campo "Exclusão de dados do usuário" do Básico reverte sozinho para
+facebook.com ao salvar — bug/validação da Meta não resolvido).
+
+### Aprendizados da API de Marketing (custou horas — não redescobrir)
+
+- `POST /campaigns` agora **exige `is_adset_budget_sharing_enabled: true|false`** quando não
+  usa orçamento de campanha (usamos `false` p/ teste A/B limpo).
+- `POST /adsets` exige `bid_strategy` explícita (usamos `LOWEST_COST_WITHOUT_CAP`) e, p/ novos
+  adsets, `targeting.targeting_automation.advantage_audience` (0 = mantém gênero/idade rígidos).
+- `targeting_optimization` foi **removido** — a Expansão de Segmentação Detalhada agora é
+  automática (a variante A ganha expansão sem configurar nada).
+- Anúncio de WhatsApp (`destination_type: WHATSAPP`) exige `promoted_object: { page_id }` de
+  Página com **WhatsApp Business** conectado (conta pessoal vinculada → erro 2446885).
+  Criamos a Página **"Feliz cred correspondente bancario" (1119238764613554)** com o número
+  +55 47 99686-4687 conectado como principal, e o @felizcred vinculado a ela.
+- Chaves de região (`/search?type=adgeolocation&location_types=["region"]`): RS = 456, SC = 459.
+- `source_instagram_media_id` exige o **ID Graph/V2** da mídia (ex: 18385327756113225 para o
+  post DHOOi8jxpzI), não o ID decodificado do link. Dá pra obter via rota
+  `/painel/api/instagram/publicacoes` (tem `media_url` também).
+- Imagem já subida na conta de anúncios: hash `031e9c81e64cd593b5fdc74f3d02029a` (imagem do
+  post DHOOi8jxpzI, "IMPORTANTE! Gerente ou supervisor").
+- O rascunho antigo "Felizcred - Teste A/B Gerentes Varejo SC-RS [RASCUNHO]" (26/06, pausado,
+  sem anúncios) continua lá — pode ser apagado quando o usuário quiser.
+
+### Plano do teste
+
+- **Quinta 09/07 9h**: pausar a campanha de pior resultado (pedir no chat ou painel 📊).
+- **Sexta 10/07**: comparar tudo e escolher a vencedora; término automático 23:59.
 - Mais adiante (não decidido ainda): testar Público Semelhante (Lookalike) a partir dos
   contatos reais que já converteram no WhatsApp/Instagram — tende a performar melhor que
   qualquer combinação manual de cargo/interesse, mas precisa de volume mínimo de contatos
