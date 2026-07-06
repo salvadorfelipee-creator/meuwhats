@@ -292,8 +292,11 @@ async function processarEntry(entry) {
         }
 
         // Menu inicial automático: conversa nova ou parada há mais de 24h
-        // (cliques em botão não contam — são continuação do fluxo, não conversa nova)
-        if (conversaInativa && tipo !== "button" && tipo !== "interactive") {
+        // (cliques em botão não contam — são continuação do fluxo, não conversa nova;
+        // "unsupported"/"reaction" também não — costumam vir de números de sistema
+        // que não aceitam resposta, gerando "Message undeliverable")
+        const TIPOS_COM_MENU = ["text", "image", "audio", "video", "document", "sticker"];
+        if (conversaInativa && TIPOS_COM_MENU.includes(tipo)) {
           const menu = menuInicial();
           try {
             await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes);
