@@ -150,6 +150,19 @@ function criarAnuncio({ nome, conjuntoId, creativoId, status = "PAUSED" }) {
   );
 }
 
+// Lista anúncios com o id do criativo de cada um — usado na receita "usuário cria 1
+// anúncio no Gerenciador, API replica nos demais conjuntos" (ver README, seção Campanhas).
+async function listarAnuncios() {
+  const json = await assertOk(
+    graphRequest("GET", `/${GRAPH_VERSION}/${AD_ACCOUNT_ID}/ads`, {
+      fields: "id,name,status,effective_status,adset_id,creative{id}",
+      limit: 100,
+    }),
+    "Falha ao listar anúncios"
+  );
+  return json.data || [];
+}
+
 async function listarCampanhas() {
   const json = await assertOk(
     graphRequest("GET", `/${GRAPH_VERSION}/${AD_ACCOUNT_ID}/campaigns`, {
@@ -196,6 +209,7 @@ module.exports = {
   criarCreativo,
   criarCreativoDePublicacaoInstagram,
   criarAnuncio,
+  listarAnuncios,
   listarCampanhas,
   listarConjuntos,
   obterInsights,

@@ -475,6 +475,24 @@ modo de desenvolvimento e a Meta bloqueia `POST /adcreatives` de apps não publi
 incompletos" (o campo "Exclusão de dados do usuário" do Básico reverte sozinho para
 facebook.com ao salvar — bug/validação da Meta não resolvido).
 
+### RECEITA para criar anúncios em lote (processo combinado com o usuário)
+
+Enquanto o app FELIZCRED estiver em modo de desenvolvimento, `POST /adcreatives` é bloqueado
+(erro 1885183), mas `POST /ads` reaproveitando um `creative_id` existente **funciona**.
+O processo combinado é:
+
+1. Claude cria via API as campanhas + conjuntos (segmentação, orçamento, datas, destino
+   WhatsApp) — isso nunca é bloqueado.
+2. O **usuário cria só o PRIMEIRO anúncio** no Gerenciador de Anúncios, dentro de um dos
+   conjuntos ("Usar posts existentes" → post do Instagram → botão WhatsApp). Sem aceitar
+   nenhuma recomendação Advantage+ (elas desmontam a segmentação do teste).
+3. Claude roda `listarAnuncios()` (`ads.js`) pra pegar o `creative{id}` do anúncio criado e
+   replica nos demais conjuntos com `criarAnuncio({ conjuntoId, creativoId, status })` —
+   1 chamada por conjunto, sem UI. Foi assim que os 5 anúncios restantes do teste de
+   06/07/2026 foram criados (criativo `1028074113254702`).
+4. Duplicar pelo Gerenciador **não** funciona bem entre campanhas diferentes (a cópia perde
+   Página/Instagram/post e trava a edição) — não perder tempo com isso de novo.
+
 ### Aprendizados da API de Marketing (custou horas — não redescobrir)
 
 - `POST /campaigns` agora **exige `is_adset_budget_sharing_enabled: true|false`** quando não
