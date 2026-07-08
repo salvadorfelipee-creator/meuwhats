@@ -291,15 +291,23 @@ async function processarEntry(entry) {
           await db.insertMessage({ ...base, type: tipo, body: `[mensagem do tipo ${tipo}]` });
         }
 
-        // Menu inicial automático: conversa nova ou parada há mais de 24h
-        // (cliques em botão não contam — são continuação do fluxo, não conversa nova;
-        // "unsupported"/"reaction" também não — costumam vir de números de sistema
-        // que não aceitam resposta, gerando "Message undeliverable")
+        // Menu inicial automático: conversa nova ou parada há mais de 24h, no máximo
+        // 1x a cada 24h por contato (marcação atômica no banco — mensagens em rajada
+        // ou processadas em paralelo não duplicam o menu).
+        // Cliques em botão não contam (continuação do fluxo), nem "unsupported"/"reaction"
+        // (costumam vir de números de sistema que não aceitam resposta).
         const TIPOS_COM_MENU = ["text", "image", "audio", "video", "document", "sticker"];
         if (conversaInativa && TIPOS_COM_MENU.includes(tipo)) {
-          const menu = menuInicial();
           try {
-            await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes);
+            const podeEnviar = await db.tentarMarcarMenuEnviado(
+              de,
+              businessNumberId,
+              HORAS_INATIVIDADE_MENU * 60 * 60 * 1000
+            );
+            if (podeEnviar) {
+              const menu = menuInicial();
+              await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes);
+            }
           } catch (err) {
             console.error("Erro ao enviar menu inicial:", err.message);
           }

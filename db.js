@@ -92,6 +92,11 @@ const ready = (async () => {
     await client.execute(`ALTER TABLE messages ADD COLUMN error_message TEXT`);
   }
 
+  const infoConversations = await client.execute(`PRAGMA table_info(conversations)`);
+  if (!infoConversations.rows.some((r) => r.name === "menu_sent_at")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN menu_sent_at INTEGER`);
+  }
+
   await client.execute(`CREATE TABLE IF NOT EXISTS instagram_dm_contacts (
     instagram_user_id TEXT PRIMARY KEY,
     welcomed_at INTEGER
@@ -119,6 +124,21 @@ async function upsertConversation(phone, businessNumberId, name, when) {
             last_message_at = excluded.last_message_at`,
     args: [phone, businessNumberId, name || null, when],
   });
+}
+
+// Tenta "reservar" o direito de enviar o menu automático: só retorna true se o último
+// envio foi há mais de `janelaMs` (ou nunca). O UPDATE condicional é atômico no banco,
+// então mensagens chegando em paralelo não conseguem duplicar o menu.
+async function tentarMarcarMenuEnviado(phone, businessNumberId, janelaMs) {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `UPDATE conversations SET menu_sent_at = ?
+          WHERE phone = ? AND business_number_id = ?
+            AND (menu_sent_at IS NULL OR menu_sent_at < ?)`,
+    args: [agora, phone, businessNumberId, agora - janelaMs],
+  });
+  return result.rowsAffected > 0;
 }
 
 async function getConversation(phone, businessNumberId) {
@@ -244,6 +264,7 @@ async function telegramListContacts() {
 module.exports = {
   upsertConversation,
   getConversation,
+  tentarMarcarMenuEnviado,
   insertMessage,
   updateStatusByWaId,
   listConversations,

@@ -509,6 +509,10 @@ async function carregarMensagens() {
   const mensagens = await res.json();
   const div = document.getElementById("mensagens");
   const estavaNoFim = div.scrollTop + div.clientHeight >= div.scrollHeight - 30;
+  // Só força o scroll pro fim ao abrir a conversa; nas atualizações automáticas,
+  // respeita a posição de quem rolou pra cima pra ler o histórico
+  const primeiraCarga = div.dataset.telefone !== telefoneAtual + "|" + numeroAtivoId;
+  div.dataset.telefone = telefoneAtual + "|" + numeroAtivoId;
 
   div.innerHTML = "";
   let ultimaData = null;
@@ -545,7 +549,7 @@ async function carregarMensagens() {
     bolha.innerHTML = conteudo + erroHtml + `<div class="hora">${formatarHoraMsg(m.created_at)}${statusTxt}</div>`;
     div.appendChild(bolha);
   }
-  if (estavaNoFim || mensagens.length) div.scrollTop = div.scrollHeight;
+  if (primeiraCarga || estavaNoFim) div.scrollTop = div.scrollHeight;
 }
 
 function escapeHtml(s) {

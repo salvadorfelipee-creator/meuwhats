@@ -164,6 +164,10 @@ mensagem, título de botão com até 20 caracteres). Não usa nenhuma ferramenta
 conversa é nova **ou** está sem atividade há mais de 24h (`HORAS_INATIVIDADE_MENU`), o servidor
 responde com saudação conforme o horário de Brasília ("bom dia/boa tarde/boa noite") e dois
 botões. Vale para **todos os números** configurados. Cliques em botão não redisparam o menu.
+**Limite de 1 menu a cada 24h por contato**, garantido pela coluna `menu_sent_at` em
+`conversations` com UPDATE condicional atômico (`tentarMarcarMenuEnviado` em `db.js`) —
+corrige bug de 08/07/2026 em que uma rajada de mensagens (processadas em webhooks paralelos)
+disparava um menu para cada mensagem. Tipos `unsupported`/`reaction` não disparam menu.
 
 Fluxo (cada botão tem um `id` que aponta pro próximo passo em `FLUXO_BOTOES`):
 
