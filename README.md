@@ -539,9 +539,18 @@ Gasto total R$147,60 · 19 conversas iniciadas · média R$7,77/conversa:
 
 **Rodada 2 (11→16/07/2026)**: reativadas em 11/07 as duas vencedoras — **SC - B Aberto -
 Homem** e **RS - Gerente - Homem** — com R$7,70/dia cada (R$85 total dividido entre as
-duas até quinta 16/07 23:59, pedido do usuário; versões mulher ficaram pausadas por
-desempenho fraco). Mesmos anúncios já aprovados (sem nova revisão). O fluxo do WhatsApp
-reformulado em 11/07 recebe esses leads.
+duas até quinta 16/07 23:59, pedido do usuário). Mesmos anúncios já aprovados (sem nova
+revisão). O fluxo do WhatsApp reformulado em 11/07 recebe esses leads. Ainda em 11/07,
+somaram-se:
+- **RS - Gerente - Mulher** reativada: R$5,70/dia até terça 14/07 23:59 (R$20 total).
+- **RS - Gerente Varejo - Homem** (NOVA, campanha `120248732836350006`): filtro diferente
+  pra chegar em gerente de varejo — (cargos Supervisor `104372906264935` OU GERENTE
+  COMERCIAL/DEP.VENDAS `257037871086800` OU Gerente Regional de Vendas `138347752858893`
+  OU comportamento Administradores de lojas `6377178995383`) **E** interesses (Varejo
+  `6003778400853` OU Supermercado OU Mercearia), RS, homens 25+, público-semente estimado
+  4,6-5,4 mil. Orçamento mínimo da Meta (**piso descoberto: R$5,23/dia**) → R$5,30/dia,
+  até quarta 15/07 23:59. Justificativa do usuário: no RS "é melhor fazer processo".
+- Total no ar na rodada 2: 4 campanhas (~R$26,40/dia somadas, términos automáticos ter/qua/qui).
 
 **Conclusões**: (1) público aberto (Advantage) venceu a segmentação detalhada por 3x —
 qualificar no fluxo do WhatsApp, não no targeting, foi a decisão certa; (2) homens
