@@ -537,6 +537,12 @@ Gasto total R$147,60 · 19 conversas iniciadas · média R$7,77/conversa:
 | SC - A Gerente+Setor - Homem | 1 | R$24,67 | 0,93% |
 | SC - B Aberto - Mulher | 1 | R$24,66 | 0,99% |
 
+**Rodada 2 (11→16/07/2026)**: reativadas em 11/07 as duas vencedoras — **SC - B Aberto -
+Homem** e **RS - Gerente - Homem** — com R$7,70/dia cada (R$85 total dividido entre as
+duas até quinta 16/07 23:59, pedido do usuário; versões mulher ficaram pausadas por
+desempenho fraco). Mesmos anúncios já aprovados (sem nova revisão). O fluxo do WhatsApp
+reformulado em 11/07 recebe esses leads.
+
 **Conclusões**: (1) público aberto (Advantage) venceu a segmentação detalhada por 3x —
 qualificar no fluxo do WhatsApp, não no targeting, foi a decisão certa; (2) homens
 respondem muito mais a esse criativo (13 x 6 conversas); (3) a vencedora também teve
