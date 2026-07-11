@@ -207,7 +207,12 @@ No histórico do painel, as mensagens enviadas com botões mostram os botões co
   atômica, sem duplicar), `setInterval` de 1 min no `server.js` (`LEMBRETE_MINUTOS`/
   `LEMBRETE_TEXTOS`). Resposta manual pelo painel **cancela** o lembrete pendente daquela
   conversa. ⚠️ No free tier do Render o servidor hiberna sem tráfego — o lembrete pode
-  atrasar até o próximo despertar.
+  atrasar até o próximo despertar. **Mitigado em 11/07/2026** com auto-ping: o servidor
+  chama `GET /ping` (rota pública, sem auth) pela própria URL pública a cada 10 min
+  (`PUBLIC_URL`, padrão `https://meuwhats.onrender.com`), o que impede a hibernação
+  enquanto o processo estiver de pé. Reforço opcional: monitor externo gratuito
+  (uptimerobot.com, tipo HTTP(s), URL `https://meuwhats.onrender.com/ping`, intervalo
+  5 min) — cobre também o caso de o serviço já ter dormido por algum motivo.
 
 ---
 

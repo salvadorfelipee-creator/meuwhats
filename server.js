@@ -1,4 +1,5 @@
 const http = require("http");
+const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
@@ -522,6 +523,11 @@ const server = http.createServer(async (req, res) => {
   const path_ = url.pathname;
 
   try {
+    // GET /ping — usado pelo auto-ping (e por monitores externos) pra manter o Render acordado
+    if (req.method === "GET" && path_ === "/ping") {
+      return send(res, 200, { ok: true });
+    }
+
     // GET /webhook — verificação do Meta
     if (req.method === "GET" && path_ === "/webhook") {
       const mode = url.searchParams.get("hub.mode");
@@ -832,6 +838,18 @@ server.listen(PORT, () => {
   console.log(`   Painel:      https://SEU_DOMINIO/painel`);
   console.log("─".repeat(50));
 });
+
+// ─── AUTO-PING (manter o Render acordado) ────────────────────────────────────
+// O free tier do Render hiberna após ~15 min sem tráfego. O próprio servidor
+// chama /ping pela URL pública a cada 10 min, contando como tráfego de entrada.
+// (Só não resolve se o processo já estiver dormindo — pra isso serve um monitor
+// externo tipo UptimeRobot apontando pra mesma URL, ver README.)
+const PUBLIC_URL = process.env.PUBLIC_URL || "https://meuwhats.onrender.com";
+setInterval(() => {
+  https
+    .get(`${PUBLIC_URL}/ping`, (res) => res.resume())
+    .on("error", (err) => console.error("Auto-ping falhou:", err.message));
+}, 10 * 60 * 1000);
 
 // ─── VERIFICADOR DE FLUXOS PARADOS ───────────────────────────────────────────
 // A cada minuto: quem está aguardando resposta há mais tempo que o limite do
