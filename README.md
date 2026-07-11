@@ -210,9 +210,10 @@ No histórico do painel, as mensagens enviadas com botões mostram os botões co
   atrasar até o próximo despertar. **Mitigado em 11/07/2026** com auto-ping: o servidor
   chama `GET /ping` (rota pública, sem auth) pela própria URL pública a cada 10 min
   (`PUBLIC_URL`, padrão `https://meuwhats.onrender.com`), o que impede a hibernação
-  enquanto o processo estiver de pé. Reforço opcional: monitor externo gratuito
-  (uptimerobot.com, tipo HTTP(s), URL `https://meuwhats.onrender.com/ping`, intervalo
-  5 min) — cobre também o caso de o serviço já ter dormido por algum motivo.
+  enquanto o processo estiver de pé. Reforço externo **já configurado em 11/07/2026**:
+  monitor no UptimeRobot (conta do usuário, plano grátis), tipo HTTP(s), URL
+  `https://meuwhats.onrender.com/ping`, intervalo 5 min, alerta por e-mail — cobre também
+  o caso de o serviço já ter dormido por algum motivo e avisa se o servidor cair.
 
 ---
 
