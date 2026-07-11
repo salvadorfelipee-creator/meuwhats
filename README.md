@@ -169,18 +169,24 @@ botões. Vale para **todos os números** configurados. Cliques em botão não re
 corrige bug de 08/07/2026 em que uma rajada de mensagens (processadas em webhooks paralelos)
 disparava um menu para cada mensagem. Tipos `unsupported`/`reaction` não disparam menu.
 
-Fluxo (cada botão tem um `id` que aponta pro próximo passo em `FLUXO_BOTOES`):
+Fluxo (cada botão tem um `id` que aponta pro próximo passo em `FLUXO_BOTOES`) —
+**reformulado em 11/07/2026** após analisar as conversas do 1º teste A/B:
 
-- **Menu**: "Olá, {saudação}! Me chamo Felipe..." → botões `ANÚNCIO GERENTE` / `CONSIGNADO CLT`
-- **ANÚNCIO GERENTE** (`fluxo_gerente`): triagem do anúncio de gerente/supervisor →
-  `TRABALHO/TRABALHEI` ou `NUNCA TRABALHEI`
+- **Primeira mensagem** (todo contato novo/inativo 24h): "Olá, {saudação}! Você clicou no
+  nosso anúncio voltado para quem trabalha ou já trabalhou como GERENTE ou SUPERVISOR..." →
+  botões `TRABALHO/TRABALHEI` / `NUNCA TRABALHEI` (a triagem virou a primeira mensagem; o
+  menu antigo `ANÚNCIO GERENTE`/`CONSIGNADO CLT` foi desativado, mas os passos
+  `fluxo_gerente`/`fluxo_clt` seguem respondendo a botões antigos)
   - `TRABALHO/TRABALHEI` → pergunta se saiu do cargo há mais de 2 anos →
     - `NÃO PASSOU 2 ANOS` → oferece análise GRATUITA por escritório de advocacia parceiro →
       botão `AUTORIZO` → pede nome e cidade e avisa que o contato virá do (47) 99978-2256
-    - `FAZ MAIS DE 2 ANOS` → explica que o direito prescreveu e oferece simular consignado CLT
-  - `NUNCA TRABALHEI` → explica que não se aplica e oferece consignado CLT (taxa 4,98%)
-- **CONSIGNADO CLT** (`fluxo_clt`): **resposta provisória** ("aguarde um atendente") — o fluxo
-  completo dessa opção ainda vai ser definido pelo usuário.
+    - `FAZ MAIS DE 2 ANOS` → explica que prescreveu e abre **lista de produtos** (era beco
+      sem saída — 8 leads pararam aí no 1º teste)
+  - `NUNCA TRABALHEI` → explica que não se aplica e abre a mesma **lista de produtos**
+- **Lista de produtos** (`LISTA_PRODUTOS`, mensagem interativa tipo `list` via `sendList` —
+  botões comuns só permitem 3 opções, lista permite até 10): CONSIGNADO CLT, CONSIGNADO
+  INSS, SAQUE-ANIVERSÁRIO FGTS, CARRO EM GARANTIA, SEGURO VEICULAR → cada escolha
+  (`prod_*`) confirma e avisa que um atendente assume.
 
 Depois do fim de cada ramo, quem assume é o atendimento humano pelo painel (não existe
 "atribuir conversa" como em ferramentas de fluxo — toda conversa já aparece no painel).

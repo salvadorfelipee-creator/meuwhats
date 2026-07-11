@@ -119,14 +119,17 @@ const RESPOSTAS_BOTAO = {
     "Não iremos mais enviar mensagem e fique à vontade para nos chamar quando precisar!",
 };
 
-async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes) {
-  const result = botoes
+async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes, lista) {
+  const result = lista
+    ? await wa.sendList(businessNumberId, phone, texto, lista.botao, lista.opcoes)
+    : botoes
     ? await wa.sendButtons(businessNumberId, phone, texto, botoes)
     : await wa.sendText(businessNumberId, phone, texto);
   const waId = result.messages?.[0]?.id || null;
   const now = Date.now();
-  // No histórico do painel, os botões aparecem listados abaixo do texto
-  const bodySalvo = botoes ? `${texto}\n\n${botoes.map((b) => `🔘 ${b.title}`).join("\n")}` : texto;
+  // No histórico do painel, botões/opções aparecem listados abaixo do texto
+  const opcoes = lista ? lista.opcoes : botoes;
+  const bodySalvo = opcoes ? `${texto}\n\n${opcoes.map((b) => `🔘 ${b.title}`).join("\n")}` : texto;
   await db.upsertConversation(phone, businessNumberId, null, now);
   await db.insertMessage({
     phone,
@@ -156,13 +159,40 @@ function saudacaoDoDia() {
 }
 
 function menuInicial() {
+  // Desde 11/07/2026 a primeira mensagem é direto a triagem do anúncio de gerente
+  // (decisão do usuário: vale para todo contato novo, não só quem vem do anúncio).
+  // O menu antigo (ANÚNCIO GERENTE / CONSIGNADO CLT) foi desativado, mas os passos
+  // fluxo_gerente/fluxo_clt continuam no FLUXO_BOTOES para quem clicar em botões antigos.
   return {
-    texto: `Olá, ${saudacaoDoDia()}! Me chamo Felipe. Escolha uma das opções abaixo para iniciar o atendimento:`,
+    texto:
+      `Olá, ${saudacaoDoDia()}! Você clicou no nosso anúncio voltado para quem trabalha ou já trabalhou ` +
+      "como GERENTE ou SUPERVISOR. Para saber se você tem direito a receber FGTS, ou se deixou de receber, " +
+      "preciso de algumas informações para te direcionar ao atendimento especializado. Vamos lá, é bem rápido!",
     botoes: [
-      { id: "fluxo_gerente", title: "ANÚNCIO GERENTE" },
-      { id: "fluxo_clt", title: "CONSIGNADO CLT" },
+      { id: "gerente_trabalhou", title: "TRABALHO/TRABALHEI" },
+      { id: "gerente_nunca", title: "NUNCA TRABALHEI" },
     ],
   };
+}
+
+// Lista de produtos oferecida quando a revisão de FGTS não se aplica
+// (título de linha tem limite de 24 caracteres — o nome completo vai na descrição)
+const LISTA_PRODUTOS = {
+  botao: "Ver opções",
+  opcoes: [
+    { id: "prod_clt", title: "CONSIGNADO CLT", description: "Empréstimo consignado CLT" },
+    { id: "prod_inss", title: "CONSIGNADO INSS", description: "Empréstimo consignado INSS" },
+    { id: "prod_fgts", title: "SAQUE-ANIVERSÁRIO FGTS", description: "Antecipação do saque-aniversário" },
+    { id: "prod_carro", title: "CARRO EM GARANTIA", description: "Empréstimo com carro em garantia" },
+    { id: "prod_seguro", title: "SEGURO VEICULAR", description: "Cotação de seguro para seu veículo" },
+  ],
+};
+
+function PRODUTO_CONFIRMACAO(produto) {
+  return (
+    `Perfeito! Anotado: ${produto}. Um atendente vai falar com você em instantes para fazer a simulação.\n\n` +
+    "Enquanto isso, conheça nosso site: www.felizcred.com.br"
+  );
 }
 
 const FLUXO_BOTOES = {
@@ -198,13 +228,22 @@ const FLUXO_BOTOES = {
   gerente_mais2: {
     texto:
       "No seu caso, como já passou mais de 2 anos, o direito de reaver algum valor pendente infelizmente já " +
-      "prescreveu. Ficamos à disposição!\n\nPodemos simular o consignado CLT, caso você deseje.",
+      "prescreveu. Mas ainda podemos simular outras opções para você — toque no botão abaixo e escolha:",
+    lista: LISTA_PRODUTOS,
   },
   gerente_nunca: {
     texto:
-      "Nesse caso, infelizmente não é possível verificar, pois só se aplica a quem trabalha como gerente ou " +
-      "supervisor.\n\nGostaria de simular o empréstimo consignado CLT? Estamos com uma taxa de juros de 4,98%.",
+      "Nesse caso, infelizmente não é possível verificar, pois a revisão só se aplica a quem trabalha ou já " +
+      "trabalhou como gerente ou supervisor. Mas podemos simular outras opções para você — toque no botão " +
+      "abaixo e escolha:",
+    lista: LISTA_PRODUTOS,
   },
+  // Escolhas da lista de produtos → confirma e passa pro atendimento humano
+  prod_clt: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO CLT") },
+  prod_inss: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO INSS") },
+  prod_fgts: { texto: PRODUTO_CONFIRMACAO("o SAQUE-ANIVERSÁRIO FGTS") },
+  prod_carro: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO COM CARRO EM GARANTIA") },
+  prod_seguro: { texto: PRODUTO_CONFIRMACAO("o SEGURO VEICULAR") },
   // Resposta provisória — o fluxo completo do consignado CLT ainda vai ser definido
   fluxo_clt: {
     texto:
@@ -264,7 +303,7 @@ async function processarEntry(entry) {
           const passo = FLUXO_BOTOES[reply.id];
           if (passo) {
             try {
-              await enviarRespostaAutomatica(businessNumberId, de, passo.texto, passo.botoes);
+              await enviarRespostaAutomatica(businessNumberId, de, passo.texto, passo.botoes, passo.lista);
             } catch (err) {
               console.error("Erro ao enviar passo do fluxo de botões:", err.message);
             }

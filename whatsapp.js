@@ -77,6 +77,31 @@ async function sendButtons(fromPhoneNumberId, to, bodyText, buttons) {
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+async function sendList(fromPhoneNumberId, to, bodyText, buttonLabel, rows) {
+  // Lista interativa: até 10 opções; título de linha com até 24 caracteres,
+  // descrição opcional com até 72. buttonLabel (máx. 20) é o botão que abre a lista.
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "list",
+          body: { text: bodyText },
+          action: { button: buttonLabel, sections: [{ rows }] },
+        },
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao enviar lista: ${JSON.stringify(json)}`);
+  return json; // { messages: [{ id: "wamid..." }], ... }
+}
+
 async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, components) {
   const { status, buffer } = await graphRequest(
     "POST",
@@ -137,4 +162,4 @@ async function downloadMedia(mediaId) {
   return { buffer, mimeType: info.mime_type };
 }
 
-module.exports = { sendText, sendButtons, sendTemplate, downloadMedia };
+module.exports = { sendText, sendButtons, sendList, sendTemplate, downloadMedia };
