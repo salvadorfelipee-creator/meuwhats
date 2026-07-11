@@ -518,10 +518,26 @@ O processo combinado é:
 - O rascunho antigo "Felizcred - Teste A/B Gerentes Varejo SC-RS [RASCUNHO]" (26/06, pausado,
   sem anúncios) continua lá — pode ser apagado quando o usuário quiser.
 
-### Plano do teste
+### RESULTADO FINAL do teste (06→10/07/2026, apurado 11/07)
 
-- **Quinta 09/07 9h**: pausar a campanha de pior resultado (pedir no chat ou painel 📊).
-- **Sexta 10/07**: comparar tudo e escolher a vencedora; término automático 23:59.
+Gasto total R$147,60 · 19 conversas iniciadas · média R$7,77/conversa:
+
+| Campanha | Conversas | Custo/conversa | CTR |
+|---|---|---|---|
+| 🏆 SC - B Aberto - Homem | 8 | R$3,04 | 1,77% |
+| RS - Gerente - Homem | 4 | R$6,17 | 0,86% |
+| RS - Gerente - Mulher | 3 | R$8,19 | 0,77% |
+| SC - A Gerente+Setor - Mulher | 2 | R$12,33 | 0,93% |
+| SC - A Gerente+Setor - Homem | 1 | R$24,67 | 0,93% |
+| SC - B Aberto - Mulher | 1 | R$24,66 | 0,99% |
+
+**Conclusões**: (1) público aberto (Advantage) venceu a segmentação detalhada por 3x —
+qualificar no fluxo do WhatsApp, não no targeting, foi a decisão certa; (2) homens
+respondem muito mais a esse criativo (13 x 6 conversas); (3) a vencedora também teve
+conversas mais profundas (6 first_reply e 3 leads registrados pela Meta); (4) RS só-cargo
+ficou no meio-termo. **Próxima rodada sugerida** (não criada ainda): público aberto,
+homens 25+, SC e RS (o aberto não chegou a ser testado no RS). Antes de escalar, conferir
+no painel a **qualidade** das 19 conversas (quantas clicaram TRABALHO/TRABALHEI na triagem).
 - Mais adiante (não decidido ainda): testar Público Semelhante (Lookalike) a partir dos
   contatos reais que já converteram no WhatsApp/Instagram — tende a performar melhor que
   qualquer combinação manual de cargo/interesse, mas precisa de volume mínimo de contatos
