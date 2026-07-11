@@ -195,6 +195,40 @@ function PRODUTO_CONFIRMACAO(produto) {
   );
 }
 
+// ─── LEMBRETES PARA QUEM PARA NO MEIO DO FLUXO ──────────────────────────────
+// Minutos de silêncio até mandar UM lembrete, por passo. Quem clicou
+// NUNCA TRABALHEI (gerente_nunca) fica de fora de propósito — decisão do usuário.
+const LEMBRETE_MINUTOS = {
+  menu_inicial: 15,
+  fluxo_gerente: 15,
+  gerente_trabalhou: 15,
+  gerente_menos2: 15,
+  gerente_mais2: 15,
+  gerente_autorizo: 20,
+};
+
+const LEMBRETE_TEXTOS = {
+  gerente_autorizo:
+    "Olá! Para entrar na agenda de atendimento do escritório parceiro, preciso do seu nome e da sua " +
+    "cidade — é só responder aqui 😊",
+  padrao:
+    "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da " +
+    "mensagem acima 👆",
+};
+
+// Resposta quando a pessoa manda o nome/cidade (passo gerente_autorizo).
+// No fim de semana avisa que o escritório parceiro escreve na segunda às 9h —
+// assim não é preciso pagar template pra reabrir a conversa depois das 24h.
+function confirmacaoAgenda() {
+  const dia = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", weekday: "short" }).format(new Date());
+  const fimDeSemana = dia === "Sat" || dia === "Sun";
+  return fimDeSemana
+    ? "Perfeito, obrigado! Seus dados já entraram na agenda de atendimento. Na segunda-feira, às 9 horas, " +
+      "o escritório parceiro irá enviar uma mensagem explicando como eles irão analisar o seu caso."
+    : "Perfeito, obrigado! Seus dados já entraram na agenda de atendimento. O escritório parceiro irá " +
+      "enviar uma mensagem explicando como eles irão analisar o seu caso.";
+}
+
 const FLUXO_BOTOES = {
   fluxo_gerente: {
     texto:
@@ -285,6 +319,15 @@ async function processarEntry(entry) {
 
         if (tipo === "text") {
           await db.insertMessage({ ...base, type: "text", body: msg.text?.body });
+          // Se a conversa estava aguardando nome/cidade, confirma e agenda
+          if (conversaAnterior?.fluxo_passo === "gerente_autorizo") {
+            try {
+              await enviarRespostaAutomatica(businessNumberId, de, confirmacaoAgenda());
+              await db.setFluxoPasso(de, businessNumberId, null);
+            } catch (err) {
+              console.error("Erro ao confirmar agenda:", err.message);
+            }
+          }
         } else if (tipo === "button") {
           const textoBotao = msg.button?.text || msg.button?.payload || "";
           await db.insertMessage({ ...base, type: "button", body: textoBotao });
@@ -304,6 +347,8 @@ async function processarEntry(entry) {
           if (passo) {
             try {
               await enviarRespostaAutomatica(businessNumberId, de, passo.texto, passo.botoes, passo.lista);
+              // Marca (ou limpa) o passo em que a conversa fica aguardando resposta
+              await db.setFluxoPasso(de, businessNumberId, LEMBRETE_MINUTOS[reply.id] ? reply.id : null);
             } catch (err) {
               console.error("Erro ao enviar passo do fluxo de botões:", err.message);
             }
@@ -346,6 +391,7 @@ async function processarEntry(entry) {
             if (podeEnviar) {
               const menu = menuInicial();
               await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes);
+              await db.setFluxoPasso(de, businessNumberId, "menu_inicial");
             }
           } catch (err) {
             console.error("Erro ao enviar menu inicial:", err.message);
@@ -589,6 +635,8 @@ const server = http.createServer(async (req, res) => {
       const waId = result.messages?.[0]?.id || null;
       const now = Date.now();
       await db.upsertConversation(phone, businessId, null, now);
+      // Atendente humano assumiu — cancela lembrete automático pendente
+      await db.setFluxoPasso(phone, businessId, null);
       await db.insertMessage({
         phone,
         business_number_id: businessId,
@@ -784,3 +832,29 @@ server.listen(PORT, () => {
   console.log(`   Painel:      https://SEU_DOMINIO/painel`);
   console.log("─".repeat(50));
 });
+
+// ─── VERIFICADOR DE FLUXOS PARADOS ───────────────────────────────────────────
+// A cada minuto: quem está aguardando resposta há mais tempo que o limite do
+// passo recebe UM lembrete (marcação atômica no banco evita duplicados).
+// Obs: no plano free do Render o servidor pode hibernar sem tráfego — nesse
+// caso o lembrete sai no próximo despertar (webhook/painel), com atraso.
+setInterval(async () => {
+  try {
+    const pendentes = await db.listarFluxosAguardando();
+    const agora = Date.now();
+    for (const p of pendentes) {
+      const minutos = LEMBRETE_MINUTOS[p.fluxo_passo];
+      if (!minutos || agora - Number(p.fluxo_passo_at) < minutos * 60 * 1000) continue;
+      if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id))) continue;
+      try {
+        const texto = LEMBRETE_TEXTOS[p.fluxo_passo] || LEMBRETE_TEXTOS.padrao;
+        await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
+        console.log(`⏰ Lembrete de fluxo parado enviado para ${p.phone} (passo ${p.fluxo_passo})`);
+      } catch (err) {
+        console.error("Erro ao enviar lembrete de fluxo:", err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no verificador de fluxos parados:", err.message);
+  }
+}, 60 * 1000);

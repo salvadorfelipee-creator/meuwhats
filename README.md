@@ -192,6 +192,23 @@ Depois do fim de cada ramo, quem assume é o atendimento humano pelo painel (nã
 "atribuir conversa" como em ferramentas de fluxo — toda conversa já aparece no painel).
 No histórico do painel, as mensagens enviadas com botões mostram os botões como linhas "🔘".
 
+**Lembretes e agenda (11/07/2026)** — para não perder lead sem pagar template depois das 24h:
+
+- Quem responde o **nome/cidade** (passo `gerente_autorizo`) recebe confirmação automática;
+  **no fim de semana** ela avisa: *"Na segunda-feira, às 9 horas, o escritório parceiro irá
+  enviar uma mensagem explicando como eles irão analisar o seu caso"* (função
+  `confirmacaoAgenda()` — em dia útil, mesma mensagem sem o "segunda às 9h").
+- Quem **para de responder no meio do fluxo** recebe UM lembrete automático: 20 min no passo
+  do nome/cidade ("para entrar na agenda preciso do seu nome e cidade"), 15 min nos demais
+  passos ("toque em uma das opções acima"). Exceção de propósito: quem clicou **NUNCA
+  TRABALHEI** não recebe lembrete (decisão do usuário).
+- Implementação: colunas `fluxo_passo`/`fluxo_passo_at`/`fluxo_lembrete` em `conversations`,
+  `setFluxoPasso`/`listarFluxosAguardando`/`tentarMarcarLembreteEnviado` em `db.js` (marcação
+  atômica, sem duplicar), `setInterval` de 1 min no `server.js` (`LEMBRETE_MINUTOS`/
+  `LEMBRETE_TEXTOS`). Resposta manual pelo painel **cancela** o lembrete pendente daquela
+  conversa. ⚠️ No free tier do Render o servidor hiberna sem tráfego — o lembrete pode
+  atrasar até o próximo despertar.
+
 ---
 
 ## Automações do Instagram

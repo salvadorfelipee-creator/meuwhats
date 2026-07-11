@@ -96,6 +96,11 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "menu_sent_at")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN menu_sent_at INTEGER`);
   }
+  if (!infoConversations.rows.some((r) => r.name === "fluxo_passo")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN fluxo_passo TEXT`);
+    await client.execute(`ALTER TABLE conversations ADD COLUMN fluxo_passo_at INTEGER`);
+    await client.execute(`ALTER TABLE conversations ADD COLUMN fluxo_lembrete INTEGER DEFAULT 0`);
+  }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS instagram_dm_contacts (
     instagram_user_id TEXT PRIMARY KEY,
@@ -137,6 +142,37 @@ async function tentarMarcarMenuEnviado(phone, businessNumberId, janelaMs) {
           WHERE phone = ? AND business_number_id = ?
             AND (menu_sent_at IS NULL OR menu_sent_at < ?)`,
     args: [agora, phone, businessNumberId, agora - janelaMs],
+  });
+  return result.rowsAffected > 0;
+}
+
+// Registra em que passo do fluxo automático a conversa está aguardando resposta
+// (passo = null limpa a marcação, ex.: quando o atendimento humano assume).
+async function setFluxoPasso(phone, businessNumberId, passo) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET fluxo_passo = ?, fluxo_passo_at = ?, fluxo_lembrete = 0
+          WHERE phone = ? AND business_number_id = ?`,
+    args: [passo, passo ? Date.now() : null, phone, businessNumberId],
+  });
+}
+
+async function listarFluxosAguardando() {
+  await ready;
+  const result = await client.execute(
+    `SELECT phone, business_number_id, fluxo_passo, fluxo_passo_at FROM conversations
+     WHERE fluxo_passo IS NOT NULL AND fluxo_lembrete = 0`
+  );
+  return result.rows;
+}
+
+// Atômico: só o primeiro chamador consegue marcar (evita lembrete duplicado)
+async function tentarMarcarLembreteEnviado(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `UPDATE conversations SET fluxo_lembrete = 1
+          WHERE phone = ? AND business_number_id = ? AND fluxo_lembrete = 0 AND fluxo_passo IS NOT NULL`,
+    args: [phone, businessNumberId],
   });
   return result.rowsAffected > 0;
 }
@@ -265,6 +301,9 @@ module.exports = {
   upsertConversation,
   getConversation,
   tentarMarcarMenuEnviado,
+  setFluxoPasso,
+  listarFluxosAguardando,
+  tentarMarcarLembreteEnviado,
   insertMessage,
   updateStatusByWaId,
   listConversations,
