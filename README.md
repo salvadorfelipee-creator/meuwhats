@@ -575,7 +575,29 @@ somaram-se:
   até quarta 15/07 23:59. Justificativa do usuário: no RS "é melhor fazer processo".
 - Total no ar na rodada 2: 4 campanhas (~R$26,40/dia somadas, términos automáticos ter/qua/qui).
 
-**Conclusões**: (1) público aberto (Advantage) venceu a segmentação detalhada por 3x —
+**RESULTADO da rodada 2 (11→16/07/2026, apurado 16/07)** — R$119,38 gastos, 14 conversas
+(R$8,53/conversa; rodada 1 foi R$7,77):
+
+| Campanha | Gasto | Conversas | Custo/conversa | Obs |
+|---|---|---|---|---|
+| SC - B Aberto - Homem | R$38,56 | 8 | R$4,82 | caiu de R$3,04; zerou nos 2 últimos dias |
+| RS - Gerente - Homem | R$38,33 | 3 | R$12,78 | dobrou o custo (era R$6,17); frequência ~2 |
+| RS - Gerente - Mulher | R$19,23 | 0 | — | zero; cortar de vez |
+| RS - Gerente Varejo - Homem (novo) | R$23,26 | 3 | R$7,75 | CTR 0,75%; filtro não superou o aberto |
+
+**Porém, no funil do WhatsApp o custo por lead QUALIFICADO melhorou**: 22 conversas novas
+no painel, 15 clicaram TRABALHO/TRABALHEI (68%), 4 completaram até nome/cidade e 2
+escolheram produto na lista nova (SAQUE FGTS e CARRO EM GARANTIA) = 6 leads aproveitáveis
+→ **R$19,90/lead** vs R$24,60 na rodada 1. O fluxo reformulado + lembretes seguraram mais
+gente até o fim.
+
+**Diagnóstico da queda nas conversas**: fadiga de criativo/público — a mesma imagem (post
+de março) rodou 10 dias seguidos nos mesmos públicos pequenos; frequência chegou a ~2 no
+RS, CPM subiu (R$17-20) e a campeã zerou conversas em 15-16/07. **Próxima alavanca é
+trocar o criativo** (nova imagem/vídeo, 2-3 variações no público vencedor SC aberto
+homem), não testar mais públicos. Lookalike ainda não é viável (~50 contatos; precisa ~100).
+
+**Conclusões** (rodada 1): (1) público aberto (Advantage) venceu a segmentação detalhada por 3x —
 qualificar no fluxo do WhatsApp, não no targeting, foi a decisão certa; (2) homens
 respondem muito mais a esse criativo (13 x 6 conversas); (3) a vencedora também teve
 conversas mais profundas (6 first_reply e 3 leads registrados pela Meta); (4) RS só-cargo
