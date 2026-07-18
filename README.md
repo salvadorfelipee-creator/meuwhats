@@ -309,6 +309,15 @@ não dá pra mandar mensagem pra uma lista de contatos existente.
 
 ## Status da Análise do App (Instagram) — onde paramos
 
+**Atualização (18/07/2026): APROVADA — automações do Instagram funcionando para contas reais.**
+App FELIZCRED publicado (tela **Publicar** do developers.facebook.com mostra "Publicado").
+Rodado `GET /painel/api/instagram/diagnostico` nesse dia e os três testes vieram `ok:true`:
+`basic` (`@felizcred`), `manage_comments` (leu comentários do último post) e `manage_messages`
+(leu 25 conversas reais). Ou seja, as 3 automações da tabela acima (comentário → DM, reply de
+story → DM, primeira DM → boas-vindas) estão ativas de verdade, sem precisar mais de conta
+testadora. As pendências de configuração do item 5 abaixo (ícone do app, nome de exibição)
+podem não ter sido resolvidas — não foram checadas nesse teste, só o acesso via API.
+
 **Atualização (26/06/2026): CORRIGIDO — a Análise ainda está PENDENTE, não foi aprovada.**
 Uma anotação anterior nesta sessão dizia "aprovada" por engano (confusão entre "enviado" e
 "aprovado"). O alerta real do App Dashboard (aba **Alertas**) mostra: *"Análise do app: O app
