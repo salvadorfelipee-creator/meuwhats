@@ -40,8 +40,10 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `INSTAGRAM_ACCESS_TOKEN` | Token de acesso da API do Instagram (Graph API) | —                     |
 | `INSTAGRAM_ACCOUNT_ID` | ID numérico da conta profissional do Instagram      | —                     |
 | `INSTAGRAM_VERIFY_TOKEN` | Token de verificação do webhook do Instagram    | `meu_token_secreto_instagram` |
-| `INSTAGRAM_COMMENT_REPLY` | Texto enviado por DM ao comentar em um post    | (ver seção Instagram) |
-| `INSTAGRAM_WELCOME_MESSAGE` | Texto de boas-vindas (primeira DM / reply de story) | (ver seção Instagram) |
+| `INSTAGRAM_MENU_MESSAGE` | Texto-base do menu de 5 opções (usado como padrão pelas duas variáveis abaixo) | (ver seção Instagram) |
+| `INSTAGRAM_COMMENT_REPLY` | Texto enviado por DM ao comentar em um post — sobrescreve o menu se definido | `INSTAGRAM_MENU_MESSAGE` |
+| `INSTAGRAM_WELCOME_MESSAGE` | Texto de boas-vindas (primeira DM / reply de story) — sobrescreve o menu se definido | `INSTAGRAM_MENU_MESSAGE` |
+| `INSTAGRAM_WHATSAPP_NUMERO` | Número de WhatsApp (formato `55DDDNUMERO`, sem `+`/espaços) usado no link gerado quando o cliente escolhe uma opção do menu | `5547997059353` |
 | `META_ADS_ACCESS_TOKEN` | Token de acesso da API de Marketing (campanhas de anúncios) | — |
 | `META_AD_ACCOUNT_ID` | ID da conta de anúncios, formato `act_XXXXXXXXX`        | —                     |
 | `TELEGRAM_BOT_TOKEN` | Token do bot, gerado pelo @BotFather                        | —                     |
@@ -223,12 +225,53 @@ Três automações via webhook nativo da Meta (sem polling), rodando no mesmo se
 
 | Automação | Quando dispara | Mensagem |
 |---|---|---|
-| Comentário → DM | Qualquer comentário em uma foto/post | "Olá! 😊 Para saber mais, acesse www.felizcred.com.br ou fale com a gente pelo WhatsApp que está na nossa bio!" |
-| Reply de Story → DM | Alguém responde a um Story | mesma mensagem de boas-vindas abaixo |
-| Primeira DM → Boas-vindas | Primeira mensagem direta de alguém (controle via tabela `instagram_dm_contacts`) | "Olá! 👋 Agradecemos por nos seguir!\n\nNo nosso blog você encontra as principais novidades sobre empréstimo. Por aqui você também pode simular:\n\n💼 Consignado CLT\n💡 Empréstimo na conta de luz\n💰 Saque do FGTS\n🏛️ Empréstimo consignado do INSS\n\nÉ só responder essa mensagem que a gente te ajuda!" |
+| Comentário → DM | Qualquer comentário em uma foto/post | menu de 5 opções (`INSTAGRAM_MENU_MESSAGE`, ver abaixo) |
+| Reply de Story → DM | Alguém responde a um Story | mesmo menu |
+| Primeira DM → Boas-vindas | Primeira mensagem direta de alguém (controle via tabela `instagram_dm_contacts`) | mesmo menu |
 
-Os textos têm um padrão no código, mas podem ser sobrescritos por variável de ambiente
-(`INSTAGRAM_COMMENT_REPLY`, `INSTAGRAM_WELCOME_MESSAGE`) sem precisar mudar código.
+⚠️ **Não existe webhook de "curtida" nem de "novo seguidor"** na API do Instagram (Meta não
+expõe esses eventos, só `comments`, `messages`, `mentions`, `story_insights` etc. — não é
+limitação do código, é da plataforma). Por isso "primeira DM" funciona como o proxy prático de
+"seguiu e chamou" — a grande maioria de quem segue acaba mandando mensagem (pelo botão do
+anúncio, pelo link da bio, etc.). Curtida isolada sem comentário/DM não dispara nada.
+
+### Menu de 5 opções (18/07/2026) → link direto pro WhatsApp
+
+Pedido do usuário: quem interage manda a mesma mensagem com um menu de produtos; ao responder
+com o número ou o nome da opção, o bot manda de volta um link `wa.me` já com o texto preenchido,
+levando direto pra conversa no WhatsApp (`INSTAGRAM_WHATSAPP_NUMERO`, padrão `5547997059353`).
+
+Texto padrão (`INSTAGRAM_MENU_MESSAGE`, usado tanto no comentário quanto na boas-vindas):
+
+> Olá! 😊 Seja muito bem-vindo(a)!
+>
+> Podemos te ajudar com atendimento pessoal e sem burocracia. Somos correspondente bancário e trabalhamos com as melhores instituições do mercado.
+>
+> Escolha abaixo o que você procura que já te chamamos no WhatsApp:
+>
+> 1️⃣ 🚗 Seguro de veículo
+> 2️⃣ 💼 Consignado CLT
+> 3️⃣ 💰 Saque do FGTS
+> 4️⃣ 🔑 Empréstimo com carro em garantia
+> 5️⃣ 🚙 Financiamento de veículo
+>
+> É só responder com o número ou o nome da opção que a gente continua por lá! 📲
+
+Reconhecimento da resposta (`detectarOpcaoMenuInstagram` em `server.js`): aceita o número
+(`1`–`5`) ou uma palavra-chave por opção (`seguro`, `clt`/`consignado`, `fgts`/`saque`,
+`garantia`, `financiamento`), sem diferenciar maiúscula/acento. Se não reconhecer, não responde
+nada automaticamente (fica pro atendimento manual no painel). Ao reconhecer, envia:
+
+> Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre {produto}:
+> https://wa.me/5547997059353?text=Olá%2C%20vim%20do%20Instagram%20e%20quero%20saber%20sobre%20{produto}
+
+Cada texto (menu e mensagem de comentário) pode ser sobrescrito por variável de ambiente
+(`INSTAGRAM_MENU_MESSAGE`, `INSTAGRAM_COMMENT_REPLY`, `INSTAGRAM_WELCOME_MESSAGE`) sem precisar
+mudar código — as duas últimas caem no texto do menu se não forem definidas.
+
+⚠️ **Ainda não testado em produção** — implementado e com sintaxe validada (`node --check`)
+nesta sessão, mas precisa de um deploy + teste real (comentar num post e responder "3", por
+exemplo) para confirmar o comportamento ponta a ponta.
 
 ### Como conseguir as credenciais (caminho oficial, sem risco de banimento)
 
@@ -649,10 +692,12 @@ no painel a **qualidade** das 19 conversas (quantas clicaram TRABALHO/TRABALHEI 
   aprovado e testado
 - Resposta automática aos botões do template (`Quero saber mais` / `Não quero receber mais`)
 - Automações do Instagram implementadas no código (comentário→DM, story reply→DM, primeira
-  DM→boas-vindas), publicação e leitura de insights via API — Análise do App **ainda
-  pendente** (enviada, sem decisão da Meta até 26/06/2026; ver seção "Status da Análise do
-  App", é o ponto de partida da próxima conversa). Rota `/painel/api/instagram/diagnostico`
-  criada pra checar acesso real sem precisar de prints do App Dashboard.
+  DM→boas-vindas), publicação e leitura de insights via API — Análise do App **aprovada**
+  (confirmado via diagnóstico em 18/07/2026, ver seção "Status da Análise do App"). Rota
+  `/painel/api/instagram/diagnostico` criada pra checar acesso real sem precisar de prints do
+  App Dashboard. Mensagem trocada por um **menu de 5 opções** que gera link `wa.me` pro
+  WhatsApp conforme a escolha (ver seção "Automações do Instagram") — implementado em
+  18/07/2026, **ainda não testado em produção** (falta deploy + teste real).
 - Páginas públicas de Política de Privacidade (`/privacidade`) e Termos de Uso (`/termos`)
   publicadas, usadas na Análise do App
 - Gerenciamento de campanhas de anúncios via API de Marketing implementado (`ads.js` + rotas +

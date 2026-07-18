@@ -25,16 +25,56 @@ const TELEGRAM_THANKS_MESSAGE =
   process.env.TELEGRAM_THANKS_MESSAGE ||
   "Recebemos seu contato, obrigado! Em breve alguém da nossa equipe vai falar com você. 🙌";
 
-const INSTAGRAM_COMMENT_REPLY =
-  process.env.INSTAGRAM_COMMENT_REPLY ||
-  "Olá! 😊 Para saber mais, acesse www.felizcred.com.br ou fale com a gente pelo WhatsApp que está na nossa bio!";
+const INSTAGRAM_MENU_MESSAGE =
+  process.env.INSTAGRAM_MENU_MESSAGE ||
+  "Olá! 😊 Seja muito bem-vindo(a)!\n\n" +
+  "Podemos te ajudar com atendimento pessoal e sem burocracia. Somos correspondente bancário " +
+  "e trabalhamos com as melhores instituições do mercado.\n\n" +
+  "Escolha abaixo o que você procura que já te chamamos no WhatsApp:\n\n" +
+  "1️⃣ 🚗 Seguro de veículo\n2️⃣ 💼 Consignado CLT\n3️⃣ 💰 Saque do FGTS\n" +
+  "4️⃣ 🔑 Empréstimo com carro em garantia\n5️⃣ 🚙 Financiamento de veículo\n\n" +
+  "É só responder com o número ou o nome da opção que a gente continua por lá! 📲";
 
-const INSTAGRAM_WELCOME_MESSAGE =
-  process.env.INSTAGRAM_WELCOME_MESSAGE ||
-  "Olá! 👋 Agradecemos por nos seguir!\n\n" +
-  "No nosso blog você encontra as principais novidades sobre empréstimo. Por aqui você também pode simular:\n\n" +
-  "💼 Consignado CLT\n💡 Empréstimo na conta de luz\n💰 Saque do FGTS\n🏛️ Empréstimo consignado do INSS\n\n" +
-  "É só responder essa mensagem que a gente te ajuda!";
+const INSTAGRAM_COMMENT_REPLY = process.env.INSTAGRAM_COMMENT_REPLY || INSTAGRAM_MENU_MESSAGE;
+const INSTAGRAM_WELCOME_MESSAGE = process.env.INSTAGRAM_WELCOME_MESSAGE || INSTAGRAM_MENU_MESSAGE;
+
+const INSTAGRAM_WHATSAPP_NUMERO = process.env.INSTAGRAM_WHATSAPP_NUMERO || "5547997059353";
+
+// Opções do menu do Instagram → produto e palavras-chave aceitas na resposta do cliente
+// (número da opção sempre aceito; palavras são comparadas sem acento/maiúscula).
+const INSTAGRAM_OPCOES_MENU = [
+  { produto: "Seguro de veículo", chaves: ["1", "seguro"] },
+  { produto: "Consignado CLT", chaves: ["2", "clt", "consignado"] },
+  { produto: "Saque do FGTS", chaves: ["3", "fgts", "saque"] },
+  { produto: "Empréstimo com carro em garantia", chaves: ["4", "garantia"] },
+  { produto: "Financiamento de veículo", chaves: ["5", "financiamento"] },
+];
+
+const REGEX_ACENTOS = new RegExp("[̀-ͯ]", "g");
+
+function normalizarTexto(texto) {
+  return (texto || "")
+    .normalize("NFD")
+    .replace(REGEX_ACENTOS, "")
+    .toLowerCase()
+    .trim();
+}
+
+function detectarOpcaoMenuInstagram(texto) {
+  const t = normalizarTexto(texto);
+  if (!t) return null;
+  for (const opcao of INSTAGRAM_OPCOES_MENU) {
+    for (const chave of opcao.chaves) {
+      if (chave.length === 1 ? t === chave : t.includes(chave)) return opcao;
+    }
+  }
+  return null;
+}
+
+function linkWhatsAppInstagram(produto) {
+  const texto = `Olá, vim do Instagram e quero saber sobre ${produto}`;
+  return `https://wa.me/${INSTAGRAM_WHATSAPP_NUMERO}?text=${encodeURIComponent(texto)}`;
+}
 
 const PHONE_NUMBERS = process.env.PHONE_NUMBERS_JSON
   ? JSON.parse(process.env.PHONE_NUMBERS_JSON)
@@ -431,6 +471,20 @@ async function handleInstagramComment(value) {
 async function handleInstagramMessaging(messaging) {
   const senderId = messaging.sender?.id;
   if (!senderId) return;
+
+  const opcao = detectarOpcaoMenuInstagram(messaging.message?.text);
+  if (opcao) {
+    try {
+      await ig.sendDM(
+        senderId,
+        `Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre ${opcao.produto}:\n${linkWhatsAppInstagram(opcao.produto)}`
+      );
+      console.log(`📸 ${senderId} escolheu "${opcao.produto}" → link do WhatsApp enviado`);
+    } catch (err) {
+      console.error("Erro ao enviar link do WhatsApp (menu Instagram):", err.message);
+    }
+    return;
+  }
 
   const isStoryReply = !!messaging.message?.reply_to?.story;
   if (isStoryReply) {
