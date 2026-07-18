@@ -379,6 +379,24 @@ Gerenciamento de campanhas pagas (Instagram/Facebook) via Marketing API, pedido 
 — sem formulário no painel. Módulo `ads.js`, rotas em `server.js`, visualização/controle no
 painel (botão 📊 — lista campanhas com gasto/impressões/cliques/CTR, pausa/ativa).
 
+### App FELIZCRED publicado (18/07/2026) — bloqueio de `POST /adcreatives` removido
+
+O app saiu do modo de desenvolvimento (tela **Publicar** no developers.facebook.com mostra
+status "Publicado"). Testado nesse dia com token avulso (`ads_management`+`ads_read`): o erro
+1885183 ("app não publicado") **não ocorre mais** — `POST /adcreatives` agora responde com
+erros normais de validação de parâmetro (ex: ID de mídia do Instagram desatualizado), não mais
+com bloqueio de plataforma. Ou seja, a partir de agora **dá pra criar o criativo direto via API**
+(`criarCreativoDePublicacaoInstagram` em `ads.js`), sem precisar mais do passo manual "usuário
+cria o primeiro anúncio no Gerenciador" descrito na receita abaixo — mas a receita continua
+documentada como fallback caso algo volte a travar.
+
+Detalhe descoberto no teste: o `source_instagram_media_id` salvo de campanhas antigas
+(`3588869927198956744`, post DHOOi8jxpzI) não é mais aceito ("must be a valid Instagram media
+V2 ID") — precisa buscar o ID atual antes de reusar. Instagram Business ID da conta conectada:
+`17841405493321848` (obtido via `GET /act_{AD_ACCOUNT_ID}/instagram_accounts`). Buscar a lista
+de mídia (`GET /{instagram_business_id}/media`) exige um token com `instagram_business_basic`,
+que o token de Marketing API (só `ads_management`/`ads_read`) não tem.
+
 ### Configuração já feita
 
 - Caso de uso "Criar e gerenciar anúncios com a API de Marketing" adicionado ao app
