@@ -863,6 +863,32 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await db.telegramListContacts());
     }
 
+    // GET /painel/api/linkedin/leads — lista de leads do LinkedIn (adicionados manualmente)
+    if (req.method === "GET" && path_ === "/painel/api/linkedin/leads") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.linkedinListLeads());
+    }
+
+    // POST /painel/api/linkedin/leads — adiciona um ou mais leads (colados do Sales Navigator)
+    if (req.method === "POST" && path_ === "/painel/api/linkedin/leads") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const leads = Array.isArray(body.leads) ? body.leads : [];
+      for (const l of leads) {
+        await db.linkedinAddLead({ ...l, created_at: Date.now() });
+      }
+      return send(res, 200, { ok: true, adicionados: leads.length });
+    }
+
+    // POST /painel/api/linkedin/leads/:id/status — marca lead como contatado/descartado/etc.
+    const matchLinkedinStatus = path_.match(/^\/painel\/api\/linkedin\/leads\/(\d+)\/status$/);
+    if (req.method === "POST" && matchLinkedinStatus) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await db.linkedinSetStatus(Number(matchLinkedinStatus[1]), body.status);
+      return send(res, 200, { ok: true });
+    }
+
     // GET /media/:filename — servir arquivo de mídia
     const matchMedia = path_.match(/^\/media\/([a-zA-Z0-9_.-]+)$/);
     if (req.method === "GET" && matchMedia) {

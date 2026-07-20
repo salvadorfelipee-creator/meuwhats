@@ -350,6 +350,44 @@ não dá pra mandar mensagem pra uma lista de contatos existente.
 
 ---
 
+## Geração de leads via LinkedIn (20/07/2026) — decisão deliberada de não automatizar o LinkedIn
+
+Pedido do usuário: gerar leads via LinkedIn com filtro de cargo + sinal de quem saiu/mudou de
+emprego recentemente. **Decisão tomada**: não construir nenhum bot/scraper que faça login e
+navegue no LinkedIn automaticamente (é o que ferramentas tipo Phantombuster/Waalaxy fazem) —
+viola os Termos de Uso do LinkedIn independente do plano (grátis, trial do Sales Navigator ou
+pago), e o risco real é banimento da conta. **Isso não é uma trava técnica, é uma trava de ToS**
+— não reconsiderar essa decisão sem o usuário assumir explicitamente o risco de outra forma.
+
+O que existe hoje (aba **🔗 LinkedIn** no painel, ver seção "Interface do painel" acima) é só o
+destino manual dos leads — cadastro via colar em massa, sem nenhuma automação tocando o
+LinkedIn.
+
+**Caminho legal recomendado para achar os leads** (trabalho manual do usuário, não automatizado):
+
+1. **Sales Navigator (tem período de trial gratuito, ~30 dias)**: monta busca salva com filtro
+   de cargo + "Changed jobs" (mudou de emprego nos últimos 90 dias — é o mais próximo que existe
+   de "data de saída", só disponível no Sales Navigator, não no LinkedIn grátis) e ativa
+   **"Alert me about new results"** — isso é 100% automação legítima porque é feature nativa do
+   próprio LinkedIn (não é bot de terceiros). Copiar os resultados manualmente pra aba LinkedIn
+   do painel.
+2. Alternativa sem Sales Navigator: buscar `#opentowork` (selo que a pessoa mesma ativa quando
+   está buscando recolocação — sinal de intenção mais forte que "mudou de emprego", e gratuito).
+3. **Descoberta via Google (ainda não implementada)**: script que consulta a API gratuita do
+   Google Custom Search (100 buscas grátis/dia) com `site:linkedin.com/in "cargo" "cidade"` —
+   não toca o LinkedIn diretamente (só consulta o Google), então não tem o mesmo risco de ToS.
+   Precisa de: API key do Google Custom Search + Search Engine ID (ambos gratuitos, o usuário
+   cria em console.cloud.google.com e programmablesearchengine.google.com).
+4. **Enriquecimento de e-mail (ainda não implementado)**: Hunter.io tem plano grátis (~25
+   verificações/mês) pra tentar achar e-mail a partir de nome + domínio da empresa. Precisa de
+   uma API key do usuário (cadastro em hunter.io).
+
+Os itens 3 e 4 dependem do usuário gerar as respectivas chaves de API antes de eu poder
+implementar a automação real (descoberta + enriquecimento) — sem elas, o fluxo é 100% manual
+(colar na aba LinkedIn do painel).
+
+---
+
 ## Status da Análise do App (Instagram) — onde paramos
 
 **Atualização (18/07/2026): APROVADA — automações do Instagram funcionando para contas reais.**
@@ -707,6 +745,11 @@ no painel a **qualidade** das 19 conversas (quantas clicaram TRABALHO/TRABALHEI 
 - Atendimento automático com botões no WhatsApp implementado em 06/07/2026 (menu inicial para
   conversa nova/inativa 24h + fluxo do anúncio de gerente — ver seção própria acima). Pendente:
   o usuário vai definir o fluxo do botão CONSIGNADO CLT (hoje é resposta provisória).
+- Aba **🔗 LinkedIn** no painel implementada em 20/07/2026 pra cadastro manual de leads (colar em
+  massa) — ver seção "Geração de leads via LinkedIn" pra entender por que não existe automação de
+  scraping do LinkedIn (decisão deliberada de ToS) e quais os próximos passos (script de
+  descoberta via Google + enriquecimento de e-mail via Hunter.io), ambos pendentes de o usuário
+  gerar as respectivas chaves de API grátis.
 
 ---
 
@@ -758,6 +801,9 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `POST /painel/api/ads/:id/status`                                | Pausa/ativa campanha, conjunto ou anúncio (auth) |
 | `POST /webhook/telegram`                                          | Recebe updates do bot do Telegram (`/start`, contato compartilhado) |
 | `GET /painel/api/telegram/contacts`                               | Lista contatos captados pelo bot do Telegram (auth) |
+| `GET /painel/api/linkedin/leads`                                  | Lista leads do LinkedIn adicionados manualmente (auth) |
+| `POST /painel/api/linkedin/leads`                                 | Adiciona um ou mais leads colados do Sales Navigator (auth) |
+| `POST /painel/api/linkedin/leads/:id/status`                      | Marca lead como contatado/descartado (auth) |
 
 ### Interface do painel (`public/painel.html`)
 
@@ -774,6 +820,13 @@ de ícones que troca entre três telas dentro da mesma página:
   pausar/ativar.
 - **📨 Telegram** — lista de contatos (leads) captados pelo bot, com telefone, username e
   parâmetro de origem (campanha) quando disponível.
+- **🔗 LinkedIn** — lista de leads (nome, cargo, empresa, e-mail, link do perfil) adicionados
+  manualmente via botão "Adicionar leads" (cola em massa, um por linha, formato
+  `nome,cargo,empresa,email,link`). Existe pra dar suporte ao fluxo de geração de leads pelo
+  LinkedIn (ver seção própria abaixo) — não há automação de scraping do LinkedIn em si (decisão
+  deliberada, ver seção "Geração de leads via LinkedIn"), só o cadastro/acompanhamento manual dos
+  leads encontrados por lá. Cada lead tem status `novo`/`contatado`/`descartado`, ajustável pelos
+  botões no card.
 
 **Notificações de mensagem nova (WhatsApp)** — botão 🔔 no cabeçalho da aba WhatsApp pede
 permissão de notificação do navegador (`Notification` API). Com permissão concedida, toda

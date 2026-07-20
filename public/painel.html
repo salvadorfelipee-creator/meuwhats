@@ -123,6 +123,15 @@
   #massa-enviar { background: var(--accent); color: #fff; }
   #massa-resultado { margin-top: 12px; font-size: 13px; color: var(--text-muted); }
 
+  #modal-linkedin { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 10; }
+  #li-cancelar { background: var(--bg-alt); }
+  #li-salvar { background: var(--accent); color: #fff; }
+  #li-resultado { margin-top: 12px; font-size: 13px; color: var(--text-muted); }
+  .li-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+  .li-status.novo { background: var(--bg-alt); color: var(--text-muted); }
+  .li-status.contatado { background: #DFF0DA; color: #2E7D32; }
+  .li-status.descartado { background: #F0DADA; color: #B71C1C; }
+
   /* ── Instagram ────────────────────────────────────────────── */
   #ig-perfil-card { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
   #ig-perfil-card img { width: 52px; height: 52px; border-radius: 50%; }
@@ -154,6 +163,7 @@
     <button class="nav-item" data-view="instagram" title="Instagram">📸</button>
     <button class="nav-item" data-view="ads" title="Ads Manager">📊</button>
     <button class="nav-item" data-view="telegram" title="Telegram">📨</button>
+    <button class="nav-item" data-view="linkedin" title="LinkedIn">🔗</button>
   </nav>
 
   <!-- ── WhatsApp ─────────────────────────────────────────── -->
@@ -240,6 +250,20 @@
       <div class="cards-grid" id="tg-lista">Carregando...</div>
     </div>
   </div>
+
+  <!-- ── LinkedIn ─────────────────────────────────────────── -->
+  <div id="view-linkedin" class="view">
+    <div class="page-wrap">
+      <div class="page-header">
+        <h2>LinkedIn — Leads</h2>
+        <div class="page-header-acoes">
+          <button id="li-adicionar" class="btn-secundario">Adicionar leads</button>
+          <button id="li-atualizar" class="btn-primario">Atualizar</button>
+        </div>
+      </div>
+      <div class="cards-grid" id="li-lista">Carregando...</div>
+    </div>
+  </div>
 </div>
 
 <div id="modal-massa">
@@ -261,6 +285,19 @@
   </div>
 </div>
 
+<div id="modal-linkedin">
+  <div class="modal-conteudo">
+    <h3>Adicionar leads do LinkedIn</h3>
+    <label>Cole os leads copiados dos alertas de busca do Sales Navigator (ou de onde vier) — um por linha, no formato: nome,cargo,empresa,email,link do perfil (campos vazios são permitidos, mas mantenha as vírgulas)</label>
+    <textarea id="li-contatos" placeholder="João Silva,Gerente,Empresa X,joao@x.com,https://linkedin.com/in/joaosilva&#10;Maria Souza,Supervisora,Empresa Y,,https://linkedin.com/in/mariasouza"></textarea>
+    <div class="modal-botoes">
+      <button id="li-cancelar" type="button">Cancelar</button>
+      <button id="li-salvar" type="button">Adicionar</button>
+    </div>
+    <div id="li-resultado"></div>
+  </div>
+</div>
+
 <script>
 let telefoneAtual = null;
 let conversasCache = [];
@@ -277,6 +314,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     if (btn.dataset.view === "instagram") carregarTudoInstagram();
     if (btn.dataset.view === "ads") carregarCampanhas();
     if (btn.dataset.view === "telegram") carregarContatosTelegram();
+    if (btn.dataset.view === "linkedin") carregarLeadsLinkedin();
   });
 });
 
@@ -828,6 +866,91 @@ async function carregarContatosTelegram() {
 }
 
 document.getElementById("tg-atualizar").addEventListener("click", carregarContatosTelegram);
+
+// ─── LinkedIn ───────────────────────────────────────────────────────────────
+async function carregarLeadsLinkedin() {
+  const div = document.getElementById("li-lista");
+  div.textContent = "Carregando...";
+  try {
+    const res = await fetch("/painel/api/linkedin/leads");
+    const leads = await res.json();
+    if (leads.error) throw new Error(leads.error);
+    if (!leads.length) {
+      div.innerHTML = `<div class="card lista-vazia">Nenhum lead adicionado ainda.</div>`;
+      return;
+    }
+    div.innerHTML = leads.map((l) => `
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
+          <strong>${escapeHtml(l.nome || "Sem nome")}</strong>
+          <span class="li-status ${escapeHtml(l.status)}">${escapeHtml(l.status)}</span>
+        </div>
+        ${l.cargo || l.empresa ? `<div style="color:var(--text-muted);font-size:12px;">${escapeHtml([l.cargo, l.empresa].filter(Boolean).join(" — "))}</div>` : ""}
+        <div style="margin-top:8px; font-size:13.5px;">${
+          l.email ? "✉️ " + escapeHtml(l.email) : `<span style="color:var(--text-muted);">Sem e-mail</span>`
+        }</div>
+        ${l.perfil_url ? `<div style="margin-top:4px;"><a href="${escapeHtml(l.perfil_url)}" target="_blank" rel="noopener">Ver perfil</a></div>` : ""}
+        <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">${formatarHoraIg(l.created_at)}</div>
+        <div style="margin-top:10px; display:flex; gap:6px;">
+          <button type="button" class="btn-secundario li-marcar" data-id="${l.id}" data-status="contatado" style="font-size:11px; padding:4px 10px;">Marcar contatado</button>
+          <button type="button" class="btn-secundario li-marcar" data-id="${l.id}" data-status="descartado" style="font-size:11px; padding:4px 10px;">Descartar</button>
+        </div>
+      </div>
+    `).join("");
+    div.querySelectorAll(".li-marcar").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        await fetch(`/painel/api/linkedin/leads/${btn.dataset.id}/status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: btn.dataset.status }),
+        });
+        carregarLeadsLinkedin();
+      });
+    });
+  } catch (err) {
+    div.innerHTML = `<div class="card ig-erro">Erro ao carregar leads: ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+document.getElementById("li-atualizar").addEventListener("click", carregarLeadsLinkedin);
+
+document.getElementById("li-adicionar").addEventListener("click", () => {
+  document.getElementById("li-resultado").textContent = "";
+  document.getElementById("li-contatos").value = "";
+  document.getElementById("modal-linkedin").style.display = "flex";
+});
+
+document.getElementById("li-cancelar").addEventListener("click", () => {
+  document.getElementById("modal-linkedin").style.display = "none";
+});
+
+document.getElementById("li-salvar").addEventListener("click", async () => {
+  const linhas = document.getElementById("li-contatos").value.split("\n").map((l) => l.trim()).filter(Boolean);
+  const leads = linhas.map((l) => {
+    const [nome, cargo, empresa, email, perfil_url] = l.split(",").map((s) => (s || "").trim());
+    return { nome, cargo, empresa, email, perfil_url };
+  });
+
+  const resDiv = document.getElementById("li-resultado");
+  if (!leads.length) {
+    resDiv.textContent = "Cole ao menos uma linha.";
+    return;
+  }
+  resDiv.textContent = "Adicionando...";
+  try {
+    const res = await fetch("/painel/api/linkedin/leads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leads }),
+    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error);
+    document.getElementById("modal-linkedin").style.display = "none";
+    carregarLeadsLinkedin();
+  } catch (err) {
+    resDiv.textContent = `Erro: ${err.message}`;
+  }
+});
 
 atualizarBotaoNotif();
 carregarNumeros().then(carregarConversas).then(verificarNovasMensagens);
