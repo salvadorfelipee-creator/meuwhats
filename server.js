@@ -889,6 +889,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // POST /painel/api/linkedin/leads/:id/email — preenche/edita o e-mail achado manualmente
+    const matchLinkedinEmail = path_.match(/^\/painel\/api\/linkedin\/leads\/(\d+)\/email$/);
+    if (req.method === "POST" && matchLinkedinEmail) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await db.linkedinSetEmail(Number(matchLinkedinEmail[1]), (body.email || "").trim());
+      return send(res, 200, { ok: true });
+    }
+
     // GET /media/:filename — servir arquivo de mídia
     const matchMedia = path_.match(/^\/media\/([a-zA-Z0-9_.-]+)$/);
     if (req.method === "GET" && matchMedia) {

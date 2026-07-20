@@ -879,7 +879,16 @@ async function carregarLeadsLinkedin() {
       div.innerHTML = `<div class="card lista-vazia">Nenhum lead adicionado ainda.</div>`;
       return;
     }
-    div.innerHTML = leads.map((l) => `
+    // Fila do dia: quem ainda não tem e-mail checado aparece primeiro (mais antigo primeiro dentro do grupo)
+    const semEmail = leads.filter((l) => !l.email && l.status === "novo");
+    const resto = leads.filter((l) => l.email || l.status !== "novo");
+    const ordenados = [...semEmail, ...resto];
+    if (semEmail.length) {
+      div.innerHTML = `<div class="card" style="grid-column:1/-1; background:var(--bg-alt); font-size:13px;">📋 Fila de hoje: ${semEmail.length} lead(s) sem e-mail verificado ainda — pegue os primeiros da lista, abra o perfil, confira "Informações de contato" e preencha.</div>`;
+    } else {
+      div.innerHTML = "";
+    }
+    div.innerHTML += ordenados.map((l) => `
       <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:start; gap:8px;">
           <strong>${escapeHtml(l.nome || "Sem nome")}</strong>
@@ -891,7 +900,8 @@ async function carregarLeadsLinkedin() {
         }</div>
         ${l.perfil_url ? `<div style="margin-top:4px;"><a href="${escapeHtml(l.perfil_url)}" target="_blank" rel="noopener">Ver perfil</a></div>` : ""}
         <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">${formatarHoraIg(l.created_at)}</div>
-        <div style="margin-top:10px; display:flex; gap:6px;">
+        <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap;">
+          <button type="button" class="btn-secundario li-email" data-id="${l.id}" style="font-size:11px; padding:4px 10px;">${l.email ? "Editar e-mail" : "Adicionar e-mail"}</button>
           <button type="button" class="btn-secundario li-marcar" data-id="${l.id}" data-status="contatado" style="font-size:11px; padding:4px 10px;">Marcar contatado</button>
           <button type="button" class="btn-secundario li-marcar" data-id="${l.id}" data-status="descartado" style="font-size:11px; padding:4px 10px;">Descartar</button>
         </div>
@@ -903,6 +913,19 @@ async function carregarLeadsLinkedin() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: btn.dataset.status }),
+        });
+        carregarLeadsLinkedin();
+      });
+    });
+    div.querySelectorAll(".li-email").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const atual = leads.find((l) => String(l.id) === btn.dataset.id)?.email || "";
+        const novo = prompt("E-mail público encontrado no perfil (deixe vazio pra remover):", atual);
+        if (novo === null) return;
+        await fetch(`/painel/api/linkedin/leads/${btn.dataset.id}/email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: novo.trim() }),
         });
         carregarLeadsLinkedin();
       });

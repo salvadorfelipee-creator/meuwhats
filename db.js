@@ -346,6 +346,14 @@ async function linkedinSetStatus(id, status) {
   });
 }
 
+async function linkedinSetEmail(id, email) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE linkedin_leads SET email = ? WHERE id = ?`,
+    args: [email, id],
+  });
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -365,4 +373,5 @@ module.exports = {
   linkedinAddLead,
   linkedinListLeads,
   linkedinSetStatus,
+  linkedinSetEmail,
 };

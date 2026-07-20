@@ -386,6 +386,19 @@ Os itens 3 e 4 dependem do usuário gerar as respectivas chaves de API antes de 
 implementar a automação real (descoberta + enriquecimento) — sem elas, o fluxo é 100% manual
 (colar na aba LinkedIn do painel).
 
+**Sobre e-mail público de perfil (20/07/2026)**: o usuário pediu especificamente e-mail que a
+própria pessoa deixou público no perfil (campo "Informações de contato"), não e-mail
+adivinhado/verificado por padrão de domínio (tipo Hunter.io) — faz sentido, é dado real que a
+pessoa escolheu compartilhar. Só que o LinkedIn **só mostra isso um perfil por vez**, nunca em
+lista/busca, então não tem lote pra "importar". O usuário chegou a pedir um jeito de automatizar
+isso "mesmo que seja 10 por dia" — **recusado**: um script abrindo perfis sozinho pra extrair
+esse dado continua sendo automação de coleta bloqueada pelos Termos de Uso, e limitar o ritmo é
+justamente a tática clássica de tentar ficar embaixo do radar de detecção do LinkedIn, não uma
+forma de tornar a coisa permitida. Em vez disso, a "fila do dia" (ver acima) foi construída pra
+tornar o processo 100% manual (usuário abre cada perfil e copia o e-mail se existir) mais rápido
+de executar — se um pedido futuro insistir em automatizar essa parte especificamente, a resposta
+correta é manter a recusa, não ir "amaciando" com throttling/delay artificial.
+
 ---
 
 ## Status da Análise do App (Instagram) — onde paramos
@@ -804,6 +817,7 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `GET /painel/api/linkedin/leads`                                  | Lista leads do LinkedIn adicionados manualmente (auth) |
 | `POST /painel/api/linkedin/leads`                                 | Adiciona um ou mais leads colados do Sales Navigator (auth) |
 | `POST /painel/api/linkedin/leads/:id/status`                      | Marca lead como contatado/descartado (auth) |
+| `POST /painel/api/linkedin/leads/:id/email`                       | Preenche/edita o e-mail achado manualmente no perfil (auth) |
 
 ### Interface do painel (`public/painel.html`)
 
@@ -822,11 +836,17 @@ de ícones que troca entre três telas dentro da mesma página:
   parâmetro de origem (campanha) quando disponível.
 - **🔗 LinkedIn** — lista de leads (nome, cargo, empresa, e-mail, link do perfil) adicionados
   manualmente via botão "Adicionar leads" (cola em massa, um por linha, formato
-  `nome,cargo,empresa,email,link`). Existe pra dar suporte ao fluxo de geração de leads pelo
-  LinkedIn (ver seção própria abaixo) — não há automação de scraping do LinkedIn em si (decisão
-  deliberada, ver seção "Geração de leads via LinkedIn"), só o cadastro/acompanhamento manual dos
-  leads encontrados por lá. Cada lead tem status `novo`/`contatado`/`descartado`, ajustável pelos
-  botões no card.
+  `nome,cargo,empresa,email,link`, mas aceita colar só uma linha por vez também). Existe pra dar
+  suporte ao fluxo de geração de leads pelo LinkedIn (ver seção própria abaixo) — não há automação
+  de scraping do LinkedIn em si (decisão deliberada, ver seção "Geração de leads via LinkedIn"),
+  só o cadastro/acompanhamento manual dos leads encontrados por lá. Cada lead tem status
+  `novo`/`contatado`/`descartado`, ajustável pelos botões no card.
+  **"Fila do dia" (20/07/2026)**: a lista ordena automaticamente pra mostrar primeiro quem ainda
+  não tem e-mail verificado (status `novo` + sem e-mail), com um aviso no topo contando quantos
+  faltam — pensado pro fluxo manual de "10 por dia" (abrir perfil no LinkedIn, checar
+  "Informações de contato", clicar em "Adicionar e-mail" no card e colar o que achou). Botão
+  "Adicionar/Editar e-mail" em cada card usa `prompt()` simples, sem precisar reabrir o modal de
+  importação em massa.
 
 **Notificações de mensagem nova (WhatsApp)** — botão 🔔 no cabeçalho da aba WhatsApp pede
 permissão de notificação do navegador (`Notification` API). Com permissão concedida, toda
