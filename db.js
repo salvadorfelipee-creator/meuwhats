@@ -118,17 +118,7 @@ const ready = (async () => {
     created_at INTEGER NOT NULL
   )`);
 
-  await client.execute(`CREATE TABLE IF NOT EXISTS linkedin_leads (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT,
-    cargo TEXT,
-    empresa TEXT,
-    email TEXT,
-    perfil_url TEXT UNIQUE,
-    origem TEXT,
-    status TEXT NOT NULL DEFAULT 'novo',
-    created_at INTEGER NOT NULL
-  )`);
+  await client.execute(`DROP TABLE IF EXISTS linkedin_leads`);
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -309,51 +299,6 @@ async function telegramListContacts() {
   return result.rows;
 }
 
-async function linkedinAddLead(l) {
-  await ready;
-  await client.execute({
-    sql: `INSERT INTO linkedin_leads (nome, cargo, empresa, email, perfil_url, origem, status, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, 'novo', ?)
-          ON CONFLICT(perfil_url) DO UPDATE SET
-            nome = COALESCE(excluded.nome, linkedin_leads.nome),
-            cargo = COALESCE(excluded.cargo, linkedin_leads.cargo),
-            empresa = COALESCE(excluded.empresa, linkedin_leads.empresa),
-            email = COALESCE(excluded.email, linkedin_leads.email),
-            origem = COALESCE(excluded.origem, linkedin_leads.origem)`,
-    args: [
-      l.nome || null,
-      l.cargo || null,
-      l.empresa || null,
-      l.email || null,
-      l.perfil_url || null,
-      l.origem || null,
-      l.created_at,
-    ],
-  });
-}
-
-async function linkedinListLeads() {
-  await ready;
-  const result = await client.execute(`SELECT * FROM linkedin_leads ORDER BY created_at DESC`);
-  return result.rows;
-}
-
-async function linkedinSetStatus(id, status) {
-  await ready;
-  await client.execute({
-    sql: `UPDATE linkedin_leads SET status = ? WHERE id = ?`,
-    args: [status, id],
-  });
-}
-
-async function linkedinSetEmail(id, email) {
-  await ready;
-  await client.execute({
-    sql: `UPDATE linkedin_leads SET email = ? WHERE id = ?`,
-    args: [email, id],
-  });
-}
-
 module.exports = {
   upsertConversation,
   getConversation,
@@ -370,8 +315,4 @@ module.exports = {
   instagramLimparSaudados,
   telegramUpsertContact,
   telegramListContacts,
-  linkedinAddLead,
-  linkedinListLeads,
-  linkedinSetStatus,
-  linkedinSetEmail,
 };

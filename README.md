@@ -350,54 +350,23 @@ não dá pra mandar mensagem pra uma lista de contatos existente.
 
 ---
 
-## Geração de leads via LinkedIn (20/07/2026) — decisão deliberada de não automatizar o LinkedIn
+## Geração de leads via LinkedIn — tentado e descartado (20/07/2026)
 
-Pedido do usuário: gerar leads via LinkedIn com filtro de cargo + sinal de quem saiu/mudou de
-emprego recentemente. **Decisão tomada**: não construir nenhum bot/scraper que faça login e
-navegue no LinkedIn automaticamente (é o que ferramentas tipo Phantombuster/Waalaxy fazem) —
-viola os Termos de Uso do LinkedIn independente do plano (grátis, trial do Sales Navigator ou
-pago), e o risco real é banimento da conta. **Isso não é uma trava técnica, é uma trava de ToS**
-— não reconsiderar essa decisão sem o usuário assumir explicitamente o risco de outra forma.
+Usuário pediu leads via LinkedIn (filtro de cargo + sinal de quem saiu/mudou de emprego). Foi
+implementada uma aba **🔗 LinkedIn** no painel pra cadastro manual dos leads (cargo, empresa,
+e-mail público, link do perfil) com fila priorizando quem ainda não tinha e-mail checado — mas
+o usuário decidiu não seguir com esse canal e pediu pra **remover** a aba (removida nesse mesmo
+dia; sem tabela/rotas/UI no código atual).
 
-O que existe hoje (aba **🔗 LinkedIn** no painel, ver seção "Interface do painel" acima) é só o
-destino manual dos leads — cadastro via colar em massa, sem nenhuma automação tocando o
-LinkedIn.
-
-**Caminho legal recomendado para achar os leads** (trabalho manual do usuário, não automatizado):
-
-1. **Sales Navigator (tem período de trial gratuito, ~30 dias)**: monta busca salva com filtro
-   de cargo + "Changed jobs" (mudou de emprego nos últimos 90 dias — é o mais próximo que existe
-   de "data de saída", só disponível no Sales Navigator, não no LinkedIn grátis) e ativa
-   **"Alert me about new results"** — isso é 100% automação legítima porque é feature nativa do
-   próprio LinkedIn (não é bot de terceiros). Copiar os resultados manualmente pra aba LinkedIn
-   do painel.
-2. Alternativa sem Sales Navigator: buscar `#opentowork` (selo que a pessoa mesma ativa quando
-   está buscando recolocação — sinal de intenção mais forte que "mudou de emprego", e gratuito).
-3. **Descoberta via Google (ainda não implementada)**: script que consulta a API gratuita do
-   Google Custom Search (100 buscas grátis/dia) com `site:linkedin.com/in "cargo" "cidade"` —
-   não toca o LinkedIn diretamente (só consulta o Google), então não tem o mesmo risco de ToS.
-   Precisa de: API key do Google Custom Search + Search Engine ID (ambos gratuitos, o usuário
-   cria em console.cloud.google.com e programmablesearchengine.google.com).
-4. **Enriquecimento de e-mail (ainda não implementado)**: Hunter.io tem plano grátis (~25
-   verificações/mês) pra tentar achar e-mail a partir de nome + domínio da empresa. Precisa de
-   uma API key do usuário (cadastro em hunter.io).
-
-Os itens 3 e 4 dependem do usuário gerar as respectivas chaves de API antes de eu poder
-implementar a automação real (descoberta + enriquecimento) — sem elas, o fluxo é 100% manual
-(colar na aba LinkedIn do painel).
-
-**Sobre e-mail público de perfil (20/07/2026)**: o usuário pediu especificamente e-mail que a
-própria pessoa deixou público no perfil (campo "Informações de contato"), não e-mail
-adivinhado/verificado por padrão de domínio (tipo Hunter.io) — faz sentido, é dado real que a
-pessoa escolheu compartilhar. Só que o LinkedIn **só mostra isso um perfil por vez**, nunca em
-lista/busca, então não tem lote pra "importar". O usuário chegou a pedir um jeito de automatizar
-isso "mesmo que seja 10 por dia" — **recusado**: um script abrindo perfis sozinho pra extrair
-esse dado continua sendo automação de coleta bloqueada pelos Termos de Uso, e limitar o ritmo é
-justamente a tática clássica de tentar ficar embaixo do radar de detecção do LinkedIn, não uma
-forma de tornar a coisa permitida. Em vez disso, a "fila do dia" (ver acima) foi construída pra
-tornar o processo 100% manual (usuário abre cada perfil e copia o e-mail se existir) mais rápido
-de executar — se um pedido futuro insistir em automatizar essa parte especificamente, a resposta
-correta é manter a recusa, não ir "amaciando" com throttling/delay artificial.
+**Decisão que vale manter mesmo sem a feature**: em nenhum momento foi construído (nem deve ser,
+se o assunto voltar) um bot/scraper que faça login e navegue no LinkedIn automaticamente — viola
+os Termos de Uso independente do plano (grátis, trial do Sales Navigator ou pago) ou do ritmo
+(o usuário chegou a pedir throttling a "10 por dia" pra tentar ficar embaixo do radar de
+detecção — recusado, throttling não torna a automação permitida, só mais difícil de detectar).
+Se um pedido futuro reabrir esse tema, os caminhos legítimos discutidos foram: busca salva +
+alerta nativo do Sales Navigator (feature própria do LinkedIn, não bot), `#opentowork` como
+sinal gratuito de intenção, e — só pra descoberta/enriquecimento fora do LinkedIn — script de
+Google Custom Search (`site:linkedin.com/in "cargo"`) e Hunter.io, nenhum dos dois implementado.
 
 ---
 
@@ -758,11 +727,6 @@ no painel a **qualidade** das 19 conversas (quantas clicaram TRABALHO/TRABALHEI 
 - Atendimento automático com botões no WhatsApp implementado em 06/07/2026 (menu inicial para
   conversa nova/inativa 24h + fluxo do anúncio de gerente — ver seção própria acima). Pendente:
   o usuário vai definir o fluxo do botão CONSIGNADO CLT (hoje é resposta provisória).
-- Aba **🔗 LinkedIn** no painel implementada em 20/07/2026 pra cadastro manual de leads (colar em
-  massa) — ver seção "Geração de leads via LinkedIn" pra entender por que não existe automação de
-  scraping do LinkedIn (decisão deliberada de ToS) e quais os próximos passos (script de
-  descoberta via Google + enriquecimento de e-mail via Hunter.io), ambos pendentes de o usuário
-  gerar as respectivas chaves de API grátis.
 
 ---
 
@@ -814,10 +778,6 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `POST /painel/api/ads/:id/status`                                | Pausa/ativa campanha, conjunto ou anúncio (auth) |
 | `POST /webhook/telegram`                                          | Recebe updates do bot do Telegram (`/start`, contato compartilhado) |
 | `GET /painel/api/telegram/contacts`                               | Lista contatos captados pelo bot do Telegram (auth) |
-| `GET /painel/api/linkedin/leads`                                  | Lista leads do LinkedIn adicionados manualmente (auth) |
-| `POST /painel/api/linkedin/leads`                                 | Adiciona um ou mais leads colados do Sales Navigator (auth) |
-| `POST /painel/api/linkedin/leads/:id/status`                      | Marca lead como contatado/descartado (auth) |
-| `POST /painel/api/linkedin/leads/:id/email`                       | Preenche/edita o e-mail achado manualmente no perfil (auth) |
 
 ### Interface do painel (`public/painel.html`)
 
@@ -834,19 +794,6 @@ de ícones que troca entre três telas dentro da mesma página:
   pausar/ativar.
 - **📨 Telegram** — lista de contatos (leads) captados pelo bot, com telefone, username e
   parâmetro de origem (campanha) quando disponível.
-- **🔗 LinkedIn** — lista de leads (nome, cargo, empresa, e-mail, link do perfil) adicionados
-  manualmente via botão "Adicionar leads" (cola em massa, um por linha, formato
-  `nome,cargo,empresa,email,link`, mas aceita colar só uma linha por vez também). Existe pra dar
-  suporte ao fluxo de geração de leads pelo LinkedIn (ver seção própria abaixo) — não há automação
-  de scraping do LinkedIn em si (decisão deliberada, ver seção "Geração de leads via LinkedIn"),
-  só o cadastro/acompanhamento manual dos leads encontrados por lá. Cada lead tem status
-  `novo`/`contatado`/`descartado`, ajustável pelos botões no card.
-  **"Fila do dia" (20/07/2026)**: a lista ordena automaticamente pra mostrar primeiro quem ainda
-  não tem e-mail verificado (status `novo` + sem e-mail), com um aviso no topo contando quantos
-  faltam — pensado pro fluxo manual de "10 por dia" (abrir perfil no LinkedIn, checar
-  "Informações de contato", clicar em "Adicionar e-mail" no card e colar o que achou). Botão
-  "Adicionar/Editar e-mail" em cada card usa `prompt()` simples, sem precisar reabrir o modal de
-  importação em massa.
 
 **Notificações de mensagem nova (WhatsApp)** — botão 🔔 no cabeçalho da aba WhatsApp pede
 permissão de notificação do navegador (`Notification` API). Com permissão concedida, toda
