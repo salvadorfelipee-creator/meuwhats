@@ -327,6 +327,95 @@ const FLUXO_BOTOES = {
   },
 };
 
+// Fluxo padrão (correspondente bancário Felizcred), usado por qualquer número
+// que não tenha uma entrada própria em FLUXOS_POR_NUMERO logo abaixo.
+const FLUXO_FELIZCRED = {
+  menuInicial,
+  fluxoBotoes: FLUXO_BOTOES,
+  lembreteMinutos: LEMBRETE_MINUTOS,
+  lembreteTextos: LEMBRETE_TEXTOS,
+  capturaTexto: { gerente_autorizo: confirmacaoAgenda },
+};
+
+// ─── FLUXO TEMPORÁRIO DE DEMONSTRAÇÃO: CLÍNICA ODONTOLÓGICA (28/07/2026) ────
+// Pedido do usuário: mostrar pra uma pessoa como ficaria um atendimento
+// automático de clínica odontológica, usando o número "felizcred n"
+// (+55 47 9610-3804, business_number_id 518007084723311). É temporário — depois
+// da demonstração, reverter removendo a entrada desse número em
+// FLUXOS_POR_NUMERO (algumas linhas abaixo) para voltar ao fluxo Felizcred.
+function menuInicialFelicita() {
+  return {
+    texto: `Olá, ${saudacaoDoDia()}! Bem-vindo(a) à Clínica Felicita 🦷 Como podemos te ajudar hoje?`,
+    botoes: [
+      { id: "odonto_agendar", title: "AGENDAR CONSULTA" },
+      { id: "odonto_duvida", title: "TIRAR DÚVIDAS" },
+    ],
+  };
+}
+
+function confirmacaoAgendaOdonto() {
+  return (
+    "Perfeito, muito obrigado! Já anotei seus dados aqui — em breve nossa equipe confirma o melhor " +
+    "horário disponível pra você 🦷✨"
+  );
+}
+
+const LEMBRETE_MINUTOS_FELICITA = {
+  menu_inicial: 15,
+  odonto_agendar: 15,
+  odonto_para_mim: 20,
+  odonto_outra_pessoa: 20,
+};
+
+const LEMBRETE_TEXTOS_FELICITA = {
+  odonto_para_mim:
+    "Olá! Para confirmar seu agendamento, preciso do seu nome completo e do melhor horário (manhã ou tarde) 😊",
+  odonto_outra_pessoa:
+    "Olá! Para confirmar o agendamento, preciso do nome completo, idade e do melhor horário (manhã ou tarde) 😊",
+  padrao: "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da mensagem acima 👆",
+};
+
+const FLUXO_BOTOES_FELICITA = {
+  odonto_agendar: {
+    texto: "Perfeito! A consulta seria para você ou para outra pessoa (ex: filho(a))?",
+    botoes: [
+      { id: "odonto_para_mim", title: "PARA MIM" },
+      { id: "odonto_outra_pessoa", title: "PARA OUTRA PESSOA" },
+    ],
+  },
+  odonto_para_mim: {
+    texto:
+      "Certo! Pra eu já te encaixar na agenda, me diga seu nome completo e o melhor horário pra você (manhã ou tarde) 😊",
+  },
+  odonto_outra_pessoa: {
+    texto: "Sem problema! Me diga o nome completo da pessoa, a idade e o melhor horário (manhã ou tarde) 😊",
+  },
+  odonto_duvida: {
+    texto: "Sem problemas! Pode mandar sua dúvida aqui mesmo que nossa equipe já te responde 😊",
+  },
+};
+
+const FLUXO_FELICITA = {
+  menuInicial: menuInicialFelicita,
+  fluxoBotoes: FLUXO_BOTOES_FELICITA,
+  lembreteMinutos: LEMBRETE_MINUTOS_FELICITA,
+  lembreteTextos: LEMBRETE_TEXTOS_FELICITA,
+  capturaTexto: {
+    odonto_para_mim: confirmacaoAgendaOdonto,
+    odonto_outra_pessoa: confirmacaoAgendaOdonto,
+  },
+};
+
+// Mapa de qual fluxo cada número usa — qualquer número fora daqui cai no
+// FLUXO_FELIZCRED (comportamento igual ao de antes desta mudança).
+const FLUXOS_POR_NUMERO = {
+  "518007084723311": FLUXO_FELICITA, // felizcred n — demo temporária, ver comentário acima
+};
+
+function getFluxo(businessNumberId) {
+  return FLUXOS_POR_NUMERO[businessNumberId] || FLUXO_FELIZCRED;
+}
+
 // ─── PROCESSAR MENSAGENS RECEBIDAS ───────────────────────────────────────────
 async function processarEntry(entry) {
   for (const e of entry) {
@@ -335,6 +424,7 @@ async function processarEntry(entry) {
       const contatos = value.contacts || [];
       const mensagens = value.messages || [];
       const businessNumberId = value.metadata?.phone_number_id;
+      const fluxo = getFluxo(businessNumberId);
 
       for (const msg of mensagens) {
         const de = msg.from;
@@ -360,10 +450,12 @@ async function processarEntry(entry) {
 
         if (tipo === "text") {
           await db.insertMessage({ ...base, type: "text", body: msg.text?.body });
-          // Se a conversa estava aguardando nome/cidade, confirma e agenda
-          if (conversaAnterior?.fluxo_passo === "gerente_autorizo") {
+          // Se a conversa estava aguardando uma resposta em texto livre (ex: nome/cidade),
+          // confirma e limpa o passo — qual passo captura texto depende do fluxo do número.
+          const confirmarCaptura = fluxo.capturaTexto?.[conversaAnterior?.fluxo_passo];
+          if (confirmarCaptura) {
             try {
-              await enviarRespostaAutomatica(businessNumberId, de, confirmacaoAgenda());
+              await enviarRespostaAutomatica(businessNumberId, de, confirmarCaptura());
               await db.setFluxoPasso(de, businessNumberId, null);
             } catch (err) {
               console.error("Erro ao confirmar agenda:", err.message);
@@ -384,12 +476,12 @@ async function processarEntry(entry) {
           // Clique em um botão do fluxo automático (mensagens interativas)
           const reply = msg.interactive?.button_reply || msg.interactive?.list_reply || {};
           await db.insertMessage({ ...base, type: "button", body: reply.title || "[botão]" });
-          const passo = FLUXO_BOTOES[reply.id];
+          const passo = fluxo.fluxoBotoes[reply.id];
           if (passo) {
             try {
               await enviarRespostaAutomatica(businessNumberId, de, passo.texto, passo.botoes, passo.lista);
               // Marca (ou limpa) o passo em que a conversa fica aguardando resposta
-              await db.setFluxoPasso(de, businessNumberId, LEMBRETE_MINUTOS[reply.id] ? reply.id : null);
+              await db.setFluxoPasso(de, businessNumberId, fluxo.lembreteMinutos[reply.id] ? reply.id : null);
             } catch (err) {
               console.error("Erro ao enviar passo do fluxo de botões:", err.message);
             }
@@ -430,7 +522,7 @@ async function processarEntry(entry) {
               HORAS_INATIVIDADE_MENU * 60 * 60 * 1000
             );
             if (podeEnviar) {
-              const menu = menuInicial();
+              const menu = fluxo.menuInicial();
               await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes);
               await db.setFluxoPasso(de, businessNumberId, "menu_inicial");
             }
@@ -915,11 +1007,12 @@ setInterval(async () => {
     const pendentes = await db.listarFluxosAguardando();
     const agora = Date.now();
     for (const p of pendentes) {
-      const minutos = LEMBRETE_MINUTOS[p.fluxo_passo];
+      const fluxo = getFluxo(p.business_number_id);
+      const minutos = fluxo.lembreteMinutos[p.fluxo_passo];
       if (!minutos || agora - Number(p.fluxo_passo_at) < minutos * 60 * 1000) continue;
       if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id))) continue;
       try {
-        const texto = LEMBRETE_TEXTOS[p.fluxo_passo] || LEMBRETE_TEXTOS.padrao;
+        const texto = fluxo.lembreteTextos[p.fluxo_passo] || fluxo.lembreteTextos.padrao;
         await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
         console.log(`⏰ Lembrete de fluxo parado enviado para ${p.phone} (passo ${p.fluxo_passo})`);
       } catch (err) {
