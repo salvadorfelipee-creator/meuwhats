@@ -49,7 +49,7 @@ img,svg{max-width:100%;display:block}
 .btn-outline:hover{border-color:var(--blue)}
 .btn-block{width:100%}
 .btn-lg{padding:17px 32px;font-size:16.5px;box-shadow:0 10px 24px -8px rgba(255,159,28,.5)}
-.pill{display:inline-flex;align-items:center;gap:6px;background:var(--blue-light);color:var(--blue-dark);font-weight:600;font-size:12.5px;padding:6px 14px;border-radius:50px}
+.pill{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);color:var(--blue-dark);font-weight:600;font-size:12.5px;padding:7px 15px;border-radius:50px;box-shadow:0 3px 10px -6px rgba(0,40,120,.15)}
 
 /* ── NAV ── */
 header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
@@ -62,13 +62,17 @@ header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);b
 .nav-links a:hover{color:var(--blue)}
 
 /* ── HERO ── */
-.hero{padding:56px 0 44px;background:linear-gradient(180deg,var(--blue-light) 0%,#fff 100%)}
-.hero-inner{text-align:center;max-width:760px;margin:0 auto}
-.hero h1{font-size:clamp(1.9rem,4.4vw,3rem);font-weight:800;line-height:1.18;color:var(--ink);margin-bottom:16px}
+.hero{padding:52px 0 96px;background:linear-gradient(165deg,#EAF1FF 0%,#F5F9FF 55%,#fff 100%);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;width:520px;height:520px;background:radial-gradient(circle,rgba(0,102,255,.10) 0%,transparent 70%);top:-260px;right:-120px}
+.hero::after{content:'';position:absolute;width:420px;height:420px;background:radial-gradient(circle,rgba(255,159,28,.10) 0%,transparent 70%);bottom:-220px;left:-140px}
+.hero-inner{text-align:center;max-width:760px;margin:0 auto;position:relative}
+.hero-badge{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--border);color:var(--blue-dark);font-weight:700;font-size:12.5px;padding:7px 16px;border-radius:50px;margin-bottom:18px;box-shadow:0 6px 16px -8px rgba(0,40,120,.18)}
+.hero h1{font-size:clamp(2rem,4.6vw,3.1rem);font-weight:800;line-height:1.16;color:var(--ink);margin-bottom:16px;letter-spacing:-.5px}
 .hero h1 span{color:var(--blue)}
-.hero p.lead{font-size:17px;color:var(--muted);margin:0 auto 26px}
-.trust-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:28px}
+.hero p.lead{font-size:17.5px;color:var(--muted);margin:0 auto 26px;line-height:1.55}
+.trust-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:30px}
 .hero-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.hero-note{font-size:12px;color:var(--muted);margin-top:14px}
 
 /* ── PRODUTOS ── */
 .section{padding:64px 0}
@@ -76,35 +80,37 @@ header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);b
 .eyebrow{font-size:12.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--blue)}
 .section-head h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;color:var(--ink);margin:10px 0 10px}
 .section-head p{color:var(--muted);font-size:15.5px}
-.prod-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.prod-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);padding:24px 20px;text-align:left;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .2s;display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 8px -4px rgba(0,40,120,.08);position:relative}
-.prod-card:hover{border-color:var(--blue);box-shadow:var(--shadow);transform:translateY(-4px)}
-.prod-card.featured{grid-column:span 2;background:linear-gradient(160deg,var(--blue-light) 0%,#fff 60%);border-color:var(--blue)}
+.prod-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.prod-card{background:#fff;border:1px solid #E1E6F0;border-radius:var(--radius);padding:26px 22px;text-align:left;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .2s;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 20px -12px rgba(10,30,80,.18);position:relative}
+.prod-card:hover{border-color:var(--blue);box-shadow:0 20px 36px -16px rgba(0,40,120,.28);transform:translateY(-5px)}
+.prod-card.featured{grid-column:span 2;background:linear-gradient(160deg,var(--blue-light) 0%,#fff 60%);border-color:var(--blue);box-shadow:0 14px 32px -14px rgba(0,102,255,.28)}
 .prod-card .badge{position:absolute;top:-11px;right:16px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.3px;padding:4px 10px;border-radius:50px;box-shadow:0 4px 10px -2px rgba(255,159,28,.5)}
-.prod-card .ic{font-size:28px;width:52px;height:52px;background:var(--blue-light);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
-.prod-card.featured .ic{width:60px;height:60px;font-size:32px;background:#fff}
+.prod-card .ic{font-size:26px;width:52px;height:52px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.prod-card.featured .ic{width:60px;height:60px;font-size:30px}
 .prod-card h3{font-size:16px;font-weight:700;color:var(--ink)}
 .prod-card.featured h3{font-size:19px}
 .prod-card p{font-size:13px;color:var(--muted);flex:1}
 .prod-card .go{font-size:12.5px;font-weight:700;color:var(--blue)}
 
-.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:640px;margin:0 auto 8px}
-.stat-box{text-align:center}
-.stat-box .num{font-family:'Poppins',sans-serif;font-size:clamp(1.6rem,3vw,2.1rem);font-weight:800;color:var(--blue)}
-.stat-box .lbl{font-size:12.5px;color:var(--muted);font-weight:600}
+.stats-card{background:#fff;border-radius:20px;box-shadow:0 24px 48px -20px rgba(0,40,120,.28);border:1px solid #EEF1F8;display:grid;grid-template-columns:repeat(3,1fr);max-width:760px;margin:-54px auto 0;position:relative;z-index:5}
+.stat-box{text-align:center;padding:24px 12px;border-right:1px solid var(--border)}
+.stat-box:last-child{border-right:none}
+.stat-box .num{font-family:'Poppins',sans-serif;font-size:clamp(1.7rem,3vw,2.2rem);font-weight:800;color:var(--blue)}
+.stat-box .lbl{font-size:12px;color:var(--muted);font-weight:600;margin-top:2px}
 
 /* ── COMO FUNCIONA ── */
-.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
-.step{text-align:center}
-.step-num{width:46px;height:46px;border-radius:50%;background:var(--blue);color:#fff;font-family:'Poppins',sans-serif;font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;position:relative}
+.steps::before{content:'';position:absolute;top:23px;left:12%;right:12%;height:2px;background:repeating-linear-gradient(90deg,var(--blue-light) 0 10px,transparent 10px 18px);z-index:0}
+.step{text-align:center;position:relative;z-index:1}
+.step-num{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue-dark));color:#fff;font-family:'Poppins',sans-serif;font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;box-shadow:0 8px 18px -6px rgba(0,102,255,.5)}
 .step h3{font-size:15.5px;font-weight:700;color:var(--ink);margin-bottom:6px}
 .step p{font-size:13px;color:var(--muted)}
 
 /* ── POR QUE ── */
 .why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.why-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:26px 22px;transition:box-shadow .2s,transform .2s}
+.why-card{background:#fff;border:1px solid #E1E6F0;border-radius:var(--radius);padding:26px 22px;box-shadow:0 6px 20px -14px rgba(10,30,80,.16);transition:box-shadow .2s,transform .2s}
 .why-card:hover{box-shadow:var(--shadow);transform:translateY(-3px)}
-.why-card .ic{font-size:26px;margin-bottom:12px}
+.why-card .ic{font-size:24px;width:46px;height:46px;border-radius:12px;background:var(--blue-light);display:flex;align-items:center;justify-content:center;margin-bottom:14px}
 .why-card h3{font-size:15.5px;font-weight:700;margin-bottom:6px;color:var(--ink)}
 .why-card p{font-size:13.5px;color:var(--muted)}
 
@@ -140,6 +146,8 @@ footer.site .brand{color:#fff}
 .wpp-float{position:fixed;bottom:22px;right:22px;width:56px;height:56px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(37,211,102,.45);z-index:300}
 .wpp-float svg{width:26px;height:26px;fill:white}
 
+.mobile-cta-bar{display:none}
+
 @media (max-width:1024px){
   .prod-grid{grid-template-columns:repeat(3,1fr)}
   .why-grid{grid-template-columns:1fr 1fr}
@@ -151,13 +159,25 @@ footer.site .brand{color:#fff}
   .nav-links{display:none}
   .section{padding:44px 0}
   .prod-grid{grid-template-columns:1fr 1fr}
+  .prod-card.featured{grid-column:span 2}
   .why-grid{grid-template-columns:1fr}
-  .steps{grid-template-columns:1fr 1fr}
+  .steps{grid-template-columns:1fr 1fr;row-gap:28px}
+  .steps::before{display:none}
   .form-card{padding:26px 18px}
   .type-grid{grid-template-columns:1fr}
   .f-grid2{grid-template-columns:1fr}
   .partners .wrap{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
   .cta-final{margin:0 4%;padding:36px 18px}
+  .cta-final .hero-btns{flex-direction:column}
+  .stats-card{grid-template-columns:1fr 1fr 1fr;margin:-40px 4% 0;border-radius:16px}
+  .stat-box{padding:16px 6px}
+  .stat-box .num{font-size:1.4rem}
+  .stat-box .lbl{font-size:10.5px}
+  body{padding-bottom:66px}
+  .mobile-cta-bar{display:flex;position:fixed;bottom:0;left:0;right:0;z-index:290;background:#fff;border-top:1px solid var(--border);padding:10px 14px;box-shadow:0 -8px 24px -12px rgba(0,20,60,.25)}
+  .mobile-cta-bar .btn{flex:1}
+  .wpp-float{bottom:80px;width:50px;height:50px}
+  .wpp-float svg{width:24px;height:24px}
 }
 </style>
 </head>
@@ -181,6 +201,7 @@ footer.site .brand{color:#fff}
 
 <section class="hero">
   <div class="wrap hero-inner">
+    <span class="hero-badge">🏢 Corretora parceira das maiores seguradoras do Brasil</span>
     <h1>Compare Seguros e Encontre a <span>Melhor Opção</span> para Você</h1>
     <p class="lead">Receba as melhores propostas de Seguro Auto, Saúde, Vida e muito mais direto no seu WhatsApp. Rápido, grátis e sem compromisso.</p>
     <div class="trust-row">
@@ -192,25 +213,22 @@ footer.site .brand{color:#fff}
       <a href="/cotacerta/cotar/" class="btn btn-accent btn-lg">Cotar agora</a>
       <a href="/cotacerta/cotar/" class="btn btn-outline">📞 Receber uma ligação</a>
     </div>
+    <p class="hero-note">Sem spam. Você só é contatado pelo WhatsApp que informar.</p>
   </div>
 </section>
 
-<div class="partners">
+<div class="stats-card">
+  <div class="stat-box"><div class="num">7</div><div class="lbl">Seguradoras parceiras</div></div>
+  <div class="stat-box"><div class="num">100%</div><div class="lbl">Cotação gratuita</div></div>
+  <div class="stat-box"><div class="num">Min.</div><div class="lbl">Resposta via WhatsApp</div></div>
+</div>
+
+<div class="partners" style="padding-top:52px">
   <span class="label">Cotamos com as maiores seguradoras do Brasil</span>
   <div class="logo-marquee">
     <div class="logo-track" id="logoTrack"></div>
   </div>
 </div>
-
-<section class="section" style="padding-bottom:0">
-  <div class="wrap">
-    <div class="stats-row">
-      <div class="stat-box"><div class="num">7</div><div class="lbl">Seguradoras parceiras</div></div>
-      <div class="stat-box"><div class="num">100%</div><div class="lbl">Cotação gratuita</div></div>
-      <div class="stat-box"><div class="num">Min.</div><div class="lbl">Resposta via WhatsApp</div></div>
-    </div>
-  </div>
-</section>
 
 <section class="section" id="produtos">
   <div class="wrap">
@@ -220,13 +238,13 @@ footer.site .brand{color:#fff}
       <p>Escolha o produto e receba propostas de seguradoras parceiras.</p>
     </div>
     <div class="prod-grid">
-      <button class="prod-card featured" data-tipo="auto"><span class="badge">★ Mais procurado</span><span class="ic">🚗</span><h3>Seguro Auto</h3><p>Compare e economize no seguro do seu carro.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="saude"><span class="ic">🏥</span><h3>Plano de Saúde</h3><p>Encontre o plano ideal pra você e sua família.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="vida"><span class="ic">❤️</span><h3>Seguro de Vida</h3><p>Proteja quem você ama com o melhor seguro.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="residencial"><span class="ic">🏠</span><h3>Seguro Residencial</h3><p>Seu lar protegido com as melhores condições.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="odonto"><span class="ic">🦷</span><h3>Plano Odonto</h3><p>Sorriso protegido com o melhor plano.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="viagem"><span class="ic">✈️</span><h3>Seguro Viagem</h3><p>Viaje tranquilo com o seguro ideal.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="consorcio"><span class="ic">🔑</span><h3>Consórcio</h3><p>Conquiste seu bem com as melhores cartas.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card featured" data-tipo="auto"><span class="badge">★ Mais procurado</span><span class="ic" style="background:#DCE9FF;color:#0052CC">🚗</span><h3>Seguro Auto</h3><p>Compare e economize no seguro do seu carro.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="saude"><span class="ic" style="background:#DCFCE7;color:#15803D">🏥</span><h3>Plano de Saúde</h3><p>Encontre o plano ideal pra você e sua família.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="vida"><span class="ic" style="background:#FEE2E2;color:#DC2626">❤️</span><h3>Seguro de Vida</h3><p>Proteja quem você ama com o melhor seguro.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="residencial"><span class="ic" style="background:#FFF1DB;color:#D9770A">🏠</span><h3>Seguro Residencial</h3><p>Seu lar protegido com as melhores condições.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="odonto"><span class="ic" style="background:#E0F7F5;color:#0B8C88">🦷</span><h3>Plano Odonto</h3><p>Sorriso protegido com o melhor plano.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="viagem"><span class="ic" style="background:#F0E7FE;color:#7C3AED">✈️</span><h3>Seguro Viagem</h3><p>Viaje tranquilo com o seguro ideal.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="consorcio"><span class="ic" style="background:#FEF3C7;color:#B45309">🔑</span><h3>Consórcio</h3><p>Conquiste seu bem com as melhores cartas.</p><span class="go">Cotar agora →</span></button>
     </div>
   </div>
 </section>
@@ -253,9 +271,9 @@ footer.site .brand{color:#fff}
       <h2>Feito para o brasileiro</h2>
     </div>
     <div class="why-grid">
-      <div class="why-card"><div class="ic">💬</div><h3>Atendimento humano</h3><p>Sem robô — um especialista de verdade te chama no WhatsApp.</p></div>
-      <div class="why-card"><div class="ic">⚡</div><h3>Resposta rápida</h3><p>Cotação sem enrolação, direto ao ponto.</p></div>
-      <div class="why-card"><div class="ic">🔒</div><h3>Dados protegidos</h3><p>Suas informações usadas só pra montar sua cotação, conforme a LGPD.</p></div>
+      <div class="why-card"><div class="ic" style="background:#DCE9FF;color:#0052CC">💬</div><h3>Atendimento humano</h3><p>Sem robô — um especialista de verdade te chama no WhatsApp.</p></div>
+      <div class="why-card"><div class="ic" style="background:#FFF1DB;color:#D9770A">⚡</div><h3>Resposta rápida</h3><p>Cotação sem enrolação, direto ao ponto.</p></div>
+      <div class="why-card"><div class="ic" style="background:#DCFCE7;color:#15803D">🔒</div><h3>Dados protegidos</h3><p>Suas informações usadas só pra montar sua cotação, conforme a LGPD.</p></div>
     </div>
   </div>
 </section>
@@ -291,7 +309,10 @@ footer.site .brand{color:#fff}
   <div class="cta-final">
     <h2>Pronto pra economizar no seu seguro?</h2>
     <p>Compare agora, de graça, e receba as melhores opções no WhatsApp.</p>
-    <a href="/cotacerta/cotar/" class="btn btn-accent">Cotar agora</a>
+    <div class="hero-btns">
+      <a href="/cotacerta/cotar/" class="btn btn-accent">Cotar agora</a>
+      <a href="https://wa.me/554735143392" target="_blank" class="btn btn-outline" style="background:transparent;border-color:rgba(255,255,255,.4);color:#fff">💬 Falar no WhatsApp</a>
+    </div>
   </div>
 </section>
 
@@ -305,6 +326,10 @@ footer.site .brand{color:#fff}
     </div>
   </div>
 </footer>
+
+<div class="mobile-cta-bar">
+  <a href="/cotacerta/cotar/" class="btn btn-accent">Cotar agora, é grátis</a>
+</div>
 
 <a href="https://wa.me/554735143392" class="wpp-float" target="_blank" aria-label="WhatsApp">
   <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
