@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Cota Certa Seguros | Compare as Maiores Seguradoras do Brasil</title>
+<meta name="description" content="Corretora parceira de Porto Seguro, Tokio Marine, Allianz, HDI, Bradesco, Mapfre e Zurich. Compare condições e contrate com atendimento humano, sem robôs.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.felizcred.com.br/cotacerta/">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Cota Certa Seguros | Compare as Maiores Seguradoras do Brasil">
+<meta property="og:description" content="Corretora parceira de Porto Seguro, Tokio Marine, Allianz, HDI, Bradesco, Mapfre e Zurich. Cotação grátis, atendimento humano.">
+<meta property="og:url" content="https://www.felizcred.com.br/cotacerta/">
+<meta property="og:image" content="https://www.felizcred.com.br/cotacerta/og-image.jpg">
+<meta property="og:site_name" content="Cota Certa Seguros">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --navy:#0B1E3D; --navy-2:#122A4D; --navy-3:#1B3A68;
+  --gold:#B8923F; --gold-light:#D9B968; --gold-ink:#8A6B27;
+  --cream:#FAF7F1; --paper:#F3EFE6; --white:#FFFFFF;
+  --ink:#16181D; --muted:#5B6270; --border:rgba(11,30,61,.10);
+  --radius:18px; --radius-sm:12px;
+  --shadow: 0 20px 50px -20px rgba(11,30,61,.25);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--cream);color:var(--ink);line-height:1.65;overflow-x:hidden}
+h1,h2,h3,.brand{font-family:'Fraunces',serif}
+a{text-decoration:none;color:inherit}
+ul{list-style:none}
+img,svg{max-width:100%;display:block}
+.wrap{max-width:1180px;margin:0 auto;padding:0 5%}
+.eyebrow{font-size:12.5px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--gold-ink)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:15px 30px;border-radius:50px;font-weight:600;font-size:15px;cursor:pointer;border:none;transition:transform .15s,box-shadow .2s}
+.btn-primary{background:var(--navy);color:var(--white)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 24px -8px rgba(11,30,61,.45)}
+.btn-gold{background:linear-gradient(135deg,var(--gold-light),var(--gold));color:var(--navy)}
+.btn-gold:hover{transform:translateY(-2px);box-shadow:0 12px 24px -8px rgba(184,146,63,.5)}
+.btn-outline{background:transparent;color:var(--navy);border:1.5px solid var(--border)}
+.btn-outline:hover{border-color:var(--navy)}
+.btn-block{width:100%}
+
+/* ── NAV ── */
+header.site{position:sticky;top:0;z-index:200;background:rgba(250,247,241,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:18px 5%}
+.brand{font-size:22px;font-weight:700;color:var(--navy);letter-spacing:-0.3px}
+.brand em{color:var(--gold-ink);font-style:normal}
+.nav-links{display:flex;align-items:center;gap:34px}
+.nav-links a{font-size:14.5px;font-weight:500;color:var(--muted)}
+.nav-links a:hover{color:var(--navy)}
+
+/* ── HERO ── */
+.hero{padding:76px 0 60px}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+.hero h1{font-size:clamp(2.1rem,4.2vw,3.4rem);font-weight:600;line-height:1.12;color:var(--navy);margin:16px 0 20px}
+.hero h1 em{color:var(--gold-ink);font-style:italic;font-weight:500}
+.hero p.lead{font-size:17px;color:var(--muted);max-width:480px;margin-bottom:32px}
+.hero-btns{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:36px}
+.trust-row{display:flex;gap:26px;flex-wrap:wrap}
+.trust-item{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:8px;font-weight:500}
+.trust-item .dot{width:6px;height:6px;border-radius:50%;background:var(--gold)}
+
+.hero-visual{position:relative;aspect-ratio:1/1;max-width:460px;margin:0 auto}
+.shield{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.hero-visual .ring{position:absolute;border-radius:50%;border:1px solid var(--border)}
+.hero-visual .ring.r1{inset:0}
+.hero-visual .ring.r2{inset:14%}
+
+/* ── SEGURADORAS STRIP ── */
+.partners{padding:34px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--white)}
+.partners .wrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center}
+.partners .label{font-size:12.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-right:8px}
+.p-pill{background:var(--paper);border:1px solid var(--border);color:var(--navy);font-weight:600;font-size:14px;padding:9px 20px;border-radius:50px}
+
+/* ── COMO FUNCIONA ── */
+.section{padding:88px 0}
+.section-head{text-align:center;max-width:600px;margin:0 auto 52px}
+.section-head h2{font-size:clamp(1.7rem,3vw,2.4rem);font-weight:600;color:var(--navy);margin:14px 0 12px}
+.section-head p{color:var(--muted);font-size:16px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:32px}
+.step{text-align:center;padding:0 12px}
+.step-num{width:52px;height:52px;border-radius:50%;background:var(--navy);color:var(--gold-light);font-family:'Fraunces',serif;font-weight:600;font-size:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.step h3{font-size:18px;font-weight:600;color:var(--navy);margin-bottom:8px;font-family:'Inter',sans-serif}
+.step p{font-size:14.5px;color:var(--muted)}
+
+/* ── PRODUTOS ── */
+.produtos{background:var(--white)}
+.prod-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+.prod-card{background:var(--cream);border:1px solid var(--border);border-radius:var(--radius);padding:30px 24px;text-align:left;cursor:pointer;transition:border-color .2s,transform .2s;display:flex;flex-direction:column;gap:10px}
+.prod-card:hover{border-color:var(--gold);transform:translateY(-4px)}
+.prod-card .ic{font-size:30px}
+.prod-card h3{font-size:17px;font-weight:600;color:var(--navy);font-family:'Inter',sans-serif}
+.prod-card p{font-size:13.5px;color:var(--muted);flex:1}
+.prod-card .go{font-size:13px;font-weight:700;color:var(--gold-ink)}
+
+/* ── COTACAO FORM ── */
+.cotacao{background:var(--navy-2);position:relative;overflow:hidden}
+.cotacao::before{content:'';position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(184,146,63,.12) 0%,transparent 70%);top:-200px;right:-100px}
+.cotacao .section-head h2{color:var(--white)}
+.cotacao .section-head p{color:rgba(255,255,255,.6)}
+.form-card{position:relative;max-width:640px;margin:0 auto;background:var(--white);border-radius:24px;padding:40px 36px;box-shadow:var(--shadow)}
+.progress{display:flex;gap:8px;margin-bottom:28px}
+.progress span{flex:1;height:4px;border-radius:2px;background:var(--border)}
+.progress span.done{background:var(--gold)}
+.step-label{font-size:13px;font-weight:700;color:var(--gold-ink);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px}
+.step-title{font-size:20px;font-weight:600;color:var(--navy);margin-bottom:24px;font-family:'Fraunces',serif}
+.f-panel{display:none}
+.f-panel.active{display:block}
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px}
+.type-opt{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:16px;text-align:center;cursor:pointer;transition:all .15s}
+.type-opt.sel{border-color:var(--gold);background:rgba(184,146,63,.06)}
+.type-opt .ic{font-size:24px;margin-bottom:6px}
+.type-opt span{display:block;font-size:13.5px;font-weight:600;color:var(--navy)}
+.f-row{margin-bottom:16px}
+.f-row label{display:block;font-size:13px;font-weight:600;color:var(--navy);margin-bottom:6px}
+.f-row input,.f-row select{width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14.5px;font-family:'Inter',sans-serif;color:var(--ink);background:var(--cream)}
+.f-row input:focus,.f-row select:focus{outline:none;border-color:var(--gold)}
+.f-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.f-nav{display:flex;gap:12px;margin-top:8px}
+.f-nav .btn{flex:1}
+.resumo-box{background:var(--paper);border-radius:var(--radius-sm);padding:18px 20px;margin-bottom:22px;font-size:14px;color:var(--ink)}
+.resumo-box b{color:var(--navy)}
+.success{text-align:center;padding:10px 0}
+.success .ic{font-size:52px;margin-bottom:16px}
+.success h3{font-size:21px;color:var(--navy);margin-bottom:10px;font-family:'Fraunces',serif}
+.success p{color:var(--muted);margin-bottom:24px;font-size:14.5px}
+
+/* ── FAQ ── */
+.faq-list{max-width:720px;margin:0 auto}
+.faq-item{border-bottom:1px solid var(--border)}
+.faq-q{width:100%;text-align:left;background:none;border:none;padding:22px 4px;font-size:16px;font-weight:600;color:var(--navy);cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-family:'Inter',sans-serif}
+.faq-q .chev{transition:transform .2s;color:var(--gold-ink)}
+.faq-item.open .faq-q .chev{transform:rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .25s ease}
+.faq-a p{padding:0 4px 20px;color:var(--muted);font-size:14.5px;max-width:640px}
+
+/* ── FOOTER ── */
+footer.site{background:var(--navy);color:rgba(255,255,255,.65);padding:48px 0 30px}
+.footer-grid{display:flex;justify-content:space-between;flex-wrap:wrap;gap:24px;margin-bottom:24px}
+footer.site .brand{color:var(--white)}
+.footer-legal{font-size:12px;line-height:1.8;color:rgba(255,255,255,.4);border-top:1px solid rgba(255,255,255,.1);padding-top:20px}
+
+/* ── WHATSAPP FLOAT ── */
+.wpp-float{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(37,211,102,.4);z-index:300}
+.wpp-float svg{width:26px;height:26px;fill:white}
+
+@media (max-width:900px){
+  .hero-grid{grid-template-columns:1fr;text-align:center}
+  .hero p.lead{margin-left:auto;margin-right:auto}
+  .hero-btns,.trust-row{justify-content:center}
+  .hero-visual{display:none}
+  .steps{grid-template-columns:1fr}
+  .prod-grid{grid-template-columns:1fr 1fr}
+}
+@media (max-width:640px){
+  .nav-links{display:none}
+  .section{padding:60px 0}
+  .form-card{padding:28px 20px}
+  .type-grid{grid-template-columns:1fr}
+  .f-grid2{grid-template-columns:1fr}
+  .prod-grid{grid-template-columns:1fr}
+  .partners .wrap{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
+  .footer-grid{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="nav-inner">
+    <a href="#" class="brand">Cota<em>Certa</em></a>
+    <ul class="nav-links">
+      <li><a href="#como-funciona">Como funciona</a></li>
+      <li><a href="#seguradoras">Seguradoras</a></li>
+      <li><a href="#faq">Dúvidas</a></li>
+    </ul>
+    <a href="#cotacao" class="btn btn-primary">Cotar agora</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <span class="eyebrow">Corretora multimarcas</span>
+        <h1>A <em>cotação certa</em>, com quem entende de seguro.</h1>
+        <p class="lead">Compare condições entre as maiores seguradoras do Brasil e contrate com o acompanhamento de um especialista de verdade — sem robôs, sem letras miúdas.</p>
+        <div class="hero-btns">
+          <a href="#cotacao" class="btn btn-gold">Fazer minha cotação</a>
+          <a href="#como-funciona" class="btn btn-outline">Como funciona</a>
+        </div>
+        <div class="trust-row">
+          <span class="trust-item"><span class="dot"></span>7 seguradoras parceiras</span>
+          <span class="trust-item"><span class="dot"></span>Resposta em até 24h</span>
+          <span class="trust-item"><span class="dot"></span>Cotação sem compromisso</span>
+        </div>
+      </div>
+      <div class="hero-visual">
+        <svg viewBox="0 0 400 400" width="100%" height="100%">
+          <circle cx="200" cy="200" r="188" fill="none" stroke="#0B1E3D" stroke-opacity="0.08"/>
+          <circle cx="200" cy="200" r="150" fill="none" stroke="#0B1E3D" stroke-opacity="0.08"/>
+          <path d="M200 70 L305 108 V196 C305 265 260 315 200 335 C140 315 95 265 95 196 V108 Z" fill="#0B1E3D"/>
+          <path d="M200 70 L305 108 V196 C305 265 260 315 200 335 C140 315 95 265 95 196 V108 Z" fill="none" stroke="#B8923F" stroke-width="2"/>
+          <path d="M155 205 L185 235 L250 165" fill="none" stroke="#D9B968" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="partners" id="seguradoras">
+  <div class="wrap">
+    <span class="label">Cotamos com</span>
+    <span class="p-pill">Porto Seguro</span>
+    <span class="p-pill">Tokio Marine</span>
+    <span class="p-pill">Allianz</span>
+    <span class="p-pill">HDI</span>
+    <span class="p-pill">Bradesco Seguros</span>
+    <span class="p-pill">Mapfre</span>
+    <span class="p-pill">Zurich</span>
+  </div>
+</div>
+
+<section class="section" id="como-funciona">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Como funciona</span>
+      <h2>Três passos até a sua apólice</h2>
+      <p>Sem burocracia e sem análise automática que erra o preço.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <h3>Escolha o seguro</h3>
+        <p>Auto, vida, residencial ou empresarial — você conta o que precisa proteger.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <h3>Preencha em 2 minutos</h3>
+        <p>Um formulário curto, só com o essencial pra gente cotar direito.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <h3>Receba as melhores condições</h3>
+        <p>Um especialista compara as seguradoras parceiras e te chama no WhatsApp.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section produtos">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Produtos</span>
+      <h2>Qual seguro você precisa cotar?</h2>
+    </div>
+    <div class="prod-grid">
+      <button class="prod-card" data-tipo="auto">
+        <span class="ic">🚗</span>
+        <h3>Seguro Auto</h3>
+        <p>Roubo, furto, colisão e assistência 24h pro seu carro.</p>
+        <span class="go">Cotar seguro auto →</span>
+      </button>
+      <button class="prod-card" data-tipo="vida">
+        <span class="ic">❤️</span>
+        <h3>Seguro de Vida</h3>
+        <p>Proteção financeira pra sua família em qualquer imprevisto.</p>
+        <span class="go">Cotar seguro de vida →</span>
+      </button>
+      <button class="prod-card" data-tipo="residencial">
+        <span class="ic">🏠</span>
+        <h3>Seguro Residencial</h3>
+        <p>Sua casa protegida contra incêndio, roubo e mais.</p>
+        <span class="go">Cotar seguro residencial →</span>
+      </button>
+      <button class="prod-card" data-tipo="empresarial">
+        <span class="ic">🏢</span>
+        <h3>Seguro Empresarial</h3>
+        <p>Proteção pro patrimônio e a operação do seu negócio.</p>
+        <span class="go">Cotar seguro empresarial →</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<section class="section cotacao" id="cotacao">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow" style="color:var(--gold-light)">Cotação grátis</span>
+      <h2>Vamos encontrar o seguro certo pra você</h2>
+      <p>Leva menos de 2 minutos.</p>
+    </div>
+
+    <div class="form-card">
+      <div class="progress">
+        <span class="done" data-p="1"></span>
+        <span data-p="2"></span>
+        <span data-p="3"></span>
+      </div>
+
+      <form id="formCotacao">
+        <div class="f-panel active" data-panel="1">
+          <div class="step-label">Passo 1 de 3</div>
+          <div class="step-title">Qual seguro você quer cotar?</div>
+          <div class="type-grid">
+            <div class="type-opt" data-tipo="auto"><span class="ic">🚗</span><span>Auto</span></div>
+            <div class="type-opt" data-tipo="vida"><span class="ic">❤️</span><span>Vida</span></div>
+            <div class="type-opt" data-tipo="residencial"><span class="ic">🏠</span><span>Residencial</span></div>
+            <div class="type-opt" data-tipo="empresarial"><span class="ic">🏢</span><span>Empresarial</span></div>
+          </div>
+          <div class="f-nav">
+            <button type="button" class="btn btn-gold btn-block" id="toStep2">Continuar</button>
+          </div>
+        </div>
+
+        <div class="f-panel" data-panel="2">
+          <div class="step-label">Passo 2 de 3</div>
+          <div class="step-title" id="tituloDetalhe">Conte os detalhes</div>
+
+          <div id="camposAuto" style="display:none">
+            <div class="f-grid2">
+              <div class="f-row"><label>Modelo do carro</label><input type="text" id="autoModelo" placeholder="Ex: HB20 2022"></div>
+              <div class="f-row"><label>CEP</label><input type="text" id="autoCep" placeholder="00000-000"></div>
+            </div>
+            <div class="f-grid2">
+              <div class="f-row"><label>Idade do condutor</label><input type="number" id="autoIdade" placeholder="Ex: 34"></div>
+              <div class="f-row"><label>Fica em garagem à noite?</label>
+                <select id="autoGaragem"><option value="Sim">Sim</option><option value="Não">Não</option></select>
+              </div>
+            </div>
+          </div>
+
+          <div id="camposVida" style="display:none">
+            <div class="f-grid2">
+              <div class="f-row"><label>Sua idade</label><input type="number" id="vidaIdade" placeholder="Ex: 34"></div>
+              <div class="f-row"><label>Já tem algum seguro de vida?</label>
+                <select id="vidaTem"><option value="Não">Não</option><option value="Sim">Sim</option></select>
+              </div>
+            </div>
+          </div>
+
+          <div id="camposResidencial" style="display:none">
+            <div class="f-grid2">
+              <div class="f-row"><label>Tipo de imóvel</label>
+                <select id="resTipo"><option>Casa</option><option>Apartamento</option></select>
+              </div>
+              <div class="f-row"><label>CEP</label><input type="text" id="resCep" placeholder="00000-000"></div>
+            </div>
+          </div>
+
+          <div id="camposEmpresarial" style="display:none">
+            <div class="f-grid2">
+              <div class="f-row"><label>Nome da empresa</label><input type="text" id="empNome" placeholder="Razão social"></div>
+              <div class="f-row"><label>Número de funcionários</label><input type="text" id="empFunc" placeholder="Ex: 5"></div>
+            </div>
+          </div>
+
+          <div class="f-nav">
+            <button type="button" class="btn btn-outline" id="back1">Voltar</button>
+            <button type="button" class="btn btn-gold" id="toStep3">Continuar</button>
+          </div>
+        </div>
+
+        <div class="f-panel" data-panel="3">
+          <div class="step-label">Passo 3 de 3</div>
+          <div class="step-title">Pra onde enviamos sua cotação?</div>
+          <div class="f-row"><label>Nome completo</label><input type="text" id="contNome" placeholder="Seu nome"></div>
+          <div class="f-row"><label>WhatsApp</label><input type="text" id="contWhats" placeholder="(00) 00000-0000"></div>
+          <div class="f-nav">
+            <button type="button" class="btn btn-outline" id="back2">Voltar</button>
+            <button type="button" class="btn btn-primary" id="enviar">Quero minha cotação</button>
+          </div>
+        </div>
+
+        <div class="f-panel" data-panel="4">
+          <div class="success">
+            <div class="ic">✅</div>
+            <h3>Recebemos seus dados!</h3>
+            <p>Clique abaixo pra confirmar no WhatsApp — um especialista da Cota Certa te chama com as opções das seguradoras parceiras.</p>
+            <a href="#" id="linkWhats" target="_blank" class="btn btn-gold btn-block">Confirmar no WhatsApp</a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="faq">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Perguntas frequentes</span>
+      <h2>Ainda com dúvidas?</h2>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item">
+        <button class="faq-q">A Cota Certa é uma seguradora? <span class="chev">+</span></button>
+        <div class="faq-a"><p>Não. Somos uma corretora parceira de seguradoras — Porto Seguro, Tokio Marine, Allianz, HDI, Bradesco, Mapfre e Zurich — e ajudamos você a comparar as condições de cada uma antes de contratar.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Fazer a cotação tem algum custo? <span class="chev">+</span></button>
+        <div class="faq-a"><p>Não, a cotação é gratuita e sem compromisso de contratação.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Quanto tempo demora pra receber as opções? <span class="chev">+</span></button>
+        <div class="faq-a"><p>Normalmente em até 24h um especialista te chama no WhatsApp com as condições das seguradoras parceiras pro seu perfil.</p></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">Meus dados ficam seguros? <span class="chev">+</span></button>
+        <div class="faq-a"><p>Sim. Usamos suas informações só pra montar sua cotação e não compartilhamos com terceiros fora desse processo.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a href="#" class="brand">Cota<em style="color:var(--gold-light)">Certa</em></a>
+        <p style="margin-top:8px;font-size:13px;max-width:320px">Corretora parceira das principais seguradoras do Brasil.</p>
+      </div>
+    </div>
+    <div class="footer-legal">
+      Cota Certa Seguros — corretora de seguros parceira. Registro na SUSEP e
+      dados legais a confirmar antes da publicação definitiva.
+    </div>
+  </div>
+</footer>
+
+<a href="https://wa.me/554735143392" class="wpp-float" target="_blank" aria-label="WhatsApp">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
+
+<script>
+const WA_NUM = '554735143392';
+let tipoAtual = null;
+
+function selecionarTipo(tipo){
+  tipoAtual = tipo;
+  document.querySelectorAll('.type-opt').forEach(o=>o.classList.toggle('sel', o.dataset.tipo===tipo));
+  ['Auto','Vida','Residencial','Empresarial'].forEach(t=>{
+    const el = document.getElementById('campos'+t);
+    if(el) el.style.display = (t.toLowerCase()===tipo) ? 'block' : 'none';
+  });
+  const nomes = {auto:'Seguro Auto', vida:'Seguro de Vida', residencial:'Seguro Residencial', empresarial:'Seguro Empresarial'};
+  document.getElementById('tituloDetalhe').textContent = 'Detalhes do ' + (nomes[tipo]||'seguro');
+}
+
+document.querySelectorAll('.type-opt').forEach(o=>{
+  o.addEventListener('click', ()=>selecionarTipo(o.dataset.tipo));
+});
+document.querySelectorAll('.prod-card').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    selecionarTipo(c.dataset.tipo);
+    document.querySelector('#cotacao').scrollIntoView({behavior:'smooth'});
+  });
+});
+
+function irPara(passo){
+  document.querySelectorAll('.f-panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===String(passo)));
+  document.querySelectorAll('.progress span').forEach(s=>{
+    s.classList.toggle('done', Number(s.dataset.p) <= passo);
+  });
+}
+
+document.getElementById('toStep2').addEventListener('click', ()=>{
+  if(!tipoAtual){ selecionarTipo('auto'); }
+  irPara(2);
+});
+document.getElementById('back1').addEventListener('click', ()=>irPara(1));
+document.getElementById('toStep3').addEventListener('click', ()=>irPara(3));
+document.getElementById('back2').addEventListener('click', ()=>irPara(2));
+
+document.getElementById('enviar').addEventListener('click', ()=>{
+  const nome = document.getElementById('contNome').value.trim();
+  const whats = document.getElementById('contWhats').value.trim();
+
+  let detalhes = '';
+  if(tipoAtual === 'auto'){
+    detalhes = `Modelo: ${document.getElementById('autoModelo').value} | CEP: ${document.getElementById('autoCep').value} | Idade: ${document.getElementById('autoIdade').value} | Garagem: ${document.getElementById('autoGaragem').value}`;
+  } else if(tipoAtual === 'vida'){
+    detalhes = `Idade: ${document.getElementById('vidaIdade').value} | Já tem seguro: ${document.getElementById('vidaTem').value}`;
+  } else if(tipoAtual === 'residencial'){
+    detalhes = `Tipo de imóvel: ${document.getElementById('resTipo').value} | CEP: ${document.getElementById('resCep').value}`;
+  } else if(tipoAtual === 'empresarial'){
+    detalhes = `Empresa: ${document.getElementById('empNome').value} | Funcionários: ${document.getElementById('empFunc').value}`;
+  }
+
+  const nomesTipo = {auto:'Seguro Auto', vida:'Seguro de Vida', residencial:'Seguro Residencial', empresarial:'Seguro Empresarial'};
+  const msg = `Olá! Quero cotar ${nomesTipo[tipoAtual]||'um seguro'} pela Cota Certa.\nNome: ${nome}\nWhatsApp: ${whats}\n${detalhes}`;
+
+  document.getElementById('linkWhats').href = `https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`;
+  irPara(4);
+});
+
+document.querySelectorAll('.faq-q').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const item = btn.parentElement;
+    const answer = item.querySelector('.faq-a');
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i=>{
+      i.classList.remove('open');
+      i.querySelector('.faq-a').style.maxHeight = null;
+    });
+    if(!isOpen){
+      item.classList.add('open');
+      answer.style.maxHeight = answer.scrollHeight + 'px';
+    }
+  });
+});
+</script>
+</body>
+</html>
