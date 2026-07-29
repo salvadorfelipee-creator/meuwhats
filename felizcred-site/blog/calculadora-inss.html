@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de INSS 2025 — Desconto no Salário | FelizCred</title>
+<meta name="description" content="Calcule o desconto do INSS no salário em 2025 com a tabela progressiva atualizada. Veja sua alíquota efetiva, contribuição mensal e salário líquido após o desconto.">
+<link rel="canonical" href="https://www.felizcred.com.br/calculadora-inss">
+<meta property="og:title" content="Calculadora de INSS 2025 — Desconto no Salário | FelizCred">
+<meta property="og:description" content="Calcule seu desconto INSS com a tabela progressiva 2025. Alíquota efetiva e salário líquido.">
+<meta property="og:url" content="https://www.felizcred.com.br/calculadora-inss">
+<meta property="og:type" content="website">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Calculadora INSS 2025","url":"https://www.felizcred.com.br/calculadora-inss","description":"Calcule desconto INSS com tabela progressiva 2025.","applicationCategory":"FinanceApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"BRL"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--green:#00B37E;--green-dark:#00875A;--green-bg:#E6FAF4;--navy:#0D1B2A;--text:#1C2B3A;--muted:#4B5563;--bg:#F7F9FB;--white:#fff;--border:#E2E8EF;--radius:14px;--shadow:0 4px 24px rgba(0,0,0,0.08)}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg);line-height:1.7;font-size:15px}
+a{color:var(--green-dark);text-decoration:none}
+.site-header{background:var(--navy);padding:0 40px;height:62px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:1.3rem}.logo span{color:var(--green)}
+.header-cta{background:var(--green);color:#fff!important;padding:9px 20px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:.83rem;text-decoration:none}
+.breadcrumb{background:var(--white);border-bottom:1px solid var(--border);padding:10px 40px;font-size:13px;color:var(--muted)}
+.breadcrumb a{color:var(--green-dark)}.breadcrumb span{margin:0 6px;opacity:.5}
+.hero{background:linear-gradient(140deg,#1a1a3a 0%,var(--navy) 100%);padding:52px 40px 44px;text-align:center}
+.hero-badge{display:inline-block;background:rgba(0,179,126,.15);color:var(--green);border:1px solid rgba(0,179,126,.3);padding:5px 16px;border-radius:50px;font-family:'Sora',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px}
+.hero h1{font-family:'Sora',sans-serif;font-size:clamp(1.8rem,4vw,2.8rem);color:#fff;max-width:720px;margin:0 auto 12px;line-height:1.2;font-weight:800}
+.hero h1 em{color:var(--green);font-style:normal}
+.hero p{color:rgba(255,255,255,.6);font-size:.95rem;max-width:480px;margin:0 auto}
+.main-grid{max-width:1100px;margin:0 auto;padding:40px 24px 80px;display:grid;grid-template-columns:1fr 360px;gap:32px;align-items:start}
+.calc-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.calc-header{background:var(--navy);padding:22px 28px;display:flex;align-items:center;gap:14px}
+.calc-icon{width:42px;height:42px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.calc-header h2{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700}
+.calc-header p{color:rgba(255,255,255,.5);font-size:12px;margin-top:2px}
+.calc-body{padding:28px}
+label{display:block;font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.field{margin-bottom:18px}
+input,select{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;color:var(--text);background:var(--white);outline:none;transition:border-color .2s}
+input:focus,select:focus{border-color:var(--green)}
+.prefix-wrap{position:relative}
+.prefix-wrap span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;font-weight:600}
+.prefix-wrap input{padding-left:36px}
+.calc-btn{width:100%;background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);color:#fff;border:none;padding:16px;border-radius:10px;font-family:'Sora',sans-serif;font-weight:700;font-size:1rem;cursor:pointer;margin-top:4px}
+.calc-btn:hover{opacity:.9}
+.resultado{display:none;margin-top:24px;border-top:2px solid var(--border);padding-top:24px}
+.resultado.show{display:block}
+.res-big{background:var(--navy);border-radius:12px;padding:24px;display:flex;justify-content:space-around;margin-bottom:16px;flex-wrap:wrap;gap:16px}
+.res-item{text-align:center}
+.res-label-s{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.res-val{font-family:'Sora',sans-serif;font-weight:800;color:var(--white)}
+.res-val.big{font-size:1.8rem;color:var(--green)}
+.res-val.red{color:#F87171}
+.faixas-table{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:16px;border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.faixas-table th{background:var(--navy);color:#fff;padding:10px 14px;text-align:left;font-family:'Sora',sans-serif;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px}
+.faixas-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--muted)}
+.faixas-table tr:last-child td{border-bottom:none}
+.faixas-table tr.ativa td{background:#F0FDF4;font-weight:600;color:var(--green-dark)}
+.badge-ativa{background:var(--green);color:#fff;font-size:10px;padding:2px 8px;border-radius:50px;font-family:'Sora',sans-serif;font-weight:700;margin-left:6px}
+.aviso-box{background:var(--green-bg);border:1px solid #86EFCA;border-radius:10px;padding:14px 18px;margin-top:12px}
+.aviso-box p{color:#065F46;font-size:13px}
+.cta-result{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 18px;margin-top:8px}
+.cta-result p{color:#1E40AF;font-size:13px}
+.tabela-ref{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-top:24px}
+.tabela-ref h3{font-family:'Sora',sans-serif;font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:16px}
+.faq-wrap{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px;margin-top:20px}
+.faq-wrap h2{font-family:'Sora',sans-serif;font-size:1.1rem;font-weight:700;color:var(--navy);margin-bottom:16px}
+.faq-item{border-bottom:1px solid var(--border);padding:12px 0}
+.faq-item:last-child{border-bottom:none}
+.faq-q{font-family:'Sora',sans-serif;font-weight:700;color:var(--navy);margin-bottom:5px;font-size:.88rem}
+.faq-a{color:var(--muted);font-size:.84rem}
+.sidebar{display:flex;flex-direction:column;gap:20px}
+.widget{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+.widget-title{font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--green)}
+.cta-box{background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);border-radius:var(--radius);padding:28px;text-align:center}
+.cta-box h3{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700;margin-bottom:8px}
+.cta-box p{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:18px}
+.cta-box a{display:block;background:#fff;color:var(--green-dark);padding:12px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;margin-bottom:8px}
+.cta-box a.wpp{background:var(--navy);color:#fff}
+.calc-links{display:flex;flex-direction:column;gap:10px}
+.calc-link{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;color:var(--text)!important;transition:border-color .2s}
+.calc-link:hover{border-color:var(--green)}
+.calc-link .icon{font-size:1.3rem}
+.calc-link .info h4{font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700}
+.calc-link .info p{font-size:.75rem;color:var(--muted)}
+.site-footer{background:var(--navy);padding:28px 40px;text-align:center}
+.site-footer p{color:rgba(255,255,255,.4);font-size:.78rem;margin-bottom:4px}
+.site-footer a{color:var(--green)}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr}.sidebar{display:none}}
+@media(max-width:560px){.site-header{padding:0 18px}.hero{padding:40px 18px 36px}.res-big{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a href="https://www.felizcred.com.br" class="logo">Feliz<span>Cred</span></a>
+  <a href="https://wa.me/554796864687" class="header-cta" rel="noopener">💬 WhatsApp</a>
+</header>
+<nav class="breadcrumb">
+  <a href="https://www.felizcred.com.br">Início</a><span>›</span>
+  <a href="/blog/">Blog</a><span>›</span>Calculadora INSS 2025
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">🏥 Ferramenta Gratuita</div>
+  <h1>Calculadora de <em>INSS 2025</em></h1>
+  <p>Descubra exatamente quanto é descontado do seu salário para o INSS com a tabela progressiva atualizada.</p>
+</div>
+
+<div class="main-grid">
+  <div>
+    <div class="calc-card">
+      <div class="calc-header">
+        <div class="calc-icon">🏥</div>
+        <div><h2>Calcule seu desconto INSS</h2><p>Tabela progressiva 2025 — atualizada</p></div>
+      </div>
+      <div class="calc-body">
+        <div class="field">
+          <label>Salário bruto mensal</label>
+          <div class="prefix-wrap"><span>R$</span><input type="number" id="salario" placeholder="3.000" value="3000"></div>
+        </div>
+        <div class="field">
+          <label>Categoria</label>
+          <select id="categoria">
+            <option value="empregado">Empregado CLT</option>
+            <option value="domestico">Trabalhador doméstico</option>
+            <option value="autonomo">Contribuinte individual (autônomo)</option>
+          </select>
+        </div>
+        <button class="calc-btn" onclick="calcINSS()">🏥 Calcular desconto INSS</button>
+
+        <div class="resultado" id="resultado">
+          <div class="res-big">
+            <div class="res-item"><div class="res-label-s">Salário bruto</div><div class="res-val big" id="r-bruto">-</div></div>
+            <div class="res-item"><div class="res-label-s">Desconto INSS</div><div class="res-val red" id="r-desconto" style="font-size:1.4rem">-</div></div>
+            <div class="res-item"><div class="res-label-s">Alíquota efetiva</div><div class="res-val" id="r-aliquota" style="font-size:1.2rem;color:#FB923C">-</div></div>
+            <div class="res-item"><div class="res-label-s">Salário pós-INSS</div><div class="res-val" id="r-liquido" style="font-size:1.4rem;color:var(--green)">-</div></div>
+          </div>
+
+          <p style="font-family:'Sora',sans-serif;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">📊 Cálculo por faixa</p>
+          <table class="faixas-table" id="faixas-result">
+            <thead><tr><th>Faixa salarial</th><th>Alíquota</th><th>Base</th><th>Contribuição</th></tr></thead>
+            <tbody id="faixas-body"></tbody>
+          </table>
+
+          <div class="aviso-box" style="margin-top:16px">
+            <p>💡 A partir de 2023, o INSS usa a tabela <strong>progressiva</strong> — cada faixa do salário é tributada na sua alíquota, sem o efeito cascata da tabela antiga. Isso beneficia especialmente quem ganha entre R$ 2.000 e R$ 5.000.</p>
+          </div>
+          <div class="cta-result">
+            <p>💼 <strong>Com a margem consignável calculada,</strong> você pode saber exatamente quanto cabe de parcela de empréstimo no salário. <a href="/calculadora-consignado" style="font-weight:700;color:#1D4ED8">Simular consignado →</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabela-ref">
+      <h3>📋 Tabela INSS 2025 — Empregado CLT</h3>
+      <table class="faixas-table">
+        <thead><tr><th>Faixa salarial</th><th>Alíquota</th><th>Contribuição máxima na faixa</th></tr></thead>
+        <tbody>
+          <tr><td>Até R$ 1.518,00</td><td>7,5%</td><td>R$ 113,85</td></tr>
+          <tr><td>R$ 1.518,01 a R$ 2.793,88</td><td>9%</td><td>R$ 114,83</td></tr>
+          <tr><td>R$ 2.793,89 a R$ 4.190,83</td><td>12%</td><td>R$ 167,51</td></tr>
+          <tr><td>R$ 4.190,84 a R$ 8.157,41</td><td>14%</td><td>R$ 555,44</td></tr>
+          <tr><td>Acima de R$ 8.157,41</td><td colspan="2" style="color:var(--muted);font-style:italic">Teto — contribuição máxima de R$ 951,62</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="faq-wrap">
+      <h2>Perguntas frequentes sobre INSS</h2>
+      <div class="faq-item"><p class="faq-q">O que é a alíquota efetiva do INSS?</p><p class="faq-a">É o percentual real que você paga sobre o salário total, considerando as diferentes alíquotas por faixa. Com a tabela progressiva, a alíquota efetiva é sempre menor que a alíquota máxima aplicada ao salário.</p></div>
+      <div class="faq-item"><p class="faq-q">INSS é descontado sobre férias e 13º?</p><p class="faq-a">Sim. O INSS incide sobre o salário de férias (mas não sobre o 1/3 constitucional) e sobre a 2ª parcela do 13º salário. Nas férias proporcionais na rescisão, também incide INSS.</p></div>
+      <div class="faq-item"><p class="faq-q">Contribuir para o INSS dá direito a quê?</p><p class="faq-a">A contribuição garante acesso à aposentadoria, auxílio-doença, salário-maternidade, pensão por morte para dependentes, aposentadoria por invalidez e auxílio-acidente, além da proteção do BPC/LOAS para quem não contribuiu.</p></div>
+      <div class="faq-item"><p class="faq-q">Autônomo paga INSS diferente?</p><p class="faq-a">Sim. O contribuinte individual (autônomo) paga 20% sobre o salário, mas pode optar pelo plano simplificado com 11% se não quiser se aposentar por tempo de contribuição. Não há tabela progressiva para autônomos — a alíquota é fixa.</p></div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="cta-box">
+      <h3>💼 Empréstimo consignado</h3>
+      <p>Taxa a partir de 1,68% a.m. Aprovação rápida, PIX em 40 min.</p>
+      <a href="https://www.felizcred.com.br#simular">🚀 Simular grátis</a>
+      <a href="https://wa.me/554796864687" class="wpp" rel="noopener">💬 WhatsApp</a>
+    </div>
+    <div class="widget">
+      <div class="widget-title">🧮 Outras calculadoras</div>
+      <div class="calc-links">
+        <a href="/calculadora-rescisao" class="calc-link"><span class="icon">📋</span><div class="info"><h4>Calculadora Rescisão</h4><p>Verbas rescisórias</p></div></a>
+        <a href="/calculadora-fgts" class="calc-link"><span class="icon">🏦</span><div class="info"><h4>Calculadora FGTS</h4><p>Saldo e antecipação</p></div></a>
+        <a href="/calculadora-consignado" class="calc-link"><span class="icon">💼</span><div class="info"><h4>Simulador Consignado</h4><p>Parcelas e taxa</p></div></a>
+        <a href="/calculadora-ferias" class="calc-link"><span class="icon">🏖️</span><div class="info"><h4>Calculadora Férias</h4><p>Valor e 1/3</p></div></a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer class="site-footer">
+  <p><strong style="color:rgba(255,255,255,.7)">FelizCred</strong> — Handmoney Correspondente Bancário Ltda. — CNPJ 27.963.662/0001-13</p>
+  <p>Rua Paraguai, 420, Sala B — Balneário Camboriú, SC | <a href="https://www.felizcred.com.br">www.felizcred.com.br</a></p>
+</footer>
+
+<script>
+function fmt(v){return 'R$ '+v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.')}
+
+// Tabela progressiva 2025
+const FAIXAS = [
+  {de:0,      ate:1518.00,   aliq:0.075, label:'Até R$ 1.518,00'},
+  {de:1518.00, ate:2793.88,  aliq:0.09,  label:'R$ 1.518,01 a R$ 2.793,88'},
+  {de:2793.88, ate:4190.83,  aliq:0.12,  label:'R$ 2.793,89 a R$ 4.190,83'},
+  {de:4190.83, ate:8157.41,  aliq:0.14,  label:'R$ 4.190,84 a R$ 8.157,41'},
+];
+const TETO = 8157.41;
+
+function calcINSS(){
+  const sal = parseFloat(document.getElementById('salario').value)||0;
+  const cat = document.getElementById('categoria').value;
+  if(!sal){alert('Informe o salário.');return;}
+
+  let desconto = 0;
+  let rows = '';
+  let faixaAtiva = -1;
+
+  if(cat === 'autonomo'){
+    // Autônomo: 20% flat
+    const base = Math.min(sal, TETO);
+    desconto = base * 0.20;
+    rows = `<tr class="ativa"><td>Contribuinte individual (20%)</td><td>20%</td><td>${fmt(base)}</td><td>${fmt(desconto)}</td></tr>`;
+  } else {
+    // Progressiva
+    const base = Math.min(sal, TETO);
+    for(let i=0; i<FAIXAS.length; i++){
+      const f = FAIXAS[i];
+      if(base <= f.de) break;
+      const baseNaFaixa = Math.min(base, f.ate) - f.de;
+      const contrib = baseNaFaixa * f.aliq;
+      desconto += contrib;
+      const isAtiva = base > f.de && base <= f.ate;
+      if(isAtiva) faixaAtiva = i;
+      rows += `<tr ${base>f.de?'class="ativa"':''}><td>${f.label}${base>f.de&&base<=f.ate?'<span class="badge-ativa">sua faixa</span>':''}</td><td>${(f.aliq*100).toFixed(1)}%</td><td>${fmt(baseNaFaixa)}</td><td>${fmt(contrib)}</td></tr>`;
+    }
+  }
+
+  const liquido = sal - desconto;
+  const aliqEfetiva = (desconto / sal) * 100;
+
+  document.getElementById('r-bruto').textContent = fmt(sal);
+  document.getElementById('r-desconto').textContent = '-' + fmt(desconto);
+  document.getElementById('r-aliquota').textContent = aliqEfetiva.toFixed(2) + '%';
+  document.getElementById('r-liquido').textContent = fmt(liquido);
+  document.getElementById('faixas-body').innerHTML = rows;
+  document.getElementById('resultado').classList.add('show');
+  document.getElementById('resultado').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+</script>
+</body>
+</html>

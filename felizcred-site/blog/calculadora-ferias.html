@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Férias CLT 2025 — Quanto Vou Receber? | FelizCred</title>
+<meta name="description" content="Calcule o valor das suas férias CLT: salário de férias, terço constitucional (1/3), abono pecuniário e férias proporcionais. Ferramenta gratuita e atualizada 2025.">
+<link rel="canonical" href="https://www.felizcred.com.br/calculadora-ferias">
+<meta property="og:title" content="Calculadora de Férias CLT 2025 | FelizCred">
+<meta property="og:description" content="Calcule férias, 1/3 constitucional e abono. Grátis e atualizado 2025.">
+<meta property="og:url" content="https://www.felizcred.com.br/calculadora-ferias">
+<meta property="og:type" content="website">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Calculadora de Férias CLT","url":"https://www.felizcred.com.br/calculadora-ferias","description":"Calcule valor das férias CLT, 1/3 constitucional e abono pecuniário.","applicationCategory":"FinanceApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"BRL"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--green:#00B37E;--green-dark:#00875A;--green-bg:#E6FAF4;--navy:#0D1B2A;--text:#1C2B3A;--muted:#4B5563;--bg:#F7F9FB;--white:#fff;--border:#E2E8EF;--radius:14px;--shadow:0 4px 24px rgba(0,0,0,0.08)}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg);line-height:1.7;font-size:15px}
+a{color:var(--green-dark);text-decoration:none}
+.site-header{background:var(--navy);padding:0 40px;height:62px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:1.3rem}.logo span{color:var(--green)}
+.header-cta{background:var(--green);color:#fff!important;padding:9px 20px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:.83rem;text-decoration:none}
+.breadcrumb{background:var(--white);border-bottom:1px solid var(--border);padding:10px 40px;font-size:13px;color:var(--muted)}
+.breadcrumb a{color:var(--green-dark)}.breadcrumb span{margin:0 6px;opacity:.5}
+.hero{background:linear-gradient(140deg,#1a3a1a 0%,var(--navy) 100%);padding:52px 40px 44px;text-align:center}
+.hero-badge{display:inline-block;background:rgba(0,179,126,.15);color:var(--green);border:1px solid rgba(0,179,126,.3);padding:5px 16px;border-radius:50px;font-family:'Sora',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px}
+.hero h1{font-family:'Sora',sans-serif;font-size:clamp(1.8rem,4vw,2.8rem);color:#fff;max-width:720px;margin:0 auto 12px;line-height:1.2;font-weight:800}
+.hero h1 em{color:var(--green);font-style:normal}
+.hero p{color:rgba(255,255,255,.6);font-size:.95rem;max-width:480px;margin:0 auto}
+.main-grid{max-width:1100px;margin:0 auto;padding:40px 24px 80px;display:grid;grid-template-columns:1fr 360px;gap:32px;align-items:start}
+.calc-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.calc-header{background:var(--navy);padding:22px 28px;display:flex;align-items:center;gap:14px}
+.calc-icon{width:42px;height:42px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.calc-header h2{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700}
+.calc-header p{color:rgba(255,255,255,.5);font-size:12px;margin-top:2px}
+.calc-body{padding:28px}
+label{display:block;font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.field{margin-bottom:18px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+input,select{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;color:var(--text);background:var(--white);outline:none;transition:border-color .2s}
+input:focus,select:focus{border-color:var(--green)}
+.prefix-wrap{position:relative}
+.prefix-wrap span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;font-weight:600}
+.prefix-wrap input{padding-left:36px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:14px;color:var(--text)}
+.toggle-label span{display:block;font-size:12px;color:var(--muted)}
+.toggle{position:relative;display:inline-block;width:44px;height:24px}
+.toggle input{opacity:0;width:0;height:0}
+.slider-toggle{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--border);transition:.3s;border-radius:50px}
+.slider-toggle:before{position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%}
+input:checked+.slider-toggle{background:var(--green)}
+input:checked+.slider-toggle:before{transform:translateX(20px)}
+.calc-btn{width:100%;background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);color:#fff;border:none;padding:16px;border-radius:10px;font-family:'Sora',sans-serif;font-weight:700;font-size:1rem;cursor:pointer;transition:opacity .2s;margin-top:16px}
+.calc-btn:hover{opacity:.9}
+.resultado{display:none;margin-top:24px;border-top:2px solid var(--border);padding-top:24px}
+.resultado.show{display:block}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px}
+.res-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.res-card.destaque{background:var(--navy)}
+.res-num{font-family:'Sora',sans-serif;font-size:1.2rem;font-weight:800;color:var(--green-dark)}
+.res-card.destaque .res-num{color:var(--green);font-size:1.6rem}
+.res-label-s{font-size:.7rem;color:var(--muted);margin-top:5px;line-height:1.3}
+.res-card.destaque .res-label-s{color:rgba(255,255,255,.5)}
+.verba-row{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)}
+.verba-row:last-child{border-bottom:none}
+.verba-nome{font-size:13.5px;color:var(--muted)}
+.verba-val{font-family:'Sora',sans-serif;font-weight:700;font-size:13.5px}
+.aviso-box{background:var(--green-bg);border:1px solid #86EFCA;border-radius:10px;padding:14px 18px;margin-top:12px}
+.aviso-box p{color:#065F46;font-size:13px}
+.cta-result{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 18px;margin-top:8px}
+.cta-result p{color:#1E40AF;font-size:13px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px}
+.info-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+.info-card h3{font-family:'Sora',sans-serif;font-size:.95rem;font-weight:700;color:var(--navy);margin-bottom:10px}
+.info-card p,.info-card li{font-size:13.5px;color:var(--muted)}
+.info-card ul{padding-left:16px}
+.info-card li{margin-bottom:5px}
+.faq-wrap{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px;margin-top:20px}
+.faq-wrap h2{font-family:'Sora',sans-serif;font-size:1.1rem;font-weight:700;color:var(--navy);margin-bottom:16px}
+.faq-item{border-bottom:1px solid var(--border);padding:12px 0}
+.faq-item:last-child{border-bottom:none}
+.faq-q{font-family:'Sora',sans-serif;font-weight:700;color:var(--navy);margin-bottom:5px;font-size:.88rem}
+.faq-a{color:var(--muted);font-size:.84rem}
+.sidebar{display:flex;flex-direction:column;gap:20px}
+.widget{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+.widget-title{font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--green)}
+.cta-box{background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);border-radius:var(--radius);padding:28px;text-align:center}
+.cta-box h3{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700;margin-bottom:8px}
+.cta-box p{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:18px}
+.cta-box a{display:block;background:#fff;color:var(--green-dark);padding:12px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;margin-bottom:8px}
+.cta-box a.wpp{background:var(--navy);color:#fff}
+.calc-links{display:flex;flex-direction:column;gap:10px}
+.calc-link{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;color:var(--text)!important;transition:border-color .2s}
+.calc-link:hover{border-color:var(--green)}
+.calc-link .icon{font-size:1.3rem}
+.calc-link .info h4{font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700}
+.calc-link .info p{font-size:.75rem;color:var(--muted)}
+.site-footer{background:var(--navy);padding:28px 40px;text-align:center}
+.site-footer p{color:rgba(255,255,255,.4);font-size:.78rem;margin-bottom:4px}
+.site-footer a{color:var(--green)}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr}.sidebar{display:none}.field-row{grid-template-columns:1fr}.info-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.site-header{padding:0 18px}.hero{padding:40px 18px 36px}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a href="https://www.felizcred.com.br" class="logo">Feliz<span>Cred</span></a>
+  <a href="https://wa.me/554796864687" class="header-cta" rel="noopener">💬 WhatsApp</a>
+</header>
+<nav class="breadcrumb">
+  <a href="https://www.felizcred.com.br">Início</a><span>›</span>
+  <a href="/blog/">Blog</a><span>›</span>Calculadora de Férias
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">🏖️ Ferramenta Gratuita</div>
+  <h1>Calculadora de <em>Férias CLT</em> 2025</h1>
+  <p>Saiba exatamente quanto você vai receber nas férias: salário + 1/3 constitucional + abono pecuniário.</p>
+</div>
+
+<div class="main-grid">
+  <div>
+    <div class="calc-card">
+      <div class="calc-header">
+        <div class="calc-icon">🏖️</div>
+        <div><h2>Calcule suas férias CLT</h2><p>Férias integrais, proporcionais e abono</p></div>
+      </div>
+      <div class="calc-body">
+        <div class="field-row">
+          <div class="field">
+            <label>Salário bruto mensal</label>
+            <div class="prefix-wrap"><span>R$</span><input type="number" id="salario" placeholder="3.000" value="3000"></div>
+          </div>
+          <div class="field">
+            <label>Meses trabalhados no período</label>
+            <select id="meses">
+              <option value="12">12 meses (férias integrais)</option>
+              <option value="11">11 meses</option>
+              <option value="10">10 meses</option>
+              <option value="9">9 meses</option>
+              <option value="8">8 meses</option>
+              <option value="7">7 meses</option>
+              <option value="6">6 meses</option>
+              <option value="5">5 meses</option>
+              <option value="4">4 meses</option>
+              <option value="3">3 meses</option>
+              <option value="2">2 meses</option>
+              <option value="1">1 mês</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <label style="margin-bottom:12px">Opções adicionais</label>
+          <div class="toggle-row">
+            <div class="toggle-label">Abono pecuniário (vender 10 dias)
+              <span>Recebe 10 dias em dinheiro, férias ficam com 20 dias</span>
+            </div>
+            <label class="toggle"><input type="checkbox" id="abono"><span class="slider-toggle"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-label">Tem horas extras habituais?
+              <span>Informe o valor médio mensal de horas extras</span>
+            </div>
+            <label class="toggle"><input type="checkbox" id="tem-he" onchange="toggleHE()"><span class="slider-toggle"></span></label>
+          </div>
+          <div id="he-field" style="display:none;padding:12px 0">
+            <label>Média mensal de horas extras</label>
+            <div class="prefix-wrap"><span>R$</span><input type="number" id="horas-extras" placeholder="300"></div>
+          </div>
+        </div>
+
+        <button class="calc-btn" onclick="calcFerias()">🏖️ Calcular férias agora</button>
+
+        <div class="resultado" id="resultado">
+          <div class="res-grid">
+            <div class="res-card"><div class="res-num" id="r-salario-ferias">-</div><div class="res-label-s">Salário de férias</div></div>
+            <div class="res-card"><div class="res-num" id="r-um-terco">-</div><div class="res-label-s">1/3 constitucional</div></div>
+            <div class="res-card" id="r-abono-card" style="display:none"><div class="res-num" id="r-abono">-</div><div class="res-label-s">Abono pecuniário</div></div>
+            <div class="res-card destaque"><div class="res-num" id="r-total">-</div><div class="res-label-s">Total a receber</div></div>
+          </div>
+
+          <div style="margin-top:16px">
+            <p style="font-family:'Sora',sans-serif;font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px">📊 Detalhamento</p>
+            <div id="verbas-detail"></div>
+          </div>
+
+          <div class="aviso-box" style="margin-top:16px">
+            <p>💡 O pagamento das férias deve ser feito pelo empregador com pelo menos 2 dias de antecedência ao início do período de descanso. Descumprimentos devem ser denunciados ao Ministério do Trabalho.</p>
+          </div>
+          <div class="cta-result">
+            <p>💼 <strong>Precisa de crédito rápido?</strong> A FelizCred libera consignado CLT ou antecipação FGTS com PIX em 40 minutos. <a href="https://wa.me/554796864687" style="font-weight:700;color:#1D4ED8">Simular agora →</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-card">
+        <h3>📋 Regras das férias CLT</h3>
+        <ul>
+          <li>30 dias corridos após 12 meses de trabalho</li>
+          <li>Pagamento com 2 dias de antecedência</li>
+          <li>Pode ser dividida em até 3 períodos</li>
+          <li>1 período mínimo de 14 dias corridos</li>
+          <li>1/3 constitucional é obrigatório</li>
+          <li>Abono é opcional e deve ser solicitado até 15 dias antes</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <h3>⚠️ Quando as férias dobram?</h3>
+        <p>O empregador paga o dobro das férias se:</p>
+        <ul>
+          <li>Não conceder as férias no prazo legal</li>
+          <li>Pagar depois do início das férias</li>
+          <li>Não pagar o 1/3 constitucional</li>
+          <li>Permitir que o trabalhador entre em férias sem o pagamento</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="faq-wrap">
+      <h2>Perguntas frequentes sobre férias CLT</h2>
+      <div class="faq-item"><p class="faq-q">Trabalhador demitido recebe férias?</p><p class="faq-a">Sim. Na demissão sem justa causa, o trabalhador recebe férias vencidas (período completo não tirado) + férias proporcionais (fração do ano em andamento) — ambas acrescidas de 1/3 constitucional.</p></div>
+      <div class="faq-item"><p class="faq-q">O que é o abono pecuniário?</p><p class="faq-a">É a possibilidade de "vender" 10 dos 30 dias de férias para o empregador, recebendo esses dias em dinheiro. O trabalhador aproveita 20 dias de descanso e recebe o equivalente a 10 dias extras. Deve ser solicitado por escrito até 15 dias antes do início das férias.</p></div>
+      <div class="faq-item"><p class="faq-q">Férias proporcionais entram no 13º?</p><p class="faq-a">As férias e o 13º são verbas separadas. O 13º não inclui o valor das férias — são calculados e pagos de forma independente.</p></div>
+      <div class="faq-item"><p class="faq-q">Posso ser chamado de volta das férias?</p><p class="faq-a">Tecnicamente não. As férias são um direito irrenunciável. Porém, se houver acordo entre empregado e empregador, o retorno antecipado pode acontecer com o respectivo ressarcimento dos dias restantes.</p></div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="cta-box">
+      <h3>💰 Precisa de crédito rápido?</h3>
+      <p>Consignado CLT ou antecipação FGTS. PIX em 40 minutos.</p>
+      <a href="https://www.felizcred.com.br#simular">🚀 Simular grátis</a>
+      <a href="https://wa.me/554796864687" class="wpp" rel="noopener">💬 WhatsApp</a>
+    </div>
+    <div class="widget">
+      <div class="widget-title">🧮 Outras calculadoras</div>
+      <div class="calc-links">
+        <a href="/calculadora-rescisao" class="calc-link"><span class="icon">📋</span><div class="info"><h4>Calculadora Rescisão</h4><p>Verbas rescisórias</p></div></a>
+        <a href="/calculadora-fgts" class="calc-link"><span class="icon">🏦</span><div class="info"><h4>Calculadora FGTS</h4><p>Saldo e antecipação</p></div></a>
+        <a href="/calculadora-consignado" class="calc-link"><span class="icon">💼</span><div class="info"><h4>Simulador Consignado</h4><p>Parcelas e taxa</p></div></a>
+        <a href="/calculadora-inss" class="calc-link"><span class="icon">🏥</span><div class="info"><h4>Calculadora INSS</h4><p>Desconto mensal</p></div></a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer class="site-footer">
+  <p><strong style="color:rgba(255,255,255,.7)">FelizCred</strong> — Handmoney Correspondente Bancário Ltda. — CNPJ 27.963.662/0001-13</p>
+  <p>Rua Paraguai, 420, Sala B — Balneário Camboriú, SC | <a href="https://www.felizcred.com.br">www.felizcred.com.br</a></p>
+</footer>
+
+<script>
+function fmt(v){return 'R$ '+v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.')}
+function toggleHE(){
+  document.getElementById('he-field').style.display = document.getElementById('tem-he').checked ? 'block' : 'none';
+}
+function calcFerias(){
+  const sal = parseFloat(document.getElementById('salario').value)||0;
+  const meses = parseInt(document.getElementById('meses').value);
+  const abono = document.getElementById('abono').checked;
+  const he = document.getElementById('tem-he').checked ? (parseFloat(document.getElementById('horas-extras').value)||0) : 0;
+  if(!sal){alert('Informe o salário.');return;}
+  const base = sal + he;
+  const proporcional = (base / 12) * meses;
+  const diasFerias = abono ? 20 : 30;
+  const salFerias = (proporcional / 30) * diasFerias;
+  const umTerco = salFerias / 3;
+  const abonoPec = abono ? (proporcional / 30) * 10 * (4/3) : 0;
+  const total = salFerias + umTerco + abonoPec;
+
+  document.getElementById('r-salario-ferias').textContent = fmt(salFerias);
+  document.getElementById('r-um-terco').textContent = fmt(umTerco);
+  document.getElementById('r-total').textContent = fmt(total);
+
+  if(abono){
+    document.getElementById('r-abono').textContent = fmt(abonoPec);
+    document.getElementById('r-abono-card').style.display = 'block';
+  } else {
+    document.getElementById('r-abono-card').style.display = 'none';
+  }
+
+  let detail = `
+    <div class="verba-row"><span class="verba-nome">Base de cálculo (salário${he>0?' + HE':''}) proporcional</span><span class="verba-val">${fmt(proporcional)}</span></div>
+    <div class="verba-row"><span class="verba-nome">Salário de férias (${diasFerias} dias)</span><span class="verba-val">${fmt(salFerias)}</span></div>
+    <div class="verba-row"><span class="verba-nome">1/3 constitucional</span><span class="verba-val">${fmt(umTerco)}</span></div>`;
+  if(abono) detail += `<div class="verba-row"><span class="verba-nome">Abono pecuniário (10 dias + 1/3)</span><span class="verba-val">${fmt(abonoPec)}</span></div>`;
+  detail += `<div class="verba-row" style="border-top:2px solid var(--border);margin-top:4px"><span class="verba-nome" style="font-weight:700;color:var(--text)">Total bruto a receber</span><span class="verba-val" style="color:var(--green-dark);font-size:1.05rem">${fmt(total)}</span></div>`;
+  document.getElementById('verbas-detail').innerHTML = detail;
+  document.getElementById('resultado').classList.add('show');
+  document.getElementById('resultado').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+</script>
+</body>
+</html>

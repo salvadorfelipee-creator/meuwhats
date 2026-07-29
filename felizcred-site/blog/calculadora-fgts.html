@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora FGTS 2025: Saldo, Multa de 40% e Antecipação | FelizCred</title>
+<meta name="description" content="Calcule seu saldo FGTS, a multa de 40% na demissão e simule a antecipação do saque-aniversário. Ferramenta gratuita e atualizada com as regras de 2025.">
+<link rel="canonical" href="https://www.felizcred.com.br/calculadora-fgts">
+<meta property="og:title" content="Calculadora FGTS 2025: Saldo, Multa e Antecipação | FelizCred">
+<meta property="og:description" content="Calcule saldo FGTS, multa 40% e quanto antecipar do saque-aniversário. Grátis.">
+<meta property="og:url" content="https://www.felizcred.com.br/calculadora-fgts">
+<meta property="og:type" content="website">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Calculadora FGTS 2025","url":"https://www.felizcred.com.br/calculadora-fgts","description":"Calcule saldo FGTS, multa de 40% e antecipação do saque-aniversário.","applicationCategory":"FinanceApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"BRL"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--green:#00B37E;--green-dark:#00875A;--green-bg:#E6FAF4;--navy:#0D1B2A;--text:#1C2B3A;--muted:#4B5563;--bg:#F7F9FB;--white:#fff;--border:#E2E8EF;--radius:14px;--shadow:0 4px 24px rgba(0,0,0,0.08)}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg);line-height:1.7;font-size:15px}
+a{color:var(--green-dark);text-decoration:none}
+.site-header{background:var(--navy);padding:0 40px;height:62px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:1.3rem}.logo span{color:var(--green)}
+.header-cta{background:var(--green);color:#fff!important;padding:9px 20px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:.83rem;text-decoration:none}
+.breadcrumb{background:var(--white);border-bottom:1px solid var(--border);padding:10px 40px;font-size:13px;color:var(--muted)}
+.breadcrumb a{color:var(--green-dark)}.breadcrumb span{margin:0 6px;opacity:.5}
+.hero{background:linear-gradient(140deg,#0d3b2a 0%,var(--navy) 100%);padding:52px 40px 44px;text-align:center}
+.hero-badge{display:inline-block;background:rgba(0,179,126,.15);color:var(--green);border:1px solid rgba(0,179,126,.3);padding:5px 16px;border-radius:50px;font-family:'Sora',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px}
+.hero h1{font-family:'Sora',sans-serif;font-size:clamp(1.8rem,4vw,2.8rem);color:#fff;max-width:720px;margin:0 auto 12px;line-height:1.2;font-weight:800}
+.hero h1 em{color:var(--green);font-style:normal}
+.hero p{color:rgba(255,255,255,.6);font-size:.95rem;max-width:480px;margin:0 auto}
+.main-grid{max-width:1100px;margin:0 auto;padding:40px 24px 80px;display:grid;grid-template-columns:1fr 360px;gap:32px;align-items:start}
+
+/* TABS */
+.tabs{display:flex;gap:0;background:var(--white);border-radius:var(--radius) var(--radius) 0 0;overflow:hidden;border:1px solid var(--border);border-bottom:none}
+.tab{flex:1;padding:16px;text-align:center;cursor:pointer;font-family:'Sora',sans-serif;font-size:.82rem;font-weight:700;color:var(--muted);transition:all .2s;border-bottom:3px solid transparent}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--green-dark);border-bottom-color:var(--green);background:var(--green-bg)}
+.tab-content{display:none;background:var(--white);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);padding:32px;box-shadow:var(--shadow)}
+.tab-content.active{display:block}
+
+/* CAMPOS */
+label{display:block;font-size:12.5px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.field{margin-bottom:18px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+input,select{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;color:var(--text);background:var(--white);outline:none;transition:border-color .2s}
+input:focus,select:focus{border-color:var(--green)}
+.prefix-wrap{position:relative}
+.prefix-wrap span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;font-weight:600}
+.prefix-wrap input{padding-left:36px}
+.calc-btn{width:100%;background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);color:#fff;border:none;padding:15px;border-radius:10px;font-family:'Sora',sans-serif;font-weight:700;font-size:1rem;cursor:pointer;transition:opacity .2s;margin-top:4px}
+.calc-btn:hover{opacity:.9}
+
+/* RESULTADO */
+.resultado{display:none;margin-top:24px;border-top:2px solid var(--border);padding-top:24px}
+.resultado.show{display:block}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:16px}
+.res-card{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.res-card.destaque{background:var(--navy);border-color:var(--navy)}
+.res-num{font-family:'Sora',sans-serif;font-size:1.3rem;font-weight:800;color:var(--green-dark);line-height:1}
+.res-card.destaque .res-num{color:var(--green);font-size:1.6rem}
+.res-label{font-size:.72rem;color:var(--muted);margin-top:5px;line-height:1.3}
+.res-card.destaque .res-label{color:rgba(255,255,255,.5)}
+.aviso-box{background:var(--green-bg);border:1px solid #86EFCA;border-radius:10px;padding:14px 18px;margin-top:12px}
+.aviso-box p{color:#065F46;font-size:13px}
+.cta-result{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 18px;margin-top:8px}
+.cta-result p{color:#1E40AF;font-size:13px}
+
+/* TABELA SAQUE-ANIVERSÁRIO */
+.sa-table{width:100%;border-collapse:collapse;font-size:.88rem;margin-top:16px}
+.sa-table th{background:var(--navy);color:#fff;padding:10px 14px;text-align:left;font-family:'Sora',sans-serif;font-size:.75rem;text-transform:uppercase;letter-spacing:.5px}
+.sa-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--muted)}
+.sa-table tr:last-child td{border-bottom:none}
+.sa-table tr:nth-child(even) td{background:#FAFBFC}
+.sa-table .highlight{color:var(--green-dark);font-weight:700}
+
+/* SIDEBAR */
+.sidebar{display:flex;flex-direction:column;gap:20px}
+.widget{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+.widget-title{font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--green)}
+.cta-box{background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);border-radius:var(--radius);padding:28px;text-align:center}
+.cta-box h3{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700;margin-bottom:8px}
+.cta-box p{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:18px}
+.cta-box a{display:block;background:#fff;color:var(--green-dark);padding:12px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;margin-bottom:8px}
+.cta-box a.wpp{background:var(--navy);color:#fff}
+.calc-links{display:flex;flex-direction:column;gap:10px}
+.calc-link{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;color:var(--text)!important;transition:border-color .2s}
+.calc-link:hover{border-color:var(--green)}
+.calc-link .icon{font-size:1.3rem}
+.calc-link .info h4{font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700;color:var(--text)}
+.calc-link .info p{font-size:.75rem;color:var(--muted)}
+.faq-wrap{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:32px;margin-top:28px}
+.faq-wrap h2{font-family:'Sora',sans-serif;font-size:1.2rem;font-weight:700;color:var(--navy);margin-bottom:20px}
+.faq-item{border-bottom:1px solid var(--border);padding:14px 0}
+.faq-item:last-child{border-bottom:none}
+.faq-q{font-family:'Sora',sans-serif;font-weight:700;color:var(--navy);margin-bottom:6px;font-size:.9rem}
+.faq-a{color:var(--muted);font-size:.85rem}
+.site-footer{background:var(--navy);padding:28px 40px;text-align:center}
+.site-footer p{color:rgba(255,255,255,.4);font-size:.78rem;margin-bottom:4px}
+.site-footer a{color:var(--green)}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr}.sidebar{display:none}.field-row{grid-template-columns:1fr}}
+@media(max-width:560px){.site-header{padding:0 18px}.hero{padding:40px 18px 36px}.tabs{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a href="https://www.felizcred.com.br" class="logo">Feliz<span>Cred</span></a>
+  <a href="https://wa.me/554796864687" class="header-cta" rel="noopener">💬 WhatsApp</a>
+</header>
+<nav class="breadcrumb">
+  <a href="https://www.felizcred.com.br">Início</a><span>›</span>
+  <a href="/blog/">Blog</a><span>›</span>Calculadora FGTS
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">🏦 Ferramenta Gratuita</div>
+  <h1>Calculadora <em>FGTS 2025</em></h1>
+  <p>Calcule seu saldo acumulado, a multa de 40% na demissão e quanto você pode antecipar do saque-aniversário.</p>
+</div>
+
+<div class="main-grid">
+  <div>
+    <div class="tabs">
+      <div class="tab active" onclick="trocarTab('saldo',this)">📊 Saldo Acumulado</div>
+      <div class="tab" onclick="trocarTab('multa',this)">💰 Multa de 40%</div>
+      <div class="tab" onclick="trocarTab('antecipacao',this)">⚡ Antecipação</div>
+    </div>
+
+    <!-- TAB 1: SALDO -->
+    <div class="tab-content active" id="tab-saldo">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:24px">Calcule quanto já acumulou de FGTS com base no seu salário e tempo de serviço.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Salário bruto mensal</label>
+          <div class="prefix-wrap"><span>R$</span><input type="number" id="s1-salario" placeholder="3.000"></div>
+        </div>
+        <div class="field">
+          <label>Meses trabalhados</label>
+          <input type="number" id="s1-meses" placeholder="24" min="1">
+        </div>
+      </div>
+      <div class="field">
+        <label>Taxa de rendimento do FGTS (padrão 3% ao ano)</label>
+        <select id="s1-taxa">
+          <option value="0.03">3% ao ano (padrão FGTS)</option>
+          <option value="0.04">4% ao ano</option>
+          <option value="0.025">2,5% ao ano</option>
+        </select>
+      </div>
+      <button class="calc-btn" onclick="calcSaldo()">📊 Calcular saldo acumulado</button>
+      <div class="resultado" id="res-saldo">
+        <div class="res-grid">
+          <div class="res-card"><div class="res-num" id="r-depositos">-</div><div class="res-label">Depósitos brutos</div></div>
+          <div class="res-card"><div class="res-num" id="r-rendimento">-</div><div class="res-label">Rendimento estimado</div></div>
+          <div class="res-card destaque"><div class="res-num" id="r-saldo-total">-</div><div class="res-label">Saldo total estimado</div></div>
+        </div>
+        <div class="aviso-box"><p>💡 O rendimento real do FGTS é a TR + 3% ao ano. Este cálculo é uma estimativa simplificada. Consulte o app FGTS da Caixa para o saldo exato.</p></div>
+        <div class="cta-result"><p>🚀 <strong>Quer antecipar esse FGTS?</strong> A FelizCred libera PIX em 40 minutos sem consulta ao SPC. <a href="https://wa.me/554796864687" style="font-weight:700;color:#1D4ED8">Simular agora →</a></p></div>
+      </div>
+    </div>
+
+    <!-- TAB 2: MULTA 40% -->
+    <div class="tab-content" id="tab-multa">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:24px">Calcule a multa de 40% que o empregador deve pagar sobre seu FGTS em caso de demissão sem justa causa.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Saldo atual do FGTS</label>
+          <div class="prefix-wrap"><span>R$</span><input type="number" id="s2-saldo" placeholder="12.000"></div>
+        </div>
+        <div class="field">
+          <label>Tipo de demissão</label>
+          <select id="s2-tipo">
+            <option value="0.40">Sem justa causa (40%)</option>
+            <option value="0.20">Culpa recíproca (20%)</option>
+            <option value="0">Justa causa (0%)</option>
+            <option value="0">Pedido de demissão (0%)</option>
+          </select>
+        </div>
+      </div>
+      <button class="calc-btn" onclick="calcMulta()">💰 Calcular multa do FGTS</button>
+      <div class="resultado" id="res-multa">
+        <div class="res-grid">
+          <div class="res-card"><div class="res-num" id="r-saldo-fgts">-</div><div class="res-label">Saldo do FGTS</div></div>
+          <div class="res-card"><div class="res-num" id="r-multa-perc">-</div><div class="res-label">Percentual da multa</div></div>
+          <div class="res-card destaque"><div class="res-num" id="r-multa-valor">-</div><div class="res-label">Valor da multa a receber</div></div>
+        </div>
+        <div class="aviso-box"><p>✅ A multa é paga pelo empregador <strong>separadamente</strong> — não é descontada do seu saldo FGTS. Você recebe o saldo + a multa por cima.</p></div>
+      </div>
+    </div>
+
+    <!-- TAB 3: ANTECIPAÇÃO -->
+    <div class="tab-content" id="tab-antecipacao">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:24px">Simule quanto você pode receber antecipando as parcelas do saque-aniversário. Regras de 2025.</p>
+      <div class="field-row">
+        <div class="field">
+          <label>Saldo total do FGTS</label>
+          <div class="prefix-wrap"><span>R$</span><input type="number" id="s3-saldo" placeholder="15.000"></div>
+        </div>
+        <div class="field">
+          <label>Parcelas para antecipar</label>
+          <select id="s3-parcelas">
+            <option value="1">1 parcela</option>
+            <option value="2">2 parcelas</option>
+            <option value="3">3 parcelas</option>
+            <option value="4">4 parcelas</option>
+            <option value="5" selected>5 parcelas (máximo 2025)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Taxa de juros da antecipação (ao mês)</label>
+        <select id="s3-taxa">
+          <option value="0.0129">1,29% ao mês (mínima)</option>
+          <option value="0.0149" selected>1,49% ao mês (média)</option>
+          <option value="0.0175">1,75% ao mês</option>
+          <option value="0.0199">1,99% ao mês</option>
+        </select>
+      </div>
+      <button class="calc-btn" onclick="calcAntecipacao()">⚡ Simular antecipação FGTS</button>
+      <div class="resultado" id="res-antecipacao">
+        <div class="res-grid">
+          <div class="res-card"><div class="res-num" id="r-parcela-sa">-</div><div class="res-label">Valor do saque-aniversário</div></div>
+          <div class="res-card"><div class="res-num" id="r-parcelas-ant">-</div><div class="res-label">Parcelas antecipadas</div></div>
+          <div class="res-card destaque"><div class="res-num" id="r-valor-liquido">-</div><div class="res-label">Você recebe (líquido)</div></div>
+        </div>
+        <div class="aviso-box">
+          <p>📋 <strong>Regra 2025:</strong> limite máximo de 5 parcelas por contrato, com teto de R$ 500 por parcela. A partir de dezembro/2026 o limite cai para 3 parcelas.</p>
+        </div>
+        <div class="cta-result"><p>💬 <strong>Quer fazer a antecipação agora?</strong> A FelizCred atende pelo WhatsApp e libera o PIX em até 40 minutos. <a href="https://wa.me/554796864687" style="font-weight:700;color:#1D4ED8">Falar agora →</a></p></div>
+        <div style="margin-top:20px">
+          <p style="font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:12px">📊 Tabela de percentuais do saque-aniversário</p>
+          <table class="sa-table">
+            <thead><tr><th>Faixa do saldo</th><th>Percentual</th><th>Parcela fixa</th></tr></thead>
+            <tbody>
+              <tr><td>Até R$ 500</td><td>50%</td><td>—</td></tr>
+              <tr><td>R$ 500,01 a R$ 1.000</td><td>40%</td><td>R$ 50</td></tr>
+              <tr><td>R$ 1.000,01 a R$ 5.000</td><td>30%</td><td>R$ 150</td></tr>
+              <tr><td>R$ 5.000,01 a R$ 10.000</td><td>20%</td><td>R$ 650</td></tr>
+              <tr><td>R$ 10.000,01 a R$ 15.000</td><td>15%</td><td>R$ 1.150</td></tr>
+              <tr><td>R$ 15.000,01 a R$ 20.000</td><td>10%</td><td>R$ 1.900</td></tr>
+              <tr><td>Acima de R$ 20.000</td><td>5%</td><td>R$ 2.900</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-wrap">
+      <h2>Perguntas frequentes sobre FGTS</h2>
+      <div class="faq-item"><p class="faq-q">O FGTS rende alguma coisa?</p><p class="faq-a">Sim. O FGTS rende TR (Taxa Referencial) + 3% ao ano. Nos últimos anos a TR ficou próxima de zero, mas em períodos de inflação alta ela sobe. O rendimento é bem abaixo da poupança e do Tesouro Direto, mas o FGTS tem outros benefícios.</p></div>
+      <div class="faq-item"><p class="faq-q">Posso perder meu FGTS se a empresa falir?</p><p class="faq-a">Não. O FGTS é mantido na Caixa Econômica Federal, separado do patrimônio da empresa. Mesmo que a empresa feche, o dinheiro continua na sua conta vinculada e pode ser sacado normalmente com a documentação de rescisão.</p></div>
+      <div class="faq-item"><p class="faq-q">A antecipação FGTS é segura?</p><p class="faq-a">Sim, desde que feita por correspondente bancário regulamentado pelo Banco Central como a FelizCred. Desconfie de qualquer cobrança antecipada — empresas sérias não cobram nada antes de liberar o crédito.</p></div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="cta-box">
+      <h3>⚡ Antecipe seu FGTS agora</h3>
+      <p>Sem SPC, sem parcelas mensais. PIX em 40 minutos após aprovação.</p>
+      <a href="https://www.felizcred.com.br#simular">🚀 Simular grátis</a>
+      <a href="https://wa.me/554796864687" class="wpp" rel="noopener">💬 WhatsApp</a>
+    </div>
+    <div class="widget">
+      <div class="widget-title">🧮 Outras calculadoras</div>
+      <div class="calc-links">
+        <a href="/calculadora-rescisao" class="calc-link"><span class="icon">📋</span><div class="info"><h4>Calculadora de Rescisão</h4><p>Todas as verbas</p></div></a>
+        <a href="/calculadora-consignado" class="calc-link"><span class="icon">💼</span><div class="info"><h4>Simulador Consignado CLT</h4><p>Parcela e taxa</p></div></a>
+        <a href="/calculadora-inss" class="calc-link"><span class="icon">🏥</span><div class="info"><h4>Calculadora INSS</h4><p>Desconto mensal</p></div></a>
+        <a href="/calculadora-ferias" class="calc-link"><span class="icon">🏖️</span><div class="info"><h4>Calculadora de Férias</h4><p>Valor e 1/3</p></div></a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer class="site-footer">
+  <p><strong style="color:rgba(255,255,255,.7)">FelizCred</strong> — Handmoney Correspondente Bancário Ltda. — CNPJ 27.963.662/0001-13</p>
+  <p>Rua Paraguai, 420, Sala B — Balneário Camboriú, SC | <a href="https://www.felizcred.com.br">www.felizcred.com.br</a></p>
+</footer>
+
+<script>
+function trocarTab(id, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+}
+
+function fmt(v) {
+  return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function calcSaldo() {
+  const sal = parseFloat(document.getElementById('s1-salario').value) || 0;
+  const meses = parseInt(document.getElementById('s1-meses').value) || 0;
+  const taxa = parseFloat(document.getElementById('s1-taxa').value);
+  if (!sal || !meses) { alert('Preencha salário e meses.'); return; }
+  const deposito = sal * 0.08;
+  const totalDepositos = deposito * meses;
+  const rendimento = totalDepositos * (taxa * meses / 12);
+  const total = totalDepositos + rendimento;
+  document.getElementById('r-depositos').textContent = fmt(totalDepositos);
+  document.getElementById('r-rendimento').textContent = fmt(rendimento);
+  document.getElementById('r-saldo-total').textContent = fmt(total);
+  document.getElementById('res-saldo').classList.add('show');
+}
+
+function calcMulta() {
+  const saldo = parseFloat(document.getElementById('s2-saldo').value) || 0;
+  const perc = parseFloat(document.getElementById('s2-tipo').value);
+  if (!saldo) { alert('Informe o saldo do FGTS.'); return; }
+  const multa = saldo * perc;
+  document.getElementById('r-saldo-fgts').textContent = fmt(saldo);
+  document.getElementById('r-multa-perc').textContent = (perc * 100).toFixed(0) + '%';
+  document.getElementById('r-multa-valor').textContent = fmt(multa);
+  document.getElementById('res-multa').classList.add('show');
+}
+
+function calcSaqueAniversario(saldo) {
+  if (saldo <= 500) return saldo * 0.50;
+  if (saldo <= 1000) return saldo * 0.40 + 50;
+  if (saldo <= 5000) return saldo * 0.30 + 150;
+  if (saldo <= 10000) return saldo * 0.20 + 650;
+  if (saldo <= 15000) return saldo * 0.15 + 1150;
+  if (saldo <= 20000) return saldo * 0.10 + 1900;
+  return saldo * 0.05 + 2900;
+}
+
+function calcAntecipacao() {
+  const saldo = parseFloat(document.getElementById('s3-saldo').value) || 0;
+  const parcelas = parseInt(document.getElementById('s3-parcelas').value);
+  const taxa = parseFloat(document.getElementById('s3-taxa').value);
+  if (!saldo) { alert('Informe o saldo do FGTS.'); return; }
+  const parcelaAnual = Math.min(calcSaqueAniversario(saldo), 500);
+  const totalBruto = parcelaAnual * parcelas;
+  // Desconto de juros antecipados (juros simples estimado)
+  const mesesMedio = (parcelas * 12) / 2;
+  const juros = totalBruto * taxa * mesesMedio;
+  const liquido = Math.max(totalBruto - juros, totalBruto * 0.7);
+  document.getElementById('r-parcela-sa').textContent = fmt(parcelaAnual);
+  document.getElementById('r-parcelas-ant').textContent = parcelas + 'x';
+  document.getElementById('r-valor-liquido').textContent = fmt(liquido);
+  document.getElementById('res-antecipacao').classList.add('show');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Empréstimo Consignado CLT 2025 — Grátis | FelizCred</title>
+<meta name="description" content="Simule seu empréstimo consignado CLT: calcule parcelas, taxa de juros, CET e margem disponível no salário. Simulação gratuita e instantânea. Aprovação em minutos.">
+<link rel="canonical" href="https://www.felizcred.com.br/calculadora-consignado">
+<meta property="og:title" content="Simulador Consignado CLT 2025 — Calcule Parcelas | FelizCred">
+<meta property="og:description" content="Simule parcelas, taxa e margem do consignado CLT em segundos. Grátis e sem compromisso.">
+<meta property="og:url" content="https://www.felizcred.com.br/calculadora-consignado">
+<meta property="og:type" content="website">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Simulador Consignado CLT","url":"https://www.felizcred.com.br/calculadora-consignado","description":"Simule empréstimo consignado CLT: parcelas, taxa, CET e margem disponível.","applicationCategory":"FinanceApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"BRL"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--green:#00B37E;--green-dark:#00875A;--green-bg:#E6FAF4;--navy:#0D1B2A;--text:#1C2B3A;--muted:#4B5563;--bg:#F7F9FB;--white:#fff;--border:#E2E8EF;--radius:14px;--shadow:0 4px 24px rgba(0,0,0,0.08)}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg);line-height:1.7;font-size:15px}
+a{color:var(--green-dark);text-decoration:none}
+.site-header{background:var(--navy);padding:0 40px;height:62px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:1.3rem}.logo span{color:var(--green)}
+.header-cta{background:var(--green);color:#fff!important;padding:9px 20px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:.83rem;text-decoration:none}
+.breadcrumb{background:var(--white);border-bottom:1px solid var(--border);padding:10px 40px;font-size:13px;color:var(--muted)}
+.breadcrumb a{color:var(--green-dark)}.breadcrumb span{margin:0 6px;opacity:.5}
+.hero{background:linear-gradient(140deg,#0d1b3a 0%,var(--navy) 100%);padding:52px 40px 44px;text-align:center}
+.hero-badge{display:inline-block;background:rgba(0,179,126,.15);color:var(--green);border:1px solid rgba(0,179,126,.3);padding:5px 16px;border-radius:50px;font-family:'Sora',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px}
+.hero h1{font-family:'Sora',sans-serif;font-size:clamp(1.8rem,4vw,2.8rem);color:#fff;max-width:720px;margin:0 auto 12px;line-height:1.2;font-weight:800}
+.hero h1 em{color:var(--green);font-style:normal}
+.hero p{color:rgba(255,255,255,.6);font-size:.95rem;max-width:500px;margin:0 auto}
+.main-grid{max-width:1100px;margin:0 auto;padding:40px 24px 80px;display:grid;grid-template-columns:1fr 360px;gap:32px;align-items:start}
+
+/* CALC */
+.calc-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.calc-header{background:var(--navy);padding:22px 28px;display:flex;align-items:center;gap:14px}
+.calc-icon{width:42px;height:42px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.calc-header h2{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700}
+.calc-header p{color:rgba(255,255,255,.5);font-size:12px;margin-top:2px}
+.calc-body{padding:28px}
+label{display:block;font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.field{margin-bottom:18px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+input,select{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;color:var(--text);background:var(--white);outline:none;transition:border-color .2s}
+input:focus,select:focus{border-color:var(--green)}
+.prefix-wrap{position:relative}
+.prefix-wrap span{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;font-weight:600}
+.prefix-wrap input{padding-left:36px}
+.suffix-wrap{position:relative}
+.suffix-wrap span{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px}
+.suffix-wrap input{padding-right:44px}
+
+/* SLIDER */
+.slider-wrap{margin-bottom:20px}
+.slider-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.slider-val{font-family:'Sora',sans-serif;font-size:1.1rem;font-weight:800;color:var(--green-dark)}
+input[type=range]{-webkit-appearance:none;width:100%;height:6px;border-radius:50px;background:var(--border);outline:none;border:none;padding:0}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--green);cursor:pointer;box-shadow:0 2px 8px rgba(0,179,126,.4)}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:50px}
+
+.calc-btn{width:100%;background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);color:#fff;border:none;padding:16px;border-radius:10px;font-family:'Sora',sans-serif;font-weight:700;font-size:1rem;cursor:pointer;transition:opacity .2s;margin-top:8px}
+.calc-btn:hover{opacity:.9}
+
+/* RESULTADO */
+.resultado{display:none;margin-top:24px;border-top:2px solid var(--border);padding-top:24px}
+.resultado.show{display:block}
+.res-principal{background:var(--navy);border-radius:12px;padding:24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.res-item{text-align:center}
+.res-label-s{font-size:11px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.res-val{font-family:'Sora',sans-serif;font-size:1.2rem;font-weight:800;color:var(--white)}
+.res-val.big{font-size:1.8rem;color:var(--green)}
+.margem-bar-wrap{margin-top:16px}
+.margem-bar-label{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
+.margem-bar{height:10px;background:var(--border);border-radius:50px;overflow:hidden}
+.margem-fill{height:100%;border-radius:50px;transition:width .5s}
+.tabela-amort{margin-top:20px}
+.tabela-amort h4{font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:10px}
+.tabela-amort table{width:100%;border-collapse:collapse;font-size:.82rem}
+.tabela-amort th{background:var(--navy);color:#fff;padding:8px 12px;text-align:left;font-family:'Sora',sans-serif;font-size:.72rem;text-transform:uppercase}
+.tabela-amort td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--muted)}
+.tabela-amort tr:last-child td{border-bottom:none}
+.green-txt{color:var(--green-dark);font-weight:600}
+.aviso-box{background:var(--green-bg);border:1px solid #86EFCA;border-radius:10px;padding:14px 18px;margin-top:12px}
+.aviso-box p{color:#065F46;font-size:13px}
+.cta-result{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 18px;margin-top:8px}
+.cta-result p{color:#1E40AF;font-size:13px}
+
+/* COMPARATIVO TAXAS */
+.comp-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-top:24px}
+.comp-card h3{font-family:'Sora',sans-serif;font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:16px}
+.comp-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.comp-row:last-child{border-bottom:none}
+.comp-nome{font-size:14px;color:var(--muted)}
+.comp-taxa{font-family:'Sora',sans-serif;font-weight:700;font-size:.9rem}
+.taxa-green{color:var(--green-dark)}.taxa-yellow{color:#D97706}.taxa-red{color:#DC2626}
+.comp-bar-wrap{flex:1;margin:0 16px}
+.comp-bar{height:6px;border-radius:50px}
+
+/* SIDEBAR */
+.sidebar{display:flex;flex-direction:column;gap:20px}
+.widget{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+.widget-title{font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--green)}
+.cta-box{background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);border-radius:var(--radius);padding:28px;text-align:center}
+.cta-box h3{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700;margin-bottom:8px}
+.cta-box p{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:18px}
+.cta-box a{display:block;background:#fff;color:var(--green-dark);padding:12px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;margin-bottom:8px}
+.cta-box a.wpp{background:var(--navy);color:#fff}
+.calc-links{display:flex;flex-direction:column;gap:10px}
+.calc-link{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;color:var(--text)!important;transition:border-color .2s}
+.calc-link:hover{border-color:var(--green)}
+.calc-link .icon{font-size:1.3rem}
+.calc-link .info h4{font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700;color:var(--text)}
+.calc-link .info p{font-size:.75rem;color:var(--muted)}
+.faq-wrap{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px;margin-top:24px}
+.faq-wrap h2{font-family:'Sora',sans-serif;font-size:1.1rem;font-weight:700;color:var(--navy);margin-bottom:16px}
+.faq-item{border-bottom:1px solid var(--border);padding:12px 0}
+.faq-item:last-child{border-bottom:none}
+.faq-q{font-family:'Sora',sans-serif;font-weight:700;color:var(--navy);margin-bottom:5px;font-size:.88rem}
+.faq-a{color:var(--muted);font-size:.84rem}
+.site-footer{background:var(--navy);padding:28px 40px;text-align:center}
+.site-footer p{color:rgba(255,255,255,.4);font-size:.78rem;margin-bottom:4px}
+.site-footer a{color:var(--green)}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr}.sidebar{display:none}.field-row{grid-template-columns:1fr}.res-principal{grid-template-columns:1fr}}
+@media(max-width:560px){.site-header{padding:0 18px}.hero{padding:40px 18px 36px}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <a href="https://www.felizcred.com.br" class="logo">Feliz<span>Cred</span></a>
+  <a href="https://wa.me/554796864687" class="header-cta" rel="noopener">💬 WhatsApp</a>
+</header>
+<nav class="breadcrumb">
+  <a href="https://www.felizcred.com.br">Início</a><span>›</span>
+  <a href="/blog/">Blog</a><span>›</span>Simulador Consignado CLT
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">💼 Simulação Gratuita</div>
+  <h1>Simulador de <em>Consignado CLT</em> 2025</h1>
+  <p>Calcule parcelas, juros totais e margem disponível no salário. Resultado em segundos — sem compromisso.</p>
+</div>
+
+<div class="main-grid">
+  <div>
+    <div class="calc-card">
+      <div class="calc-header">
+        <div class="calc-icon">💼</div>
+        <div><h2>Simule seu consignado CLT</h2><p>Cálculo pela Tabela Price (parcelas fixas)</p></div>
+      </div>
+      <div class="calc-body">
+
+        <div class="slider-wrap">
+          <label>Valor desejado</label>
+          <div class="slider-header">
+            <span style="font-size:13px;color:var(--muted)">R$ 500</span>
+            <span class="slider-val" id="val-display">R$ 5.000</span>
+            <span style="font-size:13px;color:var(--muted)">R$ 50.000</span>
+          </div>
+          <input type="range" id="valor-range" min="500" max="50000" step="500" value="5000" oninput="atualizarSlider()">
+        </div>
+
+        <div class="field-row" style="margin-bottom:18px">
+          <div class="field">
+            <label>Número de parcelas</label>
+            <select id="parcelas">
+              <option value="6">6 meses</option>
+              <option value="12">12 meses</option>
+              <option value="18">18 meses</option>
+              <option value="24" selected>24 meses</option>
+              <option value="36">36 meses</option>
+              <option value="48">48 meses</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Taxa de juros (ao mês)</label>
+            <select id="taxa">
+              <option value="0.0168">1,68% a.m. (mínima)</option>
+              <option value="0.0175" selected>1,75% a.m. (média)</option>
+              <option value="0.0199">1,99% a.m.</option>
+              <option value="0.0220">2,20% a.m.</option>
+              <option value="0.0249">2,49% a.m.</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Seu salário bruto mensal (para calcular margem)</label>
+          <div class="prefix-wrap"><span>R$</span><input type="number" id="salario" placeholder="3.000" value="3000"></div>
+        </div>
+
+        <button class="calc-btn" onclick="simular()">💼 Simular consignado agora</button>
+
+        <div class="resultado" id="resultado">
+          <div class="res-principal">
+            <div class="res-item">
+              <div class="res-label-s">Parcela mensal</div>
+              <div class="res-val big" id="r-parcela">-</div>
+            </div>
+            <div class="res-item">
+              <div class="res-label-s">Total pago</div>
+              <div class="res-val" id="r-total">-</div>
+            </div>
+            <div class="res-item">
+              <div class="res-label-s">Custo do crédito</div>
+              <div class="res-val" id="r-custo">-</div>
+            </div>
+          </div>
+
+          <div class="margem-bar-wrap">
+            <div class="margem-bar-label">
+              <span>Margem disponível</span>
+              <span id="r-margem-txt">-</span>
+            </div>
+            <div class="margem-bar">
+              <div class="margem-fill" id="r-margem-bar" style="width:0%;background:var(--green)"></div>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:6px" id="r-margem-status"></div>
+          </div>
+
+          <div class="tabela-amort" id="tabela-wrap">
+            <h4>📊 Primeiras parcelas (Tabela Price)</h4>
+            <table id="tabela-parcelas">
+              <thead><tr><th>Parcela</th><th>Valor</th><th>Juros</th><th>Amortização</th><th>Saldo devedor</th></tr></thead>
+              <tbody id="tabela-body"></tbody>
+            </table>
+          </div>
+
+          <div class="aviso-box" style="margin-top:16px">
+            <p>💡 Simulação pela Tabela Price com parcelas fixas. O CET (Custo Efetivo Total) real pode variar conforme banco parceiro e perfil. Taxas a partir de 1,68% ao mês para CLT — muito abaixo do crédito pessoal.</p>
+          </div>
+          <div class="cta-result">
+            <p>🚀 <strong>Pronto para contratar?</strong> A FelizCred compara os bancos parceiros e apresenta a melhor condição para o seu perfil. PIX em 40 minutos. <a href="https://wa.me/554796864687" style="font-weight:700;color:#1D4ED8">Falar agora →</a></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPARATIVO -->
+    <div class="comp-card">
+      <h3>📊 Consignado CLT vs outros tipos de crédito</h3>
+      <div class="comp-row">
+        <span class="comp-nome">Consignado CLT</span>
+        <div class="comp-bar-wrap"><div class="comp-bar" style="width:12%;background:#00B37E"></div></div>
+        <span class="comp-taxa taxa-green">1,68% a.m.</span>
+      </div>
+      <div class="comp-row">
+        <span class="comp-nome">Antecipação FGTS</span>
+        <div class="comp-bar-wrap"><div class="comp-bar" style="width:10%;background:#00B37E"></div></div>
+        <span class="comp-taxa taxa-green">1,29% a.m.</span>
+      </div>
+      <div class="comp-row">
+        <span class="comp-nome">Crédito pessoal banco</span>
+        <div class="comp-bar-wrap"><div class="comp-bar" style="width:45%;background:#D97706"></div></div>
+        <span class="comp-taxa taxa-yellow">5,6% a.m.</span>
+      </div>
+      <div class="comp-row">
+        <span class="comp-nome">Cheque especial</span>
+        <div class="comp-bar-wrap"><div class="comp-bar" style="width:70%;background:#DC2626"></div></div>
+        <span class="comp-taxa taxa-red">8,2% a.m.</span>
+      </div>
+      <div class="comp-row">
+        <span class="comp-nome">Cartão de crédito rotativo</span>
+        <div class="comp-bar-wrap"><div class="comp-bar" style="width:100%;background:#DC2626"></div></div>
+        <span class="comp-taxa taxa-red">14,1% a.m.</span>
+      </div>
+    </div>
+
+    <div class="faq-wrap">
+      <h2>Perguntas frequentes sobre consignado CLT</h2>
+      <div class="faq-item"><p class="faq-q">Qual é a taxa máxima do consignado CLT?</p><p class="faq-a">A taxa máxima é definida pelo Conselho Nacional de Previdência Social (CNPS) e atualizada periodicamente. Em 2025, o teto está em 2,49% ao mês para empréstimos e 3,5% para cartão consignado. A FelizCred busca sempre a menor taxa disponível nos bancos parceiros.</p></div>
+      <div class="faq-item"><p class="faq-q">Posso quitar o consignado antes do prazo?</p><p class="faq-a">Sim. Você pode quitar antecipadamente a qualquer momento. Pela Tabela Price, você paga apenas o saldo devedor corrigido — sem multa por quitação antecipada.</p></div>
+      <div class="faq-item"><p class="faq-q">Quem tem margem esgotada pode contratar?</p><p class="faq-a">Não pelo consignado CLT, pois ele precisa de margem disponível no salário. Mas você pode antecipar o FGTS — que não usa margem. Ou fazer portabilidade para liberar espaço.</p></div>
+      <div class="faq-item"><p class="faq-q">Em quanto tempo o dinheiro cai na conta?</p><p class="faq-a">Após aprovação e assinatura digital do contrato, o PIX é enviado em até 40 minutos — qualquer banco, qualquer hora.</p></div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="cta-box">
+      <h3>💼 Contratar consignado agora</h3>
+      <p>Taxa a partir de 1,68% a.m. PIX em 40 min. Banco Pan, Facta e BMG.</p>
+      <a href="https://www.felizcred.com.br#simular">🚀 Simular no site</a>
+      <a href="https://wa.me/554796864687" class="wpp" rel="noopener">💬 WhatsApp</a>
+    </div>
+    <div class="widget">
+      <div class="widget-title">🧮 Outras calculadoras</div>
+      <div class="calc-links">
+        <a href="/calculadora-rescisao" class="calc-link"><span class="icon">📋</span><div class="info"><h4>Calculadora Rescisão</h4><p>Verbas rescisórias</p></div></a>
+        <a href="/calculadora-fgts" class="calc-link"><span class="icon">🏦</span><div class="info"><h4>Calculadora FGTS</h4><p>Saldo e antecipação</p></div></a>
+        <a href="/calculadora-ferias" class="calc-link"><span class="icon">🏖️</span><div class="info"><h4>Calculadora Férias</h4><p>Valor e 1/3</p></div></a>
+        <a href="/calculadora-inss" class="calc-link"><span class="icon">🏥</span><div class="info"><h4>Calculadora INSS</h4><p>Desconto mensal</p></div></a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer class="site-footer">
+  <p><strong style="color:rgba(255,255,255,.7)">FelizCred</strong> — Handmoney Correspondente Bancário Ltda. — CNPJ 27.963.662/0001-13</p>
+  <p>Rua Paraguai, 420, Sala B — Balneário Camboriú, SC | <a href="https://www.felizcred.com.br">www.felizcred.com.br</a></p>
+  <p style="margin-top:8px;font-size:.7rem">Simulação estimativa. Taxas e condições reais dependem da análise de crédito e banco parceiro.</p>
+</footer>
+
+<script>
+function fmt(v){return 'R$ '+v.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.')}
+
+function atualizarSlider(){
+  const v = parseInt(document.getElementById('valor-range').value);
+  document.getElementById('val-display').textContent = fmt(v);
+}
+
+function simular(){
+  const valor = parseInt(document.getElementById('valor-range').value);
+  const n = parseInt(document.getElementById('parcelas').value);
+  const i = parseFloat(document.getElementById('taxa').value);
+  const salario = parseFloat(document.getElementById('salario').value) || 0;
+
+  // Tabela Price
+  const pmt = valor * (i * Math.pow(1+i,n)) / (Math.pow(1+i,n) - 1);
+  const total = pmt * n;
+  const custo = total - valor;
+
+  document.getElementById('r-parcela').textContent = fmt(pmt);
+  document.getElementById('r-total').textContent = fmt(total);
+  document.getElementById('r-custo').textContent = fmt(custo);
+
+  // Margem
+  if(salario > 0){
+    const margemTotal = salario * 0.30;
+    const percUsado = Math.min((pmt / margemTotal) * 100, 100);
+    const sobra = margemTotal - pmt;
+    document.getElementById('r-margem-txt').textContent = sobra > 0 ? fmt(Math.max(0,sobra)) + ' livre' : 'Insuficiente';
+    document.getElementById('r-margem-bar').style.width = percUsado + '%';
+    document.getElementById('r-margem-bar').style.background = percUsado > 90 ? '#DC2626' : percUsado > 70 ? '#D97706' : '#00B37E';
+    document.getElementById('r-margem-status').textContent = sobra > 0 
+      ? `✅ Parcela de ${fmt(pmt)} cabe na sua margem de ${fmt(margemTotal)} (30% de ${fmt(salario)})`
+      : `❌ Parcela supera sua margem disponível. Reduza o valor ou aumente o prazo.`;
+  }
+
+  // Tabela amortização (primeiras 6 parcelas)
+  let saldo = valor;
+  let rows = '';
+  const maxRows = Math.min(n, 6);
+  for(let k=1; k<=maxRows; k++){
+    const juros = saldo * i;
+    const amort = pmt - juros;
+    saldo -= amort;
+    rows += `<tr>
+      <td>${k}ª</td>
+      <td>${fmt(pmt)}</td>
+      <td style="color:#DC2626">${fmt(juros)}</td>
+      <td class="green-txt">${fmt(amort)}</td>
+      <td>${fmt(Math.max(0,saldo))}</td>
+    </tr>`;
+  }
+  if(n > 6) rows += `<tr><td colspan="5" style="text-align:center;color:var(--muted);font-style:italic">... ${n-6} parcelas restantes</td></tr>`;
+  document.getElementById('tabela-body').innerHTML = rows;
+  document.getElementById('resultado').classList.add('show');
+  document.getElementById('resultado').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// Inicializar slider
+atualizarSlider();
+</script>
+</body>
+</html>

@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cotação de Seguro Auto — FelizCred</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --preto:#0a0a0a;
+  --chumbo:#141414;
+  --grafite:#222;
+  --borda:#2e2e2e;
+  --borda2:#3a3a3a;
+  --texto:#f2f2f2;
+  --muted:#777;
+  --muted2:#555;
+  --laranja:#ff6b2b;
+  --laranja2:#ff8c55;
+  --laranja-bg:rgba(255,107,43,.08);
+  --laranja-borda:rgba(255,107,43,.25);
+  --verde:#22c55e;
+  --branco:#fff;
+  --font-d:'DM Serif Display',Georgia,serif;
+  --font-b:'DM Sans',system-ui,sans-serif;
+  --r:12px;
+  --r-lg:18px;
+  --r-full:9999px;
+  --shadow:0 2px 12px rgba(0,0,0,.4);
+}
+html{scroll-behavior:smooth;}
+body{font-family:var(--font-b);background:var(--preto);color:var(--texto);min-height:100vh;overflow-x:hidden;}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes pop{0%{transform:scale(.8);opacity:0;}70%{transform:scale(1.05);}100%{transform:scale(1);opacity:1;}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(255,107,43,.5);}50%{box-shadow:0 0 0 10px rgba(255,107,43,0);}}
+@keyframes stepIn{from{opacity:0;transform:translateX(24px);}to{opacity:1;transform:translateX(0);}}
+@keyframes stepOut{from{opacity:1;transform:translateX(0);}to{opacity:0;transform:translateX(-24px);}}
+
+.screen{display:none;min-height:100vh;}
+.screen.active{display:flex;flex-direction:column;}
+
+/* ══════════════════════════════════════
+   LANDING
+══════════════════════════════════════ */
+#screen-landing{
+  background:var(--preto);
+  position:relative;overflow:hidden;
+  align-items:center;justify-content:center;
+  padding:20px;
+}
+#screen-landing::before{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,107,43,.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,107,43,.04) 1px,transparent 1px);
+  background-size:56px 56px;pointer-events:none;
+}
+#screen-landing::after{
+  content:'';position:absolute;
+  top:-300px;right:-300px;width:700px;height:700px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,107,43,.1) 0%,transparent 65%);
+  pointer-events:none;
+}
+.land-wrap{position:relative;z-index:1;max-width:560px;width:100%;text-align:center;}
+
+.land-logo{
+  font-family:var(--font-d);font-size:1.3rem;color:var(--branco);
+  margin-bottom:40px;display:block;
+  animation:fadeUp .5s ease both;
+}
+.land-logo em{color:var(--laranja);font-style:normal;}
+
+.land-badge{
+  display:inline-flex;align-items:center;gap:7px;
+  border:1px solid var(--borda2);border-radius:var(--r-full);
+  padding:5px 16px;
+  font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--laranja);margin-bottom:28px;
+  animation:fadeUp .5s .1s ease both;
+}
+.land-badge .pip{width:6px;height:6px;border-radius:50%;background:var(--laranja);animation:glow 2s infinite;}
+
+.land-title{
+  font-family:var(--font-d);
+  font-size:clamp(2.2rem,7vw,3.8rem);line-height:1.05;
+  margin-bottom:18px;
+  animation:fadeUp .5s .2s ease both;
+}
+.land-title em{color:var(--laranja);font-style:italic;}
+
+.land-sub{
+  font-size:clamp(.88rem,2.5vw,1rem);color:var(--muted);
+  line-height:1.7;margin-bottom:40px;
+  animation:fadeUp .5s .3s ease both;
+}
+
+/* stats strip */
+.land-stats{
+  display:flex;border:1px solid var(--borda);border-radius:var(--r);
+  overflow:hidden;margin-bottom:40px;
+  animation:fadeUp .5s .4s ease both;
+}
+.land-stat{
+  flex:1;padding:16px 10px;background:var(--chumbo);
+  text-align:center;border-right:1px solid var(--borda);
+}
+.land-stat:last-child{border-right:none;}
+.land-stat .n{font-family:var(--font-d);font-size:1.5rem;color:var(--laranja);display:block;}
+.land-stat .l{font-size:.65rem;color:var(--muted);margin-top:3px;}
+
+/* seguradoras logos */
+.seguradoras-wrap{
+  margin-bottom:36px;
+  animation:fadeUp .5s .45s ease both;
+}
+.seg-label{font-size:.65rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;}
+.seg-logos{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:10px;
+}
+.seg-logo{
+  background:var(--chumbo);border:1px solid var(--borda);
+  border-radius:8px;padding:7px 14px;
+  font-size:.7rem;font-weight:700;color:var(--muted);
+  letter-spacing:.03em;transition:border-color .2s,color .2s;
+  white-space:nowrap;
+}
+.seg-logo:hover{border-color:var(--laranja);color:var(--laranja);}
+
+/* Logo SVG container */
+.seg-logo-img{
+  border-radius:8px;
+  overflow:hidden;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  transition:transform .2s,box-shadow .2s;
+  box-shadow:0 2px 8px rgba(0,0,0,.3);
+}
+.seg-logo-img:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 16px rgba(0,0,0,.4);
+}
+.seg-logo-img svg{display:block;}
+
+/* versão menor para o resultado */
+.seg-logo-sm svg{width:80px;height:27px;}
+.seg-logo-sm{border-radius:6px;}
+
+/* benefícios */
+.beneficios{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
+  margin-bottom:40px;
+  animation:fadeUp .5s .5s ease both;
+}
+@media(max-width:460px){.beneficios{grid-template-columns:1fr 1fr;}}
+.bene-item{
+  background:var(--chumbo);border:1px solid var(--borda);
+  border-radius:var(--r);padding:14px 10px;text-align:center;
+}
+.bene-icon{font-size:1.4rem;margin-bottom:6px;}
+.bene-txt{font-size:.68rem;color:var(--muted);line-height:1.4;}
+
+.btn-start{
+  display:inline-flex;align-items:center;gap:10px;
+  background:var(--laranja);color:var(--branco);
+  border:none;border-radius:var(--r-full);
+  padding:18px 48px;
+  font-family:var(--font-b);font-size:1rem;font-weight:800;
+  cursor:pointer;letter-spacing:-.2px;
+  transition:background .15s,transform .15s,box-shadow .15s;
+  animation:fadeUp .5s .55s ease both;
+}
+.btn-start:hover{background:var(--laranja2);transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,107,43,.4);}
+.btn-start:active{transform:scale(.97);}
+.land-note{font-size:.7rem;color:var(--muted2);margin-top:14px;animation:fadeUp .5s .6s ease both;}
+
+/* ══════════════════════════════════════
+   QUIZ — 3 etapas estilo Allianz
+══════════════════════════════════════ */
+#screen-quiz{background:var(--preto);}
+
+/* header fixo */
+.quiz-hdr{
+  position:sticky;top:0;z-index:20;
+  background:rgba(10,10,10,.96);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--borda);
+  padding:14px 20px;
+}
+.quiz-hdr-inner{max-width:560px;margin:0 auto;}
+
+/* stepper visual */
+.stepper{
+  display:flex;align-items:center;
+  gap:0;margin-bottom:0;
+}
+.step-item{
+  display:flex;flex-direction:column;align-items:center;
+  flex:1;position:relative;
+}
+.step-item:not(:last-child)::after{
+  content:'';
+  position:absolute;top:14px;left:50%;
+  width:100%;height:2px;
+  background:var(--borda2);
+  z-index:0;transition:background .4s;
+}
+.step-item.done:not(:last-child)::after,
+.step-item.active:not(:last-child)::after{
+  background:var(--laranja);
+}
+.step-circle{
+  width:28px;height:28px;border-radius:50%;
+  background:var(--chumbo);border:2px solid var(--borda2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.72rem;font-weight:700;color:var(--muted);
+  position:relative;z-index:1;
+  transition:background .3s,border-color .3s,color .3s;
+}
+.step-item.active .step-circle{
+  background:var(--laranja);border-color:var(--laranja);color:var(--branco);
+}
+.step-item.done .step-circle{
+  background:var(--laranja);border-color:var(--laranja);color:var(--branco);
+}
+.step-label{
+  font-size:.6rem;color:var(--muted);margin-top:4px;
+  text-align:center;white-space:nowrap;
+}
+.step-item.active .step-label{color:var(--laranja);}
+.step-item.done .step-label{color:var(--laranja);}
+
+/* quiz body */
+.quiz-body{
+  flex:1;max-width:560px;margin:0 auto;width:100%;
+  padding:28px 20px 100px;
+}
+
+.etapa-title{
+  font-family:var(--font-d);font-size:clamp(1.3rem,4vw,1.65rem);
+  color:var(--texto);margin-bottom:4px;line-height:1.2;
+}
+.etapa-sub{font-size:.82rem;color:var(--muted);margin-bottom:24px;line-height:1.5;}
+
+/* campos de input */
+.field-group{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}
+
+.field{
+  display:flex;flex-direction:column;gap:5px;
+}
+.field label{font-size:.72rem;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;}
+.field input,.field select{
+  background:var(--chumbo);
+  border:1.5px solid var(--borda2);
+  border-radius:var(--r);
+  padding:14px 16px;
+  font-family:var(--font-b);font-size:.92rem;
+  color:var(--texto);
+  outline:none;
+  transition:border-color .15s,background .15s;
+  width:100%;
+  -webkit-appearance:none;appearance:none;
+}
+.field input::placeholder{color:var(--muted2);}
+.field input:focus,.field select:focus{border-color:var(--laranja);background:#1a1a1a;}
+.field select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' viewBox='0 0 24 24'%3E%3Cpath stroke='%23777' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center;
+  padding-right:36px;cursor:pointer;
+}
+.field select option{background:#1c1c1c;color:var(--texto);}
+
+/* checkboxes */
+.check-group{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.check-item{
+  display:flex;align-items:center;gap:12px;
+  background:var(--chumbo);border:1.5px solid var(--borda2);
+  border-radius:var(--r);padding:14px 16px;cursor:pointer;
+  transition:border-color .15s,background .15s;
+}
+.check-item:hover{border-color:var(--borda2);background:#1a1a1a;}
+.check-item.checked{border-color:var(--laranja);background:var(--laranja-bg);}
+.check-box{
+  width:20px;height:20px;border-radius:5px;
+  border:1.5px solid var(--borda2);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s,border-color .15s;
+}
+.check-item.checked .check-box{background:var(--laranja);border-color:var(--laranja);}
+.check-mark{display:none;color:var(--branco);}
+.check-item.checked .check-mark{display:block;}
+.check-txt{font-size:.88rem;color:var(--texto);}
+.check-sub{font-size:.72rem;color:var(--muted);margin-top:1px;}
+
+/* opções card (seleção única) */
+.opts-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+.opt-card{
+  display:flex;align-items:center;gap:14px;
+  background:var(--chumbo);border:1.5px solid var(--borda2);
+  border-radius:var(--r);padding:15px 18px;cursor:pointer;
+  transition:border-color .15s,background .15s;
+  font-family:var(--font-b);
+}
+.opt-card:hover{border-color:var(--borda2);background:#1a1a1a;}
+.opt-card.selected{border-color:var(--laranja);background:var(--laranja-bg);}
+.opt-radio{
+  width:18px;height:18px;border-radius:50%;
+  border:2px solid var(--borda2);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:border-color .15s;
+}
+.opt-card.selected .opt-radio{border-color:var(--laranja);}
+.opt-radio-inner{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--laranja);opacity:0;transition:opacity .15s;
+}
+.opt-card.selected .opt-radio-inner{opacity:1;}
+.opt-card-txt{flex:1;}
+.opt-card-label{font-size:.9rem;font-weight:600;color:var(--texto);}
+.opt-card-sub{font-size:.72rem;color:var(--muted);margin-top:2px;}
+
+/* footer */
+.quiz-ftr{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(10,10,10,.96);backdrop-filter:blur(12px);
+  border-top:1px solid var(--borda);padding:14px 20px;
+  z-index:20;
+}
+.quiz-ftr-inner{
+  max-width:560px;margin:0 auto;
+  display:flex;gap:10px;
+}
+.btn-prev{
+  background:var(--chumbo);border:1.5px solid var(--borda2);
+  border-radius:var(--r-full);padding:14px 22px;
+  font-family:var(--font-b);font-size:.85rem;font-weight:600;
+  color:var(--muted);cursor:pointer;
+  transition:border-color .15s,color .15s;flex-shrink:0;
+}
+.btn-prev:hover{border-color:var(--borda2);color:var(--texto);}
+.btn-prev:disabled{opacity:.3;cursor:not-allowed;}
+.btn-prox{
+  flex:1;background:var(--laranja);color:var(--branco);
+  border:none;border-radius:var(--r-full);padding:14px;
+  font-family:var(--font-b);font-size:.95rem;font-weight:800;
+  cursor:pointer;letter-spacing:-.1px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:background .15s,opacity .15s,transform .1s;
+}
+.btn-prox:disabled{opacity:.3;cursor:not-allowed;}
+.btn-prox:not(:disabled):hover{background:var(--laranja2);}
+.btn-prox:not(:disabled):active{transform:scale(.98);}
+
+/* ══════════════════════════════════════
+   LOADING
+══════════════════════════════════════ */
+#screen-loading{
+  align-items:center;justify-content:center;flex-direction:column;
+  gap:20px;text-align:center;padding:40px 20px;
+}
+.loader{
+  width:52px;height:52px;border:3px solid var(--borda2);
+  border-top-color:var(--laranja);border-radius:50%;
+  animation:spin 1s linear infinite;
+}
+.loader-title{font-family:var(--font-d);font-size:1.4rem;}
+.loader-steps{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+.lstep{
+  display:flex;align-items:center;gap:8px;
+  font-size:.8rem;color:var(--muted);opacity:0;transition:opacity .3s;
+}
+.lstep.v{opacity:1;}
+.ldot{width:6px;height:6px;border-radius:50%;background:var(--borda2);flex-shrink:0;transition:background .3s;}
+.lstep.v .ldot{background:var(--laranja);}
+
+/* ══════════════════════════════════════
+   RESULTADO
+══════════════════════════════════════ */
+#screen-result{background:var(--preto);}
+
+.res-hdr{
+  background:var(--chumbo);border-bottom:1px solid var(--borda);
+  padding:20px;text-align:center;
+}
+.res-hdr p{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--laranja);margin-bottom:5px;}
+.res-hdr h2{font-family:var(--font-d);font-size:clamp(1.3rem,4vw,1.8rem);}
+
+.res-body{max-width:560px;margin:0 auto;width:100%;padding:24px 20px 48px;}
+
+/* card cotação */
+.cotacao-card{
+  background:var(--chumbo);border:1px solid var(--borda);
+  border-radius:var(--r-lg);padding:28px 22px;text-align:center;
+  margin-bottom:14px;position:relative;overflow:hidden;
+}
+.cotacao-card::before{
+  content:'';position:absolute;top:-60px;right:-60px;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,107,43,.12) 0%,transparent 70%);
+}
+.cotacao-card>*{position:relative;}
+.cot-badge{
+  display:inline-block;
+  background:var(--laranja-bg);border:1px solid var(--laranja-borda);
+  border-radius:var(--r-full);padding:4px 14px;
+  font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--laranja);margin-bottom:14px;
+}
+.cot-label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;}
+.cot-anual{font-family:var(--font-d);font-size:2.8rem;line-height:1;margin-bottom:3px;animation:pop .5s .8s ease both;}
+.cot-ou{font-size:.75rem;color:var(--muted);margin-bottom:3px;}
+.cot-mensal{font-family:var(--font-d);font-size:1.5rem;color:var(--laranja);animation:pop .5s .9s ease both;}
+.cot-nota{font-size:.68rem;color:var(--muted);margin-top:12px;line-height:1.5;}
+
+/* perfil resumo */
+.resumo-card{
+  background:var(--chumbo);border:1px solid var(--borda);
+  border-radius:var(--r);padding:18px 20px;margin-bottom:14px;
+}
+.resumo-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px;}
+.resumo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:400px){.resumo-grid{grid-template-columns:1fr;}}
+.resumo-item .lbl{font-size:.65rem;color:var(--muted);}
+.resumo-item .val{font-size:.85rem;font-weight:600;color:var(--texto);margin-top:2px;}
+
+/* seguradoras no resultado */
+.seg-result{
+  background:var(--chumbo);border:1px solid var(--borda);
+  border-radius:var(--r);padding:18px 20px;margin-bottom:14px;
+}
+.seg-result-title{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:12px;}
+.seg-result-logos{display:flex;flex-wrap:wrap;gap:8px;}
+.seg-result-logo{
+  background:var(--grafite);border:1px solid var(--borda);
+  border-radius:6px;padding:5px 12px;
+  font-size:.68rem;font-weight:700;color:var(--muted);
+}
+
+/* coberturas */
+.cob-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+@media(max-width:400px){.cob-grid{grid-template-columns:1fr;}}
+.cob-card{
+  background:var(--chumbo);border:1px solid var(--borda);
+  border-radius:var(--r);padding:14px;
+}
+.cob-icon{font-size:1.1rem;margin-bottom:6px;}
+.cob-title{font-size:.78rem;font-weight:700;color:var(--texto);margin-bottom:2px;}
+.cob-desc{font-size:.68rem;color:var(--muted);line-height:1.4;}
+
+/* CTA */
+.cta-box{
+  background:linear-gradient(135deg,#150800,#1f0d00);
+  border:1px solid var(--laranja-borda);border-radius:var(--r-lg);
+  padding:26px 22px;text-align:center;margin-bottom:12px;
+  position:relative;overflow:hidden;
+}
+.cta-box::before{
+  content:'';position:absolute;bottom:-50px;left:-50px;
+  width:180px;height:180px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,107,43,.1) 0%,transparent 70%);
+}
+.cta-box>*{position:relative;}
+.cta-tag{
+  display:inline-block;background:var(--laranja-bg);border:1px solid var(--laranja-borda);
+  border-radius:var(--r-full);padding:3px 12px;
+  font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--laranja);margin-bottom:12px;
+}
+.cta-title{font-family:var(--font-d);font-size:1.4rem;margin-bottom:8px;line-height:1.2;}
+.cta-sub{font-size:.8rem;color:var(--muted);line-height:1.6;margin-bottom:20px;}
+.btn-wa{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;background:#25d366;color:var(--branco);
+  border:none;border-radius:var(--r-full);padding:16px;
+  font-family:var(--font-b);font-size:.95rem;font-weight:800;
+  cursor:pointer;text-decoration:none;
+  transition:background .15s,transform .15s,box-shadow .15s;
+  margin-bottom:10px;
+}
+.btn-wa:hover{background:#1ebe5c;transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,211,102,.35);}
+.btn-wa:active{transform:scale(.97);}
+.cta-note{font-size:.68rem;color:#444;}
+
+.btn-refazer{
+  display:block;width:100%;text-align:center;
+  background:none;border:none;font-family:var(--font-b);
+  font-size:.8rem;color:var(--muted);cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px;
+  margin-top:10px;transition:color .15s;
+}
+.btn-refazer:hover{color:var(--texto);}
+
+/* success toast */
+.toast{
+  position:fixed;top:20px;left:50%;transform:translateX(-50%);
+  background:#15803d;color:#fff;border-radius:8px;
+  padding:10px 20px;font-size:.82rem;font-weight:600;
+  z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;
+}
+.toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- ══ LANDING ══ -->
+<section id="screen-landing" class="screen active">
+  <div class="land-wrap">
+    <span class="land-logo">Feliz<em>Cred</em> <span style="font-family:var(--font-b);font-size:.7rem;color:var(--muted);font-weight:400;">Seguros</span></span>
+
+    <div class="land-badge">
+      <span class="pip"></span>Cotação de Seguro Auto
+    </div>
+
+    <h1 class="land-title">
+      Seu carro protegido<br>pelo <em>melhor preço</em>
+    </h1>
+    <p class="land-sub">
+      Compare as principais seguradoras do Brasil em 3 etapas rápidas e receba uma estimativa real pelo WhatsApp — sem burocracia e sem compromisso.
+    </p>
+
+    <!-- Stats -->
+    <div class="land-stats">
+      <div class="land-stat">
+        <span class="n">3</span><span class="l">Etapas rápidas</span>
+      </div>
+      <div class="land-stat">
+        <span class="n">2min</span><span class="l">Tempo médio</span>
+      </div>
+      <div class="land-stat">
+        <span class="n">7</span><span class="l">Seguradoras top</span>
+      </div>
+    </div>
+
+    <!-- Seguradoras -->
+    <div class="seguradoras-wrap">
+      <p class="seg-label">Trabalhamos com as melhores</p>
+      <div class="seg-logos">
+        <div class="seg-logo-img"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#e8001d"/>
+    <text x="60" y="16" font-family="Arial,sans-serif" font-size="9" font-weight="900" fill="white" text-anchor="middle" letter-spacing="1">PORTO</text>
+    <text x="60" y="28" font-family="Arial,sans-serif" font-size="7" font-weight="700" fill="white" text-anchor="middle" letter-spacing="2">SEGURO</text>
+  </svg></div>
+        <div class="seg-logo-img"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#d71921"/>
+    <text x="60" y="15" font-family="Arial,sans-serif" font-size="8" font-weight="900" fill="white" text-anchor="middle" letter-spacing="1">TOKIO</text>
+    <text x="60" y="26" font-family="Arial,sans-serif" font-size="7" font-weight="700" fill="white" text-anchor="middle" letter-spacing="1">MARINE</text>
+    <line x1="10" y1="32" x2="110" y2="32" stroke="white" stroke-width="1.5" opacity="0.5"/>
+    <text x="60" y="39" font-family="Arial,sans-serif" font-size="5" fill="white" text-anchor="middle" opacity="0.8">SEGURADORA</text>
+  </svg></div>
+        <div class="seg-logo-img"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#003781"/>
+    <text x="38" y="25" font-family="Arial,sans-serif" font-size="13" font-weight="900" fill="white" text-anchor="middle">⊕</text>
+    <text x="78" y="17" font-family="Arial,sans-serif" font-size="9" font-weight="900" fill="white" text-anchor="middle" letter-spacing="0.5">Allianz</text>
+    <text x="78" y="29" font-family="Arial,sans-serif" font-size="6" fill="#7ab4e8" text-anchor="middle" letter-spacing="1">SEGUROS</text>
+  </svg></div>
+        <div class="seg-logo-img"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#e30613"/>
+    <text x="40" y="27" font-family="Arial Black,Arial,sans-serif" font-size="20" font-weight="900" fill="white" text-anchor="middle">HDI</text>
+    <rect x="65" y="12" width="1.5" height="16" fill="white" opacity="0.5"/>
+    <text x="93" y="21" font-family="Arial,sans-serif" font-size="6.5" font-weight="700" fill="white" text-anchor="middle" letter-spacing="0.5">SEGUROS</text>
+    <text x="93" y="30" font-family="Arial,sans-serif" font-size="5" fill="white" text-anchor="middle" opacity="0.7">BRASIL</text>
+  </svg></div>
+        <div class="seg-logo-img"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#cc092f"/>
+    <circle cx="20" cy="20" r="10" fill="none" stroke="white" stroke-width="2"/>
+    <circle cx="20" cy="20" r="5" fill="white"/>
+    <text x="72" y="17" font-family="Arial,sans-serif" font-size="9" font-weight="900" fill="white" text-anchor="middle" letter-spacing="0.3">Bradesco</text>
+    <text x="72" y="29" font-family="Arial,sans-serif" font-size="6.5" fill="white" text-anchor="middle" letter-spacing="1" opacity="0.85">SEGUROS</text>
+  </svg></div>
+        <div class="seg-logo-img"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#c8002d"/>
+    <text x="60" y="25" font-family="Arial Black,Arial,sans-serif" font-size="16" font-weight="900" fill="white" text-anchor="middle" letter-spacing="1">MAPFRE</text>
+  </svg></div>
+        <div class="seg-logo-img"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#009fe3"/>
+    <polygon points="20,8 32,8 32,32 20,32 26,20" fill="white" opacity="0.9"/>
+    <text x="75" y="17" font-family="Arial,sans-serif" font-size="10" font-weight="900" fill="white" text-anchor="middle" letter-spacing="1">Zurich</text>
+    <text x="75" y="30" font-family="Arial,sans-serif" font-size="6" fill="white" text-anchor="middle" letter-spacing="2" opacity="0.8">INSURANCE</text>
+  </svg></div>
+      </div>
+    </div>
+
+    <!-- Benefícios -->
+    <div class="beneficios">
+      <div class="bene-item"><div class="bene-icon">🔒</div><div class="bene-txt">Proteção total contra roubo e furto</div></div>
+      <div class="bene-item"><div class="bene-icon">💥</div><div class="bene-txt">Cobertura em colisões e acidentes</div></div>
+      <div class="bene-item"><div class="bene-icon">🚨</div><div class="bene-txt">Assistência 24h em todo o Brasil</div></div>
+      <div class="bene-item"><div class="bene-icon">🏥</div><div class="bene-txt">Carro reserva durante o reparo</div></div>
+      <div class="bene-item"><div class="bene-icon">⚖️</div><div class="bene-txt">Proteção jurídica em acidentes</div></div>
+      <div class="bene-item"><div class="bene-icon">💰</div><div class="bene-txt">Melhor custo-benefício garantido</div></div>
+    </div>
+
+    <button class="btn-start" id="btn-start">
+      Simular meu seguro agora
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </button>
+    <p class="land-note">Sem compromisso · Estimativa imediata · Cotação real pelo WhatsApp</p>
+  </div>
+</section>
+
+<!-- ══ QUIZ ══ -->
+<section id="screen-quiz" class="screen">
+  <header class="quiz-hdr">
+    <div class="quiz-hdr-inner">
+      <div class="stepper" id="stepper">
+        <div class="step-item active" data-step="1">
+          <div class="step-circle">1</div>
+          <span class="step-label">Seus dados</span>
+        </div>
+        <div class="step-item" data-step="2">
+          <div class="step-circle">2</div>
+          <span class="step-label">Seu veículo</span>
+        </div>
+        <div class="step-item" data-step="3">
+          <div class="step-circle">3</div>
+          <span class="step-label">Cobertura</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="quiz-body" id="quiz-body"></main>
+
+  <footer class="quiz-ftr">
+    <div class="quiz-ftr-inner">
+      <button class="btn-prev" id="btn-prev" disabled>← Voltar</button>
+      <button class="btn-prox" id="btn-prox" disabled>
+        Próximo
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </footer>
+</section>
+
+<!-- ══ LOADING ══ -->
+<section id="screen-loading" class="screen">
+  <div class="loader"></div>
+  <div>
+    <p class="loader-title">Calculando sua cotação…</p>
+    <div class="loader-steps">
+      <div class="lstep" data-d="300"><div class="ldot"></div><span>Analisando perfil do condutor</span></div>
+      <div class="lstep" data-d="900"><div class="ldot"></div><span>Verificando risco do veículo</span></div>
+      <div class="lstep" data-d="1600"><div class="ldot"></div><span>Consultando tabela de seguradoras</span></div>
+      <div class="lstep" data-d="2200"><div class="ldot"></div><span>Gerando estimativa personalizada</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ RESULTADO ══ -->
+<section id="screen-result" class="screen">
+  <header class="res-hdr">
+    <p>✦ Estimativa gerada</p>
+    <h2>Sua Cotação Estimada</h2>
+  </header>
+  <div class="res-body">
+
+    <div class="cotacao-card">
+      <span class="cot-badge" id="cot-badge">Perfil Padrão</span>
+      <p class="cot-label">Estimativa anual</p>
+      <p class="cot-anual" id="cot-anual">R$ 0</p>
+      <p class="cot-ou">ou aproximadamente</p>
+      <p class="cot-mensal" id="cot-mensal">R$ 0/mês</p>
+      <p class="cot-nota">*Estimativa baseada no perfil informado. O valor real pode variar conforme a seguradora e condições. Nossa equipe compara +14 seguradoras para encontrar o melhor preço.</p>
+    </div>
+
+    <div class="resumo-card">
+      <p class="resumo-title">Perfil informado</p>
+      <div class="resumo-grid" id="resumo-grid"></div>
+    </div>
+
+    <div class="seg-result">
+      <p class="seg-result-title">Seguradoras que vamos consultar</p>
+      <div class="seg-result-logos">
+        <div class="seg-logo-img seg-logo-sm"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#e8001d"/>
+    <text x="60" y="16" font-family="Arial,sans-serif" font-size="9" font-weight="900" fill="white" text-anchor="middle" letter-spacing="1">PORTO</text>
+    <text x="60" y="28" font-family="Arial,sans-serif" font-size="7" font-weight="700" fill="white" text-anchor="middle" letter-spacing="2">SEGURO</text>
+  </svg></div>
+        <div class="seg-logo-img seg-logo-sm"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#d71921"/>
+    <text x="60" y="15" font-family="Arial,sans-serif" font-size="8" font-weight="900" fill="white" text-anchor="middle" letter-spacing="1">TOKIO</text>
+    <text x="60" y="26" font-family="Arial,sans-serif" font-size="7" font-weight="700" fill="white" text-anchor="middle" letter-spacing="1">MARINE</text>
+    <line x1="10" y1="32" x2="110" y2="32" stroke="white" stroke-width="1.5" opacity="0.5"/>
+    <text x="60" y="39" font-family="Arial,sans-serif" font-size="5" fill="white" text-anchor="middle" opacity="0.8">SEGURADORA</text>
+  </svg></div>
+        <div class="seg-logo-img seg-logo-sm"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#003781"/>
+    <text x="38" y="25" font-family="Arial,sans-serif" font-size="13" font-weight="900" fill="white" text-anchor="middle">⊕</text>
+    <text x="78" y="17" font-family="Arial,sans-serif" font-size="9" font-weight="900" fill="white" text-anchor="middle" letter-spacing="0.5">Allianz</text>
+    <text x="78" y="29" font-family="Arial,sans-serif" font-size="6" fill="#7ab4e8" text-anchor="middle" letter-spacing="1">SEGUROS</text>
+  </svg></div>
+        <div class="seg-logo-img seg-logo-sm"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#e30613"/>
+    <text x="40" y="27" font-family="Arial Black,Arial,sans-serif" font-size="20" font-weight="900" fill="white" text-anchor="middle">HDI</text>
+    <rect x="65" y="12" width="1.5" height="16" fill="white" opacity="0.5"/>
+    <text x="93" y="21" font-family="Arial,sans-serif" font-size="6.5" font-weight="700" fill="white" text-anchor="middle" letter-spacing="0.5">SEGUROS</text>
+    <text x="93" y="30" font-family="Arial,sans-serif" font-size="5" fill="white" text-anchor="middle" opacity="0.7">BRASIL</text>
+  </svg></div>
+        <div class="seg-logo-img seg-logo-sm"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#cc092f"/>
+    <circle cx="20" cy="20" r="10" fill="none" stroke="white" stroke-width="2"/>
+    <circle cx="20" cy="20" r="5" fill="white"/>
+    <text x="72" y="17" font-family="Arial,sans-serif" font-size="9" font-weight="900" fill="white" text-anchor="middle" letter-spacing="0.3">Bradesco</text>
+    <text x="72" y="29" font-family="Arial,sans-serif" font-size="6.5" fill="white" text-anchor="middle" letter-spacing="1" opacity="0.85">SEGUROS</text>
+  </svg></div>
+        <div class="seg-logo-img seg-logo-sm"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#c8002d"/>
+    <text x="60" y="25" font-family="Arial Black,Arial,sans-serif" font-size="16" font-weight="900" fill="white" text-anchor="middle" letter-spacing="1">MAPFRE</text>
+  </svg></div>
+        <div class="seg-logo-img seg-logo-sm"><svg viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg" width="100" height="33">
+    <rect width="120" height="40" rx="4" fill="#009fe3"/>
+    <polygon points="20,8 32,8 32,32 20,32 26,20" fill="white" opacity="0.9"/>
+    <text x="75" y="17" font-family="Arial,sans-serif" font-size="10" font-weight="900" fill="white" text-anchor="middle" letter-spacing="1">Zurich</text>
+    <text x="75" y="30" font-family="Arial,sans-serif" font-size="6" fill="white" text-anchor="middle" letter-spacing="2" opacity="0.8">INSURANCE</text>
+  </svg></div>
+      </div>
+    </div>
+
+    <div class="cob-grid" id="cob-grid"></div>
+
+    <div class="cta-box">
+      <span class="cta-tag">Próximo passo</span>
+      <h3 class="cta-title">Quer a cotação real com as melhores seguradoras?</h3>
+      <p class="cta-sub">Nossa equipe compara as 14 seguradoras parceiras e envia a proposta com o melhor custo-benefício para o seu perfil — direto no seu WhatsApp.</p>
+      <a class="btn-wa" id="btn-wa" href="#" target="_blank" rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Receber cotação real no WhatsApp
+      </a>
+      <p class="cta-note">Atendimento seg–sex 9h–18h · (47) 3514-3392</p>
+    </div>
+
+    <button class="btn-refazer" id="btn-refazer">Refazer simulação</button>
+  </div>
+</section>
+
+<div class="toast" id="toast">📧 Dados enviados para nossa equipe!</div>
+
+<!-- ══ JS OOP ══ -->
+<script>
+'use strict';
+
+// ── EmailJS Config ──────────────────────────────────
+// ⚠️ Crie conta em emailjs.com (grátis 200 emails/mês)
+// Substitua os valores abaixo após criar:
+const EMAILJS_SERVICE_ID  = 'SEU_SERVICE_ID';
+const EMAILJS_TEMPLATE_ID = 'SEU_TEMPLATE_ID';
+const EMAILJS_PUBLIC_KEY  = 'SUA_PUBLIC_KEY';
+// ────────────────────────────────────────────────────
+
+// ── WhatsApp ─────────────────────────────────────────
+const WA_NUM = '554735143392';
+
+/* ──────────────────────────────────
+   CLASS: QuizData — 3 etapas
+────────────────────────────────── */
+class QuizData {
+  constructor() {
+    this.etapas = [
+      {
+        id: 'etapa1',
+        number: 1,
+        title: 'Vamos nos conhecer',
+        subtitle: 'Precisamos de algumas informações para personalizar sua cotação.',
+        tipo: 'form',
+        campos: [
+          { id: 'nome',     label: 'Nome completo',   type: 'text',  placeholder: 'Seu nome', required: true },
+          { id: 'telefone', label: 'WhatsApp',         type: 'tel',   placeholder: '(47) 99999-9999', required: true },
+          { id: 'email',    label: 'E-mail',           type: 'email', placeholder: 'seu@email.com', required: true },
+          { id: 'cpf',      label: 'CPF do segurado',  type: 'text',  placeholder: '000.000.000-00', required: false },
+          { id: 'nascimento',label: 'Data de nascimento', type: 'date', required: true },
+        ]
+      },
+      {
+        id: 'etapa2',
+        number: 2,
+        title: 'Sobre o seu veículo',
+        subtitle: 'Informe os dados do carro que deseja segurar.',
+        tipo: 'veiculo',
+        campos: [
+          {
+            id: 'tipo_veiculo', label: 'Tipo de veículo', type: 'select', required: true,
+            options: ['Selecione','Hatch','Sedan','SUV / Crossover','Picape','Minivan','Esportivo','Outros']
+          },
+          {
+            id: 'origem', label: 'Nacional ou importado', type: 'select', required: true,
+            options: ['Selecione','Nacional','Importado']
+          },
+          {
+            id: 'ano', label: 'Ano do veículo', type: 'select', required: true,
+            options: ['Selecione', ...Array.from({length:26},(_,i)=>(2025-i).toString())]
+          },
+          { id: 'modelo', label: 'Marca e modelo', type: 'text', placeholder: 'Ex: Honda Civic EXL', required: true },
+          { id: 'placa',  label: 'Placa do veículo (opcional)', type: 'text', placeholder: 'ABC1D23', required: false },
+        ],
+        extras: [
+          { id: 'seg_novo',       label: 'Seguro Novo',         sub: 'Primeira vez contratando' },
+          { id: 'seg_renovacao',  label: 'Renovação de Seguro', sub: 'Já tenho seguro e quero renovar' },
+        ]
+      },
+      {
+        id: 'etapa3',
+        number: 3,
+        title: 'Que cobertura você quer?',
+        subtitle: 'Escolha o nível de proteção ideal para o seu perfil.',
+        tipo: 'opcoes',
+        pergunta_cobertura: {
+          id: 'cobertura',
+          opcoes: [
+            { id: 'completa',    label: 'Cobertura Completa',  sub: 'Colisão + roubo/furto + incêndio + terceiros + assistência 24h', mult: 1.00 },
+            { id: 'basica',      label: 'Cobertura Básica',    sub: 'Roubo/furto + danos a terceiros + assistência 24h', mult: 0.55 },
+            { id: 'orientacao',  label: 'Quero orientação',    sub: 'Nosso especialista indica a melhor opção para você', mult: 0.75 },
+          ]
+        },
+        pergunta_pernoite: {
+          id: 'pernoite',
+          titulo: 'Onde o carro fica à noite?',
+          opcoes: [
+            { id: 'garagem',        label: 'Garagem fechada / Condomínio',  sub: 'Menor risco', mult: 0.88 },
+            { id: 'estacionamento', label: 'Estacionamento pago',           sub: 'Risco moderado', mult: 0.96 },
+            { id: 'rua',            label: 'Via pública / Rua',             sub: 'Maior exposição', mult: 1.18 },
+          ]
+        }
+      }
+    ];
+  }
+  getEtapa(i) { return this.etapas[i] || null; }
+  get total()  { return this.etapas.length; }
+}
+
+/* ──────────────────────────────────
+   CLASS: QuizEngine
+────────────────────────────────── */
+class QuizEngine {
+  constructor(data) {
+    this._data = data;
+    this._idx  = 0;
+    this._respostas = {};  // dados coletados
+  }
+  get idx()     { return this._idx; }
+  get isFirst() { return this._idx === 0; }
+  get isLast()  { return this._idx === this._data.total - 1; }
+  get etapa()   { return this._data.getEtapa(this._idx); }
+
+  salvar(dados) { Object.assign(this._respostas, dados); }
+  next() { if (!this.isLast) this._idx++; }
+  back() { if (!this.isFirst) this._idx--; }
+
+  calcular() {
+    const r = this._respostas;
+
+    // Calcular idade a partir de nascimento
+    let idade = 30;
+    if (r.nascimento) {
+      const nasc = new Date(r.nascimento);
+      const hoje = new Date();
+      idade = hoje.getFullYear() - nasc.getFullYear();
+    }
+
+    // Ano do veículo
+    const anoVei = parseInt(r.ano) || 2018;
+    const anoAtual = new Date().getFullYear();
+    const idadeVei = anoAtual - anoVei;
+
+    // Base por tipo
+    const baseMap = { 'Hatch':2800,'Sedan':3400,'SUV / Crossover':5200,'Picape':4800,'Minivan':4200,'Esportivo':8000,'Outros':3200 };
+    let base = baseMap[r.tipo_veiculo] || 3400;
+
+    // Importado aumenta
+    if (r.origem === 'Importado') base *= 1.45;
+
+    // Multiplicador por idade do veículo
+    let multVei = idadeVei < 3 ? 1.15 : idadeVei < 6 ? 1.05 : idadeVei < 10 ? 0.95 : 0.82;
+
+    // Multiplicador por idade do condutor
+    let multIdade = idade < 26 ? 1.75 : idade < 36 ? 1.20 : idade < 51 ? 1.00 : 1.05;
+
+    // Cobertura
+    const multCob = parseFloat(r.mult_cobertura) || 1.00;
+
+    // Pernoite
+    const multPer = parseFloat(r.mult_pernoite) || 1.00;
+
+    // Valor final
+    let anual = Math.round(base * multVei * multIdade * multCob * multPer / 100) * 100;
+    const mensal = Math.round(anual / 12 / 10) * 10;
+
+    // Badge de risco
+    const risco = multIdade * multPer;
+    const badge = risco < 1.1 ? 'Baixo Risco' : risco < 1.5 ? 'Risco Moderado' : 'Alto Risco';
+
+    // Cobertura label
+    const cobMap = { completa:'Completa',basica:'Básica',orientacao:'À definir' };
+    const cobLabel = cobMap[r.cobertura] || 'Completa';
+
+    // Resumo
+    const resumo = [
+      { lbl:'Nome',         val: r.nome || '—' },
+      { lbl:'Veículo',      val: `${r.tipo_veiculo || '—'} ${r.origem === 'Importado' ? '(Importado)' : ''}`.trim() },
+      { lbl:'Ano',          val: r.ano || '—' },
+      { lbl:'Modelo',       val: r.modelo || '—' },
+      { lbl:'Pernoite',     val: r.pernoite_label || '—' },
+      { lbl:'Cobertura',    val: cobLabel },
+    ];
+
+    // Mensagem WhatsApp
+    const msg = `Olá! Fiz a simulação de seguro auto e gostaria da cotação real.\n\n` +
+      `*Meus dados:*\n` +
+      `• Nome: ${r.nome || '—'}\n` +
+      `• WhatsApp: ${r.telefone || '—'}\n` +
+      `• E-mail: ${r.email || '—'}\n\n` +
+      `*Veículo:*\n` +
+      `• Tipo: ${r.tipo_veiculo || '—'}\n` +
+      `• Origem: ${r.origem || '—'}\n` +
+      `• Ano: ${r.ano || '—'}\n` +
+      `• Modelo: ${r.modelo || '—'}\n` +
+      `• Placa: ${r.placa || 'Não informada'}\n\n` +
+      `*Preferências:*\n` +
+      `• Cobertura: ${cobLabel}\n` +
+      `• Pernoite: ${r.pernoite_label || '—'}\n\n` +
+      `*Estimativa gerada:* R$ ${anual.toLocaleString('pt-BR')}/ano`;
+
+    return { anual, mensal, badge, resumo, msg, raw: r };
+  }
+
+  persist(result) {
+    try { sessionStorage.setItem('quizSeguro', JSON.stringify({ result, ts: Date.now() })); } catch(e) {}
+  }
+}
+
+/* ──────────────────────────────────
+   CLASS: QuizUI — 3 etapas tipo Allianz
+────────────────────────────────── */
+class QuizUI {
+  constructor(engine) {
+    this._e      = engine;
+    this._body   = document.getElementById('quiz-body');
+    this._btnNext= document.getElementById('btn-prox');
+    this._btnPrev= document.getElementById('btn-prev');
+    this._onFinish = null;
+  }
+
+  onFinish(cb) { this._onFinish = cb; }
+
+  init() {
+    this.render();
+    this._btnNext.addEventListener('click', () => this._handleNext());
+    this._btnPrev.addEventListener('click', () => this._handlePrev());
+  }
+
+  render() {
+    const et = this._e.etapa;
+    this._body.innerHTML = '';
+    this._body.style.animation = '';
+    void this._body.offsetWidth;
+    this._body.style.animation = 'stepIn .3s ease both';
+
+    const wrap = document.createElement('div');
+
+    // título
+    const hdr = document.createElement('div');
+    hdr.innerHTML = `<h2 class="etapa-title">${et.title}</h2><p class="etapa-sub">${et.subtitle}</p>`;
+    wrap.appendChild(hdr);
+
+    if (et.tipo === 'form' || et.tipo === 'veiculo') {
+      this._renderForm(wrap, et);
+    } else if (et.tipo === 'opcoes') {
+      this._renderOpcoes(wrap, et);
+    }
+
+    this._body.appendChild(wrap);
+    this._syncControls();
+    this._updateStepper();
+  }
+
+  _renderForm(wrap, et) {
+    const group = document.createElement('div');
+    group.className = 'field-group';
+
+    et.campos.forEach(c => {
+      const fld = document.createElement('div');
+      fld.className = 'field';
+
+      if (c.type === 'select') {
+        fld.innerHTML = `<label>${c.label}${c.required ? ' *' : ''}</label>
+          <select id="${c.id}" ${c.required ? 'required' : ''}>
+            ${c.options.map(o => `<option value="${o === 'Selecione' ? '' : o}">${o}</option>`).join('')}
+          </select>`;
+      } else {
+        fld.innerHTML = `<label>${c.label}${c.required ? ' *' : ''}</label>
+          <input type="${c.type}" id="${c.id}" placeholder="${c.placeholder || ''}" ${c.required ? 'required' : ''} />`;
+      }
+      group.appendChild(fld);
+
+      // preencher se já tiver valor
+      setTimeout(() => {
+        const el = document.getElementById(c.id);
+        if (el && this._e._respostas[c.id]) el.value = this._e._respostas[c.id];
+        if (el) el.addEventListener('input', () => this._checkFormValidity(et));
+        if (el) el.addEventListener('change', () => this._checkFormValidity(et));
+      }, 0);
+    });
+
+    wrap.appendChild(group);
+
+    // Extras (checkboxes) para etapa 2
+    if (et.extras) {
+      const cg = document.createElement('div');
+      cg.className = 'check-group';
+      et.extras.forEach(ex => {
+        const ci = document.createElement('div');
+        ci.className = 'check-item' + (this._e._respostas[ex.id] ? ' checked' : '');
+        ci.dataset.id = ex.id;
+        ci.innerHTML = `
+          <div class="check-box">
+            <svg class="check-mark" width="10" height="10" fill="none" viewBox="0 0 24 24">
+              <path stroke="white" stroke-width="3" d="M20 6L9 17l-5-5"/>
+            </svg>
+          </div>
+          <div><div class="check-txt">${ex.label}</div><div class="check-sub">${ex.sub}</div></div>`;
+        ci.addEventListener('click', () => {
+          ci.classList.toggle('checked');
+          this._e._respostas[ex.id] = ci.classList.contains('checked');
+        });
+        cg.appendChild(ci);
+      });
+      wrap.appendChild(cg);
+    }
+
+    setTimeout(() => this._checkFormValidity(et), 100);
+  }
+
+  _renderOpcoes(wrap, et) {
+    // Cobertura
+    const cobTitle = document.createElement('p');
+    cobTitle.style.cssText = 'font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;';
+    cobTitle.textContent = 'Tipo de cobertura';
+    wrap.appendChild(cobTitle);
+
+    const cobGrid = document.createElement('div');
+    cobGrid.className = 'opts-grid';
+    et.pergunta_cobertura.opcoes.forEach(o => {
+      const card = document.createElement('div');
+      card.className = 'opt-card' + (this._e._respostas['cobertura'] === o.id ? ' selected' : '');
+      card.innerHTML = `
+        <div class="opt-radio"><div class="opt-radio-inner"></div></div>
+        <div class="opt-card-txt">
+          <div class="opt-card-label">${o.label}</div>
+          <div class="opt-card-sub">${o.sub}</div>
+        </div>`;
+      card.addEventListener('click', () => {
+        cobGrid.querySelectorAll('.opt-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        this._e._respostas['cobertura'] = o.id;
+        this._e._respostas['mult_cobertura'] = o.mult;
+        this._checkOpcoes();
+      });
+      cobGrid.appendChild(card);
+    });
+    wrap.appendChild(cobGrid);
+
+    // Pernoite
+    const perTitle = document.createElement('p');
+    perTitle.style.cssText = 'font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:20px 0 10px;';
+    perTitle.textContent = 'Onde o carro fica à noite?';
+    wrap.appendChild(perTitle);
+
+    const perGrid = document.createElement('div');
+    perGrid.className = 'opts-grid';
+    et.pergunta_pernoite.opcoes.forEach(o => {
+      const card = document.createElement('div');
+      card.className = 'opt-card' + (this._e._respostas['pernoite'] === o.id ? ' selected' : '');
+      card.innerHTML = `
+        <div class="opt-radio"><div class="opt-radio-inner"></div></div>
+        <div class="opt-card-txt">
+          <div class="opt-card-label">${o.label}</div>
+          <div class="opt-card-sub">${o.sub}</div>
+        </div>`;
+      card.addEventListener('click', () => {
+        perGrid.querySelectorAll('.opt-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        this._e._respostas['pernoite'] = o.id;
+        this._e._respostas['pernoite_label'] = o.label;
+        this._e._respostas['mult_pernoite'] = o.mult;
+        this._checkOpcoes();
+      });
+      perGrid.appendChild(card);
+    });
+    wrap.appendChild(perGrid);
+
+    this._checkOpcoes();
+  }
+
+  _checkFormValidity(et) {
+    // Coletar valores atuais
+    let valid = true;
+    et.campos.forEach(c => {
+      const el = document.getElementById(c.id);
+      if (!el) return;
+      if (c.required && (!el.value || el.value === '')) valid = false;
+      if (el.value) this._e._respostas[c.id] = el.value;
+    });
+    this._btnNext.disabled = !valid;
+  }
+
+  _checkOpcoes() {
+    const hasCob = !!this._e._respostas['cobertura'];
+    const hasPer = !!this._e._respostas['pernoite'];
+    this._btnNext.disabled = !(hasCob && hasPer);
+  }
+
+  _handleNext() {
+    if (this._e.isLast) {
+      if (this._onFinish) this._onFinish();
+      return;
+    }
+    this._e.next();
+    this.render();
+  }
+
+  _handlePrev() {
+    if (this._e.isFirst) return;
+    this._e.back();
+    this.render();
+  }
+
+  _syncControls() {
+    this._btnPrev.disabled = this._e.isFirst;
+    this._btnNext.textContent = '';
+    if (this._e.isLast) {
+      this._btnNext.innerHTML = 'Ver minha cotação <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>';
+    } else {
+      this._btnNext.innerHTML = 'Próximo <svg width="14" height="14" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>';
+    }
+    this._btnNext.disabled = true; // será habilitado pela validação
+  }
+
+  _updateStepper() {
+    const current = this._e.idx;
+    document.querySelectorAll('.step-item').forEach((el, i) => {
+      el.classList.remove('active', 'done');
+      if (i < current)  el.classList.add('done');
+      if (i === current) el.classList.add('active');
+    });
+  }
+}
+
+/* ──────────────────────────────────
+   CLASS: ResultEngine
+────────────────────────────────── */
+class ResultEngine {
+  load() {
+    try {
+      const s = sessionStorage.getItem('quizSeguro');
+      if (s) { this._r = JSON.parse(s).result; return this; }
+    } catch(e) {}
+    this._r = null; return this;
+  }
+
+  render() {
+    const r = this._r; if (!r) return;
+
+    // Valores
+    this._anim(document.getElementById('cot-anual'),  0, r.anual,  900, 'R$ ');
+    this._anim(document.getElementById('cot-mensal'), 0, r.mensal, 1000,'R$ ', '/mês');
+    document.getElementById('cot-badge').textContent = r.badge;
+
+    // Resumo
+    const rg = document.getElementById('resumo-grid');
+    rg.innerHTML = r.resumo.map(i => `
+      <div class="resumo-item">
+        <div class="lbl">${i.lbl}</div>
+        <div class="val">${i.val}</div>
+      </div>`).join('');
+
+    // Coberturas
+    const cobItems = r.raw.cobertura === 'basica' ? [
+      {icon:'🔒',t:'Roubo e Furto',d:'Proteção total contra roubo e furto do veículo'},
+      {icon:'🚗',t:'Danos a Terceiros',d:'Cobre danos materiais causados a outros veículos'},
+      {icon:'📋',t:'Assistência 24h',d:'Guincho e socorro em caso de pane ou acidente'},
+      {icon:'⚖️',t:'Responsabilidade Civil',d:'Proteção jurídica em caso de acidentes'},
+    ] : [
+      {icon:'💥',t:'Colisão',d:'Cobre danos ao seu veículo em acidentes'},
+      {icon:'🔒',t:'Roubo e Furto',d:'Proteção completa contra roubo e furto'},
+      {icon:'🔥',t:'Incêndio',d:'Cobertura total em caso de incêndio'},
+      {icon:'🚗',t:'Danos a Terceiros',d:'Cobre danos materiais e corporais'},
+      {icon:'📋',t:'Assistência 24h',d:'Guincho, pane seca, troca de pneu'},
+      {icon:'🏥',t:'Carro Reserva',d:'Veículo substituto durante o reparo'},
+    ];
+    document.getElementById('cob-grid').innerHTML = cobItems.map(c =>
+      `<div class="cob-card"><div class="cob-icon">${c.icon}</div><div class="cob-title">${c.t}</div><div class="cob-desc">${c.d}</div></div>`
+    ).join('');
+
+    // WhatsApp
+    document.getElementById('btn-wa').href = `https://wa.me/${WA_NUM}?text=${encodeURIComponent(r.msg)}`;
+
+    // Enviar email via EmailJS
+    this._enviarEmail(r);
+  }
+
+  _enviarEmail(r) {
+    // Só envia se EmailJS estiver configurado
+    if (EMAILJS_PUBLIC_KEY === 'SUA_PUBLIC_KEY') return;
+    try {
+      emailjs.init(EMAILJS_PUBLIC_KEY);
+      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+        nome:        r.raw.nome || '—',
+        telefone:    r.raw.telefone || '—',
+        email:       r.raw.email || '—',
+        cpf:         r.raw.cpf || '—',
+        nascimento:  r.raw.nascimento || '—',
+        tipo_veiculo:r.raw.tipo_veiculo || '—',
+        origem:      r.raw.origem || '—',
+        ano:         r.raw.ano || '—',
+        modelo:      r.raw.modelo || '—',
+        placa:       r.raw.placa || 'Não informada',
+        cobertura:   r.raw.cobertura || '—',
+        pernoite:    r.raw.pernoite_label || '—',
+        estimativa:  `R$ ${r.anual.toLocaleString('pt-BR')}/ano`,
+        to_email:    'salvador.felipee9@gmail.com',
+      }).then(() => {
+        const toast = document.getElementById('toast');
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3000);
+      });
+    } catch(e) { console.warn('EmailJS não configurado:', e); }
+  }
+
+  _anim(el, from, to, dur, pre='', suf='') {
+    const start = performance.now();
+    const run = now => {
+      const p = Math.min((now - start) / dur, 1);
+      const e = 1 - Math.pow(1 - p, 3);
+      el.textContent = pre + Math.round(from + (to - from) * e).toLocaleString('pt-BR') + suf;
+      if (p < 1) requestAnimationFrame(run);
+    };
+    requestAnimationFrame(run);
+  }
+}
+
+/* ──────────────────────────────────
+   CLASS: ScreenManager
+────────────────────────────────── */
+class ScreenManager {
+  constructor() {
+    this._s = {
+      landing: document.getElementById('screen-landing'),
+      quiz:    document.getElementById('screen-quiz'),
+      loading: document.getElementById('screen-loading'),
+      result:  document.getElementById('screen-result'),
+    };
+  }
+  show(n) {
+    Object.entries(this._s).forEach(([k,el]) => el.classList.toggle('active', k === n));
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+}
+
+/* ── BOOTSTRAP ── */
+(function main() {
+  const screens = new ScreenManager();
+  const data    = new QuizData();
+  const engine  = new QuizEngine(data);
+  const ui      = new QuizUI(engine);
+  const result  = new ResultEngine();
+
+  document.getElementById('btn-start').addEventListener('click', () => {
+    screens.show('quiz');
+    ui.init();
+  });
+
+  ui.onFinish(() => {
+    screens.show('loading');
+    document.querySelectorAll('.lstep').forEach(s => {
+      setTimeout(() => s.classList.add('v'), parseInt(s.dataset.d, 10));
+    });
+    const r = engine.calcular();
+    engine.persist(r);
+    setTimeout(() => {
+      screens.show('result');
+      result.load().render();
+    }, 2800);
+  });
+
+  document.getElementById('btn-refazer').addEventListener('click', () => {
+    sessionStorage.removeItem('quizSeguro');
+    location.reload();
+  });
+})();
+</script>
+</body>
+</html>

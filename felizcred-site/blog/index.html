@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog FelizCred — Credito FGTS CLT e INSS</title>
+<meta name="description" content="Artigos sobre emprestimo consignado CLT, antecipacao do FGTS, direitos trabalhistas e INSS. 32 conteudos para o trabalhador brasileiro.">
+<link rel="canonical" href="https://www.felizcred.com.br/blog/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--green:#00FF88;--green-dark:#00e67a;--green-mid:#00B37E;--navy:#0A1628;--navy-mid:#112240;--white:#fff;--gray:#8892a4;--border:rgba(255,255,255,0.08);--radius:16px}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--navy);color:var(--white);line-height:1.7}
+a{text-decoration:none;color:inherit}
+nav.topnav{position:sticky;top:0;z-index:100;background:rgba(10,22,40,0.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 40px;height:68px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:'Sora',sans-serif;font-weight:800;font-size:1.4rem}.logo span{color:var(--green)}
+.nav-links{display:flex;gap:28px;list-style:none}
+.nav-links a{font-size:14px;font-weight:500;color:var(--gray);transition:color .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--white)}
+.nav-cta{background:var(--green)!important;color:var(--navy)!important;padding:10px 20px;border-radius:50px;font-family:'Sora',sans-serif;font-weight:700;font-size:13px}
+.blog-hero{background:linear-gradient(140deg,var(--navy) 0%,var(--navy-mid) 100%);padding:72px 40px 64px;text-align:center;position:relative;overflow:hidden;border-bottom:1px solid var(--border)}
+.blog-hero::before{content:'';position:absolute;width:500px;height:500px;background:radial-gradient(circle,rgba(0,255,136,.08) 0%,transparent 70%);top:-150px;left:50%;transform:translateX(-50%);pointer-events:none}
+.hero-tag{display:inline-block;background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.25);padding:6px 18px;border-radius:50px;font-family:'Sora',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:20px}
+.blog-hero h1{font-family:'Sora',sans-serif;font-size:clamp(2rem,5vw,3.2rem);font-weight:800;line-height:1.18;color:var(--white);max-width:700px;margin:0 auto 16px}
+.blog-hero h1 em{color:var(--green);font-style:normal}
+.blog-hero p{color:var(--gray);font-size:1rem;max-width:500px;margin:0 auto 32px}
+.search-wrap{display:flex;max-width:480px;margin:0 auto;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:50px;overflow:hidden;transition:border-color .2s}
+.search-wrap:focus-within{border-color:rgba(0,255,136,.4)}
+.search-wrap input{flex:1;border:none;outline:none;background:transparent;color:var(--white);padding:14px 22px;font-size:14px;font-family:'DM Sans',sans-serif}
+.search-wrap input::placeholder{color:var(--gray)}
+.search-wrap button{background:var(--green);border:none;color:var(--navy);padding:0 24px;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;cursor:pointer}
+.filters{background:var(--navy-mid);border-bottom:1px solid var(--border);padding:0 40px;display:flex;overflow-x:auto}
+.filters::-webkit-scrollbar{display:none}
+.filter-btn{background:none;border:none;border-bottom:2px solid transparent;padding:15px 22px;font-size:13.5px;font-weight:500;color:var(--gray);cursor:pointer;white-space:nowrap;transition:all .2s;font-family:'DM Sans',sans-serif}
+.filter-btn.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+.blog-wrap{max-width:1200px;margin:0 auto;padding:56px 40px 80px;display:grid;grid-template-columns:1fr 300px;gap:48px;align-items:start}
+.no-results{display:none;text-align:center;padding:60px 20px;color:var(--gray)}
+.no-results h3{font-family:'Sora',sans-serif;font-size:1.2rem;color:var(--white);margin-bottom:8px}
+.articles-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.article-card{background:var(--navy-mid);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .2s,transform .2s;cursor:pointer;display:block}
+.article-card:hover{border-color:rgba(0,255,136,.3);transform:translateY(-3px)}
+.card-thumb{height:110px;display:flex;align-items:center;justify-content:center}
+.card-body{padding:18px}
+.cat-tag{display:inline-block;padding:4px 12px;border-radius:50px;font-size:11px;font-family:'Sora',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+.tag-green{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2)}
+.tag-blue{background:rgba(59,130,246,.1);color:#60A5FA;border:1px solid rgba(59,130,246,.2)}
+.tag-orange{background:rgba(251,146,60,.1);color:#FB923C;border:1px solid rgba(251,146,60,.2)}
+.tag-purple{background:rgba(167,139,250,.1);color:#A78BFA;border:1px solid rgba(167,139,250,.2)}
+.tag-red{background:rgba(248,113,113,.1);color:#F87171;border:1px solid rgba(248,113,113,.2)}
+.tag-yellow{background:rgba(250,204,21,.1);color:#FDE047;border:1px solid rgba(250,204,21,.2)}
+.card-body h3{font-family:'Sora',sans-serif;font-size:.88rem;font-weight:700;color:var(--white);line-height:1.4;margin:8px 0 10px}
+.card-foot{display:flex;justify-content:space-between;align-items:center}
+.card-date,.card-time{font-size:11px;color:rgba(255,255,255,.3)}
+.section-divider{display:flex;align-items:center;gap:14px;margin:36px 0 20px}
+.section-divider span{font-family:'Sora',sans-serif;font-size:.75rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
+.section-divider::before,.section-divider::after{content:'';flex:1;height:1px;background:rgba(0,255,136,.15)}
+.results-count{font-size:13px;color:var(--gray);margin-bottom:20px}
+.results-count strong{color:var(--white)}
+.sidebar{display:flex;flex-direction:column;gap:20px}
+.widget{background:var(--navy-mid);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.widget-title{font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green);margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.cta-widget{background:linear-gradient(135deg,#00875A,#005c3d);border:none;border-radius:var(--radius);padding:28px;text-align:center}
+.cta-widget h3{font-family:'Sora',sans-serif;font-size:1.05rem;font-weight:700;color:var(--white);margin-bottom:8px}
+.cta-widget p{color:rgba(255,255,255,.75);font-size:13px;margin-bottom:18px}
+.btn-sim{display:block;background:var(--green);color:var(--navy);padding:12px;border-radius:50px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;margin-bottom:8px}
+.btn-wpp{display:block;background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);padding:10px;border-radius:50px;font-size:13px;font-weight:500}
+.pop-list{display:flex;flex-direction:column;gap:10px}
+.pop-item{display:flex;gap:12px;align-items:flex-start;padding:8px;border-radius:10px;cursor:pointer}
+.pop-item:hover{background:rgba(255,255,255,.04)}
+.pop-num{width:26px;height:26px;border-radius:7px;background:rgba(0,255,136,.1);color:var(--green);font-family:'Sora',sans-serif;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pop-item h4{font-size:13px;font-weight:500;color:var(--white);line-height:1.4}
+.pop-item span{font-size:11px;color:var(--gray)}
+.tags-cloud{display:flex;flex-wrap:wrap;gap:8px}
+.tag-pill{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--gray);padding:5px 12px;border-radius:50px;font-size:12px;cursor:pointer;transition:all .2s}
+.tag-pill:hover{background:rgba(0,255,136,.1);border-color:rgba(0,255,136,.3);color:var(--green)}
+.wpp-float{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(37,211,102,.4);z-index:999}
+.wpp-float svg{width:28px;height:28px;fill:white}
+footer{background:var(--navy-mid);border-top:1px solid var(--border);padding:40px;text-align:center}
+footer p{font-size:12px;color:var(--gray);margin-bottom:6px}
+footer a{color:var(--green)}
+@media(max-width:1024px){.blog-wrap{grid-template-columns:1fr}.sidebar{display:none}}
+@media(max-width:768px){nav.topnav{padding:0 18px}.nav-links{display:none}.blog-hero{padding:48px 18px 40px}.filters{padding:0 18px}.blog-wrap{padding:32px 18px 60px}.articles-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <a href="https://www.felizcred.com.br" class="logo">Feliz<span>Cred</span></a>
+  <ul class="nav-links">
+    <li><a href="https://www.felizcred.com.br#produtos">Produtos</a></li>
+    <li><a href="https://www.felizcred.com.br#simular">Simular CLT</a></li>
+    <li><a href="https://www.felizcred.com.br#fgts-simular">Simular FGTS</a></li>
+    <li><a href="/blog/" class="active">Blog</a></li>
+    <li><a href="https://wa.me/554796864687" class="nav-cta">WhatsApp</a></li>
+  </ul>
+</nav>
+<div class="blog-hero">
+  <div class="hero-tag">Blog FelizCred</div>
+  <h1>Dicas de credito para voce<br><em>tomar decisoes melhores</em></h1>
+  <p>FGTS, CLT, INSS e direitos trabalhistas — 32 conteudos para o trabalhador brasileiro.</p>
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="Buscar... ex: fgts, gerente, desenrola, rescisao" oninput="buscar()">
+    <button onclick="buscar()">Buscar</button>
+  </div>
+</div>
+<div class="filters">
+  <button class="filter-btn active" onclick="filtrar('todos',this)">Todos (32)</button>
+  <button class="filter-btn" onclick="filtrar('fgts',this)">FGTS</button>
+  <button class="filter-btn" onclick="filtrar('clt',this)">Emprestimo CLT</button>
+  <button class="filter-btn" onclick="filtrar('negativado',this)">Negativados</button>
+  <button class="filter-btn" onclick="filtrar('inss',this)">INSS</button>
+  <button class="filter-btn" onclick="filtrar('direitos',this)">Direitos CLT</button>
+  <button class="filter-btn" onclick="filtrar('comparativo',this)">Comparativos</button>
+  <button class="filter-btn" onclick="filtrar('seguros',this)">Seguros</button>
+</div>
+<div class="blog-wrap">
+  <main id="mainContent">
+    <div class="results-count" id="resultsCount"><strong>32</strong> itens encontrados</div>
+    <div class="no-results" id="noResults"><h3>Nenhum resultado encontrado</h3><p>Tente outro termo de busca ou selecione uma categoria.</p></div>
+    <div class="articles-grid" id="articlesGrid">
+      <a href="/blog/antecipacao-fgts-novas-regras-2025.html" class="article-card" data-cat="fgts" data-tags="fgts antecipacao saque aniversario regras 2025 negativado sem spc novas regras">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#00875A,#005c3d)"><span style="font-size:2.4rem">🏦</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-orange">Novas Regras FGTS</span>
+          <h3>Antecipacao do FGTS em 2025: o que mudou e como ainda vale a pena</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/saque-aniversario-fgts-vale-a-pena.html" class="article-card" data-cat="fgts" data-tags="saque aniversario fgts vale pena pros contras antecipacao">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#2a2a0a,#404010)"><span style="font-size:2.4rem">🎂</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-yellow">FGTS</span>
+          <h3>Saque-aniversario FGTS: vale a pena para o seu perfil?</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/multa-40-fgts-como-usar.html" class="article-card" data-cat="fgts direitos" data-tags="multa 40 fgts demissao calcular quitar dividas rescisao">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a2a0a,#2a4010)"><span style="font-size:2.4rem">💰</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">FGTS Rescisao</span>
+          <h3>Multa de 40% do FGTS: como calcular e usar a seu favor</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/fgts-atrasado-o-que-fazer.html" class="article-card" data-cat="fgts direitos" data-tags="fgts atrasado deposito empregador denunciar ministerio trabalho">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a1a2a,#202040)"><span style="font-size:2.4rem">⏰</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-purple">FGTS Direitos</span>
+          <h3>FGTS atrasado: o que fazer e como proteger seus direitos</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/emprestimo-consignado-clt.html" class="article-card" data-cat="clt" data-tags="emprestimo consignado clt carteira assinada parcelas salario taxa juros">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0f3460,#1a5276)"><span style="font-size:2.4rem">💼</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">Emprestimo CLT</span>
+          <h3>Emprestimo Consignado CLT: tudo que voce precisa saber em 2025</h3>
+          <div class="card-foot"><span class="card-date">01 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/margem-consignavel-quanto-posso-pegar.html" class="article-card" data-cat="clt" data-tags="margem consignavel quanto pegar emprestimo salario 35 calcular">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a1a2a,#103040)"><span style="font-size:2.4rem">📊</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">Emprestimo CLT</span>
+          <h3>Margem consignavel: o que e e quanto voce pode pegar de emprestimo</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/portabilidade-consignado-clt-como-funciona.html" class="article-card" data-cat="clt" data-tags="portabilidade consignado clt trocar banco taxa menor transferir contrato">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a2a2a,#104040)"><span style="font-size:2.4rem">🔄</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">Consignado CLT</span>
+          <h3>Portabilidade de consignado CLT: como funciona e quando vale a pena</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/credito-do-trabalhador-novo-consignado-privado.html" class="article-card" data-cat="clt" data-tags="credito trabalhador novo consignado privado fgts garantia mp 1292">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a1a3a,#102050)"><span style="font-size:2.4rem">🆕</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">Novo Consignado</span>
+          <h3>Credito do Trabalhador: o novo consignado privado com FGTS</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/novas-garantias-consignado-clt-fgts.html" class="article-card" data-cat="clt" data-tags="novas garantias consignado clt fgts multa rescisoria verbas juros menores">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a2a1a,#0d4020)"><span style="font-size:2.4rem">🛡️</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">Mudanca 2025</span>
+          <h3>Novas garantias do consignado CLT: FGTS e multa rescisoria explicados</h3>
+          <div class="card-foot"><span class="card-date">29 jun 2025</span><span class="card-time">8 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/pix-em-40-minutos-como-funciona.html" class="article-card" data-cat="clt" data-tags="pix 40 minutos rapido como funciona processo digital credito">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a3a1a,#2d5c2d)"><span style="font-size:2.4rem">⚡</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">Como Funciona</span>
+          <h3>PIX em 40 minutos: como funciona o emprestimo digital da FelizCred</h3>
+          <div class="card-foot"><span class="card-date">18 mai 2025</span><span class="card-time">5 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/clt-vs-fgts-qual-escolher.html" class="article-card" data-cat="comparativo" data-tags="clt fgts comparativo qual melhor escolher diferenca consignado antecipacao">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a2744,#2d4a6e)"><span style="font-size:2.4rem">⚖️</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-purple">Comparativo</span>
+          <h3>Consignado CLT ou Antecipacao FGTS: qual escolher em 2025?</h3>
+          <div class="card-foot"><span class="card-date">22 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/emprestimo-para-negativado.html" class="article-card" data-cat="negativado" data-tags="negativado nome sujo spc serasa credito emprestimo restricao cpf sem consulta">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#2d1b4e,#4a2d6e)"><span style="font-size:2.4rem">💳</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-red">Negativados</span>
+          <h3>Emprestimo com nome sujo: como conseguir credito em 2025</h3>
+          <div class="card-foot"><span class="card-date">14 mai 2025</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/desenrola-brasil-fgts-pagar-dividas.html" class="article-card" data-cat="negativado" data-tags="desenrola brasil programa dividas negociar fgts pagar quitar nome sujo renegociacao desconto">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a1f3a,#0d2a50)"><span style="font-size:2.4rem">💸</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">Educacao Financeira</span>
+          <h3>Desenrola Brasil 2025: como funciona e como usar o FGTS para quitar dividas</h3>
+          <div class="card-foot"><span class="card-date">15 jul 2025</span><span class="card-time">8 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/gerente-supervisor-horas-extras-direitos.html" class="article-card" data-cat="direitos" data-tags="gerente supervisor hora extra direitos trabalhistas receber horas extras processo calcular">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a0d2a,#2a1040)"><span style="font-size:2.4rem">⚖️</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-purple">Direitos CLT</span>
+          <h3>Gerente tem direito a hora extra? Calcule quanto pode receber</h3>
+          <div class="card-foot"><span class="card-date">06 jul 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/demissao-sem-justa-causa-direitos-fgts-consignado.html" class="article-card" data-cat="direitos" data-tags="demissao justa causa direitos fgts rescisao verbas consignado verbas rescitorias">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#2a1a0a,#4a3010)"><span style="font-size:2.4rem">📋</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-orange">Direitos CLT</span>
+          <h3>Demissao sem justa causa: direitos FGTS e o consignado</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/13-direitos-trabalhador-clt-2025.html" class="article-card" data-cat="direitos" data-tags="direitos trabalhador clt ferias 13 salario fgts aviso previo decimo terceiro">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a2a1a,#10402a)"><span style="font-size:2.4rem">📜</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">Direitos CLT</span>
+          <h3>13 direitos do trabalhador CLT que voce precisa conhecer em 2025</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/rescisao-indireta-direitos-fgts.html" class="article-card" data-cat="direitos" data-tags="rescisao indireta culpa empregador direitos fgts sacar demissao">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#2a0a1a,#400d20)"><span style="font-size:2.4rem">⚖️</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-red">Direitos CLT</span>
+          <h3>Rescisao indireta: seus direitos e como sacar o FGTS</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/decimo-terceiro-salario-como-usar.html" class="article-card" data-cat="direitos" data-tags="decimo terceiro salario 13 como usar quitar dividas calcular quando paga">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#2a1a0a,#401a0d)"><span style="font-size:2.4rem">🎄</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-orange">Direitos CLT</span>
+          <h3>13 salario 2025: como calcular e usar para quitar dividas</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/auxilio-doenca-inss.html" class="article-card" data-cat="inss" data-tags="inss auxilio doenca beneficio solicitar documentos atestado medico afastamento">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a2a3a,#0d2040)"><span style="font-size:2.4rem">🏥</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">INSS</span>
+          <h3>Auxilio-Doenca INSS 2025: como solicitar documentos e quanto receber</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">8 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/bpc-loas-como-solicitar.html" class="article-card" data-cat="inss" data-tags="bpc loas inss assistencia social idoso deficiencia cadunico beneficio">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a2a3a,#0d2040)"><span style="font-size:2.4rem">🤝</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">Assistencia Social</span>
+          <h3>BPC LOAS 2025: quem tem direito e como dar entrada</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/aposentadoria-por-invalidez.html" class="article-card" data-cat="inss" data-tags="aposentadoria invalidez incapacidade permanente inss beneficio previdencia">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#2a1a3a,#400d3a)"><span style="font-size:2.4rem">♿</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-purple">Aposentadoria</span>
+          <h3>Aposentadoria por Invalidez: requisitos valor e passo a passo 2025</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/pensao-por-morte-inss.html" class="article-card" data-cat="inss" data-tags="pensao morte inss dependentes conjuge filhos reforma previdencia beneficio">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a1a3a,#0d0d40)"><span style="font-size:2.4rem">🕊️</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">Pensoes</span>
+          <h3>Pensao por Morte INSS 2025: quem tem direito e como solicitar</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/auxilio-acidente-inss.html" class="article-card" data-cat="inss" data-tags="auxilio acidente inss sequela trabalhar junto salario beneficio">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#3a1a1a,#400d0d)"><span style="font-size:2.4rem">🚑</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-red">Auxilios</span>
+          <h3>Auxilio-Acidente INSS: o que e quem tem direito e como pedir</h3>
+          <div class="card-foot"><span class="card-date">28 mai 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+
+      <a href="/blog/seguro-de-carro-como-funciona.html" class="article-card" data-cat="seguros" data-tags="seguro carro auto veiculo cobertura franquia preco contratar porto seguro mapfre sulamerica bradesco tokio marine">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0d1f3a,#1a3a6e)"><span style="font-size:2.4rem">🚗</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">🚗 Seguros</span>
+          <h3>Seguro de carro 2025: coberturas, franquia e quanto custa</h3>
+          <div class="card-foot"><span class="card-date">16 jul 2025</span><span class="card-time">8 min</span></div>
+        </div>
+      </a>
+
+      <a href="/blog/seguro-de-vida-para-trabalhador-clt.html" class="article-card" data-cat="seguros" data-tags="seguro vida trabalhador clt cobertura invalidez morte beneficiario preco icatu porto sulamerica bradesco">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a0d2a,#3a1a5a)"><span style="font-size:2.4rem">❤️</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-purple">❤️ Seguros</span>
+          <h3>Seguro de vida para trabalhador CLT: vale a pena contratar?</h3>
+          <div class="card-foot"><span class="card-date">16 jul 2025</span><span class="card-time">7 min</span></div>
+        </div>
+      </a>
+
+      <a href="/blog/cooperativa-vs-seguro-diferenca.html" class="article-card" data-cat="seguros comparativo" data-tags="cooperativa seguro diferenca protecao veicular susep rateio vantagens desvantagens qual melhor">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a1a0a,#3a3010)"><span style="font-size:2.4rem">🤔</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-orange">🤔 Comparativo</span>
+          <h3>Cooperativa ou seguro de carro: qual a diferença real?</h3>
+          <div class="card-foot"><span class="card-date">16 jul 2025</span><span class="card-time">8 min</span></div>
+        </div>
+      </a>
+    </div>
+    <div class="section-divider"><span>Calculadoras Gratuitas</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:32px">
+      <a href="/blog/calculadora-rescisao.html" class="article-card" data-cat="direitos" data-tags="calculadora rescisao trabalhista verbas fgts multa 40 simular calcular">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a2a3a,#2d4060)"><span style="font-size:2.4rem">📋</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">Calculadora</span>
+          <h3>Calculadora de Rescisao Trabalhista 2025</h3>
+          <p style="font-size:12px;color:var(--gray);margin-bottom:8px">Ferramenta interativa gratuita</p><div class="card-foot"><span class="card-date">Resultado instantaneo</span><span class="card-time">Gratis</span></div>
+        </div>
+      </a>
+      <a href="/blog/calculadora-fgts.html" class="article-card" data-cat="fgts" data-tags="calculadora fgts saldo multa antecipacao saque aniversario simular">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a2a1a,#0d4020)"><span style="font-size:2.4rem">🏦</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">Calculadora</span>
+          <h3>Calculadora FGTS: Saldo Multa e Antecipacao</h3>
+          <p style="font-size:12px;color:var(--gray);margin-bottom:8px">Ferramenta interativa gratuita</p><div class="card-foot"><span class="card-date">Resultado instantaneo</span><span class="card-time">Gratis</span></div>
+        </div>
+      </a>
+      <a href="/blog/calculadora-consignado.html" class="article-card" data-cat="clt" data-tags="calculadora simulador consignado clt parcela taxa juros margem simular">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a1a3a,#102050)"><span style="font-size:2.4rem">💼</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-blue">Simulador</span>
+          <h3>Simulador de Emprestimo Consignado CLT</h3>
+          <p style="font-size:12px;color:var(--gray);margin-bottom:8px">Ferramenta interativa gratuita</p><div class="card-foot"><span class="card-date">Resultado instantaneo</span><span class="card-time">Gratis</span></div>
+        </div>
+      </a>
+      <a href="/blog/calculadora-margem-consignavel.html" class="article-card" data-cat="clt" data-tags="calculadora margem consignavel quanto pegar emprestimo salario simular">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#0a2a1a,#103020)"><span style="font-size:2.4rem">📊</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">Calculadora</span>
+          <h3>Calculadora de Margem Consignavel</h3>
+          <p style="font-size:12px;color:var(--gray);margin-bottom:8px">Ferramenta interativa gratuita</p><div class="card-foot"><span class="card-date">Resultado instantaneo</span><span class="card-time">Gratis</span></div>
+        </div>
+      </a>
+      <a href="/blog/calculadora-ferias.html" class="article-card" data-cat="direitos" data-tags="calculadora ferias clt 1 3 constitucional abono pecuniario simular calcular">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a3a0a,#2a5010)"><span style="font-size:2.4rem">🏖️</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-orange">Calculadora</span>
+          <h3>Calculadora de Ferias CLT</h3>
+          <p style="font-size:12px;color:var(--gray);margin-bottom:8px">Ferramenta interativa gratuita</p><div class="card-foot"><span class="card-date">Resultado instantaneo</span><span class="card-time">Gratis</span></div>
+        </div>
+      </a>
+      <a href="/blog/calculadora-inss.html" class="article-card" data-cat="inss" data-tags="calculadora inss desconto salario tabela progressiva aliquota simular">
+        <div class="card-thumb" style="background:linear-gradient(135deg,#1a1a3a,#202060)"><span style="font-size:2.4rem">🏥</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-purple">Calculadora</span>
+          <h3>Calculadora de INSS 2025</h3>
+          <p style="font-size:12px;color:var(--gray);margin-bottom:8px">Ferramenta interativa gratuita</p><div class="card-foot"><span class="card-date">Resultado instantaneo</span><span class="card-time">Gratis</span></div>
+        </div>
+      </a>
+    </div>
+  </main>
+  <aside class="sidebar">
+    <div class="cta-widget">
+      <h3>Simule seu credito agora</h3>
+      <p>PIX em 40 minutos. Sem consulta SPC para FGTS.</p>
+      <a href="https://www.felizcred.com.br#simular" class="btn-sim">Simular gratis</a>
+      <a href="https://wa.me/554796864687" class="btn-wpp">WhatsApp</a>
+    </div>
+    <div class="widget">
+      <div class="widget-title">Mais lidos</div>
+      <div class="pop-list">
+        <a href="/blog/antecipacao-fgts-novas-regras-2025.html" class="pop-item"><div class="pop-num">1</div><div><h4>Antecipacao FGTS 2025</h4><span>4.2k leituras</span></div></a>
+        <a href="/blog/emprestimo-consignado-clt.html" class="pop-item"><div class="pop-num">2</div><div><h4>Consignado CLT: guia</h4><span>3.1k leituras</span></div></a>
+        <a href="/blog/emprestimo-para-negativado.html" class="pop-item"><div class="pop-num">3</div><div><h4>Emprestimo negativado</h4><span>2.8k leituras</span></div></a>
+        <a href="/blog/gerente-supervisor-horas-extras-direitos.html" class="pop-item"><div class="pop-num">4</div><div><h4>Gerente e hora extra</h4><span>Novo!</span></div></a>
+        <a href="/blog/desenrola-brasil-fgts-pagar-dividas.html" class="pop-item"><div class="pop-num">5</div><div><h4>Desenrola Brasil 2025</h4><span>Novo!</span></div></a>
+      </div>
+    </div>
+    <div class="widget">
+      <div class="widget-title">Assuntos</div>
+      <div class="tags-cloud">
+        <span class="tag-pill" onclick="filtrar('fgts',null)">FGTS</span>
+        <span class="tag-pill" onclick="filtrar('clt',null)">Consignado CLT</span>
+        <span class="tag-pill" onclick="filtrar('negativado',null)">Negativado</span>
+        <span class="tag-pill" onclick="filtrar('inss',null)">INSS</span>
+        <span class="tag-pill" onclick="filtrar('direitos',null)">Direitos CLT</span>
+        <span class="tag-pill" onclick="document.getElementById('searchInput').value='gerente';buscar()">Gerente</span>
+        <span class="tag-pill" onclick="document.getElementById('searchInput').value='desenrola';buscar()">Desenrola</span>
+        <span class="tag-pill" onclick="document.getElementById('searchInput').value='rescisao';buscar()">Rescisao</span>
+        <span class="tag-pill" onclick="filtrar('seguros',null)">Seguros</span>
+        <span class="tag-pill" onclick="document.getElementById('searchInput').value='cooperativa';buscar()">Cooperativa</span>
+      </div>
+    </div>
+  </aside>
+</div>
+<a href="https://wa.me/554796864687" class="wpp-float" target="_blank" aria-label="WhatsApp">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
+<footer>
+  <p><strong style="color:rgba(255,255,255,.7)">FelizCred</strong> — Handmoney Correspondente Bancario Ltda. — CNPJ 27.963.662/0001-13</p>
+  <p>Rua Paraguai, 420, Sala B — Balneario Camboriu, SC | <a href="https://www.felizcred.com.br">www.felizcred.com.br</a></p>
+</footer>
+<script>
+const allCards=Array.from(document.querySelectorAll('.article-card'));
+function normalizar(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function filtrar(cat,btn){
+  document.getElementById('searchInput').value='';
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');else document.querySelector('.filter-btn').classList.add('active');
+  let v=0;
+  allCards.forEach(c=>{
+    const show=cat==='todos'||(c.dataset.cat||'').includes(cat);
+    c.style.display=show?'':'none';if(show)v++;
+  });
+  atualizar(v,'');
+}
+function buscar(){
+  const q=normalizar(document.getElementById('searchInput').value.trim());
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.filter-btn').classList.add('active');
+  let v=0;
+  allCards.forEach(c=>{
+    const t=normalizar(c.querySelector('h3')?.textContent||'');
+    const tg=normalizar(c.dataset.tags||'');
+    const show=!q||t.includes(q)||tg.includes(q);
+    c.style.display=show?'':'none';if(show)v++;
+  });
+  atualizar(v,q);
+}
+function atualizar(v,q){
+  const el=document.getElementById('resultsCount');
+  const nr=document.getElementById('noResults');
+  if(v===0){el.style.display='none';nr.style.display='block';}
+  else{el.style.display='block';nr.style.display='none';
+    el.innerHTML=q?`<strong>${v}</strong> resultado${v>1?'s':''} para "<strong>${q}</strong>"`:
+    `<strong>${v}</strong> ite${v>1?'ns':'m'} encontrado${v>1?'s':''}`;}
+}
+document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')buscar();});
+</script>
+</body>
+</html>
