@@ -108,10 +108,15 @@ header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);b
 .why-card h3{font-size:15.5px;font-weight:700;margin-bottom:6px;color:var(--ink)}
 .why-card p{font-size:13.5px;color:var(--muted)}
 
-.partners{background:var(--bg-soft);padding:30px 0}
-.partners .wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center}
-.partners .label{font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-right:6px}
-.p-pill{background:#fff;border:1px solid var(--border);color:var(--ink);font-weight:600;font-size:13.5px;padding:8px 18px;border-radius:50px}
+/* ── LOGO MARQUEE ── */
+.partners{background:var(--bg-soft);padding:34px 0}
+.partners .label{display:block;text-align:center;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+.logo-marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.logo-track{display:flex;width:max-content;gap:16px;animation:marquee 26s linear infinite}
+.logo-marquee:hover .logo-track{animation-play-state:paused}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.p-pill{background:#fff;border:1px solid var(--border);color:var(--ink);font-weight:700;font-size:13.5px;padding:10px 20px 10px 12px;border-radius:50px;display:inline-flex;align-items:center;gap:10px;box-shadow:0 4px 14px -6px rgba(0,40,120,.12);white-space:nowrap;flex-shrink:0}
+.p-pill .avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Poppins',sans-serif;font-weight:800;font-size:12px;flex-shrink:0}
 
 /* ── FAQ ── */
 .faq-list{max-width:700px;margin:0 auto}
@@ -191,15 +196,9 @@ footer.site .brand{color:#fff}
 </section>
 
 <div class="partners">
-  <div class="wrap">
-    <span class="label">Cotamos com</span>
-    <span class="p-pill">Porto Seguro</span>
-    <span class="p-pill">Tokio Marine</span>
-    <span class="p-pill">Allianz</span>
-    <span class="p-pill">HDI</span>
-    <span class="p-pill">Bradesco Seguros</span>
-    <span class="p-pill">Mapfre</span>
-    <span class="p-pill">Zurich</span>
+  <span class="label">Cotamos com as maiores seguradoras do Brasil</span>
+  <div class="logo-marquee">
+    <div class="logo-track" id="logoTrack"></div>
   </div>
 </div>
 
@@ -312,6 +311,21 @@ footer.site .brand{color:#fff}
 </a>
 
 <script>
+const SEGURADORAS = [
+  {n:'Porto Seguro', a:'PS', c:'#0057B8'},
+  {n:'Tokio Marine', a:'TM', c:'#D2232A'},
+  {n:'Allianz', a:'AZ', c:'#0038A8'},
+  {n:'HDI Seguros', a:'HDI', c:'#00843D'},
+  {n:'Bradesco Seguros', a:'BR', c:'#CC092F'},
+  {n:'Mapfre', a:'MF', c:'#E4032E'},
+  {n:'Zurich', a:'ZU', c:'#0F3B8C'},
+];
+const logoTrack = document.getElementById('logoTrack');
+if(logoTrack){
+  const pillsHtml = SEGURADORAS.map(s=>`<span class="p-pill"><span class="avatar" style="background:${s.c}">${s.a}</span>${s.n}</span>`).join('');
+  logoTrack.innerHTML = pillsHtml + pillsHtml;
+}
+
 document.querySelectorAll('.prod-card').forEach(c=>{
   c.addEventListener('click', ()=>{
     window.location.href = '/cotacerta/cotar/?tipo=' + c.dataset.tipo;
