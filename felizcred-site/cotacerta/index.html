@@ -48,6 +48,7 @@ img,svg{max-width:100%;display:block}
 .btn-outline{background:#fff;color:var(--blue);border:1.5px solid var(--border)}
 .btn-outline:hover{border-color:var(--blue)}
 .btn-block{width:100%}
+.btn-lg{padding:17px 32px;font-size:16.5px;box-shadow:0 10px 24px -8px rgba(255,159,28,.5)}
 .pill{display:inline-flex;align-items:center;gap:6px;background:var(--blue-light);color:var(--blue-dark);font-weight:600;font-size:12.5px;padding:6px 14px;border-radius:50px}
 
 /* ── NAV ── */
@@ -76,12 +77,21 @@ header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);b
 .section-head h2{font-size:clamp(1.6rem,3vw,2.2rem);font-weight:800;color:var(--ink);margin:10px 0 10px}
 .section-head p{color:var(--muted);font-size:15.5px}
 .prod-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.prod-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);padding:24px 20px;text-align:left;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .2s;display:flex;flex-direction:column;gap:8px}
-.prod-card:hover{border-color:var(--blue);box-shadow:var(--shadow);transform:translateY(-3px)}
+.prod-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius);padding:24px 20px;text-align:left;cursor:pointer;transition:border-color .2s,box-shadow .2s,transform .2s;display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 8px -4px rgba(0,40,120,.08);position:relative}
+.prod-card:hover{border-color:var(--blue);box-shadow:var(--shadow);transform:translateY(-4px)}
+.prod-card.featured{grid-column:span 2;background:linear-gradient(160deg,var(--blue-light) 0%,#fff 60%);border-color:var(--blue)}
+.prod-card .badge{position:absolute;top:-11px;right:16px;background:var(--accent);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.3px;padding:4px 10px;border-radius:50px;box-shadow:0 4px 10px -2px rgba(255,159,28,.5)}
 .prod-card .ic{font-size:28px;width:52px;height:52px;background:var(--blue-light);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.prod-card.featured .ic{width:60px;height:60px;font-size:32px;background:#fff}
 .prod-card h3{font-size:16px;font-weight:700;color:var(--ink)}
+.prod-card.featured h3{font-size:19px}
 .prod-card p{font-size:13px;color:var(--muted);flex:1}
 .prod-card .go{font-size:12.5px;font-weight:700;color:var(--blue)}
+
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;max-width:640px;margin:0 auto 8px}
+.stat-box{text-align:center}
+.stat-box .num{font-family:'Poppins',sans-serif;font-size:clamp(1.6rem,3vw,2.1rem);font-weight:800;color:var(--blue)}
+.stat-box .lbl{font-size:12.5px;color:var(--muted);font-weight:600}
 
 /* ── COMO FUNCIONA ── */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
@@ -92,7 +102,8 @@ header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);b
 
 /* ── POR QUE ── */
 .why-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.why-card{background:var(--bg-soft);border-radius:var(--radius);padding:26px 22px}
+.why-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:26px 22px;transition:box-shadow .2s,transform .2s}
+.why-card:hover{box-shadow:var(--shadow);transform:translateY(-3px)}
 .why-card .ic{font-size:26px;margin-bottom:12px}
 .why-card h3{font-size:15.5px;font-weight:700;margin-bottom:6px;color:var(--ink)}
 .why-card p{font-size:13.5px;color:var(--muted)}
@@ -173,27 +184,8 @@ footer.site .brand{color:#fff}
       <span class="pill">🔒 Dados protegidos (LGPD)</span>
     </div>
     <div class="hero-btns">
-      <a href="/cotacerta/cotar/" class="btn btn-accent">Cotar agora</a>
+      <a href="/cotacerta/cotar/" class="btn btn-accent btn-lg">Cotar agora</a>
       <a href="/cotacerta/cotar/" class="btn btn-outline">📞 Receber uma ligação</a>
-    </div>
-  </div>
-</section>
-
-<section class="section" id="produtos">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Produtos</span>
-      <h2>Qual seguro você quer cotar?</h2>
-      <p>Escolha o produto e receba propostas de seguradoras parceiras.</p>
-    </div>
-    <div class="prod-grid">
-      <button class="prod-card" data-tipo="auto"><span class="ic">🚗</span><h3>Seguro Auto</h3><p>Compare e economize no seguro do seu carro.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="saude"><span class="ic">🏥</span><h3>Plano de Saúde</h3><p>Encontre o plano ideal pra você e sua família.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="vida"><span class="ic">❤️</span><h3>Seguro de Vida</h3><p>Proteja quem você ama com o melhor seguro.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="residencial"><span class="ic">🏠</span><h3>Seguro Residencial</h3><p>Seu lar protegido com as melhores condições.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="odonto"><span class="ic">🦷</span><h3>Plano Odonto</h3><p>Sorriso protegido com o melhor plano.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="viagem"><span class="ic">✈️</span><h3>Seguro Viagem</h3><p>Viaje tranquilo com o seguro ideal.</p><span class="go">Cotar agora →</span></button>
-      <button class="prod-card" data-tipo="consorcio"><span class="ic">🔑</span><h3>Consórcio</h3><p>Conquiste seu bem com as melhores cartas.</p><span class="go">Cotar agora →</span></button>
     </div>
   </div>
 </section>
@@ -210,6 +202,35 @@ footer.site .brand{color:#fff}
     <span class="p-pill">Zurich</span>
   </div>
 </div>
+
+<section class="section" style="padding-bottom:0">
+  <div class="wrap">
+    <div class="stats-row">
+      <div class="stat-box"><div class="num">7</div><div class="lbl">Seguradoras parceiras</div></div>
+      <div class="stat-box"><div class="num">100%</div><div class="lbl">Cotação gratuita</div></div>
+      <div class="stat-box"><div class="num">Min.</div><div class="lbl">Resposta via WhatsApp</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="produtos">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Produtos</span>
+      <h2>Qual seguro você quer cotar?</h2>
+      <p>Escolha o produto e receba propostas de seguradoras parceiras.</p>
+    </div>
+    <div class="prod-grid">
+      <button class="prod-card featured" data-tipo="auto"><span class="badge">★ Mais procurado</span><span class="ic">🚗</span><h3>Seguro Auto</h3><p>Compare e economize no seguro do seu carro.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="saude"><span class="ic">🏥</span><h3>Plano de Saúde</h3><p>Encontre o plano ideal pra você e sua família.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="vida"><span class="ic">❤️</span><h3>Seguro de Vida</h3><p>Proteja quem você ama com o melhor seguro.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="residencial"><span class="ic">🏠</span><h3>Seguro Residencial</h3><p>Seu lar protegido com as melhores condições.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="odonto"><span class="ic">🦷</span><h3>Plano Odonto</h3><p>Sorriso protegido com o melhor plano.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="viagem"><span class="ic">✈️</span><h3>Seguro Viagem</h3><p>Viaje tranquilo com o seguro ideal.</p><span class="go">Cotar agora →</span></button>
+      <button class="prod-card" data-tipo="consorcio"><span class="ic">🔑</span><h3>Consórcio</h3><p>Conquiste seu bem com as melhores cartas.</p><span class="go">Cotar agora →</span></button>
+    </div>
+  </div>
+</section>
 
 <section class="section" id="como-funciona">
   <div class="wrap">

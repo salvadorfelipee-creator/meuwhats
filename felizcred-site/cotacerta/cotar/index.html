@@ -47,6 +47,7 @@ img,svg{max-width:100%;display:block}
 .btn-outline{background:#fff;color:var(--blue);border:1.5px solid var(--border)}
 .btn-outline:hover{border-color:var(--blue)}
 .btn-block{width:100%}
+.btn-lg{padding:17px 30px;font-size:16px}
 .btn-lg{padding:16px 28px;font-size:16px}
 
 /* ── HEADER ── */
@@ -94,7 +95,11 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .form-outer{padding:0 0 24px}
 .form-card{background:#fff;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
 .step-head{background:linear-gradient(135deg,var(--blue),var(--blue-dark));padding:20px 24px;border-bottom:3px solid var(--teal)}
-.step-head .lbl{color:rgba(255,255,255,.7);font-size:11.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px}
+.step-head-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.step-head .lbl{color:rgba(255,255,255,.7);font-size:11.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.step-dots{display:flex;gap:6px}
+.step-dots span{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.25);transition:background .2s,transform .2s}
+.step-dots span.on{background:var(--teal);transform:scale(1.25)}
 .step-head h2{color:#fff;font-size:19px;font-weight:800}
 .step-body{padding:26px 24px}
 .f-panel{display:none}
@@ -102,8 +107,8 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .f-row{margin-bottom:18px}
 .f-row label{display:block;font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px}
 .f-row label .opt{font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0}
-.f-row input,.f-row select{width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14.5px;font-family:'Inter',sans-serif;color:var(--ink);background:var(--bg-soft)}
-.f-row input:focus,.f-row select:focus{outline:none;border-color:var(--blue)}
+.f-row input,.f-row select{width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14.5px;font-family:'Inter',sans-serif;color:var(--ink);background:var(--bg-soft);transition:box-shadow .15s,border-color .15s}
+.f-row input:focus,.f-row select:focus{outline:none;border-color:var(--blue);background:#fff;box-shadow:0 0 0 4px var(--blue-light, rgba(0,102,255,.12))}
 .f-hint{font-size:12px;color:var(--muted);margin-top:5px}
 .f-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
@@ -111,8 +116,8 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .choice-2{grid-template-columns:1fr 1fr}
 .choice-3{grid-template-columns:1fr 1fr 1fr}
 .choice-opt{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 8px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg-soft)}
-.choice-opt:hover{border-color:var(--blue)}
-.choice-opt.sel{border-color:var(--blue);background:var(--blue);color:#fff}
+.choice-opt:hover{border-color:var(--blue);box-shadow:0 4px 12px -4px rgba(0,102,255,.25);transform:translateY(-1px)}
+.choice-opt.sel{border-color:var(--blue);background:var(--blue);color:#fff;box-shadow:0 4px 14px -4px rgba(0,102,255,.45)}
 .choice-opt .ic{font-size:22px;margin-bottom:6px}
 .choice-opt span{display:block;font-size:12.5px;font-weight:700}
 
@@ -124,13 +129,16 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .success{text-align:center;padding:6px 0}
 .success .ic{font-size:48px;margin-bottom:14px}
 .success h3{font-size:20px;color:var(--ink);margin-bottom:8px;font-family:'Poppins',sans-serif;font-weight:800}
-.success p{color:var(--muted);margin-bottom:22px;font-size:14px}
+.success p{color:var(--muted);margin-bottom:18px;font-size:14px}
+.next-steps{background:var(--bg-soft);border-radius:var(--radius-sm);padding:16px 18px;margin-bottom:22px;text-align:left;display:flex;flex-direction:column;gap:10px}
+.ns-item{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink);font-weight:500}
+.ns-num{flex-shrink:0;width:22px;height:22px;border-radius:50%;background:var(--teal);color:#fff;font-size:11.5px;font-weight:800;display:flex;align-items:center;justify-content:center}
 
 /* ── TRUST ── */
-.trust-section{background:#fff;border-top:1px solid var(--border);padding:26px 0}
-.trust-row2{display:flex;gap:10px 22px;flex-wrap:wrap;justify-content:center;align-items:center}
-.trust-item{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--muted)}
-.trust-item .ic{font-size:16px}
+.trust-section{background:#fff;border-top:1px solid var(--border);padding:34px 0}
+.trust-row2{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;max-width:960px;margin:0 auto}
+.trust-item{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);background:var(--bg-soft);border-radius:var(--radius-sm);padding:16px 8px}
+.trust-item .ic{font-size:22px}
 
 footer.site{background:var(--navy);color:rgba(255,255,255,.55);padding:26px 0;text-align:center;font-size:11.5px;line-height:1.8}
 footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
@@ -138,12 +146,16 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
 .wpp-float{position:fixed;bottom:22px;right:22px;width:56px;height:56px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(37,211,102,.45);z-index:300}
 .wpp-float svg{width:26px;height:26px;fill:white}
 
+@media (max-width:900px){
+  .trust-row2{grid-template-columns:repeat(3,1fr)}
+}
 @media (max-width:640px){
   .opt-grid{grid-template-columns:1fr}
   .f-grid2{grid-template-columns:1fr}
   .choice-3{grid-template-columns:1fr 1fr}
   .step-body{padding:20px 16px}
   .step-head{padding:16px 18px}
+  .trust-row2{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -226,7 +238,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
     <div class="form-card">
       <form id="formCotacao">
         <div class="f-panel active" data-panel="1">
-          <div class="step-head"><div class="lbl">Passo 1 · Produto</div><h2>Qual seguro você quer cotar?</h2></div>
+          <div class="step-head"><div class="step-head-top"><div class="lbl">Passo 1 · Produto</div><div class="step-dots"><span class="on"></span><span></span><span></span></div></div><h2>Qual seguro você quer cotar?</h2></div>
           <div class="step-body">
             <div class="choice-grid choice-2" id="produtoGrid">
               <div class="choice-opt" data-tipo="auto"><span class="ic">🚗</span><span>Auto</span></div>
@@ -242,7 +254,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
         </div>
 
         <div class="f-panel" data-panel="2">
-          <div class="step-head"><div class="lbl" id="lblDetalhe">Passo 2 · Detalhes</div><h2 id="tituloDetalhe">Conte os detalhes</h2></div>
+          <div class="step-head"><div class="step-head-top"><div class="lbl" id="lblDetalhe">Passo 2 · Detalhes</div><div class="step-dots"><span></span><span class="on"></span><span></span></div></div><h2 id="tituloDetalhe">Conte os detalhes</h2></div>
           <div class="step-body">
 
             <div id="camposAuto" style="display:none">
@@ -370,7 +382,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
         </div>
 
         <div class="f-panel" data-panel="3">
-          <div class="step-head"><div class="lbl">Passo 3 · Contato</div><h2>Pra onde enviamos sua cotação?</h2></div>
+          <div class="step-head"><div class="step-head-top"><div class="lbl">Passo 3 · Contato</div><div class="step-dots"><span></span><span></span><span class="on"></span></div></div><h2>Pra onde enviamos sua cotação?</h2></div>
           <div class="step-body">
             <div class="f-grid2">
               <div class="f-row"><label>Nome completo</label><input type="text" id="contNome" placeholder="Seu nome"></div>
@@ -386,18 +398,24 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
             </label>
             <div class="f-nav">
               <button type="button" class="btn btn-outline" id="back2">Voltar</button>
-              <button type="button" class="btn btn-accent" id="enviar">Quero minha cotação</button>
+              <button type="button" class="btn btn-accent btn-lg btn-block" id="enviar">Quero receber no WhatsApp</button>
             </div>
           </div>
         </div>
 
         <div class="f-panel" data-panel="4">
+          <div class="step-head" style="border-bottom-color:var(--green)"><div class="lbl">Tudo certo</div><h2>Solicitação recebida ✓</h2></div>
           <div class="step-body">
             <div class="success">
               <div class="ic">✅</div>
               <h3>Recebemos sua solicitação!</h3>
               <p>Em breve um especialista Cota Certa vai te chamar no WhatsApp com as melhores opções.</p>
-              <a href="#" id="linkWhats" target="_blank" class="btn btn-accent btn-block">Confirmar no WhatsApp</a>
+              <div class="next-steps">
+                <div class="ns-item"><span class="ns-num">1</span>Confirme abaixo no WhatsApp</div>
+                <div class="ns-item"><span class="ns-num">2</span>Um especialista compara as seguradoras parceiras</div>
+                <div class="ns-item"><span class="ns-num">3</span>Você recebe as melhores condições, sem compromisso</div>
+              </div>
+              <a href="#" id="linkWhats" target="_blank" class="btn btn-accent btn-lg btn-block">Confirmar no WhatsApp</a>
             </div>
           </div>
         </div>
