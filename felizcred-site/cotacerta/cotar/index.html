@@ -65,25 +65,20 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .hero h1 em{color:var(--accent);font-style:normal}
 .hero-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:13px;font-weight:600;padding:8px 18px;border-radius:50px;margin-bottom:22px;position:relative}
 .hero-pill b{color:var(--navy);background:var(--accent);padding:2px 10px;border-radius:50px;font-weight:800}
-.partners-label{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:14px}
-.logo-marquee{overflow:hidden;position:relative;-webkit-mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent);mask-image:linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent)}
-.logo-track{display:flex;width:max-content;gap:10px;animation:marquee 24s linear infinite}
-.logo-marquee:hover .logo-track{animation-play-state:paused}
-@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.p-pill{background:#fff;color:var(--blue-dark);font-weight:700;font-size:12.5px;padding:7px 14px 7px 8px;border-radius:8px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0}
-.p-pill .avatar{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Poppins',sans-serif;font-weight:800;font-size:9px;flex-shrink:0}
+.partners-label{font-size:12px;font-weight:600;color:rgba(255,255,255,.55);letter-spacing:.2px}
+.partners-label b{color:rgba(255,255,255,.85);font-weight:700}
 
 /* ── OPCOES ── */
-.opcoes{padding:16px 0 4px}
-.opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.opt-card{background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;text-align:left;display:flex;align-items:center;gap:12px}
+.opcoes{padding:14px 0 2px}
+.opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt-card{background:#fff;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;text-align:left;display:flex;align-items:center;gap:9px}
 .opt-card.destaque{border-color:var(--accent-2)}
-.opt-card .ic{font-size:20px;width:38px;height:38px;flex-shrink:0;background:var(--bg-soft);border-radius:50%;display:flex;align-items:center;justify-content:center}
+.opt-card .ic{font-size:15px;width:28px;height:28px;flex-shrink:0;background:var(--bg-soft);border-radius:50%;display:flex;align-items:center;justify-content:center}
 .opt-card .opt-body{flex:1;min-width:0}
-.opt-card h3{font-size:13.5px;font-weight:800;margin-bottom:2px}
-.opt-card p{font-size:11.5px;color:var(--muted);margin-bottom:8px;line-height:1.35}
+.opt-card h3{font-size:12.5px;font-weight:800;margin-bottom:1px}
+.opt-card p{font-size:10.5px;color:var(--muted);margin-bottom:6px;line-height:1.3}
 .opt-tag{display:none}
-.opt-card .btn{padding:8px 14px;font-size:12.5px;width:100%}
+.opt-card .btn{padding:6px 12px;font-size:11.5px;width:100%}
 
 /* ── CALLBACK ── */
 .callback-card{background:#fff;border:2px solid var(--accent-2);border-radius:var(--radius);padding:26px 24px;margin:20px 0;display:none}
@@ -116,14 +111,14 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .f-hint{font-size:12px;color:var(--muted);margin-top:5px}
 .f-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
-.choice-grid{display:grid;gap:10px}
+.choice-grid{display:grid;gap:8px}
 .choice-2{grid-template-columns:1fr 1fr}
 .choice-3{grid-template-columns:1fr 1fr 1fr}
-.choice-opt{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 8px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg-soft)}
-.choice-opt:hover{border-color:var(--blue);box-shadow:0 4px 12px -4px rgba(0,102,255,.25);transform:translateY(-1px)}
-.choice-opt.sel{border-color:var(--blue);background:var(--blue);color:#fff;box-shadow:0 4px 14px -4px rgba(0,102,255,.45)}
-.choice-opt .ic{font-size:22px;margin-bottom:6px}
-.choice-opt span{display:block;font-size:12.5px;font-weight:700}
+.choice-opt{border:1px solid var(--border);border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:#fff}
+.choice-opt:hover{border-color:var(--blue)}
+.choice-opt.sel{border-color:var(--blue);background:#EEF4FF;color:var(--blue-dark)}
+.choice-opt .ic{font-size:17px;margin-bottom:3px}
+.choice-opt span{display:block;font-size:11.5px;font-weight:600}
 
 .f-nav{display:flex;gap:12px;margin-top:6px}
 .f-nav .btn{flex:1}
@@ -178,10 +173,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
   <div class="wrap">
     <div class="hero-pill"><b>GRÁTIS</b> Cotação sem compromisso</div>
     <h1>Compare seguros e encontre <em>a melhor opção</em> pra você</h1>
-    <div class="partners-label">Seguradoras parceiras</div>
-    <div class="logo-marquee">
-      <div class="logo-track" id="logoTrack"></div>
-    </div>
+    <div class="partners-label">Cotamos com <b>Porto Seguro, Allianz, HDI</b> e mais 4 seguradoras parceiras</div>
   </div>
 </section>
 
@@ -247,7 +239,6 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
               <div class="choice-opt" data-tipo="viagem"><span class="ic">✈️</span><span>Viagem</span></div>
               <div class="choice-opt" data-tipo="consorcio"><span class="ic">🔑</span><span>Consórcio</span></div>
             </div>
-            <div class="f-nav"><button type="button" class="btn btn-teal btn-block" id="toStep2">Continuar →</button></div>
           </div>
         </div>
 
@@ -446,21 +437,6 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
 </a>
 
 <script>
-const SEGURADORAS = [
-  {n:'Porto Seguro', a:'PS', c:'#0057B8'},
-  {n:'Tokio Marine', a:'TM', c:'#D2232A'},
-  {n:'Allianz', a:'AZ', c:'#0038A8'},
-  {n:'HDI Seguros', a:'HDI', c:'#00843D'},
-  {n:'Bradesco', a:'BR', c:'#CC092F'},
-  {n:'Mapfre', a:'MF', c:'#E4032E'},
-  {n:'Zurich', a:'ZU', c:'#0F3B8C'},
-];
-const logoTrack = document.getElementById('logoTrack');
-if(logoTrack){
-  const pillsHtml = SEGURADORAS.map(s=>`<span class="p-pill"><span class="avatar" style="background:${s.c}">${s.a}</span>${s.n}</span>`).join('');
-  logoTrack.innerHTML = pillsHtml + pillsHtml;
-}
-
 const WA_NUM = '554735143392';
 let tipoAtual = null;
 
@@ -476,7 +452,10 @@ function selecionarTipo(tipo){
   document.getElementById('tituloDetalhe').textContent = 'Detalhes: ' + (NOMES[tipo]||'seguro');
 }
 
-document.querySelectorAll('#produtoGrid .choice-opt').forEach(o=>o.addEventListener('click', ()=>selecionarTipo(o.dataset.tipo)));
+document.querySelectorAll('#produtoGrid .choice-opt').forEach(o=>o.addEventListener('click', ()=>{
+  selecionarTipo(o.dataset.tipo);
+  irPara(2);
+}));
 
 document.querySelectorAll('.choice-opt[data-group]').forEach(o=>{
   o.addEventListener('click', ()=>{
@@ -491,10 +470,6 @@ function irPara(passo){
   document.querySelectorAll('.f-panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===String(passo)));
 }
 
-document.getElementById('toStep2').addEventListener('click', ()=>{
-  if(!tipoAtual) selecionarTipo('auto');
-  irPara(2);
-});
 document.getElementById('back1').addEventListener('click', ()=>irPara(1));
 document.getElementById('toStep3').addEventListener('click', ()=>irPara(3));
 document.getElementById('back2').addEventListener('click', ()=>irPara(2));
