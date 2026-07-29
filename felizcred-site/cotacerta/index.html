@@ -102,37 +102,6 @@ header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);b
 .partners .label{font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-right:6px}
 .p-pill{background:#fff;border:1px solid var(--border);color:var(--ink);font-weight:600;font-size:13.5px;padding:8px 18px;border-radius:50px}
 
-/* ── COTACAO FORM ── */
-.cotacao{background:var(--ink);position:relative}
-.cotacao .section-head h2,.cotacao .section-head .eyebrow{color:#fff}
-.cotacao .section-head p{color:rgba(255,255,255,.65)}
-.form-card{max-width:600px;margin:0 auto;background:#fff;border-radius:20px;padding:36px 30px;box-shadow:var(--shadow)}
-.progress{display:flex;gap:8px;margin-bottom:22px}
-.progress span{flex:1;height:5px;border-radius:3px;background:var(--border)}
-.progress span.done{background:var(--blue)}
-.step-label{font-size:12.5px;font-weight:700;color:var(--blue);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px}
-.step-title{font-size:19px;font-weight:800;color:var(--ink);margin-bottom:20px;font-family:'Poppins',sans-serif}
-.f-panel{display:none}
-.f-panel.active{display:block}
-.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
-.type-opt{border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 10px;text-align:center;cursor:pointer;transition:all .15s}
-.type-opt.sel{border-color:var(--blue);background:var(--blue-light)}
-.type-opt .ic{font-size:22px;margin-bottom:4px}
-.type-opt span{display:block;font-size:12.5px;font-weight:700;color:var(--ink)}
-.f-row{margin-bottom:14px}
-.f-row label{display:block;font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:5px}
-.f-row input,.f-row select{width:100%;padding:12px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;color:var(--ink);background:var(--bg-soft)}
-.f-row input:focus,.f-row select:focus{outline:none;border-color:var(--blue)}
-.f-grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.f-nav{display:flex;gap:12px;margin-top:6px}
-.f-nav .btn{flex:1}
-.consent{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--muted);margin:14px 0 18px}
-.consent input{margin-top:3px}
-.success{text-align:center;padding:6px 0}
-.success .ic{font-size:48px;margin-bottom:14px}
-.success h3{font-size:20px;color:var(--ink);margin-bottom:8px;font-family:'Poppins',sans-serif;font-weight:800}
-.success p{color:var(--muted);margin-bottom:22px;font-size:14px}
-
 /* ── FAQ ── */
 .faq-list{max-width:700px;margin:0 auto}
 .faq-item{border-bottom:1px solid var(--border)}
@@ -190,7 +159,7 @@ footer.site .brand{color:#fff}
       <li><a href="#produtos">Viagem</a></li>
       <li><a href="#produtos">Consórcio</a></li>
     </ul>
-    <a href="#cotacao" class="btn btn-accent">Cotar Agora</a>
+    <a href="/cotacerta/cotar/" class="btn btn-accent">Cotar Agora</a>
   </div>
 </header>
 
@@ -204,8 +173,8 @@ footer.site .brand{color:#fff}
       <span class="pill">🔒 Dados protegidos (LGPD)</span>
     </div>
     <div class="hero-btns">
-      <a href="#cotacao" class="btn btn-accent">Cotar agora</a>
-      <a href="#como-funciona" class="btn btn-outline">Como funciona</a>
+      <a href="/cotacerta/cotar/" class="btn btn-accent">Cotar agora</a>
+      <a href="/cotacerta/cotar/" class="btn btn-outline">📞 Receber uma ligação</a>
     </div>
   </div>
 </section>
@@ -271,163 +240,6 @@ footer.site .brand{color:#fff}
   </div>
 </section>
 
-<section class="section cotacao" id="cotacao">
-  <div class="wrap">
-    <div class="section-head">
-      <span class="eyebrow">Cotação grátis</span>
-      <h2>Vamos encontrar o seguro certo</h2>
-      <p>Leva menos de 2 minutos.</p>
-    </div>
-
-    <div class="form-card">
-      <div class="progress">
-        <span class="done" data-p="1"></span>
-        <span data-p="2"></span>
-        <span data-p="3"></span>
-      </div>
-
-      <form id="formCotacao">
-        <div class="f-panel active" data-panel="1">
-          <div class="step-label">Passo 1 de 3</div>
-          <div class="step-title">Qual produto você quer cotar?</div>
-          <div class="type-grid">
-            <div class="type-opt" data-tipo="auto"><span class="ic">🚗</span><span>Auto</span></div>
-            <div class="type-opt" data-tipo="saude"><span class="ic">🏥</span><span>Saúde</span></div>
-            <div class="type-opt" data-tipo="vida"><span class="ic">❤️</span><span>Vida</span></div>
-            <div class="type-opt" data-tipo="residencial"><span class="ic">🏠</span><span>Residencial</span></div>
-            <div class="type-opt" data-tipo="odonto"><span class="ic">🦷</span><span>Odonto</span></div>
-            <div class="type-opt" data-tipo="viagem"><span class="ic">✈️</span><span>Viagem</span></div>
-            <div class="type-opt" data-tipo="consorcio"><span class="ic">🔑</span><span>Consórcio</span></div>
-          </div>
-          <div class="f-nav"><button type="button" class="btn btn-blue btn-block" id="toStep2">Continuar</button></div>
-        </div>
-
-        <div class="f-panel" data-panel="2">
-          <div class="step-label">Passo 2 de 3</div>
-          <div class="step-title" id="tituloDetalhe">Conte os detalhes</div>
-
-          <div id="camposAuto" style="display:none">
-            <div class="f-grid2">
-              <div class="f-row"><label>Tipo</label><select id="autoTipoVeic"><option>Carro</option><option>Moto</option></select></div>
-              <div class="f-row"><label>Ano</label><input type="text" id="autoAno" placeholder="Ex: 2022"></div>
-            </div>
-            <div class="f-grid2">
-              <div class="f-row"><label>Marca / Modelo</label><input type="text" id="autoModelo" placeholder="Ex: HB20"></div>
-              <div class="f-row"><label>CEP de pernoite</label><input type="text" id="autoCep" placeholder="00000-000"></div>
-            </div>
-            <div class="f-grid2">
-              <div class="f-row"><label>Data de nascimento</label><input type="text" id="autoNasc" placeholder="DD/MM/AAAA"></div>
-              <div class="f-row"><label>Tempo de CNH</label><input type="text" id="autoCnh" placeholder="Ex: 10 anos"></div>
-            </div>
-            <div class="f-grid2">
-              <div class="f-row"><label>Uso do veículo</label>
-                <select id="autoUso"><option>Particular</option><option>Aplicativo</option><option>Comercial</option></select>
-              </div>
-              <div class="f-row"><label>Fica em garagem?</label>
-                <select id="autoGaragem"><option>Sim</option><option>Não</option></select>
-              </div>
-            </div>
-          </div>
-
-          <div id="camposSaude" style="display:none">
-            <div class="f-grid2">
-              <div class="f-row"><label>Quantidade de beneficiários</label><input type="text" id="saudeQtd" placeholder="Ex: 2"></div>
-              <div class="f-row"><label>Idades</label><input type="text" id="saudeIdades" placeholder="Ex: 34 e 36"></div>
-            </div>
-            <div class="f-grid2">
-              <div class="f-row"><label>Cidade / CEP</label><input type="text" id="saudeCidade" placeholder="Sua cidade"></div>
-              <div class="f-row"><label>Tipo de plano</label>
-                <select id="saudeTipo"><option>Enfermaria</option><option>Apartamento</option></select>
-              </div>
-            </div>
-            <div class="f-row"><label>Já possui plano atualmente?</label>
-              <select id="saudeTem"><option>Não</option><option>Sim</option></select>
-            </div>
-          </div>
-
-          <div id="camposVida" style="display:none">
-            <div class="f-grid2">
-              <div class="f-row"><label>Data de nascimento</label><input type="text" id="vidaNasc" placeholder="DD/MM/AAAA"></div>
-              <div class="f-row"><label>Sexo</label><select id="vidaSexo"><option>Feminino</option><option>Masculino</option></select></div>
-            </div>
-            <div class="f-grid2">
-              <div class="f-row"><label>Fumante?</label><select id="vidaFumante"><option>Não</option><option>Sim</option></select></div>
-              <div class="f-row"><label>Possui dependentes?</label><select id="vidaDep"><option>Não</option><option>Sim</option></select></div>
-            </div>
-            <div class="f-row"><label>Capital desejado (faixa)</label><input type="text" id="vidaCapital" placeholder="Ex: R$ 100 mil"></div>
-          </div>
-
-          <div id="camposResidencial" style="display:none">
-            <div class="f-grid2">
-              <div class="f-row"><label>Tipo de imóvel</label><select id="resTipo"><option>Casa</option><option>Apartamento</option></select></div>
-              <div class="f-row"><label>CEP</label><input type="text" id="resCep" placeholder="00000-000"></div>
-            </div>
-            <div class="f-row"><label>Valor aproximado (imóvel + conteúdo)</label><input type="text" id="resValor" placeholder="Ex: R$ 300 mil"></div>
-          </div>
-
-          <div id="camposOdonto" style="display:none">
-            <div class="f-grid2">
-              <div class="f-row"><label>Quantidade de vidas</label><input type="text" id="odontoQtd" placeholder="Ex: 3"></div>
-              <div class="f-row"><label>Cidade</label><input type="text" id="odontoCidade" placeholder="Sua cidade"></div>
-            </div>
-          </div>
-
-          <div id="camposViagem" style="display:none">
-            <div class="f-grid2">
-              <div class="f-row"><label>Destino</label><select id="viagemDestino"><option>Nacional</option><option>Internacional</option></select></div>
-              <div class="f-row"><label>Quantidade de viajantes</label><input type="text" id="viagemQtd" placeholder="Ex: 2"></div>
-            </div>
-            <div class="f-row"><label>Datas da viagem</label><input type="text" id="viagemDatas" placeholder="Ex: 10/12 a 20/12"></div>
-          </div>
-
-          <div id="camposConsorcio" style="display:none">
-            <div class="f-grid2">
-              <div class="f-row"><label>Tipo</label><select id="consorcioTipo"><option>Imóvel</option><option>Veículo</option><option>Serviços</option></select></div>
-              <div class="f-row"><label>Valor da carta desejada</label><input type="text" id="consorcioValor" placeholder="Ex: R$ 80 mil"></div>
-            </div>
-            <div class="f-row"><label>Prazo preferido</label><input type="text" id="consorcioPrazo" placeholder="Ex: 120 meses"></div>
-          </div>
-
-          <div class="f-nav">
-            <button type="button" class="btn btn-outline" id="back1">Voltar</button>
-            <button type="button" class="btn btn-blue" id="toStep3">Continuar</button>
-          </div>
-        </div>
-
-        <div class="f-panel" data-panel="3">
-          <div class="step-label">Passo 3 de 3</div>
-          <div class="step-title">Pra onde enviamos sua cotação?</div>
-          <div class="f-grid2">
-            <div class="f-row"><label>Nome completo</label><input type="text" id="contNome" placeholder="Seu nome"></div>
-            <div class="f-row"><label>WhatsApp</label><input type="text" id="contWhats" placeholder="(00) 00000-0000"></div>
-          </div>
-          <div class="f-grid2">
-            <div class="f-row"><label>E-mail</label><input type="text" id="contEmail" placeholder="seu@email.com"></div>
-            <div class="f-row"><label>CPF</label><input type="text" id="contCpf" placeholder="000.000.000-00"></div>
-          </div>
-          <label class="consent">
-            <input type="checkbox" id="contConsent">
-            <span>Concordo em ser contatado(a) por WhatsApp sobre minha cotação e com o uso dos meus dados só pra essa finalidade, conforme a LGPD.</span>
-          </label>
-          <div class="f-nav">
-            <button type="button" class="btn btn-outline" id="back2">Voltar</button>
-            <button type="button" class="btn btn-accent" id="enviar">Quero minha cotação</button>
-          </div>
-        </div>
-
-        <div class="f-panel" data-panel="4">
-          <div class="success">
-            <div class="ic">✅</div>
-            <h3>Recebemos sua solicitação!</h3>
-            <p>Em breve um especialista Cota Certa vai te chamar no WhatsApp com as melhores opções.</p>
-            <a href="#" id="linkWhats" target="_blank" class="btn btn-accent btn-block">Confirmar no WhatsApp</a>
-          </div>
-        </div>
-      </form>
-    </div>
-  </div>
-</section>
-
 <section class="section" id="faq">
   <div class="wrap">
     <div class="section-head">
@@ -459,7 +271,7 @@ footer.site .brand{color:#fff}
   <div class="cta-final">
     <h2>Pronto pra economizar no seu seguro?</h2>
     <p>Compare agora, de graça, e receba as melhores opções no WhatsApp.</p>
-    <a href="#cotacao" class="btn btn-accent">Cotar agora</a>
+    <a href="/cotacerta/cotar/" class="btn btn-accent">Cotar agora</a>
   </div>
 </section>
 
@@ -479,69 +291,10 @@ footer.site .brand{color:#fff}
 </a>
 
 <script>
-const WA_NUM = '554735143392';
-let tipoAtual = null;
-
-const NOMES = {auto:'Seguro Auto', saude:'Plano de Saúde', vida:'Seguro de Vida', residencial:'Seguro Residencial', odonto:'Plano Odonto', viagem:'Seguro Viagem', consorcio:'Consórcio'};
-const IDS = ['auto','saude','vida','residencial','odonto','viagem','consorcio'];
-
-function selecionarTipo(tipo){
-  tipoAtual = tipo;
-  document.querySelectorAll('.type-opt').forEach(o=>o.classList.toggle('sel', o.dataset.tipo===tipo));
-  IDS.forEach(t=>{
-    const el = document.getElementById('campos'+t.charAt(0).toUpperCase()+t.slice(1));
-    if(el) el.style.display = (t===tipo) ? 'block' : 'none';
-  });
-  document.getElementById('tituloDetalhe').textContent = 'Detalhes: ' + (NOMES[tipo]||'seguro');
-}
-
-document.querySelectorAll('.type-opt').forEach(o=>o.addEventListener('click', ()=>selecionarTipo(o.dataset.tipo)));
 document.querySelectorAll('.prod-card').forEach(c=>{
   c.addEventListener('click', ()=>{
-    selecionarTipo(c.dataset.tipo);
-    document.querySelector('#cotacao').scrollIntoView({behavior:'smooth'});
+    window.location.href = '/cotacerta/cotar/?tipo=' + c.dataset.tipo;
   });
-});
-
-function irPara(passo){
-  document.querySelectorAll('.f-panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===String(passo)));
-  document.querySelectorAll('.progress span').forEach(s=>s.classList.toggle('done', Number(s.dataset.p) <= passo));
-}
-
-document.getElementById('toStep2').addEventListener('click', ()=>{
-  if(!tipoAtual) selecionarTipo('auto');
-  irPara(2);
-});
-document.getElementById('back1').addEventListener('click', ()=>irPara(1));
-document.getElementById('toStep3').addEventListener('click', ()=>irPara(3));
-document.getElementById('back2').addEventListener('click', ()=>irPara(2));
-
-function detalhesPorTipo(){
-  const v = id => (document.getElementById(id)||{}).value || '';
-  switch(tipoAtual){
-    case 'auto': return `Tipo: ${v('autoTipoVeic')} | Modelo: ${v('autoModelo')} | Ano: ${v('autoAno')} | CEP: ${v('autoCep')} | Nascimento: ${v('autoNasc')} | CNH: ${v('autoCnh')} | Uso: ${v('autoUso')} | Garagem: ${v('autoGaragem')}`;
-    case 'saude': return `Beneficiários: ${v('saudeQtd')} | Idades: ${v('saudeIdades')} | Cidade: ${v('saudeCidade')} | Tipo: ${v('saudeTipo')} | Já tem plano: ${v('saudeTem')}`;
-    case 'vida': return `Nascimento: ${v('vidaNasc')} | Sexo: ${v('vidaSexo')} | Fumante: ${v('vidaFumante')} | Dependentes: ${v('vidaDep')} | Capital: ${v('vidaCapital')}`;
-    case 'residencial': return `Tipo de imóvel: ${v('resTipo')} | CEP: ${v('resCep')} | Valor aproximado: ${v('resValor')}`;
-    case 'odonto': return `Vidas: ${v('odontoQtd')} | Cidade: ${v('odontoCidade')}`;
-    case 'viagem': return `Destino: ${v('viagemDestino')} | Viajantes: ${v('viagemQtd')} | Datas: ${v('viagemDatas')}`;
-    case 'consorcio': return `Tipo: ${v('consorcioTipo')} | Valor da carta: ${v('consorcioValor')} | Prazo: ${v('consorcioPrazo')}`;
-    default: return '';
-  }
-}
-
-document.getElementById('enviar').addEventListener('click', ()=>{
-  if(!document.getElementById('contConsent').checked){
-    alert('Precisamos do seu aceite pra continuar :)');
-    return;
-  }
-  const nome = document.getElementById('contNome').value.trim();
-  const whats = document.getElementById('contWhats').value.trim();
-  const email = document.getElementById('contEmail').value.trim();
-  const cpf = document.getElementById('contCpf').value.trim();
-  const msg = `Olá! Quero cotar ${NOMES[tipoAtual]||'um seguro'} pela Cota Certa.\nNome: ${nome}\nWhatsApp: ${whats}\nE-mail: ${email}\nCPF: ${cpf}\n${detalhesPorTipo()}`;
-  document.getElementById('linkWhats').href = `https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`;
-  irPara(4);
 });
 
 document.querySelectorAll('.faq-q').forEach(btn=>{
