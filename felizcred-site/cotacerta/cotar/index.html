@@ -108,8 +108,12 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .f-row label .opt{font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0}
 .f-row input,.f-row select{width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14.5px;font-family:'Inter',sans-serif;color:var(--ink);background:var(--bg-soft);transition:box-shadow .15s,border-color .15s}
 .f-row input:focus,.f-row select:focus{outline:none;border-color:var(--blue);background:#fff;box-shadow:0 0 0 4px var(--blue-light, rgba(0,102,255,.12))}
+.f-row input.valid{border-color:var(--teal);background:#fff}
 .f-hint{font-size:12px;color:var(--muted);margin-top:5px}
 .f-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+.link-outro{display:inline-block;font-size:12.5px;font-weight:600;color:var(--blue);margin-bottom:16px}
+.link-outro:hover{text-decoration:underline}
 
 .choice-grid{display:grid;gap:8px}
 .choice-2{grid-template-columns:1fr 1fr}
@@ -227,8 +231,8 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
   <div class="wrap">
     <div class="form-card">
       <form id="formCotacao">
-        <div class="f-panel active" data-panel="1">
-          <div class="step-head"><div class="step-head-top"><div class="lbl">Passo 1 · Produto</div><div class="step-dots"><span class="on"></span><span></span><span></span></div></div><h2>Qual seguro você quer cotar?</h2></div>
+        <div class="f-panel" data-panel="1">
+          <div class="step-head"><div class="step-head-top"><div class="lbl">Escolha o seguro</div><div class="step-dots"><span></span><span></span></div></div><h2>Qual seguro você quer cotar?</h2></div>
           <div class="step-body">
             <div class="choice-grid choice-2" id="produtoGrid">
               <div class="choice-opt" data-tipo="auto"><span class="ic">🚗</span><span>Auto</span></div>
@@ -242,11 +246,12 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
           </div>
         </div>
 
-        <div class="f-panel" data-panel="2">
-          <div class="step-head"><div class="step-head-top"><div class="lbl" id="lblDetalhe">Passo 2 · Detalhes</div><div class="step-dots"><span></span><span class="on"></span><span></span></div></div><h2 id="tituloDetalhe">Conte os detalhes</h2></div>
+        <div class="f-panel active" data-panel="2">
+          <div class="step-head"><div class="step-head-top"><div class="lbl" id="lblDetalhe">Passo 1 de 2 · Veículo</div><div class="step-dots"><span class="on"></span><span></span></div></div><h2 id="tituloDetalhe">Detalhes: Seguro Auto</h2></div>
           <div class="step-body">
+            <a href="#" id="linkOutroSeguro" class="link-outro">Não é seguro Auto? Ver outras opções</a>
 
-            <div id="camposAuto" style="display:none">
+            <div id="camposAuto">
               <div class="f-row"><label>Tipo de veículo</label>
                 <div class="choice-grid choice-3"><input type="hidden" id="autoTipoVeic" value="Carro">
                   <div class="choice-opt sel" data-group="autoTipoVeic" data-val="Carro"><span class="ic">🚗</span><span>Carro</span></div>
@@ -257,14 +262,27 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
               <div class="f-row"><label>Placa <span class="opt">(opcional)</span></label><input type="text" id="autoPlaca" placeholder="Ex: ABC1234"></div>
               <div class="f-row"><label>Modelo do veículo</label><input type="text" id="autoModelo" placeholder="Ex: HB20, Corolla..."></div>
               <div class="f-grid2">
-                <div class="f-row"><label>Ano</label><input type="text" id="autoAno" placeholder="Ex: 2022"></div>
-                <div class="f-row"><label>CEP de pernoite</label><input type="text" id="autoCep" placeholder="00000-000"></div>
+                <div class="f-row"><label>Ano de fabricação</label><input type="text" id="autoAnoFab" placeholder="Ex: 2021" inputmode="numeric" maxlength="4"></div>
+                <div class="f-row"><label>Ano do modelo</label><input type="text" id="autoAnoMod" placeholder="Ex: 2022" inputmode="numeric" maxlength="4"></div>
+              </div>
+              <div class="f-row"><label>CEP de pernoite</label><input type="text" id="autoCep" placeholder="00000-000" inputmode="numeric"></div>
+              <div class="f-row"><label>É renovação de seguro?</label>
+                <div class="choice-grid choice-2"><input type="hidden" id="autoRenovacao" value="Não">
+                  <div class="choice-opt sel" data-group="autoRenovacao" data-val="Não"><span class="ic">＋</span><span>Não, seguro novo</span></div>
+                  <div class="choice-opt" data-group="autoRenovacao" data-val="Sim"><span class="ic">↻</span><span>Sim, renovação</span></div>
+                </div>
               </div>
               <div class="f-row"><label>Uso do veículo</label>
                 <div class="choice-grid choice-3"><input type="hidden" id="autoUso" value="Particular">
                   <div class="choice-opt sel" data-group="autoUso" data-val="Particular"><span class="ic">🏠</span><span>Particular</span></div>
                   <div class="choice-opt" data-group="autoUso" data-val="Trabalho"><span class="ic">💼</span><span>Trabalho</span></div>
                   <div class="choice-opt" data-group="autoUso" data-val="App"><span class="ic">📱</span><span>App</span></div>
+                </div>
+              </div>
+              <div class="f-row"><label>O veículo é financiado?</label>
+                <div class="choice-grid choice-2"><input type="hidden" id="autoFinanciado" value="Não">
+                  <div class="choice-opt sel" data-group="autoFinanciado" data-val="Não"><span class="ic">✓</span><span>Não, quitado</span></div>
+                  <div class="choice-opt" data-group="autoFinanciado" data-val="Sim"><span class="ic">🏦</span><span>Sim, financiado</span></div>
                 </div>
               </div>
               <div class="f-row"><label>Fica em garagem à noite?</label>
@@ -371,7 +389,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
         </div>
 
         <div class="f-panel" data-panel="3">
-          <div class="step-head"><div class="step-head-top"><div class="lbl">Passo 3 · Contato</div><div class="step-dots"><span></span><span></span><span class="on"></span></div></div><h2>Pra onde enviamos sua cotação?</h2></div>
+          <div class="step-head"><div class="step-head-top"><div class="lbl">Passo 2 de 2 · Contato</div><div class="step-dots"><span></span><span class="on"></span></div></div><h2>Pra onde enviamos sua cotação?</h2></div>
           <div class="step-body">
             <div class="f-grid2">
               <div class="f-row"><label>Nome completo</label><input type="text" id="contNome" placeholder="Seu nome"></div>
@@ -450,6 +468,7 @@ function selecionarTipo(tipo){
     if(el) el.style.display = (t===tipo) ? 'block' : 'none';
   });
   document.getElementById('tituloDetalhe').textContent = 'Detalhes: ' + (NOMES[tipo]||'seguro');
+  document.getElementById('linkOutroSeguro').textContent = tipo==='auto' ? 'Não é seguro Auto? Ver outras opções' : 'Ver outras opções de seguro';
 }
 
 document.querySelectorAll('#produtoGrid .choice-opt').forEach(o=>o.addEventListener('click', ()=>{
@@ -473,11 +492,26 @@ function irPara(passo){
 document.getElementById('back1').addEventListener('click', ()=>irPara(1));
 document.getElementById('toStep3').addEventListener('click', ()=>irPara(3));
 document.getElementById('back2').addEventListener('click', ()=>irPara(2));
+document.getElementById('linkOutroSeguro').addEventListener('click', (e)=>{ e.preventDefault(); irPara(1); });
+
+document.getElementById('autoPlaca').addEventListener('input', function(){
+  this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,7);
+});
+function maskCep(el){
+  let v = el.value.replace(/\D/g,'').slice(0,8);
+  if(v.length>5) v = v.slice(0,5)+'-'+v.slice(5);
+  el.value = v;
+  el.classList.toggle('valid', /^\d{5}-\d{3}$/.test(v));
+}
+['autoCep','resCep'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', ()=>maskCep(el));
+});
 
 function detalhesPorTipo(){
   const v = id => (document.getElementById(id)||{}).value || '';
   switch(tipoAtual){
-    case 'auto': return `Tipo: ${v('autoTipoVeic')} | Placa: ${v('autoPlaca')} | Modelo: ${v('autoModelo')} | Ano: ${v('autoAno')} | CEP: ${v('autoCep')} | Uso: ${v('autoUso')} | Garagem: ${v('autoGaragem')}`;
+    case 'auto': return `Tipo: ${v('autoTipoVeic')} | Placa: ${v('autoPlaca')} | Modelo: ${v('autoModelo')} | Ano fab.: ${v('autoAnoFab')} | Ano modelo: ${v('autoAnoMod')} | CEP: ${v('autoCep')} | Renovação: ${v('autoRenovacao')} | Uso: ${v('autoUso')} | Financiado: ${v('autoFinanciado')} | Garagem: ${v('autoGaragem')}`;
     case 'saude': return `Beneficiários: ${v('saudeQtd')} | Idades: ${v('saudeIdades')} | Cidade: ${v('saudeCidade')} | Tipo: ${v('saudeTipo')} | Já tem plano: ${v('saudeTem')}`;
     case 'vida': return `Nascimento: ${v('vidaNasc')} | Sexo: ${v('vidaSexo')} | Fumante: ${v('vidaFumante')} | Dependentes: ${v('vidaDep')} | Capital: ${v('vidaCapital')}`;
     case 'residencial': return `Tipo de imóvel: ${v('resTipo')} | CEP: ${v('resCep')} | Valor aproximado: ${v('resValor')}`;
@@ -521,10 +555,8 @@ document.getElementById('cbEnviar').addEventListener('click', ()=>{
 (function(){
   const params = new URLSearchParams(window.location.search);
   const tipo = params.get('tipo');
-  if(tipo && NOMES[tipo]){
-    selecionarTipo(tipo);
-    irPara(2);
-  }
+  selecionarTipo(NOMES[tipo] ? tipo : 'auto');
+  irPara(2);
 })();
 </script>
 </body>
