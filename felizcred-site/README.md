@@ -48,6 +48,31 @@ fiel ao site no ar.
   e-mail não está de fato configurado. Funciona hoje só como funil visual
   até virar WhatsApp.
 
+## Cota Certa Seguros (`cotacerta/`)
+
+A partir de 2026-07-30, a subpasta `cotacerta/` (home, `cotar/`, `blog/`)
+virou também um site **próprio e independente**, com domínio dedicado:
+
+- **Projeto Vercel separado**: `otacerta-seguros`, importado do **mesmo
+  repositório** `meuwhats`, com **Root Directory = `felizcred-site/cotacerta`**
+  e Framework Preset = Other.
+- **Domínio**: `cotacertaseguros.com.br` (DNS no Hostinger desde
+  2026-07-30: `A @ → 216.198.79.1`,
+  `CNAME www → 79c197869691e9f2.vercel-dns-017.com`).
+- **Os mesmos arquivos continuam também acessíveis** em
+  `www.felizcred.com.br/cotacerta/` (servidos pelo projeto Vercel principal
+  `meuwhats`, descrito acima) — os dois endereços apontam pra pasta idêntica.
+
+**Regra que não pode quebrar**: como a mesma pasta é raiz de um domínio E
+subpasta do outro ao mesmo tempo, todo link/`src`/`href` dentro de
+`cotacerta/**` precisa ser **caminho relativo** (`img/logo.png`, `cotar/`,
+`../blog/...`) — nunca absoluto (`/cotacerta/...` ou `/img/...`). Se algum
+dia reintroduzir um caminho absoluto por engano, ele funciona em um dos dois
+endereços e quebra no outro.
+
+Ver também o mapa geral dos três sistemas no [README da raiz do
+repositório](../README.md).
+
 ## Deploy
 
 Site 100% estático (sem variáveis de ambiente, sem backend). Vive dentro do

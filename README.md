@@ -5,6 +5,37 @@ com um painel web simples para ver conversas, fotos, áudios e responder.
 
 ---
 
+## ⚠️ Mapa dos sistemas neste repositório (leia antes de editar)
+
+Este único repositório Git (`meuwhats` no GitHub) hospeda **três coisas
+independentes**, cada uma com seu próprio deploy. Não são a mesma aplicação —
+só compartilham o histórico do Git:
+
+| Sistema | Pasta | Onde roda | Domínio |
+|---|---|---|---|
+| **Painel de WhatsApp/Instagram/Telegram** (este README) | raiz (`server.js`, `db.js`, `painel/`...) | **Render** (deploy automático a cada push) | `meuwhats.onrender.com` |
+| **Site institucional FelizCred** | `felizcred-site/` | **Vercel**, projeto `meuwhats`, Root Directory = `felizcred-site` | `www.felizcred.com.br` |
+| **Cota Certa Seguros** (mesmos arquivos do item acima) | `felizcred-site/cotacerta/` | **Vercel**, projeto separado `otacerta-seguros`, Root Directory = `felizcred-site/cotacerta` | `cotacertaseguros.com.br` |
+
+Detalhes de cada site estático ficam em
+[`felizcred-site/README.md`](./felizcred-site/README.md). Regras importantes
+pra não misturar:
+
+- **Nenhum dos três compartilha código, banco de dados, variáveis de ambiente
+  ou segredos** com os outros — são deploys 100% isolados, só o `git push`
+  em `main` é comum a todos (cada um escuta e redeploya sozinho).
+- A pasta `felizcred-site/cotacerta/` é servida em **dois endereços ao mesmo
+  tempo** a partir dos mesmos arquivos: como subpasta
+  (`felizcred.com.br/cotacerta/`) e como raiz do domínio próprio
+  (`cotacertaseguros.com.br/`). Por isso, todo link/imagem interno dentro de
+  `cotacerta/` usa **caminho relativo** (`img/logo.png`, `cotar/`,
+  `../blog/`) — nunca um caminho absoluto tipo `/cotacerta/img/...` ou
+  `/img/...`, senão quebra um dos dois endereços.
+- Editar algo do painel de WhatsApp (este README, `server.js`, `db.js`) nunca
+  afeta os sites, e vice-versa.
+
+---
+
 ## Funcionalidades
 
 - Recebe mensagens (texto, imagem, áudio, vídeo, documento) via webhook

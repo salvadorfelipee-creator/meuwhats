@@ -194,7 +194,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
   </div>
 </section>
 
-<section class="opcoes">
+<section class="opcoes" id="opcoesSection">
   <div class="wrap">
     <div class="opt-grid">
       <div class="opt-card">
@@ -380,7 +380,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
         </div>
 
         <div class="f-panel" data-panel="3">
-          <div class="step-head"><div class="step-head-top"><div class="lbl">🔎 Comparando 7 seguradoras</div><div class="step-pct">100%</div></div><h2>Pra onde enviamos sua cotação?</h2></div>
+          <div class="step-head"><div class="step-head-top"><div class="lbl">✅ Última etapa</div><div class="step-pct">100%</div></div><h2>Pra onde enviamos sua cotação?</h2></div>
           <div class="step-body">
             <div class="f-grid2">
               <div class="f-row"><label>Nome completo</label><input type="text" id="contNome" placeholder="Seu nome"></div>
@@ -504,6 +504,7 @@ document.querySelectorAll('.choice-opt[data-group]').forEach(o=>{
 
 function irPara(passo){
   document.querySelectorAll('.f-panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===String(passo)));
+  document.getElementById('opcoesSection').style.display = (passo>=3) ? 'none' : '';
 }
 
 document.getElementById('back1').addEventListener('click', ()=>irPara(1));
