@@ -62,17 +62,26 @@ header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);b
 .nav-links a:hover{color:var(--blue)}
 
 /* ── HERO ── */
-.hero{padding:52px 0 96px;background:linear-gradient(165deg,#EAF1FF 0%,#F5F9FF 55%,#fff 100%);position:relative;overflow:hidden}
+.hero{padding:52px 0 70px;background:linear-gradient(165deg,#EAF1FF 0%,#F5F9FF 55%,#fff 100%);position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;width:520px;height:520px;background:radial-gradient(circle,rgba(0,102,255,.10) 0%,transparent 70%);top:-260px;right:-120px}
 .hero::after{content:'';position:absolute;width:420px;height:420px;background:radial-gradient(circle,rgba(255,159,28,.10) 0%,transparent 70%);bottom:-220px;left:-140px}
-.hero-inner{text-align:center;max-width:760px;margin:0 auto;position:relative}
+.hero-inner{display:grid;grid-template-columns:1.05fr .95fr;align-items:center;gap:44px;text-align:left;max-width:1180px;margin:0 auto;position:relative}
 .hero-badge{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--border);color:var(--blue-dark);font-weight:700;font-size:12.5px;padding:7px 16px;border-radius:50px;margin-bottom:18px;box-shadow:0 6px 16px -8px rgba(0,40,120,.18)}
-.hero h1{font-size:clamp(2rem,4.6vw,3.1rem);font-weight:800;line-height:1.16;color:var(--ink);margin-bottom:16px;letter-spacing:-.5px}
+.hero h1{font-size:clamp(2rem,4vw,2.85rem);font-weight:800;line-height:1.16;color:var(--ink);margin-bottom:16px;letter-spacing:-.5px}
 .hero h1 span{color:var(--blue)}
-.hero p.lead{font-size:17.5px;color:var(--muted);margin:0 auto 26px;line-height:1.55}
-.trust-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:30px}
-.hero-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+.hero p.lead{font-size:17.5px;color:var(--muted);margin:0 0 26px;line-height:1.55;max-width:520px}
+.trust-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-bottom:30px}
+.hero-btns{display:flex;gap:14px;justify-content:flex-start;flex-wrap:wrap}
 .hero-note{font-size:12px;color:var(--muted);margin-top:14px}
+
+.hero-media{position:relative}
+.hero-media .dots{position:absolute;top:-18px;right:-14px;width:110px;height:80px;background-image:radial-gradient(var(--accent) 2.5px,transparent 2.5px);background-size:14px 14px;opacity:.55;z-index:0}
+.hero-media .photo-wrap{position:relative;border-radius:28px;overflow:hidden;box-shadow:0 30px 60px -24px rgba(0,40,120,.35);border:6px solid #fff}
+.hero-media img{width:100%;height:100%;display:block;object-fit:cover;aspect-ratio:4/3.1}
+.hero-media .float-chip{position:absolute;left:-18px;bottom:22px;background:#fff;border-radius:14px;padding:12px 16px;box-shadow:0 14px 30px -12px rgba(0,40,120,.3);display:flex;align-items:center;gap:10px;z-index:2}
+.hero-media .float-chip .ic{width:34px;height:34px;border-radius:50%;background:#DCFCE7;color:#15803D;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.hero-media .float-chip b{display:block;font-size:13px;color:var(--ink)}
+.hero-media .float-chip span{display:block;font-size:10.5px;color:var(--muted)}
 
 /* ── PRODUTOS ── */
 .section{padding:64px 0}
@@ -92,7 +101,7 @@ header.site{position:sticky;top:0;z-index:200;background:rgba(255,255,255,.95);b
 .prod-card p{font-size:13px;color:var(--muted);flex:1}
 .prod-card .go{font-size:12.5px;font-weight:700;color:var(--blue)}
 
-.stats-card{background:#fff;border-radius:20px;box-shadow:0 24px 48px -20px rgba(0,40,120,.28);border:1px solid #EEF1F8;display:grid;grid-template-columns:repeat(3,1fr);max-width:760px;margin:-54px auto 0;position:relative;z-index:5}
+.stats-card{background:#fff;border-radius:20px;box-shadow:0 24px 48px -20px rgba(0,40,120,.28);border:1px solid #EEF1F8;display:grid;grid-template-columns:repeat(3,1fr);max-width:760px;margin:-26px auto 0;position:relative;z-index:5}
 .stat-box{text-align:center;padding:24px 12px;border-right:1px solid var(--border)}
 .stat-box:last-child{border-right:none}
 .stat-box .num{font-family:'Poppins',sans-serif;font-size:clamp(1.7rem,3vw,2.2rem);font-weight:800;color:var(--blue)}
@@ -154,6 +163,11 @@ footer.site .brand{color:#fff}
 }
 @media (max-width:900px){
   .steps{grid-template-columns:1fr 1fr}
+  .hero-inner{grid-template-columns:1fr;text-align:center}
+  .hero-text .trust-row,.hero-text .hero-btns{justify-content:center}
+  .hero-text .lead{margin-left:auto;margin-right:auto}
+  .hero-media{max-width:420px;margin:36px auto 0}
+  .hero-badge{margin-left:auto;margin-right:auto}
 }
 @media (max-width:640px){
   .nav-links{display:none}
@@ -169,7 +183,7 @@ footer.site .brand{color:#fff}
   .partners .wrap{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
   .cta-final{margin:0 4%;padding:36px 18px}
   .cta-final .hero-btns{flex-direction:column}
-  .stats-card{grid-template-columns:1fr 1fr 1fr;margin:-40px 4% 0;border-radius:16px}
+  .stats-card{grid-template-columns:1fr 1fr 1fr;margin:-20px 4% 0;border-radius:16px}
   .stat-box{padding:16px 6px}
   .stat-box .num{font-size:1.4rem}
   .stat-box .lbl{font-size:10.5px}
@@ -201,19 +215,28 @@ footer.site .brand{color:#fff}
 
 <section class="hero">
   <div class="wrap hero-inner">
-    <span class="hero-badge">🏢 Corretora parceira das maiores seguradoras do Brasil</span>
-    <h1>Compare Seguros e Encontre a <span>Melhor Opção</span> para Você</h1>
-    <p class="lead">Receba as melhores propostas de Seguro Auto, Saúde, Vida e muito mais direto no seu WhatsApp. Rápido, grátis e sem compromisso.</p>
-    <div class="trust-row">
-      <span class="pill">✅ Cotação 100% gratuita</span>
-      <span class="pill">⚡ Resposta via WhatsApp em minutos</span>
-      <span class="pill">🔒 Dados protegidos (LGPD)</span>
+    <div class="hero-text">
+      <span class="hero-badge">🏢 Corretora parceira das maiores seguradoras do Brasil</span>
+      <h1>Compare Seguros e Encontre a <span>Melhor Opção</span> para Você</h1>
+      <p class="lead">Receba as melhores propostas de Seguro Auto, Saúde, Vida e muito mais direto no seu WhatsApp. Rápido, grátis e sem compromisso.</p>
+      <div class="trust-row">
+        <span class="pill">✅ Cotação 100% gratuita</span>
+        <span class="pill">⚡ Resposta via WhatsApp em minutos</span>
+        <span class="pill">🔒 Dados protegidos (LGPD)</span>
+      </div>
+      <div class="hero-btns">
+        <a href="/cotacerta/cotar/" class="btn btn-accent btn-lg">Cotar agora</a>
+        <a href="/cotacerta/cotar/" class="btn btn-outline">📞 Receber uma ligação</a>
+      </div>
+      <p class="hero-note">Sem spam. Você só é contatado pelo WhatsApp que informar.</p>
     </div>
-    <div class="hero-btns">
-      <a href="/cotacerta/cotar/" class="btn btn-accent btn-lg">Cotar agora</a>
-      <a href="/cotacerta/cotar/" class="btn btn-outline">📞 Receber uma ligação</a>
+    <div class="hero-media">
+      <div class="dots" aria-hidden="true"></div>
+      <div class="photo-wrap">
+        <img src="/cotacerta/img/hero-auto.jpg" alt="Especialista da Cota Certa ao lado de um veículo segurado" width="640" height="496">
+      </div>
+      <div class="float-chip"><span class="ic">✓</span><div><b>Cotação aprovada</b><span>Resposta em minutos</span></div></div>
     </div>
-    <p class="hero-note">Sem spam. Você só é contatado pelo WhatsApp que informar.</p>
   </div>
 </section>
 
