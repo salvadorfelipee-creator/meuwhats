@@ -217,6 +217,35 @@ No histórico do painel, as mensagens enviadas com botões mostram os botões co
   `https://meuwhats.onrender.com/ping`, intervalo 5 min, alerta por e-mail — cobre também
   o caso de o serviço já ter dormido por algum motivo e avisa se o servidor cair.
 
+### Fluxo por número — Cota Certa Seguros (30/07/2026)
+
+O número **"felizcred n"** (`phone_number_id` `518007084723311`, WhatsApp `5547996103804`)
+tem seu **próprio fluxo**, diferente do fluxo padrão (FGTS/gerente) acima. Mecanismo:
+`FLUXOS_POR_NUMERO` mapeia `businessNumberId → objeto de fluxo` (`menuInicial`, `fluxoBotoes`,
+`lembreteMinutos`, `lembreteTextos`, `capturaTexto`); `getFluxo(businessNumberId)` cai no
+fluxo padrão (`FLUXO_FELIZCRED`) pra qualquer número não mapeado. Toda a lógica de roteamento
+em `processarEntry` usa o objeto retornado por `getFluxo`, então adicionar um novo número com
+fluxo próprio é só acrescentar uma entrada em `FLUXOS_POR_NUMERO`.
+
+O fluxo da Cota Certa (`FLUXO_COTACERTA`) tem duas entradas:
+
+- **Veio do site** (`felizcred-site/cotacerta`): o botão "Cotar agora" e o popup de callback
+  montam um link `wa.me/5547996103804?text=...` com o texto já pronto ("Olá! Quero cotar..."
+  ou "Olá! Quero receber uma ligação..."). O servidor reconhece esses prefixos
+  (`REGEX_SITE_COTACAO`/`REGEX_SITE_CALLBACK`) e responde confirmando o recebimento, **sem**
+  mandar o menu — a mensagem já contém tudo (produto, dados do veículo etc.), só falta o
+  atendimento humano assumir pelo painel.
+- **Mensagem direta** (contato novo ou inativo há 24h, sem vir do site): recebe o menu
+  (`menuInicialCotaCerta`, mensagem tipo `list` — 4 opções não cabem nos 3 botões da API) com
+  Seguro Auto, Seguro de Vida, Outros seguros e Consórcio. Só o **Auto** tem um fluxo de
+  perguntas completo (é o produto principal): tipo de veículo → modelo/ano/placa (texto livre)
+  → financiado? → uso do veículo → CEP + renovação (texto livre) → encerra avisando que um
+  especialista vai assumir. Vida/Consórcio/Outros só confirmam e já passam pro humano.
+
+⚠️ Se o número do WhatsApp da Cota Certa mudar, atualizar `COTACERTA_NUMBER_ID` em `server.js`
+**e também** o `WA_NUM`/links `wa.me` em todo `felizcred-site/cotacerta/` (home, `/cotar`,
+blog) — são duas coisas independentes que precisam apontar pro mesmo número.
+
 ---
 
 ## Automações do Instagram

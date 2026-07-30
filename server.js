@@ -327,6 +327,214 @@ const FLUXO_BOTOES = {
   },
 };
 
+// ─── FLUXO COTA CERTA SEGUROS (número "felizcred n") ────────────────────────
+// Número dedicado à Cota Certa Seguros. Duas entradas possíveis:
+//  1) Cliente preencheu o formulário do site (felizcred.com.br/cotacerta) e a
+//     mensagem já chega pronta ("Olá! Quero cotar..." / "...receber uma
+//     ligação...") — nesse caso só confirmamos o recebimento, sem menu.
+//  2) Cliente manda mensagem direto pro número — recebe o menu com os tipos
+//     de seguro; só o Auto tem um fluxo de perguntas (é o produto principal).
+const COTACERTA_NUMBER_ID = "518007084723311";
+
+const REGEX_SITE_COTACAO = /^Ol[áa]!\s*Quero cotar/i;
+const REGEX_SITE_CALLBACK = /^Ol[áa]!\s*Quero receber uma liga[çc][ãa]o/i;
+
+function respostaSiteCotacao() {
+  return (
+    "Show, recebemos as informações da sua cotação por aqui! 👍 Um especialista da Cota Certa já vai te " +
+    "chamar pra fechar as melhores condições com a seguradora parceira ideal. Só um instante!"
+  );
+}
+
+function respostaSiteCallback() {
+  return "Perfeito, já anotamos seu pedido! 📞 Um especialista da Cota Certa vai te ligar em instantes.";
+}
+
+function menuInicialCotaCerta() {
+  return {
+    texto:
+      `Olá, ${saudacaoDoDia()}! 👋 Aqui é da Cota Certa Seguros. Comparamos as melhores seguradoras ` +
+      "parceiras do Brasil pra você. Qual seguro você quer cotar?",
+    lista: {
+      botao: "Escolher seguro",
+      opcoes: [
+        { id: "cc_auto", title: "🚗 Seguro Auto", description: "O mais procurado — carro, moto ou caminhão" },
+        { id: "cc_vida", title: "❤️ Seguro de Vida", description: "Proteção pra você e sua família" },
+        { id: "cc_outros", title: "📋 Outros seguros", description: "Saúde, residencial, odonto ou viagem" },
+        { id: "cc_consorcio", title: "🔑 Consórcio", description: "Cartas de imóvel, veículo ou serviços" },
+      ],
+    },
+  };
+}
+
+const LEMBRETE_MINUTOS_COTACERTA = {
+  menu_inicial: 15,
+  cc_auto: 15,
+  cc_v_carro: 15,
+  cc_v_moto: 15,
+  cc_v_caminhao: 15,
+  cc_aguardando_financ: 15,
+  cc_fin_sim: 15,
+  cc_fin_nao: 15,
+  cc_aguardando_cep: 20,
+  cc_uso_particular: 15,
+  cc_uso_trabalho: 15,
+  cc_uso_app: 15,
+  cc_outros: 15,
+};
+
+const LEMBRETE_TEXTOS_COTACERTA = {
+  padrao:
+    "Olá! Vi que você parou no meio da cotação. Pra continuar, é só responder a mensagem acima ou tocar " +
+    "em uma das opções 👆",
+};
+
+// Depois que o cliente manda o modelo/ano/placa, pergunta se é financiado.
+async function handlerDadosVeiculo(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Perfeito, anotado! O veículo é financiado ou já quitado?",
+    [
+      { id: "cc_fin_sim", title: "Financiado" },
+      { id: "cc_fin_nao", title: "Já quitado" },
+    ]
+  );
+  await db.setFluxoPasso(de, businessNumberId, "cc_aguardando_financ");
+}
+
+// Depois do CEP + renovação, encerra o fluxo e passa pro atendimento humano.
+async function handlerFinalizarAuto(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Perfeito! 🎉 Já tenho tudo que preciso. Vou chamar um especialista agora pra fechar sua cotação com " +
+      "a seguradora parceira ideal — só um instante! 👍"
+  );
+  await db.setFluxoPasso(de, businessNumberId, null);
+}
+
+// "Outros seguros" — descobre qual produto e já passa pro atendimento humano.
+async function handlerOutrosSeguros(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Perfeito, anotado! Um especialista vai falar com você em instantes pra te ajudar. 👍"
+  );
+  await db.setFluxoPasso(de, businessNumberId, null);
+}
+
+const FLUXO_BOTOES_COTACERTA = {
+  cc_auto: {
+    texto: "Boa escolha! 🚗 Vamos deixar isso rapidinho. Qual tipo de veículo?",
+    botoes: [
+      { id: "cc_v_carro", title: "Carro" },
+      { id: "cc_v_moto", title: "Moto" },
+      { id: "cc_v_caminhao", title: "Caminhão" },
+    ],
+  },
+  cc_v_carro: {
+    texto:
+      "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: Onix 2021, ABC1234 — se ainda não tiver " +
+      "a placa, pode pular essa parte)",
+  },
+  cc_v_moto: {
+    texto:
+      "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: Fazer 250 2021, ABC1234 — se ainda não " +
+      "tiver a placa, pode pular essa parte)",
+  },
+  cc_v_caminhao: {
+    texto:
+      "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: VW Delivery 2021, ABC1234 — se ainda " +
+      "não tiver a placa, pode pular essa parte)",
+  },
+  cc_fin_sim: {
+    texto: "Certo! E qual o uso do veículo?",
+    botoes: [
+      { id: "cc_uso_particular", title: "Particular" },
+      { id: "cc_uso_trabalho", title: "Trabalho" },
+      { id: "cc_uso_app", title: "App" },
+    ],
+  },
+  cc_fin_nao: {
+    texto: "Certo! E qual o uso do veículo?",
+    botoes: [
+      { id: "cc_uso_particular", title: "Particular" },
+      { id: "cc_uso_trabalho", title: "Trabalho" },
+      { id: "cc_uso_app", title: "App" },
+    ],
+  },
+  cc_uso_particular: {
+    texto:
+      "Só mais uma coisa: qual o CEP onde o veículo fica à noite? E me diz se é seguro novo ou renovação " +
+      "de um que você já tinha.",
+  },
+  cc_uso_trabalho: {
+    texto:
+      "Só mais uma coisa: qual o CEP onde o veículo fica à noite? E me diz se é seguro novo ou renovação " +
+      "de um que você já tinha.",
+  },
+  cc_uso_app: {
+    texto:
+      "Só mais uma coisa: qual o CEP onde o veículo fica à noite? E me diz se é seguro novo ou renovação " +
+      "de um que você já tinha.",
+  },
+  cc_vida: {
+    texto:
+      "Perfeito! Um especialista em Seguro de Vida vai falar com você em instantes pra entender sua " +
+      "necessidade e buscar a melhor condição. 👍",
+  },
+  cc_consorcio: {
+    texto:
+      "Perfeito! Um especialista em Consórcio vai falar com você em instantes pra apresentar as melhores " +
+      "cartas disponíveis. 👍",
+  },
+  cc_outros: {
+    texto:
+      "Me conta rapidinho qual seguro você precisa (Saúde, Residencial, Odonto ou Viagem) que já chamo um " +
+      "especialista pra te ajudar.",
+  },
+};
+
+// Adapta confirmacaoAgenda() (só monta o texto) pro formato padrão de handler
+// de captura de texto (recebe de/businessNumberId e cuida de enviar + limpar o passo).
+async function handlerConfirmacaoAgenda(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, confirmacaoAgenda());
+  await db.setFluxoPasso(de, businessNumberId, null);
+}
+
+const FLUXO_FELIZCRED = {
+  menuInicial,
+  fluxoBotoes: FLUXO_BOTOES,
+  lembreteMinutos: LEMBRETE_MINUTOS,
+  lembreteTextos: LEMBRETE_TEXTOS,
+  capturaTexto: { gerente_autorizo: handlerConfirmacaoAgenda },
+};
+
+const FLUXO_COTACERTA = {
+  menuInicial: menuInicialCotaCerta,
+  fluxoBotoes: FLUXO_BOTOES_COTACERTA,
+  lembreteMinutos: LEMBRETE_MINUTOS_COTACERTA,
+  lembreteTextos: LEMBRETE_TEXTOS_COTACERTA,
+  capturaTexto: {
+    cc_v_carro: handlerDadosVeiculo,
+    cc_v_moto: handlerDadosVeiculo,
+    cc_v_caminhao: handlerDadosVeiculo,
+    cc_uso_particular: handlerFinalizarAuto,
+    cc_uso_trabalho: handlerFinalizarAuto,
+    cc_uso_app: handlerFinalizarAuto,
+    cc_outros: handlerOutrosSeguros,
+  },
+};
+
+const FLUXOS_POR_NUMERO = {
+  [COTACERTA_NUMBER_ID]: FLUXO_COTACERTA,
+};
+
+function getFluxo(businessNumberId) {
+  return FLUXOS_POR_NUMERO[businessNumberId] || FLUXO_FELIZCRED;
+}
+
 // ─── PROCESSAR MENSAGENS RECEBIDAS ───────────────────────────────────────────
 async function processarEntry(entry) {
   for (const e of entry) {
@@ -335,6 +543,8 @@ async function processarEntry(entry) {
       const contatos = value.contacts || [];
       const mensagens = value.messages || [];
       const businessNumberId = value.metadata?.phone_number_id;
+
+      const fluxo = getFluxo(businessNumberId);
 
       for (const msg of mensagens) {
         const de = msg.from;
@@ -358,15 +568,39 @@ async function processarEntry(entry) {
           status: "received",
         };
 
+        let mensagemJaTratada = false;
+
         if (tipo === "text") {
           await db.insertMessage({ ...base, type: "text", body: msg.text?.body });
-          // Se a conversa estava aguardando nome/cidade, confirma e agenda
-          if (conversaAnterior?.fluxo_passo === "gerente_autorizo") {
+          const corpo = msg.text?.body || "";
+          // Mensagem pré-preenchida vinda do site da Cota Certa (link do wa.me) —
+          // já confirma o recebimento e passa direto pro atendimento humano, sem menu.
+          if (businessNumberId === COTACERTA_NUMBER_ID && REGEX_SITE_COTACAO.test(corpo)) {
             try {
-              await enviarRespostaAutomatica(businessNumberId, de, confirmacaoAgenda());
+              await enviarRespostaAutomatica(businessNumberId, de, respostaSiteCotacao());
               await db.setFluxoPasso(de, businessNumberId, null);
+              mensagemJaTratada = true;
             } catch (err) {
-              console.error("Erro ao confirmar agenda:", err.message);
+              console.error("Erro ao responder cotação vinda do site:", err.message);
+            }
+          } else if (businessNumberId === COTACERTA_NUMBER_ID && REGEX_SITE_CALLBACK.test(corpo)) {
+            try {
+              await enviarRespostaAutomatica(businessNumberId, de, respostaSiteCallback());
+              await db.setFluxoPasso(de, businessNumberId, null);
+              mensagemJaTratada = true;
+            } catch (err) {
+              console.error("Erro ao responder pedido de ligação vindo do site:", err.message);
+            }
+          } else {
+            // Passo aguardando resposta em texto livre (ex.: nome/cidade, modelo do
+            // veículo, CEP) — cada fluxo define os seus próprios passos de captura.
+            const handler = fluxo.capturaTexto?.[conversaAnterior?.fluxo_passo];
+            if (handler) {
+              try {
+                await handler(de, businessNumberId);
+              } catch (err) {
+                console.error("Erro ao processar captura de texto do fluxo:", err.message);
+              }
             }
           }
         } else if (tipo === "button") {
@@ -384,12 +618,12 @@ async function processarEntry(entry) {
           // Clique em um botão do fluxo automático (mensagens interativas)
           const reply = msg.interactive?.button_reply || msg.interactive?.list_reply || {};
           await db.insertMessage({ ...base, type: "button", body: reply.title || "[botão]" });
-          const passo = FLUXO_BOTOES[reply.id];
+          const passo = fluxo.fluxoBotoes[reply.id];
           if (passo) {
             try {
               await enviarRespostaAutomatica(businessNumberId, de, passo.texto, passo.botoes, passo.lista);
               // Marca (ou limpa) o passo em que a conversa fica aguardando resposta
-              await db.setFluxoPasso(de, businessNumberId, LEMBRETE_MINUTOS[reply.id] ? reply.id : null);
+              await db.setFluxoPasso(de, businessNumberId, fluxo.lembreteMinutos[reply.id] ? reply.id : null);
             } catch (err) {
               console.error("Erro ao enviar passo do fluxo de botões:", err.message);
             }
@@ -422,7 +656,7 @@ async function processarEntry(entry) {
         // Cliques em botão não contam (continuação do fluxo), nem "unsupported"/"reaction"
         // (costumam vir de números de sistema que não aceitam resposta).
         const TIPOS_COM_MENU = ["text", "image", "audio", "video", "document", "sticker"];
-        if (conversaInativa && TIPOS_COM_MENU.includes(tipo)) {
+        if (!mensagemJaTratada && conversaInativa && TIPOS_COM_MENU.includes(tipo)) {
           try {
             const podeEnviar = await db.tentarMarcarMenuEnviado(
               de,
@@ -430,8 +664,8 @@ async function processarEntry(entry) {
               HORAS_INATIVIDADE_MENU * 60 * 60 * 1000
             );
             if (podeEnviar) {
-              const menu = menuInicial();
-              await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes);
+              const menu = fluxo.menuInicial();
+              await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista);
               await db.setFluxoPasso(de, businessNumberId, "menu_inicial");
             }
           } catch (err) {
@@ -915,11 +1149,12 @@ setInterval(async () => {
     const pendentes = await db.listarFluxosAguardando();
     const agora = Date.now();
     for (const p of pendentes) {
-      const minutos = LEMBRETE_MINUTOS[p.fluxo_passo];
+      const fluxoDoContato = getFluxo(p.business_number_id);
+      const minutos = fluxoDoContato.lembreteMinutos[p.fluxo_passo];
       if (!minutos || agora - Number(p.fluxo_passo_at) < minutos * 60 * 1000) continue;
       if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id))) continue;
       try {
-        const texto = LEMBRETE_TEXTOS[p.fluxo_passo] || LEMBRETE_TEXTOS.padrao;
+        const texto = fluxoDoContato.lembreteTextos[p.fluxo_passo] || fluxoDoContato.lembreteTextos.padrao;
         await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
         console.log(`⏰ Lembrete de fluxo parado enviado para ${p.phone} (passo ${p.fluxo_passo})`);
       } catch (err) {
