@@ -255,6 +255,7 @@ const LEMBRETE_TEXTOS = {
   padrao:
     "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da " +
     "mensagem acima 👆",
+  manter_janela: "Olá! Ainda por aí? É só responder aqui que a gente continua o atendimento 😊",
 };
 
 // Resposta quando a pessoa manda o nome/cidade (passo gerente_autorizo).
@@ -354,7 +355,8 @@ function menuInicialCotaCerta() {
   return {
     texto:
       `Olá, ${saudacaoDoDia()}! 👋 Aqui é da Cota Certa Seguros. Comparamos as melhores seguradoras ` +
-      "parceiras do Brasil pra você. Qual seguro você quer cotar?",
+      "parceiras do Brasil pra você. Qual seguro você quer cotar?\n\n" +
+      '(a qualquer momento, digite "menu" pra ver essas opções de novo)',
     lista: {
       botao: "Escolher seguro",
       opcoes: [
@@ -362,6 +364,7 @@ function menuInicialCotaCerta() {
         { id: "cc_vida", title: "❤️ Seguro de Vida", description: "Proteção pra você e sua família" },
         { id: "cc_outros", title: "📋 Outros seguros", description: "Saúde, residencial, odonto ou viagem" },
         { id: "cc_consorcio", title: "🔑 Consórcio", description: "Cartas de imóvel, veículo ou serviços" },
+        { id: "cc_atendimento", title: "💬 Falar com atendimento", description: "Já fiz minha cotação, quero falar com alguém" },
       ],
     },
   };
@@ -373,13 +376,15 @@ const LEMBRETE_MINUTOS_COTACERTA = {
   cc_v_carro: 15,
   cc_v_moto: 15,
   cc_v_caminhao: 15,
+  cc_pular_dados: 15,
   cc_aguardando_financ: 15,
   cc_fin_sim: 15,
   cc_fin_nao: 15,
-  cc_aguardando_cep: 20,
   cc_uso_particular: 15,
   cc_uso_trabalho: 15,
   cc_uso_app: 15,
+  cc_pular_cep: 15,
+  cc_aguardando_renov: 15,
   cc_outros: 15,
 };
 
@@ -387,31 +392,45 @@ const LEMBRETE_TEXTOS_COTACERTA = {
   padrao:
     "Olá! Vi que você parou no meio da cotação. Pra continuar, é só responder a mensagem acima ou tocar " +
     "em uma das opções 👆",
+  manter_janela:
+    'Ainda por aí? 😊 Sua cotação continua aberta — é só responder aqui que a gente continua de onde ' +
+    'parou (ou digite "menu" pra recomeçar).',
 };
 
-// Depois que o cliente manda o modelo/ano/placa, pergunta se é financiado.
+// Pergunta se o veículo é financiado — reaproveitada tanto pela captura de texto
+// (modelo/ano/placa) quanto pelo botão "Pular" da mesma etapa.
+const PERGUNTA_FINANCIADO = {
+  texto: "Perfeito, anotado! O veículo é financiado ou já quitado?",
+  botoes: [
+    { id: "cc_fin_sim", title: "Financiado" },
+    { id: "cc_fin_nao", title: "Já quitado" },
+  ],
+};
+
+// Pergunta se é seguro novo ou renovação — reaproveitada pela captura de texto
+// (CEP) e pelo botão "Pular" da mesma etapa.
+const PERGUNTA_RENOVACAO = {
+  texto: "Só mais uma coisa: é seguro novo ou renovação de um que você já tinha?",
+  botoes: [
+    { id: "cc_renov_novo", title: "Seguro novo" },
+    { id: "cc_renov_existente", title: "Renovação" },
+  ],
+};
+
+const MENSAGEM_FINAL_AUTO =
+  "Perfeito! 🎉 Já tenho tudo que preciso. Vou chamar um especialista agora pra fechar sua cotação com " +
+  "a seguradora parceira ideal — só um instante! 👍";
+
+// Depois que o cliente manda o modelo/ano/placa (texto livre), pergunta se é financiado.
 async function handlerDadosVeiculo(de, businessNumberId) {
-  await enviarRespostaAutomatica(
-    businessNumberId,
-    de,
-    "Perfeito, anotado! O veículo é financiado ou já quitado?",
-    [
-      { id: "cc_fin_sim", title: "Financiado" },
-      { id: "cc_fin_nao", title: "Já quitado" },
-    ]
-  );
+  await enviarRespostaAutomatica(businessNumberId, de, PERGUNTA_FINANCIADO.texto, PERGUNTA_FINANCIADO.botoes);
   await db.setFluxoPasso(de, businessNumberId, "cc_aguardando_financ");
 }
 
-// Depois do CEP + renovação, encerra o fluxo e passa pro atendimento humano.
-async function handlerFinalizarAuto(de, businessNumberId) {
-  await enviarRespostaAutomatica(
-    businessNumberId,
-    de,
-    "Perfeito! 🎉 Já tenho tudo que preciso. Vou chamar um especialista agora pra fechar sua cotação com " +
-      "a seguradora parceira ideal — só um instante! 👍"
-  );
-  await db.setFluxoPasso(de, businessNumberId, null);
+// Depois que o cliente manda o CEP (texto livre), pergunta se é novo ou renovação.
+async function handlerCep(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, PERGUNTA_RENOVACAO.texto, PERGUNTA_RENOVACAO.botoes);
+  await db.setFluxoPasso(de, businessNumberId, "cc_aguardando_renov");
 }
 
 // "Outros seguros" — descobre qual produto e já passa pro atendimento humano.
@@ -434,20 +453,19 @@ const FLUXO_BOTOES_COTACERTA = {
     ],
   },
   cc_v_carro: {
-    texto:
-      "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: Onix 2021, ABC1234 — se ainda não tiver " +
-      "a placa, pode pular essa parte)",
+    texto: "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: Onix 2021, ABC1234)",
+    botoes: [{ id: "cc_pular_dados", title: "Não sei / pular" }],
   },
   cc_v_moto: {
-    texto:
-      "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: Fazer 250 2021, ABC1234 — se ainda não " +
-      "tiver a placa, pode pular essa parte)",
+    texto: "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: Fazer 250 2021, ABC1234)",
+    botoes: [{ id: "cc_pular_dados", title: "Não sei / pular" }],
   },
   cc_v_caminhao: {
-    texto:
-      "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: VW Delivery 2021, ABC1234 — se ainda " +
-      "não tiver a placa, pode pular essa parte)",
+    texto: "Show! Me passa rapidinho: qual o modelo, ano e placa? (ex: VW Delivery 2021, ABC1234)",
+    botoes: [{ id: "cc_pular_dados", title: "Não sei / pular" }],
   },
+  // Botão "pular" da etapa modelo/ano/placa — leva direto pra pergunta de financiado.
+  cc_pular_dados: PERGUNTA_FINANCIADO,
   cc_fin_sim: {
     texto: "Certo! E qual o uso do veículo?",
     botoes: [
@@ -465,20 +483,21 @@ const FLUXO_BOTOES_COTACERTA = {
     ],
   },
   cc_uso_particular: {
-    texto:
-      "Só mais uma coisa: qual o CEP onde o veículo fica à noite? E me diz se é seguro novo ou renovação " +
-      "de um que você já tinha.",
+    texto: "Só mais uma coisa: qual o CEP onde o veículo fica à noite?",
+    botoes: [{ id: "cc_pular_cep", title: "Não sei / pular" }],
   },
   cc_uso_trabalho: {
-    texto:
-      "Só mais uma coisa: qual o CEP onde o veículo fica à noite? E me diz se é seguro novo ou renovação " +
-      "de um que você já tinha.",
+    texto: "Só mais uma coisa: qual o CEP onde o veículo fica à noite?",
+    botoes: [{ id: "cc_pular_cep", title: "Não sei / pular" }],
   },
   cc_uso_app: {
-    texto:
-      "Só mais uma coisa: qual o CEP onde o veículo fica à noite? E me diz se é seguro novo ou renovação " +
-      "de um que você já tinha.",
+    texto: "Só mais uma coisa: qual o CEP onde o veículo fica à noite?",
+    botoes: [{ id: "cc_pular_cep", title: "Não sei / pular" }],
   },
+  // Botão "pular" da etapa CEP — leva direto pra pergunta de renovação.
+  cc_pular_cep: PERGUNTA_RENOVACAO,
+  cc_renov_novo: { texto: MENSAGEM_FINAL_AUTO },
+  cc_renov_existente: { texto: MENSAGEM_FINAL_AUTO },
   cc_vida: {
     texto:
       "Perfeito! Um especialista em Seguro de Vida vai falar com você em instantes pra entender sua " +
@@ -493,6 +512,9 @@ const FLUXO_BOTOES_COTACERTA = {
     texto:
       "Me conta rapidinho qual seguro você precisa (Saúde, Residencial, Odonto ou Viagem) que já chamo um " +
       "especialista pra te ajudar.",
+  },
+  cc_atendimento: {
+    texto: "Perfeito! Já vou chamar um especialista pra continuar seu atendimento. Só um instante! 👍",
   },
 };
 
@@ -520,9 +542,9 @@ const FLUXO_COTACERTA = {
     cc_v_carro: handlerDadosVeiculo,
     cc_v_moto: handlerDadosVeiculo,
     cc_v_caminhao: handlerDadosVeiculo,
-    cc_uso_particular: handlerFinalizarAuto,
-    cc_uso_trabalho: handlerFinalizarAuto,
-    cc_uso_app: handlerFinalizarAuto,
+    cc_uso_particular: handlerCep,
+    cc_uso_trabalho: handlerCep,
+    cc_uso_app: handlerCep,
     cc_outros: handlerOutrosSeguros,
   },
 };
@@ -573,9 +595,18 @@ async function processarEntry(entry) {
         if (tipo === "text") {
           await db.insertMessage({ ...base, type: "text", body: msg.text?.body });
           const corpo = msg.text?.body || "";
-          // Mensagem pré-preenchida vinda do site da Cota Certa (link do wa.me) —
-          // já confirma o recebimento e passa direto pro atendimento humano, sem menu.
-          if (businessNumberId === COTACERTA_NUMBER_ID && REGEX_SITE_COTACAO.test(corpo)) {
+          // Palavra-chave "menu" reabre o menu inicial do fluxo a qualquer momento,
+          // não importa em que passo a conversa está.
+          if (normalizarTexto(corpo) === "menu") {
+            try {
+              const menu = fluxo.menuInicial();
+              await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista);
+              await db.setFluxoPasso(de, businessNumberId, "menu_inicial");
+              mensagemJaTratada = true;
+            } catch (err) {
+              console.error("Erro ao reabrir menu inicial:", err.message);
+            }
+          } else if (businessNumberId === COTACERTA_NUMBER_ID && REGEX_SITE_COTACAO.test(corpo)) {
             try {
               await enviarRespostaAutomatica(businessNumberId, de, respostaSiteCotacao());
               await db.setFluxoPasso(de, businessNumberId, null);
@@ -1163,5 +1194,28 @@ setInterval(async () => {
     }
   } catch (err) {
     console.error("Erro no verificador de fluxos parados:", err.message);
+  }
+}, 60 * 1000);
+
+// ─── VERIFICADOR DE JANELA DE 24H (KEEP-ALIVE) ──────────────────────────────
+// A cada minuto: quem está com um fluxo em aberto e mais de 20h sem responder
+// (mas ainda dentro da janela de 24h pra mensagem livre) recebe UM aviso pra
+// tentar trazer a pessoa de volta antes que a janela feche e vire template.
+setInterval(async () => {
+  try {
+    const pendentes = await db.listarJanelasParaManter();
+    for (const p of pendentes) {
+      if (!(await db.tentarMarcarJanelaLembreteEnviado(p.phone, p.business_number_id))) continue;
+      try {
+        const fluxoDoContato = getFluxo(p.business_number_id);
+        const texto = fluxoDoContato.lembreteTextos.manter_janela || LEMBRETE_TEXTOS_COTACERTA.manter_janela;
+        await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
+        console.log(`🔔 Aviso de janela (20h) enviado para ${p.phone} (passo ${p.fluxo_passo})`);
+      } catch (err) {
+        console.error("Erro ao enviar aviso de janela:", err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no verificador de janela de 24h:", err.message);
   }
 }, 60 * 1000);

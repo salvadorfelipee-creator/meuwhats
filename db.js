@@ -101,6 +101,9 @@ const ready = (async () => {
     await client.execute(`ALTER TABLE conversations ADD COLUMN fluxo_passo_at INTEGER`);
     await client.execute(`ALTER TABLE conversations ADD COLUMN fluxo_lembrete INTEGER DEFAULT 0`);
   }
+  if (!infoConversations.rows.some((r) => r.name === "janela_lembrete_at")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN janela_lembrete_at INTEGER`);
+  }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS instagram_dm_contacts (
     instagram_user_id TEXT PRIMARY KEY,
@@ -150,10 +153,12 @@ async function tentarMarcarMenuEnviado(phone, businessNumberId, janelaMs) {
 
 // Registra em que passo do fluxo automático a conversa está aguardando resposta
 // (passo = null limpa a marcação, ex.: quando o atendimento humano assume).
+// Também reseta o lembrete de "manter a janela aberta" — cada novo passo merece
+// sua própria chance de keep-alive perto das 24h, caso o cliente demore de novo.
 async function setFluxoPasso(phone, businessNumberId, passo) {
   await ready;
   await client.execute({
-    sql: `UPDATE conversations SET fluxo_passo = ?, fluxo_passo_at = ?, fluxo_lembrete = 0
+    sql: `UPDATE conversations SET fluxo_passo = ?, fluxo_passo_at = ?, fluxo_lembrete = 0, janela_lembrete_at = NULL
           WHERE phone = ? AND business_number_id = ?`,
     args: [passo, passo ? Date.now() : null, phone, businessNumberId],
   });
@@ -175,6 +180,32 @@ async function tentarMarcarLembreteEnviado(phone, businessNumberId) {
     sql: `UPDATE conversations SET fluxo_lembrete = 1
           WHERE phone = ? AND business_number_id = ? AND fluxo_lembrete = 0 AND fluxo_passo IS NOT NULL`,
     args: [phone, businessNumberId],
+  });
+  return result.rowsAffected > 0;
+}
+
+// Conversas com fluxo em aberto há quase 24h (janela do WhatsApp pra mensagem
+// livre) que ainda não receberam o aviso de "continua aí?" — manda-se UM só,
+// entre 20h e 24h de silêncio, pra tentar reabrir a janela antes que feche.
+async function listarJanelasParaManter() {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `SELECT phone, business_number_id, fluxo_passo FROM conversations
+          WHERE fluxo_passo IS NOT NULL AND janela_lembrete_at IS NULL
+            AND last_message_at <= ? AND last_message_at > ?`,
+    args: [agora - 20 * 60 * 60 * 1000, agora - 24 * 60 * 60 * 1000],
+  });
+  return result.rows;
+}
+
+// Atômico: só o primeiro chamador consegue marcar (evita keep-alive duplicado)
+async function tentarMarcarJanelaLembreteEnviado(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `UPDATE conversations SET janela_lembrete_at = ?
+          WHERE phone = ? AND business_number_id = ? AND janela_lembrete_at IS NULL`,
+    args: [Date.now(), phone, businessNumberId],
   });
   return result.rowsAffected > 0;
 }
@@ -306,6 +337,8 @@ module.exports = {
   setFluxoPasso,
   listarFluxosAguardando,
   tentarMarcarLembreteEnviado,
+  listarJanelasParaManter,
+  tentarMarcarJanelaLembreteEnviado,
   insertMessage,
   updateStatusByWaId,
   listConversations,
