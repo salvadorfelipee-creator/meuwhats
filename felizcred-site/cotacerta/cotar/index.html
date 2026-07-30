@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Cotar Seguro | Cota Certa Seguros</title>
-<meta name="description" content="Compare seguros com 7 seguradoras parceiras. Cotação completa em 2 minutos ou peça pra te ligarmos em até 5 minutos.">
+<meta name="description" content="Compare seguros com 7 seguradoras parceiras. Cotação completa em 2 minutos ou peça pra te ligarmos em até 10 minutos.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.felizcred.com.br/cotacerta/cotar/">
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="Cotar Seguro | Cota Certa Seguros">
-<meta property="og:description" content="Compare seguros com 7 seguradoras parceiras. Cotação em 2 minutos ou receba uma ligação em 5 minutos.">
+<meta property="og:description" content="Compare seguros com 7 seguradoras parceiras. Cotação em 2 minutos ou receba uma ligação em 10 minutos.">
 <meta property="og:url" content="https://www.felizcred.com.br/cotacerta/cotar/">
 <meta property="og:image" content="https://www.felizcred.com.br/cotacerta/og-image.jpg">
 <meta property="og:site_name" content="Cota Certa Seguros">
@@ -80,27 +80,33 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .opt-tag{display:none}
 .opt-card .btn{padding:6px 12px;font-size:11.5px;width:100%}
 
-/* ── CALLBACK ── */
-.callback-card{background:#fff;border:2px solid var(--accent-2);border-radius:var(--radius);padding:26px 24px;margin:20px 0;display:none}
-.callback-card.show{display:block}
-.callback-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
-.callback-head .ic{font-size:30px}
-.callback-head h3{font-size:17px;font-weight:800}
-.callback-head p{font-size:13px;color:var(--muted)}
-.cb-success{display:none;text-align:center;padding:10px 0}
-.cb-success.show{display:block}
+/* ── CALLBACK MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(3,26,64,.55);z-index:500;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal-card{background:#fff;border-radius:20px;padding:32px 28px;max-width:400px;width:100%;position:relative;box-shadow:0 30px 60px -20px rgba(0,20,60,.4);text-align:center}
+.modal-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;background:var(--bg-soft);border:none;font-size:15px;cursor:pointer;color:var(--muted)}
+.modal-card .cb-ic{font-size:40px;margin-bottom:10px}
+.modal-card h3{font-size:19px;font-weight:800;margin-bottom:6px}
+.modal-card p{font-size:13.5px;color:var(--muted);margin-bottom:20px}
+.modal-card .f-row{text-align:left;margin-bottom:14px}
+.cb-modal-success{display:none}
+.cb-modal-success.show{display:block}
+.cb-modal-form.hide{display:none}
+.nav-ctas{display:flex;align-items:center;gap:10px}
+.nav-cb{padding:9px 16px;font-size:13px;gap:6px}
 
 /* ── FORM CARD ── */
 .form-outer{padding:0 0 24px}
 .form-card{background:#fff;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
-.step-head{background:linear-gradient(135deg,var(--blue),var(--blue-dark));padding:20px 24px;border-bottom:3px solid var(--teal)}
-.step-head-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
-.step-head .lbl{color:rgba(255,255,255,.7);font-size:11.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.step-head{background:linear-gradient(135deg,var(--blue),var(--blue-dark));padding:12px 20px;border-bottom:3px solid var(--teal)}
+.step-head-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.step-head .lbl{color:rgba(255,255,255,.85);font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:5px}
+.step-pct{color:#fff;font-weight:800;font-size:11.5px;background:rgba(255,255,255,.16);padding:3px 10px;border-radius:50px;flex-shrink:0}
 .step-dots{display:flex;gap:6px}
 .step-dots span{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.25);transition:background .2s,transform .2s}
 .step-dots span.on{background:var(--teal);transform:scale(1.25)}
-.step-head h2{color:#fff;font-size:19px;font-weight:800}
-.step-body{padding:26px 24px}
+.step-head h2{color:#fff;font-size:16.5px;font-weight:800}
+.step-body{padding:24px}
 .f-panel{display:none}
 .f-panel.active{display:block}
 .f-row{margin-bottom:18px}
@@ -118,11 +124,11 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .choice-grid{display:grid;gap:8px}
 .choice-2{grid-template-columns:1fr 1fr}
 .choice-3{grid-template-columns:1fr 1fr 1fr}
-.choice-opt{border:1px solid var(--border);border-radius:8px;padding:10px 6px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:#fff}
-.choice-opt:hover{border-color:var(--blue)}
-.choice-opt.sel{border-color:var(--blue);background:#EEF4FF;color:var(--blue-dark)}
-.choice-opt .ic{font-size:17px;margin-bottom:3px}
-.choice-opt span{display:block;font-size:11.5px;font-weight:600}
+.choice-opt{border:1px solid var(--border);border-radius:10px;padding:13px 8px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s;background:#fff}
+.choice-opt:hover{border-color:var(--blue);box-shadow:0 4px 12px -6px rgba(0,102,255,.25)}
+.choice-opt.sel{border-color:var(--blue);background:#EEF4FF;color:var(--blue-dark);box-shadow:0 4px 12px -6px rgba(0,102,255,.3)}
+.choice-opt .ic{font-size:19px;margin-bottom:5px}
+.choice-opt span{display:block;font-size:12px;font-weight:600}
 
 .f-nav{display:flex;gap:12px;margin-top:6px}
 .f-nav .btn{flex:1}
@@ -152,6 +158,10 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
 @media (max-width:900px){
   .trust-row2{grid-template-columns:repeat(3,1fr)}
 }
+@media (max-width:480px){
+  .nav-cb{padding:9px;border-radius:50%}
+  .nav-cb .txt{display:none}
+}
 @media (max-width:640px){
   .opt-grid{grid-template-columns:1fr}
   .f-grid2{grid-template-columns:1fr}
@@ -167,9 +177,12 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
 <header class="site">
   <div class="nav-inner">
     <a href="/cotacerta/" class="brand"><img src="/cotacerta/img/logo.png" alt="Cota Certa Seguros"></a>
-    <a href="https://wa.me/554735143392" class="phone-badge" target="_blank">
-      <span class="ic">💬</span> Falar agora
-    </a>
+    <div class="nav-ctas">
+      <a href="#" class="btn btn-outline nav-cb js-callback-trigger"><span class="ic">📞</span><span class="txt">Receber ligação</span></a>
+      <a href="https://wa.me/554735143392" class="phone-badge" target="_blank">
+        <span class="ic">💬</span> Falar agora
+      </a>
+    </div>
   </div>
 </header>
 
@@ -196,30 +209,8 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
         <div class="ic">📞</div>
         <div class="opt-body">
           <h3>Receber uma ligação</h3>
-          <p>Deixe nome e telefone — a gente liga em até 5 min.</p>
-          <button type="button" class="btn btn-accent" id="btnAbrirCallback">Quero que me liguem</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="callback-card" id="callbackCard">
-      <div class="cb-form" id="cbForm">
-        <div class="callback-head">
-          <span class="ic">📞</span>
-          <div><h3>A gente te liga em até 5 minutos</h3><p>Só precisamos do seu nome e telefone.</p></div>
-        </div>
-        <div class="f-grid2">
-          <div class="f-row"><label>Nome</label><input type="text" id="cbNome" placeholder="Seu nome"></div>
-          <div class="f-row"><label>Telefone</label><input type="text" id="cbTelefone" placeholder="(00) 00000-0000"></div>
-        </div>
-        <button type="button" class="btn btn-accent btn-block btn-lg" id="cbEnviar">Quero que me liguem agora</button>
-      </div>
-      <div class="cb-success" id="cbSuccess">
-        <div class="success">
-          <div class="ic">📞</div>
-          <h3>Prontinho!</h3>
-          <p>Confirma no WhatsApp que já entramos na fila de retorno — te ligamos em até 5 minutos.</p>
-          <a href="#" id="cbWhatsLink" target="_blank" class="btn btn-accent btn-block">Confirmar no WhatsApp</a>
+          <p>Deixe nome e telefone — a gente liga em até 10 min.</p>
+          <button type="button" class="btn btn-accent js-callback-trigger" id="btnAbrirCallback">Quero que me liguem</button>
         </div>
       </div>
     </div>
@@ -247,7 +238,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
         </div>
 
         <div class="f-panel active" data-panel="2">
-          <div class="step-head"><div class="step-head-top"><div class="lbl" id="lblDetalhe">Passo 1 de 2 · Veículo</div><div class="step-dots"><span class="on"></span><span></span></div></div><h2 id="tituloDetalhe">Detalhes: Seguro Auto</h2></div>
+          <div class="step-head"><div class="step-head-top"><div class="lbl" id="lblDetalhe">🔎 Comparando 7 seguradoras</div><div class="step-pct">50%</div></div><h2 id="tituloDetalhe">Detalhes: Seguro Auto</h2></div>
           <div class="step-body">
             <a href="#" id="linkOutroSeguro" class="link-outro">Não é seguro Auto? Ver outras opções</a>
 
@@ -389,7 +380,7 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
         </div>
 
         <div class="f-panel" data-panel="3">
-          <div class="step-head"><div class="step-head-top"><div class="lbl">Passo 2 de 2 · Contato</div><div class="step-dots"><span></span><span class="on"></span></div></div><h2>Pra onde enviamos sua cotação?</h2></div>
+          <div class="step-head"><div class="step-head-top"><div class="lbl">🔎 Comparando 7 seguradoras</div><div class="step-pct">100%</div></div><h2>Pra onde enviamos sua cotação?</h2></div>
           <div class="step-body">
             <div class="f-grid2">
               <div class="f-row"><label>Nome completo</label><input type="text" id="contNome" placeholder="Seu nome"></div>
@@ -454,7 +445,33 @@ footer.site a{color:rgba(255,255,255,.8);text-decoration:underline}
   <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
 
+<div class="modal-overlay" id="cbModalOverlay">
+  <div class="modal-card">
+    <button type="button" class="modal-close" id="cbModalClose" aria-label="Fechar">✕</button>
+    <div class="cb-modal-form" id="cbModalForm">
+      <div class="cb-ic">📞</div>
+      <h3>A gente te liga em até 10 minutos</h3>
+      <p>Só precisamos do seu nome e telefone.</p>
+      <div class="f-row"><label>Nome</label><input type="text" id="cbNome" placeholder="Seu nome"></div>
+      <div class="f-row"><label>Telefone</label><input type="text" id="cbTelefone" placeholder="(00) 00000-0000"></div>
+      <button type="button" class="btn btn-accent btn-block" id="cbEnviar">Quero que me liguem agora</button>
+    </div>
+    <div class="cb-modal-success" id="cbSuccess">
+      <div class="cb-ic">✅</div>
+      <h3>Prontinho!</h3>
+      <p>Confirma no WhatsApp que já entramos na fila de retorno — te ligamos em até 10 minutos.</p>
+      <a href="#" id="cbWhatsLink" target="_blank" class="btn btn-accent btn-block">Confirmar no WhatsApp</a>
+    </div>
+  </div>
+</div>
+
 <script>
+function abrirCallbackModal(){ document.getElementById('cbModalOverlay').classList.add('show'); }
+function fecharCallbackModal(){ document.getElementById('cbModalOverlay').classList.remove('show'); }
+document.querySelectorAll('.js-callback-trigger').forEach(el=>el.addEventListener('click', (e)=>{ e.preventDefault(); abrirCallbackModal(); }));
+document.getElementById('cbModalClose').addEventListener('click', fecharCallbackModal);
+document.getElementById('cbModalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='cbModalOverlay') fecharCallbackModal(); });
+
 const WA_NUM = '554735143392';
 let tipoAtual = null;
 
@@ -536,19 +553,13 @@ document.getElementById('enviar').addEventListener('click', ()=>{
   irPara(4);
 });
 
-document.getElementById('btnAbrirCallback').addEventListener('click', ()=>{
-  const card = document.getElementById('callbackCard');
-  card.classList.toggle('show');
-  if(card.classList.contains('show')) card.scrollIntoView({behavior:'smooth', block:'center'});
-});
-
 document.getElementById('cbEnviar').addEventListener('click', ()=>{
   const nome = document.getElementById('cbNome').value.trim();
   const tel = document.getElementById('cbTelefone').value.trim();
   if(!nome || !tel){ alert('Preenche nome e telefone :)'); return; }
-  const msg = `Olá! Quero receber uma ligação em até 5 minutos.\nNome: ${nome}\nTelefone: ${tel}`;
+  const msg = `Olá! Quero receber uma ligação em até 10 minutos.\nNome: ${nome}\nTelefone: ${tel}`;
   document.getElementById('cbWhatsLink').href = `https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`;
-  document.getElementById('cbForm').style.display = 'none';
+  document.getElementById('cbModalForm').style.display = 'none';
   document.getElementById('cbSuccess').classList.add('show');
 });
 
