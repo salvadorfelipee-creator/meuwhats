@@ -795,6 +795,25 @@ de carro batido que o usuário colou no chat.
   (corretor), `3d9e00e8c793bfe3c06a9e3a523e5faa` (nicho app). Preview real conferido, tudo
   renderizando certo.
 
+### Ativadas em 31/07/2026 (mesmo dia) — as 4 campanhas estão no ar
+
+Usuário decidiu manter o nome "Solutions Engineering Team" como está (não é prioridade
+resolver agora) e pediu pra ativar. Confirmado o público com o usuário antes de ativar
+(puxado direto da API, não da memória da conversa) e as 4 campanhas + conjuntos + anúncios
+foram ativados via `POST /{id}` com `status: ACTIVE` nos três níveis. Confirmado depois via
+`GET .../campaigns?fields=status,effective_status` que as 4 estão `ACTIVE`/`ACTIVE`:
+
+| Campanha | Público | Orçamento |
+|---|---|---|
+| Comparação 7 Seguradoras | SC+RS, 25-55, interesse "Seguro de veículo" | R$7,50/dia |
+| Descubra o Preço (2 min) | SC+RS, 25-55, aberto (sem interesse) | R$7,50/dia |
+| Corretor de Verdade | SC+RS, 25-55, interesse "Seguro de veículo" | R$7,50/dia |
+| Nicho Motorista de App | SC+RS, 21-50, interesse "Uber (empresa)" | R$7,50/dia |
+
+Total R$30/dia. Próximo passo natural (não pedido ainda): acompanhar gasto/resultado pelos
+próximos dias (painel → 📊, ou pedir no chat) e decidir se pausa a de pior desempenho, mesmo
+padrão usado no teste A/B do consignado abaixo.
+
 ### RESULTADO FINAL do teste (06→10/07/2026, apurado 11/07)
 
 Gasto total R$147,60 · 19 conversas iniciadas · média R$7,77/conversa:
