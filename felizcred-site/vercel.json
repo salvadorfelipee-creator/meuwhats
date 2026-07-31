@@ -3,6 +3,11 @@
   "cleanUrls": true,
   "redirects": [
     {
+      "source": "/cotacerta/",
+      "destination": "https://www.cotacertaseguros.com.br/",
+      "permanent": true
+    },
+    {
       "source": "/cotacerta/:path*",
       "destination": "https://www.cotacertaseguros.com.br/:path*",
       "permanent": true
