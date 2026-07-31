@@ -51,7 +51,7 @@ fiel ao site no ar.
 ## Cota Certa Seguros (`cotacerta/`)
 
 A partir de 2026-07-30, a subpasta `cotacerta/` (home, `cotar/`, `blog/`)
-virou também um site **próprio e independente**, com domínio dedicado:
+virou um site **próprio e independente**, com domínio dedicado:
 
 - **Projeto Vercel separado**: `otacerta-seguros`, importado do **mesmo
   repositório** `meuwhats`, com **Root Directory = `felizcred-site/cotacerta`**
@@ -59,16 +59,23 @@ virou também um site **próprio e independente**, com domínio dedicado:
 - **Domínio**: `cotacertaseguros.com.br` (DNS no Hostinger desde
   2026-07-30: `A @ → 216.198.79.1`,
   `CNAME www → 79c197869691e9f2.vercel-dns-017.com`).
-- **Os mesmos arquivos continuam também acessíveis** em
-  `www.felizcred.com.br/cotacerta/` (servidos pelo projeto Vercel principal
-  `meuwhats`, descrito acima) — os dois endereços apontam pra pasta idêntica.
+- **`www.felizcred.com.br/cotacerta/*` não serve mais conteúdo** — desde
+  2026-07-30 é só um **redirect 308 permanente** (configurado em
+  `vercel.json`, chave `redirects`) pra `www.cotacertaseguros.com.br/*`. A
+  pasta `cotacerta/` continua existindo neste repositório só porque é a
+  fonte do outro projeto Vercel (o de domínio próprio) — **não edite nada
+  aqui esperando que apareça em `felizcred.com.br`**, esse caminho só
+  redireciona.
+- `cotacerta/` tem seu **próprio** `sitemap.xml`, `robots.txt` e
+  `vercel.json` (com `cleanUrls: true`, igual ao da raiz), todos apontando
+  pra `cotacertaseguros.com.br` — são independentes dos arquivos de mesmo
+  nome na raiz de `felizcred-site/`.
 
-**Regra que não pode quebrar**: como a mesma pasta é raiz de um domínio E
-subpasta do outro ao mesmo tempo, todo link/`src`/`href` dentro de
-`cotacerta/**` precisa ser **caminho relativo** (`img/logo.png`, `cotar/`,
-`../blog/...`) — nunca absoluto (`/cotacerta/...` ou `/img/...`). Se algum
-dia reintroduzir um caminho absoluto por engano, ele funciona em um dos dois
-endereços e quebra no outro.
+**Regra que não pode quebrar**: todo link/`src`/`href` dentro de
+`cotacerta/**` é **caminho relativo** (`img/logo.png`, `cotar/`,
+`../blog/...`), nunca absoluto (`/cotacerta/...` ou `/img/...`) — isso é
+resquício de quando a pasta ainda era servida em dois endereços ao mesmo
+tempo, mas manter relativo continua sendo a forma correta.
 
 Ver também o mapa geral dos três sistemas no [README da raiz do
 repositório](../README.md).

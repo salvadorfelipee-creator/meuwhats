@@ -24,13 +24,13 @@ pra não misturar:
 - **Nenhum dos três compartilha código, banco de dados, variáveis de ambiente
   ou segredos** com os outros — são deploys 100% isolados, só o `git push`
   em `main` é comum a todos (cada um escuta e redeploya sozinho).
-- A pasta `felizcred-site/cotacerta/` é servida em **dois endereços ao mesmo
-  tempo** a partir dos mesmos arquivos: como subpasta
-  (`felizcred.com.br/cotacerta/`) e como raiz do domínio próprio
-  (`cotacertaseguros.com.br/`). Por isso, todo link/imagem interno dentro de
-  `cotacerta/` usa **caminho relativo** (`img/logo.png`, `cotar/`,
-  `../blog/`) — nunca um caminho absoluto tipo `/cotacerta/img/...` ou
-  `/img/...`, senão quebra um dos dois endereços.
+- A pasta `felizcred-site/cotacerta/` só existe neste repositório porque é a
+  **fonte do projeto Vercel da Cota Certa** — `www.felizcred.com.br/cotacerta/*`
+  não serve mais nada, é só um redirect 308 pra
+  `www.cotacertaseguros.com.br/*` (configurado no `vercel.json` da raiz do
+  site). Todo link/imagem interno dentro de `cotacerta/` usa **caminho
+  relativo** (`img/logo.png`, `cotar/`, `../blog/`) — nunca absoluto
+  (`/cotacerta/img/...` ou `/img/...`).
 - Editar algo do painel de WhatsApp (este README, `server.js`, `db.js`) nunca
   afeta os sites, e vice-versa.
 
