@@ -749,6 +749,38 @@ apenas 2 minutos". Todas **criadas pausadas** (padrão do projeto — ativação
 **Antes de ativar**: revisar os 4 anúncios no Gerenciador (imagem/texto/página), e
 idealmente resolver o `page_id` genérico acima primeiro.
 
+### Atualização 31/07/2026 (mesmo dia) — troca de Página tentada, criativos redesenhados
+
+Pedido do usuário: usar a Página "Solutions Engineering Team" (`105193575892026`) em vez da
+"Feliz cred correspondente bancario", e trocar o visual de fundo dos criativos por uma foto
+de carro batido que o usuário colou no chat.
+
+- **Foto colada no chat: sem acesso a ela por arquivo.** Confirmado (busca em
+  `AppData/Local/Temp`, `Downloads`, `Pictures`, pasta de scratchpad da sessão — nada) que
+  imagens coladas direto na conversa não ficam disponíveis como arquivo pras ferramentas de
+  código; só existem como conteúdo de visão dentro da conversa. Não é bloqueio de permissão,
+  é limitação real do canal. Pra usar uma foto real de carro batido no futuro, o caminho é
+  salvar o arquivo em algum lugar do repo (ex: `cotacerta-seguros/img/`) e pedir a partir
+  daí.
+- **"Solutions Engineering Team" não funciona pra criar anúncio**: `POST /adcreatives`
+  retorna `error_subcode 1815202` — "a Página não tem acesso à conta do Instagram". Tentei
+  contornar restringindo o conjunto de anúncios só pro posicionamento Facebook
+  (`publisher_platforms: ["facebook"]`), mas o erro acontece na validação do criativo em si,
+  antes de posicionamento entrar em jogo — não adianta. E o token não tem
+  `pages_read_engagement` pra sequer inspecionar por que essa Página está sem Instagram
+  vinculado. **Ficou confirmado como bloqueio real de permissão/config do lado da Meta**, não
+  algo contornável por API com o token atual — segue usando `1119238764613554` (Feliz cred)
+  até o usuário vincular um Instagram a essa Página no Business Manager ou pedir outra.
+- **O que foi feito em vez disso**: os 3 criativos com foto (Descubra o Preço, Corretor de
+  Verdade, Nicho Motorista de App) foram redesenhados com um grafismo de "vidro
+  trincado"/impacto (SVG, sem foto real) sobre fundo vermelho-escuro + selo "⚠️ ATENÇÃO",
+  reforçando o gancho de aversão à perda, e reenviados como novos criativos (mesma
+  campanha/conjunto/anúncio, `creative_id` trocado via `POST /{ad_id}`). O de "Comparação 7
+  Seguradoras" manteve a imagem original (grid de logos, não usa foto). Novos hashes de
+  imagem: `c795e6b51cbbc6ba7cb5729ceb9877e5` (preço), `780e8e57db81a0e159d2747f9dab03f3`
+  (corretor), `3d9e00e8c793bfe3c06a9e3a523e5faa` (nicho app). Preview real conferido, tudo
+  renderizando certo.
+
 ### RESULTADO FINAL do teste (06→10/07/2026, apurado 11/07)
 
 Gasto total R$147,60 · 19 conversas iniciadas · média R$7,77/conversa:
