@@ -699,6 +699,55 @@ O processo combinado é:
   post DHOOi8jxpzI, "IMPORTANTE! Gerente ou supervisor").
 - O rascunho antigo "Felizcred - Teste A/B Gerentes Varejo SC-RS [RASCUNHO]" (26/06, pausado,
   sem anúncios) continua lá — pode ser apagado quando o usuário quiser.
+- **Bug crítico encontrado em 31/07/2026 no `graphRequest` de `ads.js`**: requests POST sem
+  header `Content-Length` explícito saem com `Transfer-Encoding: chunked` (comportamento
+  padrão do `https` do Node quando não se define o tamanho do corpo) e a Graph API às vezes
+  **perde/derruba um parâmetro do meio do corpo** nesse modo — ex: `special_ad_categories`
+  chegava como "obrigatório e ausente" mesmo sendo enviado corretamente (confirmado
+  comparando byte a byte com um `curl --data-urlencode` idêntico, que funcionava). Corrigido
+  adicionando `"Content-Length": Buffer.byteLength(body)` no header de toda request com
+  corpo. Se voltar a aparecer erro "parâmetro obrigatório" com um parâmetro que claramente
+  foi enviado, é isso — não é bug de payload.
+
+### Campanhas "Cota Certa Seguros" criadas em 31/07/2026 (site/produto novo, primeira leva)
+
+Pedido do usuário: instalar o Pixel do Meta no site `cotacertaseguros.com.br` e criar 4
+campanhas de tráfego pro site (`/cotar/`), R$30/dia no total dividido entre elas
+(R$7,50/dia cada), copy no estilo "descubra agora quanto fica o seguro do seu carro, em
+apenas 2 minutos". Todas **criadas pausadas** (padrão do projeto — ativação é manual).
+
+- **Pixel**: criado no ato, `Cota Certa Seguros`, ID `1060589406422111`. Instalado no
+  `<head>` das 13 páginas de `cotacerta-seguros/` (home, `/cotar/`, blog) — dispara
+  `PageView` em toda página e `Lead` customizado nos dois pontos de conversão do funil
+  (fim da cotação completa e popup "quero que me liguem"). **Sem `pages_read_engagement`
+  suficiente pra confirmar disparo real via teste automatizado** (headless browser é
+  bloqueado pelo próprio anti-fraude do `fbevents.js`) — confirmar disparo de verdade no
+  Gerenciador de Eventos → Testar Eventos, com navegador normal, antes de confiar 100% nos
+  dados de conversão.
+- **Criativos**: sem banco de fotos/design pronto pro produto de seguro, então os 4
+  criativos foram gerados localmente (HTML+screenshot, 1080×1350) reaproveitando os assets
+  reais do site — logo, as 4 logos de seguradora parceira (`img/porto.webp` etc.) e a foto
+  `img/hero-auto.jpg`. **São um placeholder funcional, não a versão final** — o ideal é
+  trocar por fotos reais (motorista de app de verdade pro criativo de nicho, por exemplo)
+  antes de escalar o orçamento.
+- **Página do anúncio**: usada a única Página confirmada utilizável com este token,
+  `1119238764613554` ("Feliz cred correspondente bancario") — **problema conhecido**: o
+  anúncio aparece com esse nome de página (marca errada pra um anúncio de seguro). Criar uma
+  Página própria "Cota Certa Seguros" no Business Manager e trocar o `page_id` nos 4
+  criativos antes de ativar é o ideal (ativar como está funciona, mas confunde quem vê).
+- Objetivo `OUTCOME_TRAFFIC`, `optimization_goal: LINK_CLICKS`, `destination_type: WEBSITE`,
+  link `https://www.cotacertaseguros.com.br/cotar/`, `bid_strategy:
+  LOWEST_COST_WITHOUT_CAP`, público SC+RS (mesmas regiões 459/456 do teste de consignado).
+
+| Campanha | Público | ID campanha | ID conjunto | ID anúncio |
+|---|---|---|---|---|
+| Cota Certa - Comparacao 7 Seguradoras | SC+RS, 25-55, interesse "Seguro de veículo" (`6003633149383`) | 120249252547780006 | 120249252547910006 | 120249252548190006 |
+| Cota Certa - Descubra o Preco (2 min) | SC+RS, 25-55, aberto (sem interesse) | 120249252548300006 | 120249252548400006 | 120249252548570006 |
+| Cota Certa - Corretor de Verdade | SC+RS, 25-55, interesse "Seguro de veículo" | 120249252548660006 | 120249252548710006 | 120249252548940006 |
+| Cota Certa - Nicho Motorista de App | SC+RS, 21-50, interesse "Uber (empresa)" (`6004675264764`) | 120249252549080006 | 120249252549200006 | 120249252549440006 |
+
+**Antes de ativar**: revisar os 4 anúncios no Gerenciador (imagem/texto/página), e
+idealmente resolver o `page_id` genérico acima primeiro.
 
 ### RESULTADO FINAL do teste (06→10/07/2026, apurado 11/07)
 

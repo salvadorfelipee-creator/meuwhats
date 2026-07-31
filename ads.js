@@ -28,7 +28,12 @@ function graphRequest(method, requestPath, params) {
         path,
         headers: {
           Authorization: `Bearer ${ACCESS_TOKEN}`,
-          ...(body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
+          ...(body
+            ? {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Content-Length": Buffer.byteLength(body),
+              }
+            : {}),
         },
       },
       (res) => {
