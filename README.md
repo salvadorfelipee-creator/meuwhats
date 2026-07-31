@@ -765,15 +765,26 @@ de carro batido que o usuário colou no chat.
   criativos com foto (substituindo o grafismo de vidro trincado). Hashes atualizados:
   `0ae08920dae518f29aa356639baf42d7` (preço), `8b10380be88faba11b2d7ffe2b65b738` (corretor),
   `77a7c34ec8398d024368d03a4d587161` (nicho app). Preview real conferido de novo, ok.
-- **"Solutions Engineering Team" não funciona pra criar anúncio**: `POST /adcreatives`
-  retorna `error_subcode 1815202` — "a Página não tem acesso à conta do Instagram". Tentei
-  contornar restringindo o conjunto de anúncios só pro posicionamento Facebook
-  (`publisher_platforms: ["facebook"]`), mas o erro acontece na validação do criativo em si,
-  antes de posicionamento entrar em jogo — não adianta. E o token não tem
-  `pages_read_engagement` pra sequer inspecionar por que essa Página está sem Instagram
-  vinculado. **Ficou confirmado como bloqueio real de permissão/config do lado da Meta**, não
-  algo contornável por API com o token atual — segue usando `1119238764613554` (Feliz cred)
-  até o usuário vincular um Instagram a essa Página no Business Manager ou pedir outra.
+- **"Solutions Engineering Team" não funcionava pra criar anúncio — resolvido pelo usuário.**
+  `POST /adcreatives` retornava `error_subcode 1815202` — "a Página não tem acesso à conta do
+  Instagram". Tentei contornar restringindo o conjunto de anúncios só pro posicionamento
+  Facebook (`publisher_platforms: ["facebook"]`), mas o erro acontecia na validação do
+  criativo em si, antes de posicionamento entrar em jogo — não adiantou, e o token não tem
+  `pages_read_engagement` pra sequer inspecionar a Página. O usuário resolveu manualmente no
+  Business Manager: criou/vinculou a conta do Instagram **@cotacertaseguros**
+  (`17841437674153172`) a essa Página. Testei de novo com `POST /adcreatives` simples (sem
+  `instagram_actor_id` — passar esse campo explicitamente dá erro "must be a valid Instagram
+  account id", token não tem escopo pra isso, mas **não precisa**: só ter a Página com IG
+  vinculado já resolve o erro original) e funcionou. Os 4 anúncios foram atualizados pra usar
+  `page_id: 105193575892026` (Solutions Engineering Team). Preview real conferido, ok.
+- **Pendência final**: o anúncio agora mostra o nome "Solutions Engineering Team" como
+  anunciante (é o nome de exibição da própria Página, não muda s vinculando Instagram).
+  Tentei renomear via `POST /{page_id}` com `name` — bloqueado: `"Application does not have
+  the capability to make this API call"` (falta permissão de app tipo `pages_manage_metadata`,
+  igual ao histórico de Instagram desta mesma seção do README). **Sem contorno por API** —
+  o usuário precisa renomear a Página manualmente (Business Manager → Configurações →
+  Páginas → Solutions Engineering Team → editar nome pra "Cota Certa Seguros"); depois disso
+  atualiza sozinho em todos os 4 anúncios, sem precisar mexer em mais nada.
 - **O que foi feito em vez disso**: os 3 criativos com foto (Descubra o Preço, Corretor de
   Verdade, Nicho Motorista de App) foram redesenhados com um grafismo de "vidro
   trincado"/impacto (SVG, sem foto real) sobre fundo vermelho-escuro + selo "⚠️ ATENÇÃO",
