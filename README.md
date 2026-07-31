@@ -755,13 +755,16 @@ Pedido do usuário: usar a Página "Solutions Engineering Team" (`10519357589202
 "Feliz cred correspondente bancario", e trocar o visual de fundo dos criativos por uma foto
 de carro batido que o usuário colou no chat.
 
-- **Foto colada no chat: sem acesso a ela por arquivo.** Confirmado (busca em
-  `AppData/Local/Temp`, `Downloads`, `Pictures`, pasta de scratchpad da sessão — nada) que
-  imagens coladas direto na conversa não ficam disponíveis como arquivo pras ferramentas de
-  código; só existem como conteúdo de visão dentro da conversa. Não é bloqueio de permissão,
-  é limitação real do canal. Pra usar uma foto real de carro batido no futuro, o caminho é
-  salvar o arquivo em algum lugar do repo (ex: `cotacerta-seguros/img/`) e pedir a partir
-  daí.
+- **Foto colada no chat: sem acesso a ela por arquivo — resolvido.** Confirmado (busca
+  exaustiva em `AppData/Local/Temp`, `Downloads`, `Pictures`, caches do próprio Claude Code)
+  que imagens coladas direto na conversa não ficam disponíveis como arquivo; só existem como
+  conteúdo de visão dentro da mensagem. Não é bloqueio de permissão, é limitação real do
+  canal. O usuário salvou a imagem (gerada por ele no ChatGPT) em
+  `felizcred-site/logo/ChatGPT Image 31 de jul. de 2026, 18_33_01.png` e apontou o caminho —
+  copiada pra `cotacerta-seguros/img/acidente-carro.png` e usada como fundo real dos 3
+  criativos com foto (substituindo o grafismo de vidro trincado). Hashes atualizados:
+  `0ae08920dae518f29aa356639baf42d7` (preço), `8b10380be88faba11b2d7ffe2b65b738` (corretor),
+  `77a7c34ec8398d024368d03a4d587161` (nicho app). Preview real conferido de novo, ok.
 - **"Solutions Engineering Team" não funciona pra criar anúncio**: `POST /adcreatives`
   retorna `error_subcode 1815202` — "a Página não tem acesso à conta do Instagram". Tentei
   contornar restringindo o conjunto de anúncios só pro posicionamento Facebook
