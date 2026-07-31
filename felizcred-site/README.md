@@ -48,34 +48,19 @@ fiel ao site no ar.
   e-mail não está de fato configurado. Funciona hoje só como funil visual
   até virar WhatsApp.
 
-## Cota Certa Seguros (`cotacerta/`)
+## Cota Certa Seguros já não vive aqui
 
-A partir de 2026-07-30, a subpasta `cotacerta/` (home, `cotar/`, `blog/`)
-virou um site **próprio e independente**, com domínio dedicado:
+Até 2026-07-30 existiu uma subpasta `cotacerta/` dentro deste projeto. Ela
+foi **movida para `../cotacerta-seguros/`** (pasta irmã, fora de
+`felizcred-site/`) quando a marca ganhou domínio e projeto Vercel próprios —
+ver [`cotacerta-seguros/README.md`](../cotacerta-seguros/README.md).
 
-- **Projeto Vercel separado**: `otacerta-seguros`, importado do **mesmo
-  repositório** `meuwhats`, com **Root Directory = `felizcred-site/cotacerta`**
-  e Framework Preset = Other.
-- **Domínio**: `cotacertaseguros.com.br` (DNS no Hostinger desde
-  2026-07-30: `A @ → 216.198.79.1`,
-  `CNAME www → 79c197869691e9f2.vercel-dns-017.com`).
-- **`www.felizcred.com.br/cotacerta/*` não serve mais conteúdo** — desde
-  2026-07-30 é só um **redirect 308 permanente** (configurado em
-  `vercel.json`, chave `redirects`) pra `www.cotacertaseguros.com.br/*`. A
-  pasta `cotacerta/` continua existindo neste repositório só porque é a
-  fonte do outro projeto Vercel (o de domínio próprio) — **não edite nada
-  aqui esperando que apareça em `felizcred.com.br`**, esse caminho só
-  redireciona.
-- `cotacerta/` tem seu **próprio** `sitemap.xml`, `robots.txt` e
-  `vercel.json` (com `cleanUrls: true`, igual ao da raiz), todos apontando
-  pra `cotacertaseguros.com.br` — são independentes dos arquivos de mesmo
-  nome na raiz de `felizcred-site/`.
-
-**Regra que não pode quebrar**: todo link/`src`/`href` dentro de
-`cotacerta/**` é **caminho relativo** (`img/logo.png`, `cotar/`,
-`../blog/...`), nunca absoluto (`/cotacerta/...` ou `/img/...`) — isso é
-resquício de quando a pasta ainda era servida em dois endereços ao mesmo
-tempo, mas manter relativo continua sendo a forma correta.
+`www.felizcred.com.br/cotacerta/*` hoje é só um **redirect 308 permanente**
+(configurado no `vercel.json` abaixo, chave `redirects`) pra
+`www.cotacertaseguros.com.br/*`. Isso só funciona porque a pasta `cotacerta/`
+**não existe mais dentro de `felizcred-site/`** — enquanto ela existia aqui,
+a Vercel servia o arquivo estático direto e ignorava o redirect (arquivo
+real sempre vence sobre regra de redirect). Não recriar essa pasta aqui.
 
 Ver também o mapa geral dos três sistemas no [README da raiz do
 repositório](../README.md).

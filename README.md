@@ -15,22 +15,25 @@ só compartilham o histórico do Git:
 |---|---|---|---|
 | **Painel de WhatsApp/Instagram/Telegram** (este README) | raiz (`server.js`, `db.js`, `painel/`...) | **Render** (deploy automático a cada push) | `meuwhats.onrender.com` |
 | **Site institucional FelizCred** | `felizcred-site/` | **Vercel**, projeto `meuwhats`, Root Directory = `felizcred-site` | `www.felizcred.com.br` |
-| **Cota Certa Seguros** (mesmos arquivos do item acima) | `felizcred-site/cotacerta/` | **Vercel**, projeto separado `otacerta-seguros`, Root Directory = `felizcred-site/cotacerta` | `cotacertaseguros.com.br` |
+| **Cota Certa Seguros** | `cotacerta-seguros/` | **Vercel**, projeto separado `otacerta-seguros`, Root Directory = `cotacerta-seguros` | `cotacertaseguros.com.br` |
 
 Detalhes de cada site estático ficam em
-[`felizcred-site/README.md`](./felizcred-site/README.md). Regras importantes
-pra não misturar:
+[`felizcred-site/README.md`](./felizcred-site/README.md) e
+[`cotacerta-seguros/README.md`](./cotacerta-seguros/README.md). Regras
+importantes pra não misturar:
 
 - **Nenhum dos três compartilha código, banco de dados, variáveis de ambiente
   ou segredos** com os outros — são deploys 100% isolados, só o `git push`
   em `main` é comum a todos (cada um escuta e redeploya sozinho).
-- A pasta `felizcred-site/cotacerta/` só existe neste repositório porque é a
-  **fonte do projeto Vercel da Cota Certa** — `www.felizcred.com.br/cotacerta/*`
-  não serve mais nada, é só um redirect 308 pra
-  `www.cotacertaseguros.com.br/*` (configurado no `vercel.json` da raiz do
-  site). Todo link/imagem interno dentro de `cotacerta/` usa **caminho
-  relativo** (`img/logo.png`, `cotar/`, `../blog/`) — nunca absoluto
-  (`/cotacerta/img/...` ou `/img/...`).
+- `www.felizcred.com.br/cotacerta/*` (endereço antigo, de quando a Cota
+  Certa vivia como subpasta) hoje é só um **redirect 308** pra
+  `www.cotacertaseguros.com.br/*` (configurado no `vercel.json` de
+  `felizcred-site/`). A pasta `cotacerta-seguros/` **não pode voltar** pra
+  dentro de `felizcred-site/` — enquanto ela morou lá, a Vercel servia o
+  arquivo estático real antes de checar o redirect, e o redirect nunca era
+  alcançado. Todo link/imagem interno dentro de `cotacerta-seguros/` usa
+  **caminho relativo** (`img/logo.png`, `cotar/`, `../blog/`) — nunca
+  absoluto.
 - Editar algo do painel de WhatsApp (este README, `server.js`, `db.js`) nunca
   afeta os sites, e vice-versa.
 
@@ -260,7 +263,7 @@ fluxo próprio é só acrescentar uma entrada em `FLUXOS_POR_NUMERO`.
 
 O fluxo da Cota Certa (`FLUXO_COTACERTA`) tem duas entradas:
 
-- **Veio do site** (`felizcred-site/cotacerta`): o botão "Cotar agora" e o popup de callback
+- **Veio do site** (`cotacerta-seguros/`): o botão "Cotar agora" e o popup de callback
   montam um link `wa.me/5547996103804?text=...` com o texto já pronto ("Olá! Quero cotar..."
   ou "Olá! Quero receber uma ligação..."). O servidor reconhece esses prefixos
   (`REGEX_SITE_COTACAO`/`REGEX_SITE_CALLBACK`) e responde confirmando o recebimento, **sem**
@@ -274,7 +277,7 @@ O fluxo da Cota Certa (`FLUXO_COTACERTA`) tem duas entradas:
   especialista vai assumir. Vida/Consórcio/Outros só confirmam e já passam pro humano.
 
 ⚠️ Se o número do WhatsApp da Cota Certa mudar, atualizar `COTACERTA_NUMBER_ID` em `server.js`
-**e também** o `WA_NUM`/links `wa.me` em todo `felizcred-site/cotacerta/` (home, `/cotar`,
+**e também** o `WA_NUM`/links `wa.me` em todo `cotacerta-seguros/` (home, `/cotar`,
 blog) — são duas coisas independentes que precisam apontar pro mesmo número.
 
 ---
