@@ -556,6 +556,15 @@ function detalhesPorTipo(){
   }
 }
 
+const LEAD_API = 'https://meuwhats.onrender.com/cotacerta/lead';
+function enviarLeadServidor(lead){
+  fetch(LEAD_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(lead),
+  }).catch(()=>{});
+}
+
 document.getElementById('enviar').addEventListener('click', ()=>{
   if(!validarObrigatorios(document.querySelector('.f-panel[data-panel="3"]'))) return;
   if(!document.getElementById('contConsent').checked){
@@ -566,8 +575,10 @@ document.getElementById('enviar').addEventListener('click', ()=>{
   const whats = document.getElementById('contWhats').value.trim();
   const email = document.getElementById('contEmail').value.trim();
   const cpf = document.getElementById('contCpf').value.trim();
-  const msg = `Olá! Quero cotar ${NOMES[tipoAtual]||'um seguro'} pela Cota Certa.\nNome: ${nome}\nWhatsApp: ${whats}\nE-mail: ${email}\nCPF: ${cpf}\n${detalhesPorTipo()}`;
+  const detalhes = detalhesPorTipo();
+  const msg = `Olá! Quero cotar ${NOMES[tipoAtual]||'um seguro'} pela Cota Certa.\nNome: ${nome}\nWhatsApp: ${whats}\nE-mail: ${email}\nCPF: ${cpf}\n${detalhes}`;
   document.getElementById('linkWhats').href = `https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`;
+  enviarLeadServidor({ tipo: NOMES[tipoAtual] || tipoAtual, nome, whatsapp: whats, email, cpf, detalhes, origem: 'formulario' });
   if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: NOMES[tipoAtual] || 'seguro' });
   irPara(4);
 });
@@ -580,6 +591,7 @@ document.getElementById('cbEnviar').addEventListener('click', ()=>{
   document.getElementById('cbWhatsLink').href = `https://wa.me/${WA_NUM}?text=${encodeURIComponent(msg)}`;
   document.getElementById('cbModalForm').style.display = 'none';
   document.getElementById('cbSuccess').classList.add('show');
+  enviarLeadServidor({ tipo: 'callback', nome, whatsapp: tel, origem: 'callback' });
   if (typeof fbq === 'function') fbq('track', 'Lead', { content_name: 'callback' });
 });
 

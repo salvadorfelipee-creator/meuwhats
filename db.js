@@ -122,6 +122,19 @@ const ready = (async () => {
   )`);
 
   await client.execute(`DROP TABLE IF EXISTS linkedin_leads`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS cotacerta_leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tipo TEXT,
+    nome TEXT,
+    whatsapp TEXT,
+    email TEXT,
+    cpf TEXT,
+    detalhes TEXT,
+    origem TEXT,
+    email_enviado INTEGER DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`);
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -330,6 +343,33 @@ async function telegramListContacts() {
   return result.rows;
 }
 
+async function salvarLeadCotaCerta(lead) {
+  await ready;
+  const { tipo, nome, whatsapp, email, cpf, detalhes, origem, emailEnviado } = lead;
+  const result = await client.execute({
+    sql: `INSERT INTO cotacerta_leads (tipo, nome, whatsapp, email, cpf, detalhes, origem, email_enviado, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      tipo || null,
+      nome || null,
+      whatsapp || null,
+      email || null,
+      cpf || null,
+      detalhes || null,
+      origem || null,
+      emailEnviado ? 1 : 0,
+      Date.now(),
+    ],
+  });
+  return result.lastInsertRowid;
+}
+
+async function listarLeadsCotaCerta() {
+  await ready;
+  const result = await client.execute(`SELECT * FROM cotacerta_leads ORDER BY created_at DESC`);
+  return result.rows;
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -348,4 +388,6 @@ module.exports = {
   instagramLimparSaudados,
   telegramUpsertContact,
   telegramListContacts,
+  salvarLeadCotaCerta,
+  listarLeadsCotaCerta,
 };

@@ -8,6 +8,7 @@ const wa = require("./whatsapp");
 const ig = require("./instagram");
 const ads = require("./ads");
 const tg = require("./telegram");
+const { notificarLeadCotaCerta } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -962,6 +963,40 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       await processarUpdateTelegram(body);
       return send(res, 200, "OK");
+    }
+
+    // POST /cotacerta/lead — form do site cotacertaseguros.com.br: salva o lead e avisa
+    // por e-mail (via Brevo), pra pegar quem preenche mas não chama no WhatsApp.
+    // Pública/sem auth (chamada direto do navegador do visitante) e com CORS liberado.
+    if (path_ === "/cotacerta/lead") {
+      if (req.method === "OPTIONS") {
+        res.writeHead(204, {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        });
+        return res.end();
+      }
+      if (req.method === "POST") {
+        const corsHeaders = { "Access-Control-Allow-Origin": "*" };
+        const lead = await parseBody(req);
+        if (!lead.nome || !lead.whatsapp) {
+          return send(res, 400, { error: "nome e whatsapp são obrigatórios" }, corsHeaders);
+        }
+        let emailEnviado = false;
+        try {
+          await notificarLeadCotaCerta(lead);
+          emailEnviado = true;
+        } catch (err) {
+          console.error("Erro ao enviar e-mail de lead Cota Certa:", err.message);
+        }
+        try {
+          await db.salvarLeadCotaCerta({ ...lead, emailEnviado });
+        } catch (err) {
+          console.error("Erro ao salvar lead Cota Certa:", err.message);
+        }
+        return send(res, 200, { ok: true }, corsHeaders);
+      }
     }
 
     // GET /privacidade — política de privacidade (pública, sem auth)

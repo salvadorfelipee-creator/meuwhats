@@ -302,6 +302,30 @@ quando enviada **fora do horário comercial**, gerado por `avisoForaHorarioCotaC
   hora do envio (`typeof passo.texto === "function" ? passo.texto() : passo.texto`) — assim
   o aviso reflete o horário real de quando a mensagem sai, não de quando o servidor subiu.
 
+### Captura de lead por e-mail (01/08/2026)
+
+O formulário de cotação (`cotacerta-seguros/cotar/index.html`) e o popup de callback só
+montavam um link `wa.me` — se a pessoa preenchia tudo mas não clicava pra abrir o WhatsApp, o
+lead se perdia. Agora, ao clicar em "Quero receber no WhatsApp" ou "Quero receber uma ligação",
+o formulário também dispara (fire-and-forget, não bloqueia o fluxo) um `POST` pra
+`https://meuwhats.onrender.com/cotacerta/lead` com os dados preenchidos.
+
+- **Servidor** (`server.js`, rota `POST /cotacerta/lead`, pública/CORS liberado pra qualquer
+  origem — é só um formulário de entrada, sem dado sensível de saída): salva o lead na tabela
+  `cotacerta_leads` (`db.js` → `salvarLeadCotaCerta`/`listarLeadsCotaCerta`, sem UI no painel
+  ainda, consulta é via script/SQL direto por enquanto) **e** manda um e-mail de aviso pro time
+  via API do Brevo (`email.js` → `notificarLeadCotaCerta`, usa `https` puro, sem SDK).
+- **Domínio de e-mail**: `cotacertaseguros.com.br` foi autenticado no Brevo em 01/08/2026
+  (SPF mesclado com o Hostinger, DKIM 1 e 2 do Brevo, DMARC com `rua=mailto:contato@...`) —
+  necessário pra `contato@cotacertaseguros.com.br` conseguir mandar e-mail transacional sem
+  cair em spam.
+- **Variáveis de ambiente necessárias no Render** (ver `CHAVES-LOCAL.md` — precisam ser geradas
+  manualmente no painel do Brevo, não dá pra automatizar): `BREVO_API_KEY`, `LEAD_EMAIL_TO`
+  (pra onde o aviso é mandado) e, opcionalmente, `BREVO_EMAIL_FROM`/`BREVO_EMAIL_FROM_NOME`
+  (default `contato@cotacertaseguros.com.br` / "Cota Certa Seguros"). Sem `BREVO_API_KEY` o
+  envio de e-mail falha silenciosamente (só loga erro) mas o lead **continua sendo salvo** no
+  banco — o `try/catch` em volta do e-mail não bloqueia o `try/catch` em volta do save.
+
 ---
 
 ## Automações do Instagram
