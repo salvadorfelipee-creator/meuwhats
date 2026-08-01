@@ -340,15 +340,62 @@ const COTACERTA_NUMBER_ID = "518007084723311";
 const REGEX_SITE_COTACAO = /^Ol[áa]!\s*Quero cotar/i;
 const REGEX_SITE_CALLBACK = /^Ol[áa]!\s*Quero receber uma liga[çc][ãa]o/i;
 
+// ─── HORÁRIO COMERCIAL (Cota Certa) ──────────────────────────────────────────
+// Assumido seg-sex 9h-18h, sábado 9h-12h, domingo fechado (não confirmado com o
+// usuário — ajustar aqui se o horário real da equipe for diferente).
+function horarioComercialCotaCerta(data = new Date()) {
+  const tz = "America/Sao_Paulo";
+  const dia = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(data);
+  const hora = Number(
+    new Intl.DateTimeFormat("pt-BR", { timeZone: tz, hour: "numeric", hour12: false }).format(data)
+  );
+  if (dia === "Sun") return false;
+  if (dia === "Sat") return hora >= 9 && hora < 12;
+  return hora >= 9 && hora < 18;
+}
+
+// Aviso pra anexar em qualquer mensagem automática que prometa contato de um
+// especialista — deixa claro que a resposta é automática e quando o atendimento
+// humano volta. No fim de semana prolongado (sábado à tarde ou domingo) reforça
+// o aviso da janela de 24h do WhatsApp, porque aí o próximo expediente (segunda
+// de manhã) fica a mais de 24h de distância — se o especialista não conseguir
+// responder a tempo, a conversa fecha e só reabre com o cliente mandando
+// mensagem de novo.
+function avisoForaHorarioCotaCerta(data = new Date()) {
+  if (horarioComercialCotaCerta(data)) return "";
+  const tz = "America/Sao_Paulo";
+  const dia = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(data);
+  const hora = Number(
+    new Intl.DateTimeFormat("pt-BR", { timeZone: tz, hour: "numeric", hour12: false }).format(data)
+  );
+  const finalDeSemanaProlongado = dia === "Sun" || (dia === "Sat" && hora >= 12);
+  if (finalDeSemanaProlongado) {
+    return (
+      "\n\n⏰ Essa resposta foi automática — nossa equipe atende de segunda a sexta das 9h às 18h e aos " +
+      "sábados até o meio-dia, e por hoje já encerramos. Um especialista fala com você segunda-feira. Como " +
+      'as conversas no WhatsApp fecham depois de 24h sem resposta, se a gente não conseguir voltar a tempo ' +
+      'é só mandar um "oi" aqui na segunda que a gente retoma o atendimento na hora! 😊'
+    );
+  }
+  return (
+    "\n\n⏰ Essa resposta foi automática — nossa equipe atende de segunda a sexta das 9h às 18h e aos " +
+    "sábados até o meio-dia. Um especialista fala com você assim que abrir o expediente."
+  );
+}
+
 function respostaSiteCotacao() {
   return (
     "Show, recebemos as informações da sua cotação por aqui! 👍 Um especialista da Cota Certa já vai te " +
-    "chamar pra fechar as melhores condições com a seguradora parceira ideal. Só um instante!"
+    "chamar pra fechar as melhores condições com a seguradora parceira ideal. Só um instante!" +
+    avisoForaHorarioCotaCerta()
   );
 }
 
 function respostaSiteCallback() {
-  return "Perfeito, já anotamos seu pedido! 📞 Um especialista da Cota Certa vai te ligar em instantes.";
+  return (
+    "Perfeito, já anotamos seu pedido! 📞 Um especialista da Cota Certa vai te ligar em instantes." +
+    avisoForaHorarioCotaCerta()
+  );
 }
 
 function menuInicialCotaCerta() {
@@ -392,9 +439,12 @@ const LEMBRETE_TEXTOS_COTACERTA = {
   padrao:
     "Olá! Vi que você parou no meio da cotação. Pra continuar, é só responder a mensagem acima ou tocar " +
     "em uma das opções 👆",
-  manter_janela:
+  // Função (não string fixa) pra poder incluir o aviso de fim de semana prolongado
+  // quando esse lembrete de 20h cair perto do fechamento da janela de 24h.
+  manter_janela: () =>
     'Ainda por aí? 😊 Sua cotação continua aberta — é só responder aqui que a gente continua de onde ' +
-    'parou (ou digite "menu" pra recomeçar).',
+    'parou (ou digite "menu" pra recomeçar).' +
+    avisoForaHorarioCotaCerta(),
 };
 
 // Pergunta se o veículo é financiado — reaproveitada tanto pela captura de texto
@@ -417,9 +467,10 @@ const PERGUNTA_RENOVACAO = {
   ],
 };
 
-const MENSAGEM_FINAL_AUTO =
+const MENSAGEM_FINAL_AUTO = () =>
   "Perfeito! 🎉 Já tenho tudo que preciso. Vou chamar um especialista agora pra fechar sua cotação com " +
-  "a seguradora parceira ideal — só um instante! 👍";
+  "a seguradora parceira ideal — só um instante! 👍" +
+  avisoForaHorarioCotaCerta();
 
 // Depois que o cliente manda o modelo/ano/placa (texto livre), pergunta se é financiado.
 async function handlerDadosVeiculo(de, businessNumberId) {
@@ -438,7 +489,8 @@ async function handlerOutrosSeguros(de, businessNumberId) {
   await enviarRespostaAutomatica(
     businessNumberId,
     de,
-    "Perfeito, anotado! Um especialista vai falar com você em instantes pra te ajudar. 👍"
+    "Perfeito, anotado! Um especialista vai falar com você em instantes pra te ajudar. 👍" +
+      avisoForaHorarioCotaCerta()
   );
   await db.setFluxoPasso(de, businessNumberId, null);
 }
@@ -499,22 +551,28 @@ const FLUXO_BOTOES_COTACERTA = {
   cc_renov_novo: { texto: MENSAGEM_FINAL_AUTO },
   cc_renov_existente: { texto: MENSAGEM_FINAL_AUTO },
   cc_vida: {
-    texto:
+    texto: () =>
       "Perfeito! Um especialista em Seguro de Vida vai falar com você em instantes pra entender sua " +
-      "necessidade e buscar a melhor condição. 👍",
+      "necessidade e buscar a melhor condição. 👍" +
+      avisoForaHorarioCotaCerta(),
   },
   cc_consorcio: {
-    texto:
+    texto: () =>
       "Perfeito! Um especialista em Consórcio vai falar com você em instantes pra apresentar as melhores " +
-      "cartas disponíveis. 👍",
+      "cartas disponíveis. 👍" +
+      avisoForaHorarioCotaCerta(),
   },
   cc_outros: {
+    // Sem aviso de horário aqui — essa etapa só pede qual seguro é (o aviso vem
+    // depois, na resposta de handlerOutrosSeguros, quando de fato promete contato).
     texto:
       "Me conta rapidinho qual seguro você precisa (Saúde, Residencial, Odonto ou Viagem) que já chamo um " +
       "especialista pra te ajudar.",
   },
   cc_atendimento: {
-    texto: "Perfeito! Já vou chamar um especialista pra continuar seu atendimento. Só um instante! 👍",
+    texto: () =>
+      "Perfeito! Já vou chamar um especialista pra continuar seu atendimento. Só um instante! 👍" +
+      avisoForaHorarioCotaCerta(),
   },
 };
 
@@ -652,7 +710,8 @@ async function processarEntry(entry) {
           const passo = fluxo.fluxoBotoes[reply.id];
           if (passo) {
             try {
-              await enviarRespostaAutomatica(businessNumberId, de, passo.texto, passo.botoes, passo.lista);
+              const textoPasso = typeof passo.texto === "function" ? passo.texto() : passo.texto;
+              await enviarRespostaAutomatica(businessNumberId, de, textoPasso, passo.botoes, passo.lista);
               // Marca (ou limpa) o passo em que a conversa fica aguardando resposta
               await db.setFluxoPasso(de, businessNumberId, fluxo.lembreteMinutos[reply.id] ? reply.id : null);
             } catch (err) {
@@ -1208,7 +1267,8 @@ setInterval(async () => {
       if (!(await db.tentarMarcarJanelaLembreteEnviado(p.phone, p.business_number_id))) continue;
       try {
         const fluxoDoContato = getFluxo(p.business_number_id);
-        const texto = fluxoDoContato.lembreteTextos.manter_janela || LEMBRETE_TEXTOS_COTACERTA.manter_janela;
+        const manterJanela = fluxoDoContato.lembreteTextos.manter_janela || LEMBRETE_TEXTOS_COTACERTA.manter_janela;
+        const texto = typeof manterJanela === "function" ? manterJanela() : manterJanela;
         await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
         console.log(`🔔 Aviso de janela (20h) enviado para ${p.phone} (passo ${p.fluxo_passo})`);
       } catch (err) {

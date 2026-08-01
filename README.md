@@ -280,6 +280,28 @@ O fluxo da Cota Certa (`FLUXO_COTACERTA`) tem duas entradas:
 **e também** o `WA_NUM`/links `wa.me` em todo `cotacerta-seguros/` (home, `/cotar`,
 blog) — são duas coisas independentes que precisam apontar pro mesmo número.
 
+### Aviso de horário comercial (31/07/2026)
+
+Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa
+(`respostaSiteCotacao`, `respostaSiteCallback`, fim do fluxo Auto, Vida, Consórcio, Outros,
+Falar com atendimento, e o lembrete de manter a janela aberta às 20h) agora anexa um aviso
+quando enviada **fora do horário comercial**, gerado por `avisoForaHorarioCotaCerta()`:
+
+- **Horário assumido** (não confirmado com o usuário — ajustar em
+  `horarioComercialCotaCerta()` se for diferente na prática): seg-sex 9h-18h, sábado 9h-12h,
+  domingo fechado.
+- **Fora do horário num dia de semana normal**: aviso simples dizendo que a resposta foi
+  automática e que um especialista fala assim que abrir o expediente.
+- **Sábado depois do meio-dia ou domingo** (o próximo expediente, segunda de manhã, fica a
+  mais de 24h de distância): aviso reforçado, avisando que o atendimento só volta segunda e
+  pedindo pra mandar um "oi" nesse dia caso a conversa feche — porque a janela de resposta
+  livre do WhatsApp fecha 24h após a última mensagem do cliente, e sem isso a empresa
+  precisaria pagar por um template pra reabrir.
+- Implementação: `texto` nos passos terminais de `FLUXO_BOTOES_COTACERTA` (e em
+  `LEMBRETE_TEXTOS_COTACERTA.manter_janela`) virou função em vez de string fixa, resolvida na
+  hora do envio (`typeof passo.texto === "function" ? passo.texto() : passo.texto`) — assim
+  o aviso reflete o horário real de quando a mensagem sai, não de quando o servidor subiu.
+
 ---
 
 ## Automações do Instagram
