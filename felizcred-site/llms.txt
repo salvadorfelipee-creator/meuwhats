@@ -1,0 +1,34 @@
+# FelizCred
+
+> FelizCred é uma correspondente bancária (Handmoney Correspondente Bancário Ltda., CNPJ 27.963.662/0001-13, Balneário Camboriú/SC) especializada em crédito consignado CLT, antecipação de FGTS e produtos financeiros para trabalhadores com carteira assinada e aposentados/pensionistas do INSS no Brasil. Atendimento 100% digital pelo WhatsApp, PIX em até 40 minutos após aprovação.
+
+## Produtos
+
+- [Empréstimo Consignado CLT](https://www.felizcred.com.br/blog/calculadora-consignado): simulador de parcela, taxa e CET
+- [Antecipação de FGTS](https://www.felizcred.com.br/blog/calculadora-fgts): saldo, multa de 40% e saque-aniversário antecipado
+
+## Calculadoras gratuitas
+
+Ferramentas interativas, gratuitas e sem cadastro, com resultado instantâneo:
+
+- [Calculadora de FGTS](https://www.felizcred.com.br/blog/calculadora-fgts): saldo acumulado, multa de 40% e antecipação do saque-aniversário
+- [Calculadora de Rescisão Trabalhista](https://www.felizcred.com.br/blog/calculadora-rescisao): todas as verbas rescisórias por tipo de desligamento
+- [Simulador de Consignado CLT](https://www.felizcred.com.br/blog/calculadora-consignado): parcela, taxa de juros e CET
+- [Calculadora de Margem Consignável](https://www.felizcred.com.br/blog/calculadora-margem-consignavel): quanto do salário pode ser comprometido
+- [Calculadora de Férias CLT](https://www.felizcred.com.br/blog/calculadora-ferias): valor das férias, 1/3 constitucional e abono pecuniário
+- [Calculadora de INSS](https://www.felizcred.com.br/blog/calculadora-inss): desconto mensal com a tabela progressiva
+- [Calculadora de 13º Salário](https://www.felizcred.com.br/blog/calculadora-decimo-terceiro): 1ª e 2ª parcela, com desconto de INSS e IRRF
+- [Calculadora de Salário Líquido](https://www.felizcred.com.br/blog/calculadora-salario-liquido): do salário bruto ao valor líquido
+- [Calculadora de Imposto de Renda (IRRF)](https://www.felizcred.com.br/blog/calculadora-irrf): tabela progressiva, alíquota efetiva e faixa de isenção
+- [Calculadora de Seguro-Desemprego](https://www.felizcred.com.br/blog/calculadora-seguro-desemprego): número de parcelas e valor de cada uma
+- [Calculadora de Aposentadoria INSS](https://www.felizcred.com.br/blog/calculadora-aposentadoria): estimativa por idade mínima e regra de pontos
+
+## Conteúdo educativo
+
+- [Blog](https://www.felizcred.com.br/blog/): artigos sobre direitos trabalhistas, FGTS, INSS, consignado e seguros
+- [Guia Prático de Crédito](https://www.felizcred.com.br/guia/): guia introdutório sobre crédito consignado e FGTS
+
+## Contato
+
+- WhatsApp: https://wa.me/554796864687
+- Site: https://www.felizcred.com.br

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Aposentadoria INSS 2025: Idade e Pontos | FelizCred</title>
+<meta name="description" content="Estime quanto tempo falta para se aposentar pelo INSS, pela idade mínima ou pela regra de pontos. Simulação gratuita baseada na Reforma da Previdência.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://www.felizcred.com.br/blog/calculadora-aposentadoria">
+<meta property="og:title" content="Calculadora de Aposentadoria INSS 2025 | FelizCred">
+<meta property="og:description" content="Estime quanto tempo falta para se aposentar pela idade mínima ou pela regra de pontos. Grátis.">
+<meta property="og:url" content="https://www.felizcred.com.br/blog/calculadora-aposentadoria">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://www.felizcred.com.br/og-image.jpg">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Calculadora de Aposentadoria INSS 2025","url":"https://www.felizcred.com.br/blog/calculadora-aposentadoria","description":"Estime quanto tempo falta para se aposentar pela idade mínima ou pela regra de pontos.","applicationCategory":"FinanceApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"BRL"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Início","item":"https://www.felizcred.com.br/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://www.felizcred.com.br/blog/"},{"@type":"ListItem","position":3,"name":"Calculadora de Aposentadoria","item":"https://www.felizcred.com.br/blog/calculadora-aposentadoria"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Qual a idade mínima para se aposentar pelo INSS?","acceptedAnswer":{"@type":"Answer","text":"Desde 2023, a idade mínima já totalmente em vigor é de 65 anos para homens e 62 anos para mulheres, com no mínimo 15 anos de contribuição (20 anos para homens que nunca contribuíram antes da reforma)."}},{"@type":"Question","name":"O que é a regra de pontos?","acceptedAnswer":{"@type":"Answer","text":"É uma regra de transição para quem já contribuía antes da Reforma da Previdência (13/11/2019). Você se aposenta quando a soma da sua idade com seu tempo de contribuição atinge um número mínimo de pontos, que sobe 1 ponto por ano até estabilizar em 105 (homens, em 2028) e 100 (mulheres, em 2033)."}},{"@type":"Question","name":"Essa calculadora substitui o Meu INSS?","acceptedAnswer":{"@type":"Answer","text":"Não. É uma estimativa simplificada das duas regras gerais mais comuns. Ela não considera regras especiais (professor, atividade especial, PCD, pedágio de 50%/100%) nem seu histórico real de contribuições. Para o cálculo oficial, consulte o app ou site Meu INSS (gov.br/meuinss)."}}]}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--green:#00B37E;--green-dark:#00875A;--green-bg:#E6FAF4;--navy:#0D1B2A;--text:#1C2B3A;--muted:#4B5563;--bg:#F7F9FB;--white:#fff;--border:#E2E8EF;--radius:14px;--shadow:0 4px 24px rgba(0,0,0,0.08)}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;color:var(--text);background:var(--bg);line-height:1.7;font-size:15px}
+a{color:var(--green-dark);text-decoration:none}
+.site-header{background:var(--navy);padding:0 40px;height:62px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{color:#fff;font-family:'Sora',sans-serif;font-weight:800;font-size:1.3rem}.logo span{color:var(--green)}
+.header-cta{background:var(--green);color:#fff!important;padding:9px 20px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:.83rem;text-decoration:none}
+.breadcrumb{background:var(--white);border-bottom:1px solid var(--border);padding:10px 40px;font-size:13px;color:var(--muted)}
+.breadcrumb a{color:var(--green-dark)}.breadcrumb span{margin:0 6px;opacity:.5}
+.hero{background:linear-gradient(140deg,#2a0a3a 0%,var(--navy) 100%);padding:52px 40px 44px;text-align:center}
+.hero-badge{display:inline-block;background:rgba(0,179,126,.15);color:var(--green);border:1px solid rgba(0,179,126,.3);padding:5px 16px;border-radius:50px;font-family:'Sora',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:16px}
+.hero h1{font-family:'Sora',sans-serif;font-size:clamp(1.8rem,4vw,2.8rem);color:#fff;max-width:720px;margin:0 auto 12px;line-height:1.2;font-weight:800}
+.hero h1 em{color:var(--green);font-style:normal}
+.hero p{color:rgba(255,255,255,.6);font-size:.95rem;max-width:480px;margin:0 auto}
+.main-grid{max-width:1100px;margin:0 auto;padding:40px 24px 80px;display:grid;grid-template-columns:1fr 360px;gap:32px;align-items:start}
+.calc-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.calc-header{background:var(--navy);padding:22px 28px;display:flex;align-items:center;gap:14px}
+.calc-icon{width:42px;height:42px;background:var(--green);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.calc-header h2{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700}
+.calc-header p{color:rgba(255,255,255,.5);font-size:12px;margin-top:2px}
+.calc-body{padding:28px}
+label{display:block;font-size:12px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.field{margin-bottom:18px}
+.field-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+input,select{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Inter',sans-serif;color:var(--text);background:var(--white);outline:none;transition:border-color .2s}
+input:focus,select:focus{border-color:var(--green)}
+.calc-btn{width:100%;background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);color:#fff;border:none;padding:16px;border-radius:10px;font-family:'Sora',sans-serif;font-weight:700;font-size:1rem;cursor:pointer;margin-top:4px}
+.calc-btn:hover{opacity:.9}
+.resultado{display:none;margin-top:24px;border-top:2px solid var(--border);padding-top:24px}
+.resultado.show{display:block}
+.rota-card{background:var(--bg);border:2px solid var(--border);border-radius:12px;padding:20px;margin-bottom:14px}
+.rota-card.melhor{border-color:var(--green);background:var(--green-bg)}
+.rota-card h4{font-family:'Sora',sans-serif;font-size:.9rem;font-weight:700;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.rota-card .badge-melhor{background:var(--green);color:#fff;font-size:10px;padding:2px 8px;border-radius:50px;font-weight:700}
+.rota-card p{font-size:.85rem;color:var(--muted)}
+.rota-card .destaque{font-family:'Sora',sans-serif;font-weight:800;font-size:1.3rem;color:var(--green-dark)}
+.aviso-box{background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:14px 18px;margin-top:12px}
+.aviso-box p{color:#92400E;font-size:13px}
+.cta-result{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:14px 18px;margin-top:8px}
+.cta-result p{color:#1E40AF;font-size:13px}
+.faq-wrap{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px;margin-top:20px}
+.faq-wrap h2{font-family:'Sora',sans-serif;font-size:1.1rem;font-weight:700;color:var(--navy);margin-bottom:16px}
+.faq-item{border-bottom:1px solid var(--border);padding:12px 0}
+.faq-item:last-child{border-bottom:none}
+.faq-q{font-family:'Sora',sans-serif;font-weight:700;color:var(--navy);margin-bottom:5px;font-size:.88rem}
+.faq-a{color:var(--muted);font-size:.84rem}
+.sidebar{display:flex;flex-direction:column;gap:20px}
+.widget{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px}
+.widget-title{font-family:'Sora',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid var(--green)}
+.cta-box{background:linear-gradient(135deg,var(--green) 0%,var(--green-dark) 100%);border-radius:var(--radius);padding:28px;text-align:center}
+.cta-box h3{font-family:'Sora',sans-serif;color:#fff;font-size:1.05rem;font-weight:700;margin-bottom:8px}
+.cta-box p{color:rgba(255,255,255,.8);font-size:13px;margin-bottom:18px}
+.cta-box a{display:block;background:#fff;color:var(--green-dark);padding:12px;border-radius:8px;font-family:'Sora',sans-serif;font-weight:700;font-size:14px;margin-bottom:8px}
+.cta-box a.wpp{background:var(--navy);color:#fff}
+.calc-links{display:flex;flex-direction:column;gap:10px}
+.calc-link{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;color:var(--text)!important;transition:border-color .2s}
+.calc-link:hover{border-color:var(--green)}
+.calc-link .icon{font-size:1.3rem}
+.calc-link .info h4{font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700}
+.calc-link .info p{font-size:.75rem;color:var(--muted)}
+.calc-link.ver-todas{justify-content:center;background:var(--bg);font-family:'Sora',sans-serif;font-weight:700;font-size:.82rem;color:var(--green-dark)!important}
+.site-footer{background:var(--navy);padding:28px 40px;text-align:center}
+.site-footer p{color:rgba(255,255,255,.4);font-size:.78rem;margin-bottom:4px}
+.site-footer a{color:var(--green)}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr}.sidebar{display:none}.field-row{grid-template-columns:1fr}}
+@media(max-width:560px){.site-header{padding:0 18px}.hero{padding:40px 18px 36px}}
+</style>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMXC2DFR5G"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag("js", new Date());
+  gtag("config", "G-ZMXC2DFR5G");
+  gtag("config", "G-2WFDJBG3S2");
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <a href="https://www.felizcred.com.br" class="logo">Feliz<span>Cred</span></a>
+  <a href="https://wa.me/554796864687" class="header-cta" rel="noopener">💬 WhatsApp</a>
+</header>
+<nav class="breadcrumb">
+  <a href="https://www.felizcred.com.br">Início</a><span>›</span>
+  <a href="/blog/">Blog</a><span>›</span>Calculadora de Aposentadoria
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">🧓 Ferramenta Gratuita</div>
+  <h1>Calculadora de <em>Aposentadoria INSS</em></h1>
+  <p>Estime quanto tempo falta para se aposentar pela idade mínima ou pela regra de pontos.</p>
+</div>
+
+<div class="main-grid">
+  <div>
+    <div class="calc-card">
+      <div class="calc-header">
+        <div class="calc-icon">🧓</div>
+        <div><h2>Calcule sua aposentadoria</h2><p>Idade mínima x regra de pontos</p></div>
+      </div>
+      <div class="calc-body">
+        <div class="field-row">
+          <div class="field">
+            <label>Sexo</label>
+            <select id="sexo">
+              <option value="m">Mulher</option>
+              <option value="h">Homem</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Idade atual</label>
+            <input type="number" id="idade" placeholder="45" min="14" value="45">
+          </div>
+          <div class="field">
+            <label>Tempo de contribuição (anos)</label>
+            <input type="number" id="contrib" placeholder="20" min="0" step="0.5" value="20">
+          </div>
+        </div>
+        <button class="calc-btn" onclick="calcAposentadoria()">🧓 Calcular minha aposentadoria</button>
+
+        <div class="resultado" id="resultado">
+          <div id="rota-idade" class="rota-card">
+            <h4>📅 Pela idade mínima <span id="badge-idade"></span></h4>
+            <p>Idade mínima exigida: <strong id="r-idade-min">-</strong> · Você atinge em <span class="destaque" id="r-idade-anos">-</span></p>
+          </div>
+          <div id="rota-pontos" class="rota-card">
+            <h4>🎯 Pela regra de pontos <span id="badge-pontos"></span></h4>
+            <p>Pontos necessários hoje: <strong id="r-pontos-nec">-</strong> · Seus pontos atuais: <strong id="r-pontos-atuais">-</strong> · Você atinge em <span class="destaque" id="r-pontos-anos">-</span></p>
+          </div>
+          <div class="aviso-box">
+            <p>⚠️ <strong>Estimativa simplificada</strong> das duas regras gerais da Reforma da Previdência (EC 103/2019). Não considera regras especiais (professor, atividade especial, PCD, pedágio de 50%/100%) nem seu histórico real de contribuições no CNIS. Para o cálculo oficial, consulte o <strong>Meu INSS</strong> (gov.br/meuinss).</p>
+          </div>
+          <div class="cta-result"><p>🏥 <strong>Já sabe quando vai se aposentar?</strong> Aposentados e pensionistas do INSS têm acesso ao consignado com as menores taxas do mercado. <a href="https://wa.me/554796864687" style="font-weight:700;color:#1D4ED8">Simular consignado INSS →</a></p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-wrap">
+      <h2>Perguntas frequentes sobre aposentadoria</h2>
+      <div class="faq-item"><p class="faq-q">Qual a idade mínima para se aposentar pelo INSS?</p><p class="faq-a">Desde 2023, a idade mínima já totalmente em vigor é de 65 anos para homens e 62 anos para mulheres, com no mínimo 15 anos de contribuição (20 anos para homens que nunca contribuíram antes da reforma).</p></div>
+      <div class="faq-item"><p class="faq-q">O que é a regra de pontos?</p><p class="faq-a">É uma regra de transição para quem já contribuía antes da Reforma da Previdência (13/11/2019). Você se aposenta quando a soma da sua idade com seu tempo de contribuição atinge um número mínimo de pontos, que sobe 1 ponto por ano até estabilizar em 105 (homens, em 2028) e 100 (mulheres, em 2033).</p></div>
+      <div class="faq-item"><p class="faq-q">Essa calculadora substitui o Meu INSS?</p><p class="faq-a">Não. É uma estimativa simplificada das duas regras gerais mais comuns. Ela não considera regras especiais nem seu histórico real de contribuições. Para o cálculo oficial, consulte o app ou site Meu INSS (gov.br/meuinss).</p></div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="cta-box">
+      <h3>🏥 Consignado para aposentados</h3>
+      <p>As menores taxas do mercado para quem recebe pelo INSS.</p>
+      <a href="https://www.felizcred.com.br#simular">🚀 Simular grátis</a>
+      <a href="https://wa.me/554796864687" class="wpp" rel="noopener">💬 WhatsApp</a>
+    </div>
+    <div class="widget">
+      <div class="widget-title">🧮 Outras calculadoras</div>
+      <div class="calc-links">
+        <a href="/blog/calculadora-inss" class="calc-link"><span class="icon">🏥</span><div class="info"><h4>Calculadora INSS</h4><p>Desconto mensal</p></div></a>
+        <a href="/blog/calculadora-consignado" class="calc-link"><span class="icon">💼</span><div class="info"><h4>Simulador Consignado</h4><p>Parcela e taxa</p></div></a>
+        <a href="/blog/calculadora-margem-consignavel" class="calc-link"><span class="icon">🧮</span><div class="info"><h4>Margem Consignável</h4><p>Quanto posso pegar</p></div></a>
+        <a href="/blog/calculadora-seguro-desemprego" class="calc-link"><span class="icon">🆘</span><div class="info"><h4>Seguro-Desemprego</h4><p>Parcelas e valor</p></div></a>
+        <a href="/#calculadoras" class="calc-link ver-todas">Ver todas as calculadoras →</a>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer class="site-footer">
+  <p><strong style="color:rgba(255,255,255,.7)">FelizCred</strong> — Handmoney Correspondente Bancário Ltda. — CNPJ 27.963.662/0001-13</p>
+  <p>Rua Paraguai, 420, Sala B — Balneário Camboriú, SC | <a href="https://www.felizcred.com.br">www.felizcred.com.br</a></p>
+</footer>
+
+<script>
+function calcAposentadoria(){
+  const sexo = document.getElementById('sexo').value;
+  const idade = parseFloat(document.getElementById('idade').value) || 0;
+  const contrib = parseFloat(document.getElementById('contrib').value) || 0;
+  if (!idade) { alert('Informe sua idade.'); return; }
+
+  const anoAtual = new Date().getFullYear();
+  const idadeMinima = sexo === 'h' ? 65 : 62;
+  const pontosBase = sexo === 'h' ? 96 : 86;
+  const pontosCap = sexo === 'h' ? 105 : 100;
+  const carencia = 15;
+
+  // Rota idade mínima
+  let anosIdade = Math.max(0, idadeMinima - idade);
+  if (contrib + anosIdade < carencia) anosIdade = Math.max(anosIdade, carencia - contrib);
+
+  // Rota regra de pontos (simulação ano a ano)
+  const pontosNecessariosHoje = Math.min(pontosBase + (anoAtual - 2019), pontosCap);
+  let anosPontos = null;
+  for (let y = 0; y <= 60; y++) {
+    const pontosFuturo = (idade + y) + (contrib + y);
+    const necessarioFuturo = Math.min(pontosBase + ((anoAtual + y) - 2019), pontosCap);
+    if (pontosFuturo >= necessarioFuturo && (contrib + y) >= carencia) { anosPontos = y; break; }
+  }
+
+  const melhorEhPontos = anosPontos !== null && anosPontos <= anosIdade;
+
+  document.getElementById('r-idade-min').textContent = idadeMinima + ' anos';
+  document.getElementById('r-idade-anos').textContent = anosIdade === 0 ? 'agora' : (anosIdade + ' ano' + (anosIdade > 1 ? 's' : '') + ' (' + (anoAtual + Math.ceil(anosIdade)) + ')');
+  document.getElementById('r-pontos-nec').textContent = pontosNecessariosHoje + ' pontos';
+  document.getElementById('r-pontos-atuais').textContent = (idade + contrib) + ' pontos';
+  document.getElementById('r-pontos-anos').textContent = anosPontos === null ? 'não atinge o teto simulado' : (anosPontos === 0 ? 'agora' : (anosPontos + ' ano' + (anosPontos > 1 ? 's' : '') + ' (' + (anoAtual + anosPontos) + ')'));
+
+  document.getElementById('rota-idade').classList.toggle('melhor', !melhorEhPontos);
+  document.getElementById('rota-pontos').classList.toggle('melhor', melhorEhPontos);
+  document.getElementById('badge-idade').innerHTML = !melhorEhPontos ? '<span class="badge-melhor">mais rápido</span>' : '';
+  document.getElementById('badge-pontos').innerHTML = melhorEhPontos ? '<span class="badge-melhor">mais rápido</span>' : '';
+
+  document.getElementById('resultado').classList.add('show');
+  document.getElementById('resultado').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+</script>
+</body>
+</html>

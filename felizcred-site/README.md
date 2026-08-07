@@ -86,3 +86,27 @@ repositório `meuwhats` (GitHub) como projeto Vercel separado:
 Ver [`COMO-CRIAR-POST.md`](./COMO-CRIAR-POST.md) — checklist separado deste
 README de propósito (pra não precisar reler o resto do projeto toda vez que
 o pedido for só "cria um post novo sobre X").
+
+## Calculadoras (`blog/calculadora-*.html`)
+
+11 ferramentas interativas (JS puro, sem backend): FGTS, rescisão, consignado,
+margem consignável, férias, INSS, 13º salário, salário líquido, IRRF,
+seguro-desemprego e aposentadoria. Todas seguem o mesmo template visual
+(`calc-card`/`.tabs` conforme o caso) e o mesmo checklist de SEO/AEO:
+`canonical` e `og:url` **sempre com `/blog/` no path** (erro já cometido uma
+vez — ver histórico), `og:image` reaproveitando `og-image.jpg`, GA4
+(`G-ZMXC2DFR5G` + `G-2WFDJBG3S2`), três blocos JSON-LD (`WebApplication`,
+`BreadcrumbList`, `FAQPage` a partir das perguntas visíveis na página) e um
+link `Ver todas as calculadoras →` para `/#calculadoras` na sidebar. Nova
+calculadora = adicionar card em `index.html` (`#calculadoras`) e em
+`blog/index.html` (`#calcGrid`/grid de calculadoras), mais uma linha em
+`sitemap.xml` (prioridade 0.90, não 0.80 — são páginas de conversão) e em
+`llms.txt`.
+
+## Rastreamento por IA (`robots.txt` + `llms.txt`)
+
+`robots.txt` libera explicitamente os principais crawlers de IA (GPTBot,
+ClaudeBot, PerplexityBot, Google-Extended etc.), além do `User-agent: *`
+genérico que já cobria isso. `llms.txt` na raiz é o resumo estruturado do
+site (produtos, calculadoras, blog, contato) no formato que agentes de IA
+consomem — atualizar sempre que uma página/calculadora nova entrar no ar.

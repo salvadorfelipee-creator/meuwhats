@@ -12,6 +12,8 @@
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://www.felizcred.com.br/og-image.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Calculadora de Margem Consignável","url":"https://www.felizcred.com.br/blog/calculadora-margem-consignavel","description":"Calcule sua margem consignável e o valor máximo de empréstimo disponível.","applicationCategory":"FinanceApplication","offers":{"@type":"Offer","price":"0","priceCurrency":"BRL"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Início","item":"https://www.felizcred.com.br/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://www.felizcred.com.br/blog/"},{"@type":"ListItem","position":3,"name":"Calculadora de Margem Consignável","item":"https://www.felizcred.com.br/blog/calculadora-margem-consignavel"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"O limite de 35% é calculado sobre o salário bruto ou líquido?","acceptedAnswer":{"@type":"Answer","text":"Sobre o salário bruto — antes dos descontos de INSS e IR. Portanto, a margem é calculada sobre o valor integral da remuneração, não sobre o que cai na sua conta."}},{"@type":"Question","name":"Margem esgotada: o que fazer?","acceptedAnswer":{"@type":"Answer","text":"Três caminhos: portabilidade (troca um contrato por outro com parcela menor, liberando espaço), refinanciamento (estende o prazo do contrato atual), ou antecipação do FGTS (que não usa margem consignável)."}},{"@type":"Question","name":"Aposentados têm margem maior?","acceptedAnswer":{"@type":"Answer","text":"Sim. Para aposentados e pensionistas do INSS, o limite total é de 45% — sendo 35% para empréstimos, 5% para cartão consignado e 5% para cartão de benefício."}},{"@type":"Question","name":"Se eu mudar de emprego, minha margem muda?","acceptedAnswer":{"@type":"Answer","text":"Sim. A margem é calculada com base no salário do emprego atual. Uma promoção ou mudança de empresa com salário diferente altera a margem disponível. Contratos anteriores podem precisar de renegociação."}},{"@type":"Question","name":"O cartão consignado entra na margem?","acceptedAnswer":{"@type":"Answer","text":"Sim. A fatura do cartão consignado ocupa até 5% do salário bruto dentro do limite total de 35%. Esse percentual é separado dos 30% destinados a empréstimos."}}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -125,6 +127,7 @@ input:focus,select:focus{border-color:var(--green)}
 .calc-link .icon{font-size:1.3rem}
 .calc-link .info h4{font-family:'Sora',sans-serif;font-size:.85rem;font-weight:700}
 .calc-link .info p{font-size:.75rem;color:var(--muted)}
+.calc-link.ver-todas{justify-content:center;background:var(--bg);font-family:'Sora',sans-serif;font-weight:700;font-size:.82rem;color:var(--green-dark)!important}
 
 .site-footer{background:var(--navy);padding:28px 40px;text-align:center}
 .site-footer p{color:rgba(255,255,255,.4);font-size:.78rem;margin-bottom:4px}
@@ -301,6 +304,7 @@ input:focus,select:focus{border-color:var(--green)}
         <a href="/blog/calculadora-consignado" class="calc-link"><span class="icon">💼</span><div class="info"><h4>Simulador Consignado</h4><p>Parcelas e taxa</p></div></a>
         <a href="/blog/calculadora-ferias" class="calc-link"><span class="icon">🏖️</span><div class="info"><h4>Calculadora Férias</h4><p>Valor e 1/3</p></div></a>
         <a href="/blog/calculadora-inss" class="calc-link"><span class="icon">🏥</span><div class="info"><h4>Calculadora INSS</h4><p>Desconto mensal</p></div></a>
+        <a href="/#calculadoras" class="calc-link ver-todas">Ver todas as calculadoras →</a>
       </div>
     </div>
     <div class="widget">
