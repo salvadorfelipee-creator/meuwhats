@@ -495,6 +495,23 @@
   .how-card h4 { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 8px; }
   .how-card p { font-size: 13px; color: var(--gray); line-height: 1.6; }
 
+  /* ─── CALCULADORAS ─── */
+  .calc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .calc-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: var(--radius);
+    padding: 26px 24px;
+    transition: border-color .3s, background .3s;
+    display: block;
+  }
+  .calc-card:hover { border-color: rgba(0,200,83,0.3); background: rgba(0,200,83,0.04); }
+  .calc-card .calc-icon { font-size: 26px; margin-bottom: 12px; display: block; }
+  .calc-card h4 { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+  .calc-card p { font-size: 13px; color: var(--gray); line-height: 1.6; }
+  @media (max-width: 900px) { .calc-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .calc-grid { grid-template-columns: 1fr; } }
+
   /* ─── TESTIMONIALS ─── */
   .testimonials-section { background: rgba(255,255,255,0.02); padding: 90px 5%; }
   .testi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1200px; margin: 0 auto; }
@@ -740,6 +757,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     <li><a href="#simular">Simular CLT</a></li>
     <li><a href="#fgts-simular">Simular FGTS</a></li>
     <li><a href="#como-funciona">Como Funciona</a></li>
+    <li><a href="#calculadoras">Calculadoras</a></li>
     <li><a href="#faq">Dúvidas</a></li>
     <li><a href="/blog/">Blog</a></li>
     <li><a href="https://wa.me/554797059353" class="nav-cta">💬 WhatsApp</a></li>
@@ -1085,6 +1103,45 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       <h4>Receba via PIX</h4>
       <p>Aprovado! O dinheiro cai na sua conta em até 40 minutos via PIX.</p>
     </div>
+  </div>
+</div>
+
+<!-- CALCULADORAS -->
+<div class="section" id="calculadoras">
+  <div class="section-label">Ferramentas gratuitas</div>
+  <h2>Calculadoras FelizCred</h2>
+  <p class="section-sub">Simule seus valores antes de falar com a gente. Grátis e sem cadastro.</p>
+  <div class="calc-grid">
+    <a href="/blog/calculadora-fgts" class="calc-card">
+      <span class="calc-icon">🏦</span>
+      <h4>Calculadora FGTS</h4>
+      <p>Saldo acumulado, multa de 40% e antecipação do saque-aniversário.</p>
+    </a>
+    <a href="/blog/calculadora-rescisao" class="calc-card">
+      <span class="calc-icon">📋</span>
+      <h4>Calculadora de Rescisão</h4>
+      <p>Aviso prévio, 13º proporcional, férias e todas as verbas rescisórias.</p>
+    </a>
+    <a href="/blog/calculadora-consignado" class="calc-card">
+      <span class="calc-icon">💼</span>
+      <h4>Simulador Consignado CLT</h4>
+      <p>Parcela, taxa de juros e CET do seu empréstimo consignado.</p>
+    </a>
+    <a href="/blog/calculadora-inss" class="calc-card">
+      <span class="calc-icon">🏥</span>
+      <h4>Calculadora de INSS</h4>
+      <p>Desconto mensal com a tabela progressiva atualizada de 2025.</p>
+    </a>
+    <a href="/blog/calculadora-ferias" class="calc-card">
+      <span class="calc-icon">🏖️</span>
+      <h4>Calculadora de Férias</h4>
+      <p>Valor das férias, terço constitucional e abono pecuniário.</p>
+    </a>
+    <a href="/blog/calculadora-margem-consignavel" class="calc-card">
+      <span class="calc-icon">🧮</span>
+      <h4>Margem Consignável</h4>
+      <p>Quanto você ainda pode comprometer do salário em consignado.</p>
+    </a>
   </div>
 </div>
 
