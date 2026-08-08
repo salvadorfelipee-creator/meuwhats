@@ -34,6 +34,8 @@ Guia completo sobre a Reforma Tributária brasileira do consumo (EC 132/2023, LC
 - [IBS para empresa (PJ)](https://www.felizcred.com.br/blog/ibs-pessoa-juridica): simulador comparando ICMS/ISS hoje x IBS de referência
 - [Imposto Seletivo para pessoa física](https://www.felizcred.com.br/blog/imposto-seletivo-pessoa-fisica): o "imposto do pecado" (cigarro, bebida, veículos poluentes, mineração)
 - [Imposto Seletivo para empresa (PJ)](https://www.felizcred.com.br/blog/imposto-seletivo-pessoa-juridica): verificador se a atividade da empresa é afetada
+- [Split Payment para pessoa física](https://www.felizcred.com.br/blog/split-payment-pessoa-fisica): como funciona a divisão automática do imposto no pagamento eletrônico
+- [Split Payment para empresa (PJ)](https://www.felizcred.com.br/blog/split-payment-pessoa-juridica): simulador do impacto no fluxo de caixa
 
 ## Conteúdo educativo
 

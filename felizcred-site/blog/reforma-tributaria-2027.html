@@ -113,6 +113,9 @@ strong { color: var(--text); font-weight: 600; }
 .page-wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; }
 .article-body { padding: 52px 0 80px; }
 
+
+.featured-img-wrap{margin-bottom:36px}
+.featured-img{width:100%;height:280px;object-fit:cover;border-radius:var(--radius);box-shadow:var(--shadow);display:block}
 .toc { background: var(--green-bg); border-left: 4px solid var(--green); border-radius: 0 var(--radius) var(--radius) 0; padding: 24px 28px; margin-bottom: 48px; }
 .toc-title { font-family: 'Sora', sans-serif; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--green-dark); margin-bottom: 14px; }
 .toc ol { padding-left: 18px; }
@@ -156,7 +159,7 @@ tr:nth-child(even) td { background: #FAFBFC; }
 .ok { color: var(--green-dark); font-weight: 600; }
 .no { color: #DC2626; font-weight: 600; }
 
-.impostos-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin: 28px 0; }
+.impostos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin: 28px 0; }
 .imposto-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px 20px; }
 .imposto-card h4 { font-family: 'Sora', sans-serif; font-size: 1.05rem; font-weight: 800; color: var(--navy); margin-bottom: 8px; }
 .imposto-card p { font-size: 0.85rem; margin-bottom: 14px; }
@@ -222,6 +225,8 @@ tr:nth-child(even) td { background: #FAFBFC; }
 <div class="page-wrap">
   <article class="article-body">
 
+    <div class="featured-img-wrap"><img src="../img/blog/congresso-nacional.webp" alt="Congresso Nacional, em Brasília, onde foi aprovada a Reforma Tributária" class="featured-img" loading="lazy"></div>
+
     <div class="alert-box">
       <div class="alert-icon">⚖️</div>
       <div>
@@ -286,8 +291,8 @@ tr:nth-child(even) td { background: #FAFBFC; }
       </div>
     </div>
 
-    <h2 id="tres-impostos">Os 3 impostos novos, um por um</h2>
-    <p>Preparamos um guia separado pra cada imposto — um voltado pra <strong>pessoa física</strong> (o que muda no seu bolso) e outro pra <strong>pessoa jurídica</strong> (o que muda na sua empresa, com simulador):</p>
+    <h2 id="tres-impostos">Os 3 impostos novos (+ o split payment), um por um</h2>
+    <p>Preparamos um guia separado pra cada imposto — um voltado pra <strong>pessoa física</strong> (o que muda no seu bolso) e outro pra <strong>pessoa jurídica</strong> (o que muda na sua empresa, com simulador) — e mais um par sobre o <strong>split payment</strong>, o mecanismo que divide automaticamente o imposto no pagamento eletrônico:</p>
 
     <div class="impostos-grid">
       <div class="imposto-card">
@@ -314,6 +319,14 @@ tr:nth-child(even) td { background: #FAFBFC; }
           <a href="/blog/imposto-seletivo-pessoa-juridica">🏢 Pra empresa (PJ) →</a>
         </div>
       </div>
+      <div class="imposto-card">
+        <h4>💳 Split Payment</h4>
+        <p>Divisão automática do imposto no pagamento eletrônico, contra sonegação.</p>
+        <div class="imposto-links">
+          <a href="/blog/split-payment-pessoa-fisica">👤 Pra você (PF) →</a>
+          <a href="/blog/split-payment-pessoa-juridica">🏢 Pra empresa (PJ) →</a>
+        </div>
+      </div>
     </div>
 
     <h2 id="o-que-acaba">O que acaba (e o que ainda não acaba)</h2>
@@ -337,7 +350,7 @@ tr:nth-child(even) td { background: #FAFBFC; }
       <li><strong>Cesta Básica Nacional de Alimentos</strong> — alíquota zero de CBS e IBS</li>
       <li><strong>Redução de 60%</strong> na alíquota para saúde, educação, transporte público coletivo, produtos agropecuários, medicamentos e produções artísticas/culturais, entre outros setores listados na LC 214/2025</li>
       <li><strong>Cashback (devolução)</strong> — famílias de baixa renda inscritas no CadÚnico recebem de volta parte do CBS/IBS pago em itens como energia elétrica, água/esgoto e gás de cozinha</li>
-      <li><strong>Split payment</strong> — em pagamentos eletrônicos (cartão, Pix), o imposto pode ser automaticamente segregado e recolhido no momento da transação, reduzindo sonegação</li>
+      <li><strong><a href="/blog/split-payment-pessoa-fisica">Split payment</a></strong> — em pagamentos eletrônicos (cartão, Pix), o imposto pode ser automaticamente segregado e recolhido no momento da transação, reduzindo sonegação</li>
     </ul>
     <div class="blue-box">
       <p>📊 A estimativa mais divulgada pelo governo pra alíquota-padrão somada (CBS + IBS) fica em torno de <strong>26,5%</strong> — sendo aproximadamente 8,8% de CBS e 17,7% de IBS. É uma <strong>estimativa de referência</strong>, recalculada periodicamente; a alíquota final exata depende de resolução do Senado e pode variar até lá.</p>
@@ -382,6 +395,8 @@ tr:nth-child(even) td { background: #FAFBFC; }
         <a href="/blog/ibs-pessoa-juridica" class="related-link"><span>🏢</span> IBS pra empresa: simulador de impacto</a>
         <a href="/blog/imposto-seletivo-pessoa-fisica" class="related-link"><span>👤</span> Imposto Seletivo pra pessoa física</a>
         <a href="/blog/imposto-seletivo-pessoa-juridica" class="related-link"><span>🏢</span> Imposto Seletivo pra empresa</a>
+        <a href="/blog/split-payment-pessoa-fisica" class="related-link"><span>👤</span> Split Payment pra pessoa física</a>
+        <a href="/blog/split-payment-pessoa-juridica" class="related-link"><span>🏢</span> Split Payment pra empresa: simulador de fluxo de caixa</a>
       </div>
     </div>
 

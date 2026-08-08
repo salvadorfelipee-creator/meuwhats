@@ -103,14 +103,18 @@ calculadora = adicionar card em `index.html` (`#calculadoras`) e em
 `sitemap.xml` (prioridade 0.90, não 0.80 — são páginas de conversão) e em
 `llms.txt`.
 
-## Reforma Tributária 2027 (`blog/reforma-tributaria-2027.html` + 6 artigos)
+## Reforma Tributária 2027 (`blog/reforma-tributaria-2027.html` + 8 artigos)
 
 Série sobre a Reforma Tributária do consumo (EC 132/2023, LC 214/2025), que
 muda o sistema de impostos a partir de **1º de janeiro de 2027**: 1 página
 hub (`reforma-tributaria-2027.html`) + 1 par PF/PJ pra cada um dos 3 impostos
 novos — `cbs-pessoa-{fisica,juridica}.html`, `ibs-pessoa-{fisica,juridica}.html`,
-`imposto-seletivo-pessoa-{fisica,juridica}.html`. As 3 páginas PJ têm
-simulador/verificador interativo (JS puro, mesmo padrão das calculadoras).
+`imposto-seletivo-pessoa-{fisica,juridica}.html` — + 1 par PF/PJ sobre o
+mecanismo de **split payment** (`split-payment-pessoa-{fisica,juridica}.html`,
+divisão automática do imposto no pagamento eletrônico, contra sonegação).
+As 4 páginas PJ têm simulador/verificador interativo (JS puro, mesmo padrão
+das calculadoras) — a de split payment simula o efeito no fluxo de caixa
+(quanto fica retido automaticamente vs. quanto cai livre na conta).
 
 **Regras de precisão que valem pra qualquer atualização futura desse
 conteúdo**: datas/cronograma (2026 teste, 2027 CBS cheia + fim de PIS/Cofins/
@@ -127,6 +131,36 @@ cálculo contábil real (não modelam crédito de insumos específico). O
 verificador do Imposto Seletivo é só qualitativo (a atividade entra ou não
 na lista constitucional) porque as alíquotas por produto dependem de lei
 ordinária ainda não totalmente definida.
+
+## Imagens reais nos posts (`img/blog/*.webp`)
+
+Posts de blog historicamente só tinham um emoji sobre um gradiente CSS como
+"thumbnail" — sem foto de verdade. A partir de 2026-08-08, novos posts devem
+ter uma foto real. Fluxo usado (repita pra cada post novo):
+
+1. `WebSearch` por um termo descritivo em inglês (ex: "pixabay free photo
+   industrial pollution chimney") — Pixabay é a fonte preferida porque a
+   licença permite uso comercial livre **sem exigir atribuição**.
+2. `WebFetch` na página do resultado pra extrair a URL direta
+   `cdn.pixabay.com/photo/.../nome-ID_1280.jpg` (a maior versão disponível).
+3. Baixar com `curl` pra um diretório temporário e **abrir com o Read tool
+   antes de usar** — confirma visualmente que a imagem é relevante e
+   apropriada (isso já pegou uma foto de formulário de IR americano que não
+   fazia sentido pra conteúdo brasileiro).
+4. Converter pra `.webp` com `ffmpeg -vf "scale=800:-1" -q:v 80` (arquivos
+   ficam entre 15KB e 100KB, bem leves) e salvar em `img/blog/nome-descritivo.webp`.
+5. Usar como `background-image` no `.card-thumb.photo` (listagem do blog,
+   `blog/index.html`) e como `<img class="featured-img">` logo no início do
+   `<article class="article-body">` de cada post (banner full-width, 280px
+   de altura, `object-fit:cover`).
+
+Uma mesma foto pode ser reaproveitada entre o par PF/PJ do mesmo assunto
+(ex: `moeda-real.webp` nos dois posts de CBS) — o que diferencia
+visualmente é o título e a cor da badge, não precisa foto exclusiva por
+página. Fotos já disponíveis: `congresso-nacional.webp` (Reforma Tributária/
+hub), `moeda-real.webp` (CBS), `mercado-prateleira.webp` (IBS),
+`poluicao-industrial.webp` (Imposto Seletivo), `pagamento-cartao.webp`
+(Split Payment) — reveja se alguma já serve antes de baixar uma nova.
 
 ## Rastreamento por IA (`robots.txt` + `llms.txt`)
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Blog FelizCred — Credito FGTS CLT e INSS</title>
-<meta name="description" content="Artigos sobre emprestimo consignado CLT, antecipacao do FGTS, direitos trabalhistas e INSS. 32 conteudos para o trabalhador brasileiro.">
+<meta name="description" content="Artigos sobre reforma tributaria, emprestimo consignado CLT, antecipacao do FGTS, direitos trabalhistas e INSS. 49 conteudos para o trabalhador brasileiro.">
 <link rel="canonical" href="https://www.felizcred.com.br/blog/">
 <meta name="robots" content="index, follow">
 
@@ -51,6 +51,9 @@ nav.topnav{position:sticky;top:0;z-index:100;background:rgba(10,22,40,0.97);back
 .article-card{background:var(--navy-mid);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .2s,transform .2s;cursor:pointer;display:block}
 .article-card:hover{border-color:rgba(0,255,136,.3);transform:translateY(-3px)}
 .card-thumb{height:110px;display:flex;align-items:center;justify-content:center}
+.card-thumb.photo{background-size:cover;background-position:center;position:relative}
+.card-thumb.photo::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,15,25,.15),rgba(10,15,25,.55))}
+.card-thumb.photo span{position:relative;z-index:1;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
 .card-body{padding:18px}
 .cat-tag{display:inline-block;padding:4px 12px;border-radius:50px;font-size:11px;font-family:'Sora',sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
 .tag-green{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2)}
@@ -107,14 +110,14 @@ footer a{color:var(--green)}
 <div class="blog-hero">
   <div class="hero-tag">Blog FelizCred</div>
   <h1>Dicas de credito para voce<br><em>tomar decisoes melhores</em></h1>
-  <p>FGTS, CLT, INSS e direitos trabalhistas — 32 conteudos para o trabalhador brasileiro.</p>
+  <p>FGTS, CLT, INSS, Reforma Tributária e direitos trabalhistas — 49 conteudos para o trabalhador brasileiro.</p>
   <div class="search-wrap">
     <input type="text" id="searchInput" placeholder="Buscar... ex: fgts, gerente, desenrola, rescisao" oninput="buscar()">
     <button onclick="buscar()">Buscar</button>
   </div>
 </div>
 <div class="filters">
-  <button class="filter-btn active" onclick="filtrar('todos',this)">Todos (47)</button>
+  <button class="filter-btn active" onclick="filtrar('todos',this)">Todos (49)</button>
   <button class="filter-btn" onclick="filtrar('reforma',this)">Reforma Tributária</button>
   <button class="filter-btn" onclick="filtrar('fgts',this)">FGTS</button>
   <button class="filter-btn" onclick="filtrar('clt',this)">Emprestimo CLT</button>
@@ -126,11 +129,11 @@ footer a{color:var(--green)}
 </div>
 <div class="blog-wrap">
   <main id="mainContent">
-    <div class="results-count" id="resultsCount"><strong>32</strong> itens encontrados</div>
+    <div class="results-count" id="resultsCount"><strong>49</strong> itens encontrados</div>
     <div class="no-results" id="noResults"><h3>Nenhum resultado encontrado</h3><p>Tente outro termo de busca ou selecione uma categoria.</p></div>
     <div class="articles-grid" id="articlesGrid">
       <a href="/blog/reforma-tributaria-2027" class="article-card" data-cat="reforma" data-tags="reforma tributaria 2027 cbs ibs imposto seletivo pis cofins icms iss ipi novos impostos">
-        <div class="card-thumb" style="background:linear-gradient(135deg,#0d1b2a,#1a2e48)"><span style="font-size:2.4rem">⚖️</span></div>
+        <div class="card-thumb photo" style="background-image:url(../img/blog/congresso-nacional.webp)"><span style="font-size:2.4rem">⚖️</span></div>
         <div class="card-body">
           <span class="cat-tag tag-orange">Reforma Tributária</span>
           <h3>Reforma Tributária 2027: o que muda em cada imposto (guia completo)</h3>
@@ -138,7 +141,7 @@ footer a{color:var(--green)}
         </div>
       </a>
       <a href="/blog/cbs-pessoa-fisica" class="article-card" data-cat="reforma" data-tags="cbs 2027 pessoa fisica pis cofins reforma tributaria">
-        <div class="card-thumb" style="background:linear-gradient(135deg,#00875A,#005c3d)"><span style="font-size:2.4rem">🧾</span></div>
+        <div class="card-thumb photo" style="background-image:url(../img/blog/moeda-real.webp)"><span style="font-size:2.4rem">🧾</span></div>
         <div class="card-body">
           <span class="cat-tag tag-green">Reforma Tributária</span>
           <h3>CBS 2027: o que muda pra você no dia a dia</h3>
@@ -146,7 +149,7 @@ footer a{color:var(--green)}
         </div>
       </a>
       <a href="/blog/cbs-pessoa-juridica" class="article-card" data-cat="reforma" data-tags="cbs 2027 pessoa juridica empresa simulador pis cofins reforma tributaria">
-        <div class="card-thumb" style="background:linear-gradient(135deg,#00875A,#005c3d)"><span style="font-size:2.4rem">🧮</span></div>
+        <div class="card-thumb photo" style="background-image:url(../img/blog/moeda-real.webp)"><span style="font-size:2.4rem">🧮</span></div>
         <div class="card-body">
           <span class="cat-tag tag-green">Reforma Tributária</span>
           <h3>CBS 2027 pra empresa: simulador de impacto (PIS/Cofins x CBS)</h3>
@@ -154,7 +157,7 @@ footer a{color:var(--green)}
         </div>
       </a>
       <a href="/blog/ibs-pessoa-fisica" class="article-card" data-cat="reforma" data-tags="ibs 2027 pessoa fisica icms iss reforma tributaria">
-        <div class="card-thumb" style="background:linear-gradient(135deg,#0f3460,#1a5276)"><span style="font-size:2.4rem">🏛️</span></div>
+        <div class="card-thumb photo" style="background-image:url(../img/blog/mercado-prateleira.webp)"><span style="font-size:2.4rem">🏛️</span></div>
         <div class="card-body">
           <span class="cat-tag tag-blue">Reforma Tributária</span>
           <h3>IBS 2027: o que muda pra você (substitui ICMS e ISS)</h3>
@@ -162,7 +165,7 @@ footer a{color:var(--green)}
         </div>
       </a>
       <a href="/blog/ibs-pessoa-juridica" class="article-card" data-cat="reforma" data-tags="ibs 2027 pessoa juridica empresa simulador icms iss reforma tributaria">
-        <div class="card-thumb" style="background:linear-gradient(135deg,#0f3460,#1a5276)"><span style="font-size:2.4rem">🧮</span></div>
+        <div class="card-thumb photo" style="background-image:url(../img/blog/mercado-prateleira.webp)"><span style="font-size:2.4rem">🧮</span></div>
         <div class="card-body">
           <span class="cat-tag tag-blue">Reforma Tributária</span>
           <h3>IBS 2027 pra empresa: simulador (ICMS/ISS x IBS)</h3>
@@ -170,7 +173,7 @@ footer a{color:var(--green)}
         </div>
       </a>
       <a href="/blog/imposto-seletivo-pessoa-fisica" class="article-card" data-cat="reforma" data-tags="imposto seletivo 2027 pessoa fisica imposto do pecado cigarro bebida reforma tributaria">
-        <div class="card-thumb" style="background:linear-gradient(135deg,#2b1520,#3f1f2c)"><span style="font-size:2.4rem">🚬</span></div>
+        <div class="card-thumb photo" style="background-image:url(../img/blog/poluicao-industrial.webp)"><span style="font-size:2.4rem">🚬</span></div>
         <div class="card-body">
           <span class="cat-tag tag-purple">Reforma Tributária</span>
           <h3>Imposto Seletivo 2027: o "imposto do pecado" — o que você precisa saber</h3>
@@ -178,11 +181,27 @@ footer a{color:var(--green)}
         </div>
       </a>
       <a href="/blog/imposto-seletivo-pessoa-juridica" class="article-card" data-cat="reforma" data-tags="imposto seletivo 2027 pessoa juridica empresa verificador cigarro bebida reforma tributaria">
-        <div class="card-thumb" style="background:linear-gradient(135deg,#2b1520,#3f1f2c)"><span style="font-size:2.4rem">🔍</span></div>
+        <div class="card-thumb photo" style="background-image:url(../img/blog/poluicao-industrial.webp)"><span style="font-size:2.4rem">🔍</span></div>
         <div class="card-body">
           <span class="cat-tag tag-purple">Reforma Tributária</span>
           <h3>Imposto Seletivo 2027 pra empresa: minha atividade é afetada?</h3>
           <div class="card-foot"><span class="card-date">7 ago 2026</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/split-payment-pessoa-fisica" class="article-card" data-cat="reforma" data-tags="split payment 2027 pessoa fisica pagamento eletronico cartao pix reforma tributaria">
+        <div class="card-thumb photo" style="background-image:url(../img/blog/pagamento-cartao.webp)"><span style="font-size:2.4rem">💳</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">Reforma Tributária</span>
+          <h3>Split Payment 2027: o que muda quando você paga com cartão ou Pix</h3>
+          <div class="card-foot"><span class="card-date">8 ago 2026</span><span class="card-time">6 min</span></div>
+        </div>
+      </a>
+      <a href="/blog/split-payment-pessoa-juridica" class="article-card" data-cat="reforma" data-tags="split payment 2027 pessoa juridica empresa fluxo de caixa simulador reforma tributaria">
+        <div class="card-thumb photo" style="background-image:url(../img/blog/pagamento-cartao.webp)"><span style="font-size:2.4rem">🧮</span></div>
+        <div class="card-body">
+          <span class="cat-tag tag-green">Reforma Tributária</span>
+          <h3>Split Payment 2027 pra empresa: simulador de fluxo de caixa</h3>
+          <div class="card-foot"><span class="card-date">8 ago 2026</span><span class="card-time">7 min</span></div>
         </div>
       </a>
       <a href="/blog/antecipacao-fgts-novas-regras-2025.html" class="article-card" data-cat="fgts" data-tags="fgts antecipacao saque aniversario regras 2025 negativado sem spc novas regras">
@@ -559,6 +578,7 @@ footer a{color:var(--green)}
 </footer>
 <script>
 const allCards=Array.from(document.querySelectorAll('.article-card'));
+atualizar(allCards.length,'');
 function normalizar(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function filtrar(cat,btn){
   document.getElementById('searchInput').value='';
