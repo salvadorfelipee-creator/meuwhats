@@ -23,6 +23,18 @@ Ferramentas interativas, gratuitas e sem cadastro, com resultado instantâneo:
 - [Calculadora de Seguro-Desemprego](https://www.felizcred.com.br/blog/calculadora-seguro-desemprego): número de parcelas e valor de cada uma
 - [Calculadora de Aposentadoria INSS](https://www.felizcred.com.br/blog/calculadora-aposentadoria): estimativa por idade mínima e regra de pontos
 
+## Reforma Tributária 2027 (CBS, IBS, Imposto Seletivo)
+
+Guia completo sobre a Reforma Tributária brasileira do consumo (EC 132/2023, LC 214/2025), que muda o sistema de impostos a partir de 1º de janeiro de 2027. Um artigo por imposto, separado para pessoa física e pessoa jurídica (com simuladores interativos para PJ):
+
+- [Reforma Tributária 2027: guia completo](https://www.felizcred.com.br/blog/reforma-tributaria-2027): visão geral, linha do tempo e os 3 novos impostos
+- [CBS para pessoa física](https://www.felizcred.com.br/blog/cbs-pessoa-fisica): o que muda no dia a dia do consumidor
+- [CBS para empresa (PJ)](https://www.felizcred.com.br/blog/cbs-pessoa-juridica): simulador comparando PIS/Cofins hoje x CBS em 2027
+- [IBS para pessoa física](https://www.felizcred.com.br/blog/ibs-pessoa-fisica): o que muda no dia a dia do consumidor
+- [IBS para empresa (PJ)](https://www.felizcred.com.br/blog/ibs-pessoa-juridica): simulador comparando ICMS/ISS hoje x IBS de referência
+- [Imposto Seletivo para pessoa física](https://www.felizcred.com.br/blog/imposto-seletivo-pessoa-fisica): o "imposto do pecado" (cigarro, bebida, veículos poluentes, mineração)
+- [Imposto Seletivo para empresa (PJ)](https://www.felizcred.com.br/blog/imposto-seletivo-pessoa-juridica): verificador se a atividade da empresa é afetada
+
 ## Conteúdo educativo
 
 - [Blog](https://www.felizcred.com.br/blog/): artigos sobre direitos trabalhistas, FGTS, INSS, consignado e seguros

@@ -103,6 +103,31 @@ calculadora = adicionar card em `index.html` (`#calculadoras`) e em
 `sitemap.xml` (prioridade 0.90, não 0.80 — são páginas de conversão) e em
 `llms.txt`.
 
+## Reforma Tributária 2027 (`blog/reforma-tributaria-2027.html` + 6 artigos)
+
+Série sobre a Reforma Tributária do consumo (EC 132/2023, LC 214/2025), que
+muda o sistema de impostos a partir de **1º de janeiro de 2027**: 1 página
+hub (`reforma-tributaria-2027.html`) + 1 par PF/PJ pra cada um dos 3 impostos
+novos — `cbs-pessoa-{fisica,juridica}.html`, `ibs-pessoa-{fisica,juridica}.html`,
+`imposto-seletivo-pessoa-{fisica,juridica}.html`. As 3 páginas PJ têm
+simulador/verificador interativo (JS puro, mesmo padrão das calculadoras).
+
+**Regras de precisão que valem pra qualquer atualização futura desse
+conteúdo**: datas/cronograma (2026 teste, 2027 CBS cheia + fim de PIS/Cofins/
+IPI + início do Imposto Seletivo, 2029-32 transição de ICMS/ISS, 2033
+extinção) e a existência dos 3 impostos são fatos estabelecidos na EC
+132/2023 — cite com confiança. Já a **alíquota de referência somada
+(~26,5% = ~8,8% CBS + ~17,7% IBS)** é uma estimativa divulgada pelo governo,
+sujeita a ajuste por resolução do Senado — sempre rotular como estimativa,
+nunca como valor definitivo. Os simuladores de CBS/IBS pra empresa usam
+essas alíquotas de referência contra a alíquota atual informada pelo
+usuário (ou presets ilustrativos de PIS/Cofins e ICMS/ISS) — são
+comparações simplificadas sobre o valor total da operação, não substituem
+cálculo contábil real (não modelam crédito de insumos específico). O
+verificador do Imposto Seletivo é só qualitativo (a atividade entra ou não
+na lista constitucional) porque as alíquotas por produto dependem de lei
+ordinária ainda não totalmente definida.
+
 ## Rastreamento por IA (`robots.txt` + `llms.txt`)
 
 `robots.txt` libera explicitamente os principais crawlers de IA (GPTBot,
