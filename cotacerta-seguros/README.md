@@ -44,11 +44,37 @@ repositório](../README.md).
 - `index.html` — home (hero, seguradoras parceiras, produtos)
 - `cotar/` — funil de cotação em 3 etapas (tipo de seguro → detalhes →
   contato), termina em link `wa.me` pro WhatsApp dedicado da Cota Certa
-- `blog/` — 7 artigos de SEO "seguro para motorista de app" (Onix, HB20,
-  Kwid, Argo, Voyage, Prisma, Uno)
+- `blog/` — artigos de SEO: 7 sobre "seguro para motorista de app" (Onix,
+  HB20, Kwid, Argo, Voyage, Prisma, Uno) + 7 sobre produtos Porto Seguro
+  (`porto-seguro-*.html` — auto, residencial, vida, saúde, odonto, viagem,
+  consórcio) + 3 sobre vida/invalidez/renda protegida
 - `img/` — logo oficial, foto do hero, logos das seguradoras parceiras
   (Porto Seguro, Allianz, HDI, Bradesco, Mapfre — Tokio Marine e Zurich
   ainda usam iniciais coloridas por falta de arquivo oficial)
+- `llms.txt` — resumo estruturado do site (produtos, artigos, contato) no
+  formato que agentes de IA consomem primeiro; atualizar sempre que um
+  artigo ou produto novo entrar no ar, mesma regra do `sitemap.xml`
+
+## Artigos "Porto Seguro produto por produto" (`blog/porto-seguro-*.html`)
+
+Cada um dos 7 artigos segue o mesmo template do
+`seguro-invalidez-permanente.html` (TOC, `dark-box`/`teal-box`/`warning-box`,
+tabela de coberturas, FAQ visível) e o mesmo checklist de SEO/AEO: 3 blocos
+JSON-LD (`Article` + `BreadcrumbList` + `FAQPage`, extraída das perguntas
+visíveis na página), `canonical`/`og:url` **sempre sem `.html`**, GA4
+(`G-TW0TZC72WF`) e Pixel (`1060589406422111`) iguais aos demais posts, CTA
+pro WhatsApp (`5547996103804`) e link `../cotar/?tipo=X` no header. Conteúdo
+é deliberadamente genérico/educativo (coberturas típicas, fatores de preço)
+em vez de números ou condições específicas da Porto Seguro — a corretora não
+é a seguradora e não deve afirmar termos contratuais que só a Porto Seguro
+pode confirmar. Todo artigo novo = card em `blog/index.html`, linha em
+`sitemap.xml` (prioridade 0.90) e entrada em `llms.txt`.
+
+## Rastreamento por IA (`robots.txt` + `llms.txt`)
+
+`robots.txt` libera explicitamente os principais crawlers de IA (GPTBot,
+ClaudeBot, PerplexityBot, Google-Extended etc.), além do `User-agent: *`
+genérico que já cobria isso — mesmo padrão do `felizcred-site/`.
 
 ## Pendências conhecidas
 
