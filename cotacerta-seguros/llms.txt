@@ -6,6 +6,10 @@
 
 - [Cotar um seguro](https://www.cotacertaseguros.com.br/cotar/): funil de cotação em 3 etapas (tipo de seguro → detalhes → contato), termina em atendimento via WhatsApp
 
+## Calculadora interativa
+
+- [Calculadora de Consórcio como Investimento](https://www.cotacertaseguros.com.br/blog/calculadora-consorcio-investimento): simula o lucro estimado vendendo a carta contemplada ou comprando um imóvel de renda com o crédito liberado
+
 ## Porto Seguro, produto por produto
 
 Guias sobre os produtos da Porto Seguro, uma das seguradoras parceiras da Cota Certa:
