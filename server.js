@@ -87,6 +87,12 @@ const PHONE_NUMBERS = process.env.PHONE_NUMBERS_JSON
 const MEDIA_DIR = path.join(__dirname, "media");
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
+// Imagens enviadas pelo Publique IV (ver PUBLIQUE-IV.md) — pasta separada da mídia do
+// WhatsApp porque essas precisam ficar acessíveis SEM login: Instagram/Facebook exigem uma
+// URL pública pra buscar a imagem na hora de publicar.
+const PUBLICAR_MEDIA_DIR = path.join(MEDIA_DIR, "publicar");
+fs.mkdirSync(PUBLICAR_MEDIA_DIR, { recursive: true });
+
 const EXT_BY_MIME = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -114,6 +120,17 @@ function parseBody(req) {
     });
     req.on("error", reject);
   });
+}
+
+// Decodifica uma imagem em data URL (formato que o <input type="file"> + FileReader do
+// navegador gera) e salva em PUBLICAR_MEDIA_DIR. Usado pelo upload do Publique IV.
+function salvarImagemPublicar(dataUrl) {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || "");
+  if (!match) throw new Error("Formato de imagem inválido");
+  const ext = EXT_BY_MIME[match[1]] || "jpg";
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  fs.writeFileSync(path.join(PUBLICAR_MEDIA_DIR, filename), Buffer.from(match[2], "base64"));
+  return filename;
 }
 
 function send(res, status, body, headers = {}) {
@@ -1193,10 +1210,20 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, publique.listarContas());
     }
 
-    // POST /painel/api/publicar — publica o mesmo conteúdo em várias redes de uma vez (Publique IV)
+    // POST /painel/api/publicar — publica o mesmo conteúdo em várias redes de uma vez (Publique IV).
+    // Aceita imagemUrl (link já pronto) OU imagemBase64 (upload direto do computador — o
+    // servidor salva e gera a URL pública sozinho).
     if (req.method === "POST" && path_ === "/painel/api/publicar") {
       if (!requireAuth(req, res)) return;
       const body = await parseBody(req);
+      if (body.imagemBase64) {
+        try {
+          const filename = salvarImagemPublicar(body.imagemBase64);
+          body.imagemUrl = `https://${req.headers.host}/publicar-media/${filename}`;
+        } catch (err) {
+          return send(res, 400, { error: err.message });
+        }
+      }
       if (!body.texto && !body.imagemUrl) {
         return send(res, 400, { error: "Informe ao menos um texto ou uma imagem" });
       }
@@ -1206,6 +1233,18 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         return send(res, 500, { error: err.message });
       }
+    }
+
+    // GET /publicar-media/:arquivo — serve as imagens enviadas pelo Publique IV, SEM login
+    // (Instagram/Facebook precisam buscar essa imagem publicamente pra publicar). Pasta
+    // própria e separada de /media/ (essa continua exigindo login, guarda mídia de clientes).
+    const matchPublicarMedia = path_.match(/^\/publicar-media\/([a-zA-Z0-9_.-]+)$/);
+    if (req.method === "GET" && matchPublicarMedia) {
+      const filePath = path.join(PUBLICAR_MEDIA_DIR, matchPublicarMedia[1]);
+      if (!filePath.startsWith(PUBLICAR_MEDIA_DIR) || !fs.existsSync(filePath)) {
+        return send(res, 404, "Not found");
+      }
+      return send(res, 200, fs.readFileSync(filePath));
     }
 
     // POST /painel/api/publicar/perfil-facebook — troca capa/foto de perfil/"sobre" da

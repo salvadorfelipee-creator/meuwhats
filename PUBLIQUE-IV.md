@@ -8,8 +8,10 @@ daquele conteúdo (Instagram exige imagem, LinkedIn usa o link pra gerar a prév
 
 Você escreve **um** post (texto + opcionalmente imagem e/ou link) e escolhe quais redes
 recebem. O sistema publica em paralelo lógico (uma rede por vez, mas nenhuma trava as
-outras) e devolve o resultado individual de cada uma — se uma falhar (token vencido, rede
-sem credencial, etc.) as demais continuam normalmente.
+outras) e devolve o resultado individual de cada uma, com **link direto pra publicação** —
+se uma falhar (token vencido, rede sem credencial, etc.) as demais continuam normalmente.
+A imagem é **upload direto do computador** (arrastar ou clicar) — não precisa ter a foto
+hospedada em algum lugar antes.
 
 Hoje cobre: **Instagram, Facebook, X/Twitter e LinkedIn.**
 
@@ -41,14 +43,30 @@ server.js             rotas:
                       POST /painel/api/publicar               → publica nas redes marcadas
                       GET  /painel/api/publicar/contas         → lista contas/redes disponíveis
                       POST /painel/api/publicar/perfil-facebook → capa/foto/"sobre" da Página
-public/painel.html    aba "Publicar" (🚀): formulário de post + card "Perfil da Página
-                      (Facebook)" + resultado de cada ação
+                      GET  /publicar-media/:arquivo            → serve a imagem enviada (sem
+                                                                  login — Meta precisa buscá-la)
+public/painel.html    aba "Publicar" (🚀): upload com preview + pré-visualização ao vivo do
+                      post + chips de rede + card "Perfil da Página (Facebook)"
 ```
 
 Cada rede-adaptador é uma função pura: recebe `{ texto, imagemUrl, link }` +
 credenciais explícitas, e não lê `process.env` diretamente (exceto `instagram.js`, que
 mantém compatibilidade com as funções antigas de leitura que já existiam antes do Publique
-IV — se nenhuma credencial for passada, cai no token/conta padrão do Instagram).
+IV — se nenhuma credencial for passada, cai no token/conta padrão do Instagram). Cada
+adaptador de publicação também busca e devolve `link` (o permalink da publicação), pra
+mostrar no painel.
+
+### Upload de imagem — como funciona por baixo
+
+O navegador redimensiona a imagem (máx. 1600px do lado maior, JPEG) e manda como
+`imagemBase64` no mesmo POST /painel/api/publicar. O servidor decodifica, salva em
+`media/publicar/` (pasta própria, separada de `media/` que guarda mídia de clientes do
+WhatsApp) e gera uma URL pública tipo `https://SEU_DOMINIO/publicar-media/xxxx.jpg` —
+o Instagram e o Facebook buscam a imagem por essa URL na hora de publicar. Essa rota
+**não exige login** (diferente de `/media/`) porque as redes sociais precisam acessá-la de
+fora; como a imagem já vai virar uma publicação pública mesmo, isso não é uma exposição
+nova de dado sensível. O disco do Render é efêmero (perde arquivo a cada deploy), mas isso
+não é problema aqui — a imagem só precisa existir pelos segundos que a Meta leva pra buscá-la.
 
 ## Contas — como adicionar uma nova
 
@@ -123,9 +141,11 @@ esse exige o produto "Community Management API" aprovado).
 
 ## Status
 
-Código escrito seguindo a documentação oficial de cada API, mas **ainda não testado contra
-nenhuma API real** — nenhuma das contas de X/Twitter/LinkedIn/Facebook (Página com token de
-publicação) existe ainda. Antes de confiar em publicações automáticas de verdade, faça um
-primeiro teste manual por rede e confira o resultado no ar.
+- **Instagram e Facebook**: ✅ ao vivo e testado (10/08/2026) — publicação real feita e
+  confirmada nas duas redes, incluindo o card de perfil da Página (capa/foto/"sobre"/telefone).
+- **X/Twitter e LinkedIn**: código escrito seguindo a documentação oficial de cada API, mas
+  **ainda não testado contra API real** — nenhuma das duas contas de desenvolvedor existe
+  ainda. Antes de confiar em publicação automática nelas, criar as credenciais (ver seção
+  acima) e fazer um primeiro teste manual.
 
 Pendências de conta/chave: ver `CHAVES-LOCAL.md`.

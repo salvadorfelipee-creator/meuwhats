@@ -36,6 +36,17 @@ function graphRequest(token, method, requestPath, body) {
   });
 }
 
+// Busca o link permanente de um post já publicado — não falha a publicação se der erro
+// (o post já existe, só não teríamos o link pra mostrar no painel).
+async function buscarLink(token, postId) {
+  try {
+    const { status, json } = await graphRequest(token, "GET", `/${GRAPH_VERSION}/${postId}?fields=permalink_url`);
+    return status < 400 ? json.permalink_url : null;
+  } catch {
+    return null;
+  }
+}
+
 // Publica na Página do Facebook (usado pelo Publique IV — ver PUBLIQUE-IV.md).
 // Com imagem vai por /photos (legenda = texto); sem imagem vai por /feed (message + link,
 // a própria Página gera a prévia do link).
@@ -46,7 +57,8 @@ async function publicar({ texto, imagemUrl, link }, { token, paginaId }) {
       caption: texto || "",
     });
     if (status >= 400) throw new Error(`Falha ao publicar foto no Facebook: ${JSON.stringify(json)}`);
-    return { id: json.post_id || json.id };
+    const postId = json.post_id || json.id;
+    return { id: postId, link: await buscarLink(token, postId) };
   }
 
   const { status, json } = await graphRequest(token, "POST", `/${GRAPH_VERSION}/${paginaId}/feed`, {
@@ -54,7 +66,7 @@ async function publicar({ texto, imagemUrl, link }, { token, paginaId }) {
     ...(link ? { link } : {}),
   });
   if (status >= 400) throw new Error(`Falha ao publicar no Facebook: ${JSON.stringify(json)}`);
-  return { id: json.id };
+  return { id: json.id, link: await buscarLink(token, json.id) };
 }
 
 // Troca a foto de capa da Página (usado pelo Publique IV). Sobe a imagem primeiro

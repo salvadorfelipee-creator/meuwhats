@@ -150,7 +150,20 @@ async function publicarImagem({ imagemUrl, legenda, accessToken, accountId }) {
     token
   );
   if (s2 >= 400) throw new Error(`Falha ao publicar no Instagram: ${JSON.stringify(publicado)}`);
-  return { id: publicado.id };
+
+  let link = null;
+  try {
+    const { status: s3, json: dados } = await graphRequest(
+      "GET",
+      `/${GRAPH_VERSION}/${publicado.id}?fields=permalink`,
+      null,
+      token
+    );
+    if (s3 < 400) link = dados.permalink;
+  } catch {
+    // publicação já existe mesmo se essa busca falhar — só não teremos o link pro painel
+  }
+  return { id: publicado.id, link };
 }
 
 module.exports = {

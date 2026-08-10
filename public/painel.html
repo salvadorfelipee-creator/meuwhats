@@ -139,12 +139,82 @@
   .ig-erro { color: #c0392b; font-size: 13px; }
 
   /* ── Publicar (Publique IV) ───────────────────────────────── */
-  #publicar-form label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
-  #publicar-form label:first-child { margin-top: 0; }
-  #publicar-form input, #publicar-form textarea, #publicar-form select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13.5px; font-family: inherit; resize: vertical; box-sizing: border-box; }
-  #publicar-form textarea { min-height: 90px; }
-  #pub-publicar { background: var(--accent); color: #fff; }
-  #pub-resultado { font-size: 13.5px; line-height: 1.8; }
+  .publicar-grid { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 24px; align-items: start; }
+  .publicar-card label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 6px; }
+  .publicar-card label:first-of-type { margin-top: 0; }
+  .publicar-card textarea, .publicar-card input, .publicar-card select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; font-family: inherit; resize: vertical; box-sizing: border-box; background: var(--bg);
+  }
+  .publicar-card textarea:focus, .publicar-card input:focus { outline: none; border-color: var(--accent); background: var(--card); }
+  #pub-texto { min-height: 110px; }
+  .contador { text-align: right; font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+  .contador.limite { color: #c0392b; font-weight: 600; }
+
+  .upload-zone {
+    position: relative; border: 2px dashed var(--border); border-radius: var(--radius); min-height: 180px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    transition: border-color .15s, background .15s; overflow: hidden; background: var(--bg);
+  }
+  .upload-zone:hover, .upload-zone.arrastando { border-color: var(--accent); background: var(--accent-soft); }
+  .upload-zone-vazio { text-align: center; padding: 24px; color: var(--text-muted); }
+  .upload-icone { font-size: 34px; margin-bottom: 6px; }
+  .upload-titulo { font-size: 14px; font-weight: 600; color: var(--text); }
+  .upload-sub { font-size: 12px; margin-top: 3px; }
+  #pub-upload-preview { width: 100%; max-height: 320px; object-fit: cover; display: block; }
+  .upload-remover {
+    position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%;
+    border: none; background: rgba(0,0,0,0.6); color: #fff; font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .upload-remover:hover { background: rgba(0,0,0,0.8); }
+  .aviso-instagram { font-size: 12px; color: #c0392b; margin-top: 6px; display: none; }
+
+  .rede-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rede-chip {
+    display: flex; align-items: center; gap: 7px; padding: 8px 14px 8px 8px; border-radius: 999px;
+    border: 1.5px solid var(--border); background: var(--card); cursor: pointer; font-size: 13px;
+    font-weight: 600; color: var(--text-muted); user-select: none; transition: all .15s;
+  }
+  .rede-icone {
+    width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 800; color: #fff; flex-shrink: 0;
+  }
+  .rede-chip.desabilitada { opacity: 0.45; cursor: not-allowed; }
+  .rede-chip.marcada { border-color: transparent; color: var(--text); background: var(--accent-soft); }
+  .rede-icone.rede-instagram { background: linear-gradient(45deg,#f9ce34,#ee2a7b 45%,#6228d7); }
+  .rede-icone.rede-facebook { background: #1877F2; }
+  .rede-icone.rede-twitter { background: #0F1419; }
+  .rede-icone.rede-linkedin { background: #0A66C2; }
+
+  .btn-publicar {
+    width: 100%; margin-top: 20px; padding: 13px; border: none; border-radius: 10px;
+    background: var(--accent); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn-publicar:hover { opacity: 0.92; }
+  .btn-publicar:active { transform: scale(0.99); }
+  .btn-publicar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .resultado-lista { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .resultado-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; background: var(--bg); font-size: 13.5px; }
+  .resultado-item .status { flex: 1; color: var(--text); }
+  .resultado-item.erro .status { color: #c0392b; }
+  .resultado-item a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .resultado-item a:hover { text-decoration: underline; }
+
+  .preview-coluna { position: sticky; top: 0; }
+  .preview-rotulo { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
+  .preview-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .preview-card-topo { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+  .preview-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+  .preview-nome { font-weight: 700; font-size: 13.5px; }
+  .preview-subtitulo { font-size: 11.5px; color: var(--text-muted); }
+  .preview-imagem-wrap { width: 100%; max-height: 340px; min-height: 90px; background: var(--bg-alt); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .preview-imagem-wrap img { width: 100%; max-height: 340px; object-fit: contain; display: none; }
+  .preview-imagem-vazia { color: var(--text-muted); font-size: 12.5px; text-align: center; padding: 20px; }
+  .preview-texto { padding: 12px 14px 16px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; color: var(--text); }
+  .preview-texto.vazio { color: var(--text-muted); }
 
   /* ── Ads Manager ──────────────────────────────────────────── */
   .ads-card-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
@@ -255,31 +325,60 @@
   <div id="view-publicar" class="view">
     <div class="page-wrap">
       <div class="page-header">
-        <h2>Publicar — Publique IV</h2>
-      </div>
-      <div class="card" id="publicar-form">
-        <label>Conta</label>
-        <select id="pub-conta"></select>
-
-        <label>Texto</label>
-        <textarea id="pub-texto" placeholder="Texto da publicação..."></textarea>
-
-        <label>URL da imagem (opcional — obrigatório para Instagram)</label>
-        <input id="pub-imagem" placeholder="https://..." />
-
-        <label>Link (opcional — usado por Facebook e LinkedIn)</label>
-        <input id="pub-link" placeholder="https://..." />
-
-        <label>Redes</label>
-        <div id="pub-redes"></div>
-
-        <div class="modal-botoes" style="justify-content:flex-start; margin-top:16px;">
-          <button id="pub-publicar" type="button">Publicar</button>
+        <h2>🚀 Publique IV</h2>
+        <div class="page-header-acoes">
+          <select id="pub-conta" style="min-width:180px;"></select>
         </div>
-        <div id="pub-resultado" style="margin-top:14px;"></div>
       </div>
 
-      <div class="card" id="perfil-fb-form" style="margin-top:16px;">
+      <div class="publicar-grid">
+        <div class="card publicar-card">
+          <div class="upload-zone" id="pub-upload-zone">
+            <input type="file" id="pub-imagem-input" accept="image/*" hidden />
+            <div class="upload-zone-vazio" id="pub-upload-vazio">
+              <div class="upload-icone">🖼️</div>
+              <div class="upload-titulo">Arraste uma imagem aqui ou clique pra escolher</div>
+              <div class="upload-sub">JPG, PNG ou WEBP — obrigatória pro Instagram</div>
+            </div>
+            <img id="pub-upload-preview" style="display:none;" />
+            <button type="button" id="pub-upload-remover" class="upload-remover" style="display:none;" title="Remover imagem">✕</button>
+          </div>
+
+          <label>Legenda</label>
+          <textarea id="pub-texto" placeholder="Escreva o texto da publicação..." maxlength="2200"></textarea>
+          <div class="contador" id="pub-contador">0 caracteres</div>
+
+          <label>Link (opcional — usado por Facebook/LinkedIn quando não há imagem)</label>
+          <input id="pub-link" placeholder="https://..." />
+
+          <label>Publicar em</label>
+          <div class="rede-chips" id="pub-redes"></div>
+          <div class="aviso-instagram" id="pub-aviso-instagram">O Instagram está marcado mas não tem imagem — ele vai falhar sem uma foto.</div>
+
+          <button id="pub-publicar" class="btn-publicar" type="button">Publicar agora</button>
+          <div id="pub-resultado" class="resultado-lista"></div>
+        </div>
+
+        <div class="preview-coluna">
+          <div class="preview-rotulo">Pré-visualização</div>
+          <div class="preview-card">
+            <div class="preview-card-topo">
+              <div class="preview-avatar">F</div>
+              <div>
+                <div class="preview-nome" id="preview-nome">felizcred</div>
+                <div class="preview-subtitulo">Agora</div>
+              </div>
+            </div>
+            <div class="preview-imagem-wrap">
+              <img id="preview-imagem" />
+              <div class="preview-imagem-vazia" id="preview-imagem-vazia">Sua imagem aparece aqui</div>
+            </div>
+            <div class="preview-texto vazio" id="preview-texto">Escreva sua legenda ao lado...</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card publicar-card" id="perfil-fb-form" style="margin-top:20px;">
         <h3>Perfil da Página (Facebook)</h3>
         <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">
           O Instagram não tem essa opção — a API da Meta não permite trocar bio/foto de perfil do Instagram por fora do app.
@@ -894,7 +993,13 @@ document.getElementById("tg-atualizar").addEventListener("click", carregarContat
 
 // ─── Publicar (Publique IV) ───────────────────────────────────────────────────
 let contasPublicar = [];
-const REDES_LABEL_PUB = { instagram: "Instagram", facebook: "Facebook", twitter: "X/Twitter", linkedin: "LinkedIn" };
+let pubImagemBase64 = null;
+const REDES_INFO = {
+  instagram: { label: "Instagram", sigla: "IG" },
+  facebook: { label: "Facebook", sigla: "FB" },
+  twitter: { label: "X/Twitter", sigla: "X" },
+  linkedin: { label: "LinkedIn", sigla: "in" },
+};
 
 async function carregarContasPublicar() {
   const res = await fetch("/painel/api/publicar/contas");
@@ -904,56 +1009,184 @@ async function carregarContasPublicar() {
   renderizarRedesPublicar();
 }
 
+function redesMarcadas() {
+  return Array.from(document.querySelectorAll(".rede-chip.marcada")).map((el) => el.dataset.rede);
+}
+
+function atualizarAvisoInstagram() {
+  const marcadoIg = document.querySelector('.rede-chip[data-rede="instagram"].marcada');
+  document.getElementById("pub-aviso-instagram").style.display = marcadoIg && !pubImagemBase64 ? "block" : "none";
+}
+
 function renderizarRedesPublicar() {
   const contaId = document.getElementById("pub-conta").value;
   const conta = contasPublicar.find((c) => c.id === contaId);
   const disponiveis = conta ? conta.redesDisponiveis : [];
-  document.getElementById("pub-redes").innerHTML = Object.keys(REDES_LABEL_PUB)
-    .map((rede) => {
+  document.getElementById("pub-redes").innerHTML = Object.entries(REDES_INFO)
+    .map(([rede, info]) => {
       const ok = disponiveis.includes(rede);
-      return `<label style="display:block; font-weight:400; margin:4px 0;">
-        <input type="checkbox" class="pub-rede-check" value="${rede}" style="width:auto;" ${ok ? "checked" : "disabled"} />
-        ${REDES_LABEL_PUB[rede]}${ok ? "" : " (sem credencial configurada)"}
-      </label>`;
+      return `<div class="rede-chip ${ok ? "marcada" : "desabilitada"}" data-rede="${rede}" title="${ok ? "" : "Sem credencial configurada"}">
+        <span class="rede-icone rede-${rede}">${info.sigla}</span>${info.label}
+      </div>`;
     })
     .join("");
+  document.querySelectorAll(".rede-chip:not(.desabilitada)").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("marcada");
+      atualizarAvisoInstagram();
+    });
+  });
+  atualizarAvisoInstagram();
+  atualizarPreview();
 }
 
 document.getElementById("pub-conta").addEventListener("change", renderizarRedesPublicar);
 
+// ─ Upload + redimensionamento no navegador (evita mandar foto de 12MB pro servidor) ─
+function redimensionarImagem(file, maxLado = 1600, qualidade = 0.86) {
+  return new Promise((resolve, reject) => {
+    const leitor = new FileReader();
+    leitor.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxLado || height > maxLado) {
+          const escala = maxLado / Math.max(width, height);
+          width = Math.round(width * escala);
+          height = Math.round(height * escala);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", qualidade));
+      };
+      img.onerror = () => reject(new Error("Não foi possível ler essa imagem."));
+      img.src = leitor.result;
+    };
+    leitor.onerror = () => reject(new Error("Não foi possível ler esse arquivo."));
+    leitor.readAsDataURL(file);
+  });
+}
+
+async function processarImagemSelecionada(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  try {
+    pubImagemBase64 = await redimensionarImagem(file);
+    document.getElementById("pub-upload-vazio").style.display = "none";
+    const preview = document.getElementById("pub-upload-preview");
+    preview.src = pubImagemBase64;
+    preview.style.display = "block";
+    document.getElementById("pub-upload-remover").style.display = "flex";
+  } catch (err) {
+    alert(err.message);
+  }
+  atualizarAvisoInstagram();
+  atualizarPreview();
+}
+
+const pubUploadZone = document.getElementById("pub-upload-zone");
+const pubUploadInput = document.getElementById("pub-imagem-input");
+pubUploadZone.addEventListener("click", (e) => {
+  if (e.target.id !== "pub-upload-remover") pubUploadInput.click();
+});
+pubUploadInput.addEventListener("change", () => processarImagemSelecionada(pubUploadInput.files[0]));
+pubUploadZone.addEventListener("dragover", (e) => { e.preventDefault(); pubUploadZone.classList.add("arrastando"); });
+pubUploadZone.addEventListener("dragleave", () => pubUploadZone.classList.remove("arrastando"));
+pubUploadZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  pubUploadZone.classList.remove("arrastando");
+  processarImagemSelecionada(e.dataTransfer.files[0]);
+});
+document.getElementById("pub-upload-remover").addEventListener("click", (e) => {
+  e.stopPropagation();
+  pubImagemBase64 = null;
+  pubUploadInput.value = "";
+  document.getElementById("pub-upload-vazio").style.display = "block";
+  document.getElementById("pub-upload-preview").style.display = "none";
+  document.getElementById("pub-upload-remover").style.display = "none";
+  atualizarAvisoInstagram();
+  atualizarPreview();
+});
+
+// ─ Pré-visualização ao vivo ─
+function atualizarPreview() {
+  const texto = document.getElementById("pub-texto").value;
+  const textoDiv = document.getElementById("preview-texto");
+  textoDiv.textContent = texto || "Escreva sua legenda ao lado...";
+  textoDiv.classList.toggle("vazio", !texto);
+
+  const img = document.getElementById("preview-imagem");
+  const vazio = document.getElementById("preview-imagem-vazia");
+  if (pubImagemBase64) {
+    img.src = pubImagemBase64;
+    img.style.display = "block";
+    vazio.style.display = "none";
+  } else {
+    img.style.display = "none";
+    vazio.style.display = "block";
+  }
+
+  const contaId = document.getElementById("pub-conta").value;
+  const conta = contasPublicar.find((c) => c.id === contaId);
+  document.getElementById("preview-nome").textContent = conta ? conta.nome.toLowerCase().replace(/\s+/g, "") : "felizcred";
+}
+
+document.getElementById("pub-texto").addEventListener("input", () => {
+  const len = document.getElementById("pub-texto").value.length;
+  const contador = document.getElementById("pub-contador");
+  contador.textContent = `${len} caracteres${len > 280 ? " — X/Twitter corta em 280" : ""}`;
+  contador.classList.toggle("limite", len > 2200);
+  atualizarPreview();
+});
+
 document.getElementById("pub-publicar").addEventListener("click", async () => {
   const contaId = document.getElementById("pub-conta").value;
   const texto = document.getElementById("pub-texto").value.trim();
-  const imagemUrl = document.getElementById("pub-imagem").value.trim();
   const link = document.getElementById("pub-link").value.trim();
-  const redes = Array.from(document.querySelectorAll(".pub-rede-check:checked")).map((el) => el.value);
+  const redes = redesMarcadas();
   const resDiv = document.getElementById("pub-resultado");
+  const botao = document.getElementById("pub-publicar");
 
-  if (!texto && !imagemUrl) {
-    resDiv.textContent = "Preencha ao menos o texto ou a imagem.";
+  if (!texto && !pubImagemBase64) {
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Preencha ao menos o texto ou a imagem.</span></div>`;
     return;
   }
   if (!redes.length) {
-    resDiv.textContent = "Marque ao menos uma rede.";
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Marque ao menos uma rede.</span></div>`;
     return;
   }
 
-  resDiv.textContent = "Publicando...";
-  const res = await fetch("/painel/api/publicar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contaId, texto, imagemUrl, link, redes }),
-  });
-  const data = await res.json();
-  if (data.error) {
-    resDiv.textContent = data.error;
-    return;
+  botao.disabled = true;
+  botao.textContent = "Publicando...";
+  resDiv.innerHTML = "";
+  try {
+    const res = await fetch("/painel/api/publicar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contaId, texto, link, redes, ...(pubImagemBase64 ? { imagemBase64: pubImagemBase64 } : {}) }),
+    });
+    const data = await res.json();
+    if (data.error) {
+      resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(data.error)}</span></div>`;
+      return;
+    }
+    resDiv.innerHTML = Object.entries(data.resultados)
+      .map(([rede, r]) => {
+        const info = REDES_INFO[rede] || { label: rede, sigla: "?" };
+        return `<div class="resultado-item ${r.ok ? "ok" : "erro"}">
+          <span class="rede-icone rede-${rede}">${info.sigla}</span>
+          <span class="status">${info.label}: ${r.ok ? "publicado" : escapeHtml(r.erro)}</span>
+          ${r.ok && r.link ? `<a href="${r.link}" target="_blank" rel="noopener">Ver publicação →</a>` : ""}
+        </div>`;
+      })
+      .join("");
+  } catch (err) {
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
+  } finally {
+    botao.disabled = false;
+    botao.textContent = "Publicar agora";
   }
-  resDiv.innerHTML = Object.entries(data.resultados)
-    .map(([rede, r]) => `<div>${r.ok ? "✅" : "❌"} <b>${REDES_LABEL_PUB[rede] || rede}</b>: ${
-      r.ok ? "publicado" : escapeHtml(r.erro)
-    }</div>`)
-    .join("");
 });
 
 document.getElementById("perfil-fb-salvar").addEventListener("click", async () => {
@@ -964,11 +1197,11 @@ document.getElementById("perfil-fb-salvar").addEventListener("click", async () =
   const resDiv = document.getElementById("perfil-fb-resultado");
 
   if (!capaUrl && !fotoPerfilUrl && !sobre) {
-    resDiv.textContent = "Preencha ao menos um campo.";
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Preencha ao menos um campo.</span></div>`;
     return;
   }
 
-  resDiv.textContent = "Atualizando...";
+  resDiv.innerHTML = `<div class="resultado-item"><span class="status">Atualizando...</span></div>`;
   const res = await fetch("/painel/api/publicar/perfil-facebook", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -976,14 +1209,14 @@ document.getElementById("perfil-fb-salvar").addEventListener("click", async () =
   });
   const data = await res.json();
   if (data.error) {
-    resDiv.textContent = data.error;
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(data.error)}</span></div>`;
     return;
   }
   const rotulos = { capa: "Capa", fotoPerfil: "Foto de perfil", sobre: "Sobre" };
   resDiv.innerHTML = Object.entries(data.resultados)
-    .map(([campo, r]) => `<div>${r.ok ? "✅" : "❌"} <b>${rotulos[campo] || campo}</b>: ${
+    .map(([campo, r]) => `<div class="resultado-item ${r.ok ? "ok" : "erro"}"><span class="status">${rotulos[campo] || campo}: ${
       r.ok ? "atualizado" : escapeHtml(r.erro)
-    }</div>`)
+    }</span></div>`)
     .join("");
 });
 

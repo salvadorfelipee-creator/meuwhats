@@ -123,7 +123,8 @@ async function publicar({ texto, imagemUrl }, creds) {
     body,
   });
   if (status >= 400) throw new Error(`Falha ao publicar no X/Twitter: ${JSON.stringify(json)}`);
-  return { id: json.data?.id, truncado: textoFinal !== (texto || "") };
+  const id = json.data?.id;
+  return { id, link: id ? `https://x.com/i/web/status/${id}` : null, truncado: textoFinal !== (texto || "") };
 }
 
 module.exports = { publicar };
