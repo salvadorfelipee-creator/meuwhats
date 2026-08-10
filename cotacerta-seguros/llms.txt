@@ -23,6 +23,21 @@ Guias sobre os produtos da Porto Seguro, uma das seguradoras parceiras da Cota C
 - [Porto Seguro Empresarial (PME)](https://www.cotacertaseguros.com.br/blog/porto-seguro-empresarial): coberturas pra pequenas e médias empresas
 - [Porto Seguro Bike e Equipamentos Portáteis](https://www.cotacertaseguros.com.br/blog/porto-seguro-bike): seguro pra bicicleta, notebook, câmera e drone
 
+## MetLife
+
+Guias sobre produtos da MetLife, seguradora especializada em vida, previdência e odontologia:
+
+- [Seguro de Vida Individual MetLife](https://www.cotacertaseguros.com.br/blog/metlife-vida-individual): coberturas e como funciona
+- [MetLife Vida em Grupo](https://www.cotacertaseguros.com.br/blog/metlife-vida-grupo-empresarial): seguro de vida para empresas
+- [MetLife Doenças Graves](https://www.cotacertaseguros.com.br/blog/metlife-doencas-graves): como funciona a cobertura
+- [MetLife Odonto](https://www.cotacertaseguros.com.br/blog/metlife-odonto): planos individual e empresarial
+- [MetLife Previdência Privada](https://www.cotacertaseguros.com.br/blog/metlife-previdencia-privada): PGBL x VGBL
+- [Seguro Prestamista MetLife](https://www.cotacertaseguros.com.br/blog/metlife-seguro-prestamista): quitação de dívidas e financiamentos
+- [MetLife Acidentes Pessoais](https://www.cotacertaseguros.com.br/blog/metlife-acidentes-pessoais): coberturas
+- [MetLife ou Porto Seguro: qual seguro de vida escolher?](https://www.cotacertaseguros.com.br/blog/metlife-vs-porto-seguro-vida): comparativo
+- [Seguro de Vida MetLife pra Autônomo e MEI](https://www.cotacertaseguros.com.br/blog/metlife-autonomo-mei)
+- [Carência e Cancelamento do Seguro MetLife](https://www.cotacertaseguros.com.br/blog/metlife-carencia-cancelamento): como funciona
+
 ## Seguro auto para motorista de aplicativo
 
 Guias por modelo de carro para quem dirige por Uber/99: [Onix](https://www.cotacertaseguros.com.br/blog/seguro-app-onix), [HB20](https://www.cotacertaseguros.com.br/blog/seguro-app-hb20), [Kwid](https://www.cotacertaseguros.com.br/blog/seguro-app-kwid), [Argo](https://www.cotacertaseguros.com.br/blog/seguro-app-argo), [Voyage](https://www.cotacertaseguros.com.br/blog/seguro-app-voyage), [Prisma](https://www.cotacertaseguros.com.br/blog/seguro-app-prisma), [Uno](https://www.cotacertaseguros.com.br/blog/seguro-app-uno)
