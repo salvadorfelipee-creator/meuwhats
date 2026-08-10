@@ -4,7 +4,7 @@ const GRAPH_VERSION = "v21.0";
 const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 
-function graphRequest(method, requestPath, body) {
+function graphRequest(method, requestPath, body, tokenOverride) {
   return new Promise((resolve, reject) => {
     const payload = body ? JSON.stringify(body) : null;
     const req = https.request(
@@ -13,7 +13,7 @@ function graphRequest(method, requestPath, body) {
         hostname: "graph.instagram.com",
         path: requestPath,
         headers: {
-          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          Authorization: `Bearer ${tokenOverride || ACCESS_TOKEN}`,
           ...(payload ? { "Content-Type": "application/json" } : {}),
         },
       },
@@ -129,6 +129,30 @@ async function diagnostico() {
   return resultado;
 }
 
+// Publica uma imagem no feed (usado pelo Publique IV — ver PUBLIQUE-IV.md).
+// accessToken/accountId são opcionais: se não vierem, cai no token/conta padrão (Felizcred,
+// via env). Passar os dois explicitamente é o jeito de publicar em outra conta de Instagram.
+async function publicarImagem({ imagemUrl, legenda, accessToken, accountId }) {
+  const token = accessToken || ACCESS_TOKEN;
+  const conta = accountId || ACCOUNT_ID;
+  const { status, json: container } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${conta}/media`,
+    { image_url: imagemUrl, caption: legenda || "" },
+    token
+  );
+  if (status >= 400) throw new Error(`Falha ao criar publicação no Instagram: ${JSON.stringify(container)}`);
+
+  const { status: s2, json: publicado } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${conta}/media_publish`,
+    { creation_id: container.id },
+    token
+  );
+  if (s2 >= 400) throw new Error(`Falha ao publicar no Instagram: ${JSON.stringify(publicado)}`);
+  return { id: publicado.id };
+}
+
 module.exports = {
   sendDM,
   getPerfil,
@@ -137,4 +161,5 @@ module.exports = {
   getComentariosUltimoPost,
   getConversas,
   diagnostico,
+  publicarImagem,
 };

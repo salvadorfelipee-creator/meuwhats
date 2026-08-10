@@ -8,6 +8,7 @@ const wa = require("./whatsapp");
 const ig = require("./instagram");
 const ads = require("./ads");
 const tg = require("./telegram");
+const publique = require("./publique");
 const { notificarLeadCotaCerta } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
@@ -1184,6 +1185,27 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       const removidos = await db.instagramLimparSaudados();
       return send(res, 200, { ok: true, removidos });
+    }
+
+    // GET /painel/api/publicar/contas — lista contas e quais redes já têm credencial (Publique IV)
+    if (req.method === "GET" && path_ === "/painel/api/publicar/contas") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, publique.listarContas());
+    }
+
+    // POST /painel/api/publicar — publica o mesmo conteúdo em várias redes de uma vez (Publique IV)
+    if (req.method === "POST" && path_ === "/painel/api/publicar") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.texto && !body.imagemUrl) {
+        return send(res, 400, { error: "Informe ao menos um texto ou uma imagem" });
+      }
+      try {
+        const resultados = await publique.publicarEmTodos(body);
+        return send(res, 200, { resultados });
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
     }
 
     // GET /painel/api/ads/campanhas — lista campanhas com métricas

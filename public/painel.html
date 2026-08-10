@@ -138,6 +138,14 @@
   .ig-item .ig-item-texto { color: var(--text-muted); margin-top: 2px; }
   .ig-erro { color: #c0392b; font-size: 13px; }
 
+  /* ── Publicar (Publique IV) ───────────────────────────────── */
+  #publicar-form label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+  #publicar-form label:first-child { margin-top: 0; }
+  #publicar-form input, #publicar-form textarea, #publicar-form select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13.5px; font-family: inherit; resize: vertical; box-sizing: border-box; }
+  #publicar-form textarea { min-height: 90px; }
+  #pub-publicar { background: var(--accent); color: #fff; }
+  #pub-resultado { font-size: 13.5px; line-height: 1.8; }
+
   /* ── Ads Manager ──────────────────────────────────────────── */
   .ads-card-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .ads-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 600; flex-shrink: 0; }
@@ -155,6 +163,7 @@
     <button class="nav-item" data-view="instagram" title="Instagram">📸</button>
     <button class="nav-item" data-view="ads" title="Ads Manager">📊</button>
     <button class="nav-item" data-view="telegram" title="Telegram">📨</button>
+    <button class="nav-item" data-view="publicar" title="Publicar (Publique IV)">🚀</button>
   </nav>
 
   <!-- ── WhatsApp ─────────────────────────────────────────── -->
@@ -242,6 +251,36 @@
     </div>
   </div>
 
+  <!-- ── Publicar (Publique IV) ───────────────────────────── -->
+  <div id="view-publicar" class="view">
+    <div class="page-wrap">
+      <div class="page-header">
+        <h2>Publicar — Publique IV</h2>
+      </div>
+      <div class="card" id="publicar-form">
+        <label>Conta</label>
+        <select id="pub-conta"></select>
+
+        <label>Texto</label>
+        <textarea id="pub-texto" placeholder="Texto da publicação..."></textarea>
+
+        <label>URL da imagem (opcional — obrigatório para Instagram)</label>
+        <input id="pub-imagem" placeholder="https://..." />
+
+        <label>Link (opcional — usado por Facebook e LinkedIn)</label>
+        <input id="pub-link" placeholder="https://..." />
+
+        <label>Redes</label>
+        <div id="pub-redes"></div>
+
+        <div class="modal-botoes" style="justify-content:flex-start; margin-top:16px;">
+          <button id="pub-publicar" type="button">Publicar</button>
+        </div>
+        <div id="pub-resultado" style="margin-top:14px;"></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div id="modal-massa">
@@ -279,6 +318,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     if (btn.dataset.view === "instagram") carregarTudoInstagram();
     if (btn.dataset.view === "ads") carregarCampanhas();
     if (btn.dataset.view === "telegram") carregarContatosTelegram();
+    if (btn.dataset.view === "publicar") carregarContasPublicar();
   });
 });
 
@@ -830,6 +870,70 @@ async function carregarContatosTelegram() {
 }
 
 document.getElementById("tg-atualizar").addEventListener("click", carregarContatosTelegram);
+
+// ─── Publicar (Publique IV) ───────────────────────────────────────────────────
+let contasPublicar = [];
+const REDES_LABEL_PUB = { instagram: "Instagram", facebook: "Facebook", twitter: "X/Twitter", linkedin: "LinkedIn" };
+
+async function carregarContasPublicar() {
+  const res = await fetch("/painel/api/publicar/contas");
+  contasPublicar = await res.json();
+  const select = document.getElementById("pub-conta");
+  select.innerHTML = contasPublicar.map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join("");
+  renderizarRedesPublicar();
+}
+
+function renderizarRedesPublicar() {
+  const contaId = document.getElementById("pub-conta").value;
+  const conta = contasPublicar.find((c) => c.id === contaId);
+  const disponiveis = conta ? conta.redesDisponiveis : [];
+  document.getElementById("pub-redes").innerHTML = Object.keys(REDES_LABEL_PUB)
+    .map((rede) => {
+      const ok = disponiveis.includes(rede);
+      return `<label style="display:block; font-weight:400; margin:4px 0;">
+        <input type="checkbox" class="pub-rede-check" value="${rede}" style="width:auto;" ${ok ? "checked" : "disabled"} />
+        ${REDES_LABEL_PUB[rede]}${ok ? "" : " (sem credencial configurada)"}
+      </label>`;
+    })
+    .join("");
+}
+
+document.getElementById("pub-conta").addEventListener("change", renderizarRedesPublicar);
+
+document.getElementById("pub-publicar").addEventListener("click", async () => {
+  const contaId = document.getElementById("pub-conta").value;
+  const texto = document.getElementById("pub-texto").value.trim();
+  const imagemUrl = document.getElementById("pub-imagem").value.trim();
+  const link = document.getElementById("pub-link").value.trim();
+  const redes = Array.from(document.querySelectorAll(".pub-rede-check:checked")).map((el) => el.value);
+  const resDiv = document.getElementById("pub-resultado");
+
+  if (!texto && !imagemUrl) {
+    resDiv.textContent = "Preencha ao menos o texto ou a imagem.";
+    return;
+  }
+  if (!redes.length) {
+    resDiv.textContent = "Marque ao menos uma rede.";
+    return;
+  }
+
+  resDiv.textContent = "Publicando...";
+  const res = await fetch("/painel/api/publicar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contaId, texto, imagemUrl, link, redes }),
+  });
+  const data = await res.json();
+  if (data.error) {
+    resDiv.textContent = data.error;
+    return;
+  }
+  resDiv.innerHTML = Object.entries(data.resultados)
+    .map(([rede, r]) => `<div>${r.ok ? "✅" : "❌"} <b>${REDES_LABEL_PUB[rede] || rede}</b>: ${
+      r.ok ? "publicado" : escapeHtml(r.erro)
+    }</div>`)
+    .join("");
+});
 
 atualizarBotaoNotif();
 carregarNumeros().then(carregarConversas).then(verificarNovasMensagens);

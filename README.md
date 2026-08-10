@@ -50,6 +50,7 @@ importantes pra não misturar:
 - Envio em massa via **Template de Mensagem** (botão 📢 no painel), para contatos que ainda não conversaram
 - **Atendimento automático com botões**: menu inicial para conversa nova/inativa há 24h + fluxo de triagem do anúncio de gerente (ver seção abaixo)
 - Automações do **Instagram**: resposta automática a comentários, a replies de Story e boas-vindas na primeira DM
+- **Publique IV** (aba 🚀 "Publicar" no painel): publica o mesmo conteúdo em Instagram, Facebook, X/Twitter e LinkedIn com um clique — ver [`PUBLIQUE-IV.md`](./PUBLIQUE-IV.md)
 
 ⚠️ **Sobre mídias (fotos/áudios/vídeos)**: os arquivos em si ainda ficam só no disco local
 do servidor (pasta `media/`), que no plano free do Render não é permanente — podem ser
@@ -84,6 +85,12 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `TELEGRAM_WEBHOOK_SECRET` | Segredo opcional pra validar que o webhook vem do Telegram | — (sem validação) |
 | `TELEGRAM_START_MESSAGE` | Texto enviado ao receber `/start` (com botão de compartilhar contato) | (ver seção Telegram) |
 | `TELEGRAM_THANKS_MESSAGE` | Texto enviado depois que o usuário compartilha o contato | (ver seção Telegram) |
+| `FACEBOOK_PAGE_ACCESS_TOKEN` | Token de acesso da Página do Facebook (permissão `pages_manage_posts`) | — |
+| `FACEBOOK_PAGE_ID` | ID numérico da Página do Facebook | — |
+| `TWITTER_API_KEY` / `TWITTER_API_SECRET` | Chaves do App no X Developer Portal | — |
+| `TWITTER_ACCESS_TOKEN` / `TWITTER_ACCESS_SECRET` | Token de acesso da conta (gerado no mesmo App) | — |
+| `LINKEDIN_ACCESS_TOKEN` | Token OAuth2 do App LinkedIn (escopo `w_member_social` ou `w_organization_social`) | — |
+| `LINKEDIN_AUTHOR_URN` | `urn:li:person:XXX` (perfil) ou `urn:li:organization:XXX` (Página da empresa) | — |
 
 ⚠️ Defina `PAINEL_USER`/`PAINEL_PASS` com valores próprios — o painel mostra suas conversas.
 
