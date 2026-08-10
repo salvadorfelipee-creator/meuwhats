@@ -106,4 +106,37 @@ async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, link, 
   return resultados;
 }
 
-module.exports = { publicarEmTodos, listarContas };
+// Ações de perfil (capa, foto de perfil, "sobre") — hoje só o Facebook expõe isso via API
+// pública; o Instagram Graph API não tem endpoint de escrita pra bio/foto de perfil (só
+// leitura), então essa parte continua manual no app do Instagram. Ver PUBLIQUE-IV.md.
+async function atualizarPerfilFacebook({ contaId = "felizcred", capaUrl, fotoPerfilUrl, sobre }) {
+  const conta = contaPorId(contaId);
+  const credenciais = conta.redes.facebook;
+  if (!credenciais) throw new Error("Sem credenciais do Facebook configuradas para esta conta.");
+
+  const resultados = {};
+  if (capaUrl) {
+    try {
+      resultados.capa = { ok: true, ...(await facebook.atualizarCapa(capaUrl, credenciais)) };
+    } catch (err) {
+      resultados.capa = { ok: false, erro: err.message };
+    }
+  }
+  if (fotoPerfilUrl) {
+    try {
+      resultados.fotoPerfil = { ok: true, ...(await facebook.atualizarFotoPerfil(fotoPerfilUrl, credenciais)) };
+    } catch (err) {
+      resultados.fotoPerfil = { ok: false, erro: err.message };
+    }
+  }
+  if (sobre) {
+    try {
+      resultados.sobre = { ok: true, ...(await facebook.atualizarSobre(sobre, credenciais)) };
+    } catch (err) {
+      resultados.sobre = { ok: false, erro: err.message };
+    }
+  }
+  return resultados;
+}
+
+module.exports = { publicarEmTodos, listarContas, atualizarPerfilFacebook };

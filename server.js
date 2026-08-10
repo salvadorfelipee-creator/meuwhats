@@ -1208,6 +1208,22 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // POST /painel/api/publicar/perfil-facebook — troca capa/foto de perfil/"sobre" da
+    // Página do Facebook (Publique IV). Instagram não tem endpoint de escrita pra isso.
+    if (req.method === "POST" && path_ === "/painel/api/publicar/perfil-facebook") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.capaUrl && !body.fotoPerfilUrl && !body.sobre) {
+        return send(res, 400, { error: "Informe ao menos um campo para atualizar" });
+      }
+      try {
+        const resultados = await publique.atualizarPerfilFacebook(body);
+        return send(res, 200, { resultados });
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // GET /painel/api/ads/campanhas — lista campanhas com métricas
     if (req.method === "GET" && path_ === "/painel/api/ads/campanhas") {
       if (!requireAuth(req, res)) return;

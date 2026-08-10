@@ -13,6 +13,11 @@ sem credencial, etc.) as demais continuam normalmente.
 
 Hoje cobre: **Instagram, Facebook, X/Twitter e LinkedIn.**
 
+Além de publicar, também dá pra editar o **perfil da Página do Facebook** (capa, foto de
+perfil, texto "Sobre") pelo mesmo painel. **O Instagram não tem essa opção**: a API pública
+da Meta (`graph.instagram.com`) não expõe escrita de bio/foto de perfil — só leitura. Trocar
+esses campos do Instagram continua sendo manual, direto no app.
+
 ## Como o conteúdo é adaptado por rede
 
 | Rede | Texto | Imagem | Link |
@@ -28,12 +33,16 @@ Hoje cobre: **Instagram, Facebook, X/Twitter e LinkedIn.**
 publique.js          orquestrador: sabe quais contas existem e quais redes cada uma
                       tem configurada; publicarEmTodos() chama os adaptadores certos.
 instagram.js          → publicarImagem()   (Instagram Graph API)
-facebook.js           → publicar()         (Facebook Graph API)
+facebook.js           → publicar(), atualizarCapa(), atualizarFotoPerfil(),
+                        atualizarSobre()   (Facebook Graph API)
 twitter.js            → publicar()         (X API v2 + upload de mídia v1.1, OAuth 1.0a)
 linkedin.js           → publicar()         (LinkedIn Posts API, /rest/posts)
-server.js             rota POST /painel/api/publicar (dispara) e
-                      GET  /painel/api/publicar/contas (lista contas/redes disponíveis)
-public/painel.html    aba "Publicar" (🚀): formulário + checkboxes de rede + resultado
+server.js             rotas:
+                      POST /painel/api/publicar               → publica nas redes marcadas
+                      GET  /painel/api/publicar/contas         → lista contas/redes disponíveis
+                      POST /painel/api/publicar/perfil-facebook → capa/foto/"sobre" da Página
+public/painel.html    aba "Publicar" (🚀): formulário de post + card "Perfil da Página
+                      (Facebook)" + resultado de cada ação
 ```
 
 Cada rede-adaptador é uma função pura: recebe `{ texto, imagemUrl, link }` +
@@ -76,18 +85,41 @@ const CONTAS = [
 
 ## Onde criar as credenciais de cada rede
 
-- **Instagram / Facebook**: mesmo App da Meta já usado pelo resto do projeto
-  (developers.facebook.com) — Instagram precisa de `INSTAGRAM_ACCESS_TOKEN`/`ACCOUNT_ID`
-  (já documentado no README principal); Facebook precisa de um token de **Página** com
-  permissão `pages_manage_posts` (gerado no mesmo App, em Ferramentas → Explorador da API
-  Graph, escolhendo a Página certa).
-- **X/Twitter**: criar um App em developer.x.com (plano Free serve — 50 posts/dia), ativar
-  permissão de leitura+escrita, gerar API Key/Secret do App e Access Token/Secret da conta
-  que vai postar (não do App).
-- **LinkedIn**: criar um App em linkedin.developer.com, pedir o produto "Share on LinkedIn"
-  (libera `w_member_social`), gerar um Access Token OAuth2 e pegar o URN do autor
-  (`urn:li:person:...` pra perfil pessoal, `urn:li:organization:...` pra Página da empresa —
-  esse exige o produto "Community Management API" aprovado).
+### Facebook (Página) — publicar + capa/foto/"sobre"
+
+Usa o mesmo App da Meta já existente (`1046810638003047`, "Felizcred correspondente
+bancario" — o mesmo do Instagram e dos anúncios). Passo a passo:
+
+1. Ir em developers.facebook.com → esse App → **Ferramentas → Explorador da API Graph**.
+2. No seletor "Usuário ou Página" (canto superior direito do Explorador), trocar de
+   "Usuário" pra **a Página do Facebook da Felizcred**.
+3. Em **Permissões**, marcar `pages_manage_posts` (publicar), `pages_manage_metadata`
+   (trocar capa/foto/"sobre") e `pages_read_engagement`.
+4. Clicar **"Gerar Token de Acesso"** — copiar o **Token de Acesso da Página** (esse é de
+   curta duração, ~1-2h).
+5. Trocar por um de longa duração (~60 dias), mesmo processo já usado pro
+   `META_ADS_ACCESS_TOKEN` (troca via `fb_exchange_token` com o App ID/Secret — ver
+   `CHAVES-LOCAL.md`).
+6. Pegar o **ID da Página** (aparece no próprio Explorador ou em Configurações da Página →
+   Sobre).
+7. Passar pra mim o token + o Page ID pra eu deixar anotado e você definir no Render:
+   `FACEBOOK_PAGE_ACCESS_TOKEN`, `FACEBOOK_PAGE_ID`.
+
+Instagram usa outro fluxo (Login do Instagram direto, sem precisar de Página) — já
+documentado na seção "Instagram" do README principal, `INSTAGRAM_ACCESS_TOKEN` já existe.
+
+### X/Twitter
+
+Criar um App em developer.x.com (plano Free serve — 50 posts/dia), ativar permissão de
+leitura+escrita, gerar API Key/Secret do App e Access Token/Secret da conta que vai postar
+(não do App).
+
+### LinkedIn
+
+Criar um App em linkedin.developer.com, pedir o produto "Share on LinkedIn" (libera
+`w_member_social`), gerar um Access Token OAuth2 e pegar o URN do autor
+(`urn:li:person:...` pra perfil pessoal, `urn:li:organization:...` pra Página da empresa —
+esse exige o produto "Community Management API" aprovado).
 
 ## Status
 

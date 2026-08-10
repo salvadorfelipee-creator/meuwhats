@@ -85,7 +85,7 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `TELEGRAM_WEBHOOK_SECRET` | Segredo opcional pra validar que o webhook vem do Telegram | — (sem validação) |
 | `TELEGRAM_START_MESSAGE` | Texto enviado ao receber `/start` (com botão de compartilhar contato) | (ver seção Telegram) |
 | `TELEGRAM_THANKS_MESSAGE` | Texto enviado depois que o usuário compartilha o contato | (ver seção Telegram) |
-| `FACEBOOK_PAGE_ACCESS_TOKEN` | Token de acesso da Página do Facebook (permissão `pages_manage_posts`) | — |
+| `FACEBOOK_PAGE_ACCESS_TOKEN` | Token de acesso da Página do Facebook (`pages_manage_posts` + `pages_manage_metadata`) | — |
 | `FACEBOOK_PAGE_ID` | ID numérico da Página do Facebook | — |
 | `TWITTER_API_KEY` / `TWITTER_API_SECRET` | Chaves do App no X Developer Portal | — |
 | `TWITTER_ACCESS_TOKEN` / `TWITTER_ACCESS_SECRET` | Token de acesso da conta (gerado no mesmo App) | — |
