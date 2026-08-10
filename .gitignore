@@ -6,3 +6,9 @@ data.db-journal
 data.db-wal
 data.db-shm
 media/
+
+# Pastas de material bruto/staging (fotos, vídeos, .ai, zips) — não são o site
+# publicado (esse já tem cópia própria em cotacerta-seguros/img etc.), só
+# inflariam o histórico do Git com binários grandes sem necessidade.
+felizcred-site/logo/
+sitefelizcred/

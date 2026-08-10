@@ -1,5 +1,6 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(node -e \"new Function\\(require\\('fs'\\).readFileSync\\('public/painel.html','utf8'\\).match\\(/<script>\\([\\\\s\\\\S]*\\)<\\\\/script>/\\)[1]\\); console.log\\('JS ok'\\)\")",
       "WebFetch(domain:www.felizcred.com.br)",
