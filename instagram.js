@@ -129,6 +129,31 @@ async function diagnostico() {
   return resultado;
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// O Instagram baixa/processa a imagem em segundo plano depois de criar o container —
+// publicar direto na sequência falha com "media is not ready for publishing" se a Meta
+// ainda não terminou. Espera até o status virar FINISHED (ou desiste em ~30s).
+async function aguardarContainerPronto(token, containerId, tentativas = 15, intervaloMs = 2000) {
+  for (let i = 0; i < tentativas; i++) {
+    const { status, json } = await graphRequest(
+      "GET",
+      `/${GRAPH_VERSION}/${containerId}?fields=status_code`,
+      null,
+      token
+    );
+    if (status >= 400) throw new Error(`Falha ao checar status da publicação: ${JSON.stringify(json)}`);
+    if (json.status_code === "FINISHED") return;
+    if (json.status_code === "ERROR" || json.status_code === "EXPIRED") {
+      throw new Error(`Instagram não conseguiu processar a imagem (status: ${json.status_code}).`);
+    }
+    await sleep(intervaloMs);
+  }
+  throw new Error("Instagram demorou demais pra processar a imagem — tente publicar de novo em alguns instantes.");
+}
+
 // Publica uma imagem no feed (usado pelo Publique IV — ver PUBLIQUE-IV.md).
 // accessToken/accountId são opcionais: se não vierem, cai no token/conta padrão (Felizcred,
 // via env). Passar os dois explicitamente é o jeito de publicar em outra conta de Instagram.
@@ -142,6 +167,8 @@ async function publicarImagem({ imagemUrl, legenda, accessToken, accountId }) {
     token
   );
   if (status >= 400) throw new Error(`Falha ao criar publicação no Instagram: ${JSON.stringify(container)}`);
+
+  await aguardarContainerPronto(token, container.id);
 
   const { status: s2, json: publicado } = await graphRequest(
     "POST",
