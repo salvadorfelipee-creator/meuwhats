@@ -651,6 +651,12 @@ async function processarEntry(entry) {
         const nome = contatos.find((c) => c.wa_id === de)?.profile?.name;
         const quando = Number(msg.timestamp) * 1000 || Date.now();
 
+        // Marca como lida no WhatsApp do cliente (dois tiques azuis) — não bloqueia o
+        // processamento da mensagem se a chamada falhar.
+        wa.markAsRead(businessNumberId, msg.id).catch((err) =>
+          console.error("Falha ao marcar mensagem como lida:", err.message)
+        );
+
         const conversaAnterior = await db.getConversation(de, businessNumberId);
         const conversaInativa =
           !conversaAnterior ||
@@ -1068,7 +1074,12 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       if (!body.text || !body.text.trim()) return send(res, 400, { error: "Texto vazio" });
 
-      const result = await wa.sendText(businessId, phone, body.text);
+      let result;
+      try {
+        result = await wa.sendText(businessId, phone, body.text);
+      } catch (err) {
+        return send(res, 502, { error: `Falha ao enviar pelo WhatsApp: ${err.message}` });
+      }
       const waId = result.messages?.[0]?.id || null;
       const now = Date.now();
       await db.upsertConversation(phone, businessId, null, now);

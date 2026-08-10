@@ -69,7 +69,8 @@
   .nav-item.tem-novas::after { content: ""; position: absolute; top: 4px; right: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--sidebar); }
   #btn-notif.ativado { color: var(--accent); }
   #busca-wrap { padding: 10px 12px; border-bottom: 1px solid var(--border); }
-  #busca { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-alt); outline: none; font-size: 14px; }
+  #busca { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-alt); font-size: 14px; }
+  #busca:focus { outline: none; border-color: var(--accent); background: var(--card); }
   #lista-conversas { overflow-y: auto; flex: 1; }
 
   .conversa { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--bg-alt); cursor: pointer; }
@@ -103,7 +104,8 @@
   .msg .erro-msg { font-size: 12px; color: #c0392b; margin-top: 4px; }
 
   #form-resposta { display: flex; gap: 8px; padding: 12px 16px; background: var(--card); border-top: 1px solid var(--border); }
-  #texto-resposta { flex: 1; padding: 11px 16px; border: 1px solid var(--border); border-radius: 22px; outline: none; font-size: 14.5px; background: var(--bg-alt); }
+  #texto-resposta { flex: 1; padding: 11px 16px; border: 1px solid var(--border); border-radius: 22px; font-size: 14.5px; background: var(--bg-alt); }
+  #texto-resposta:focus { outline: none; border-color: var(--accent); background: var(--card); }
   #form-resposta button { padding: 0 22px; border: none; border-radius: 22px; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
   #form-resposta button:hover { opacity: 0.9; }
 
@@ -607,8 +609,14 @@ function formatarHoraCurta(ts) {
 
 async function carregarConversas() {
   if (!numeroAtivoId) return;
-  const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}`);
-  conversasCache = await res.json();
+  try {
+    const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}`);
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    conversasCache = await res.json();
+  } catch (err) {
+    console.error("Falha ao carregar conversas:", err);
+    return; // mantém a lista anterior na tela em vez de apagar tudo
+  }
   renderizarConversas();
 }
 
@@ -619,6 +627,12 @@ function renderizarConversas() {
   const filtradas = conversasCache.filter((c) =>
     (c.name || "").toLowerCase().includes(filtro) || c.phone.includes(filtro)
   );
+  if (!filtradas.length) {
+    lista.innerHTML = `<div class="lista-vazia" style="padding:16px;">${
+      conversasCache.length ? "Nenhuma conversa encontrada pra essa busca." : "Nenhuma conversa por aqui ainda."
+    }</div>`;
+    return;
+  }
   for (const c of filtradas) {
     const div = document.createElement("div");
     div.className = "conversa" + (c.phone === telefoneAtual ? " ativa" : "");
@@ -667,8 +681,22 @@ const STATUS_LABEL = { sent: "enviada", delivered: "entregue", read: "lida", fai
 
 async function carregarMensagens() {
   if (!telefoneAtual || !numeroAtivoId) return;
-  const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/${encodeURIComponent(telefoneAtual)}/messages`);
-  const mensagens = await res.json();
+  // Guarda quem estava selecionado ANTES do fetch — o polling de 5s chama essa função
+  // sem parar, e trocar de conversa rápido pode fazer duas chamadas correrem juntas.
+  // Sem isso, a resposta mais lenta podia pintar a conversa errada na tela.
+  const telefoneAlvo = telefoneAtual;
+  const numeroAlvo = numeroAtivoId;
+  let mensagens;
+  try {
+    const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAlvo)}/${encodeURIComponent(telefoneAlvo)}/messages`);
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    mensagens = await res.json();
+  } catch (err) {
+    console.error("Falha ao carregar mensagens:", err);
+    return;
+  }
+  if (telefoneAtual !== telefoneAlvo || numeroAtivoId !== numeroAlvo) return; // conversa mudou enquanto isso carregava
+
   const div = document.getElementById("mensagens");
   const estavaNoFim = div.scrollTop + div.clientHeight >= div.scrollHeight - 30;
   // Só força o scroll pro fim ao abrir a conversa; nas atualizações automáticas,
@@ -723,16 +751,29 @@ document.getElementById("busca").addEventListener("input", renderizarConversas);
 document.getElementById("form-resposta").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = document.getElementById("texto-resposta");
+  const botao = e.target.querySelector("button");
   const texto = input.value.trim();
   if (!texto || !telefoneAtual || !numeroAtivoId) return;
-  input.value = "";
-  await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/${encodeURIComponent(telefoneAtual)}/reply`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: texto }),
-  });
-  carregarMensagens();
-  carregarConversas();
+
+  botao.disabled = true;
+  try {
+    const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/${encodeURIComponent(telefoneAtual)}/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: texto }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      throw new Error(data.error || `Falha ao enviar (${res.status})`);
+    }
+    input.value = "";
+    carregarMensagens();
+    carregarConversas();
+  } catch (err) {
+    alert(`Não foi possível enviar a mensagem: ${err.message}\n\nO texto continua no campo, tente de novo.`);
+  } finally {
+    botao.disabled = false;
+  }
 });
 
 document.getElementById("btn-massa").addEventListener("click", () => {

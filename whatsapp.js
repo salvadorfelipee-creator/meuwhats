@@ -125,6 +125,26 @@ async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, c
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+// Marca uma mensagem recebida como lida (dois tiques azuis pro cliente) — não falha o
+// processamento do webhook se der erro, só não fica marcado como lido pro cliente.
+async function markAsRead(fromPhoneNumberId, messageId) {
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        status: "read",
+        message_id: messageId,
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao marcar como lida: ${JSON.stringify(json)}`);
+  return json;
+}
+
 async function getMediaInfo(mediaId) {
   const { status, buffer } = await graphRequest(
     "GET",
@@ -162,4 +182,4 @@ async function downloadMedia(mediaId) {
   return { buffer, mimeType: info.mime_type };
 }
 
-module.exports = { sendText, sendButtons, sendList, sendTemplate, downloadMedia };
+module.exports = { sendText, sendButtons, sendList, sendTemplate, downloadMedia, markAsRead };
