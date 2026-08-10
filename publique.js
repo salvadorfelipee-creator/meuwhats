@@ -3,6 +3,14 @@ const facebook = require("./facebook");
 const twitter = require("./twitter");
 const linkedin = require("./linkedin");
 
+// Variáveis de ambiente de credencial vêm sempre com trim() — copiar/colar token no painel
+// do Render facilmente carrega um espaço ou quebra de linha a mais no fim, e isso quebra o
+// header Authorization de um jeito confuso ("Invalid character in header content").
+function env(nome) {
+  const valor = process.env[nome];
+  return valor ? valor.trim() : valor;
+}
+
 // ─── Contas ─────────────────────────────────────────────────────────────────
 // Cada conta agrupa as credenciais das redes ligadas a ela. Pra adicionar uma conta nova
 // (outra marca/CNPJ, ex.: Cota Certa Seguros): copiar o bloco "felizcred" abaixo, trocar o
@@ -15,28 +23,25 @@ const CONTAS = [
     nome: "Felizcred",
     redes: {
       instagram:
-        process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_ACCOUNT_ID
-          ? { accessToken: process.env.INSTAGRAM_ACCESS_TOKEN, accountId: process.env.INSTAGRAM_ACCOUNT_ID }
+        env("INSTAGRAM_ACCESS_TOKEN") && env("INSTAGRAM_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID") }
           : null,
       facebook:
-        process.env.FACEBOOK_PAGE_ACCESS_TOKEN && process.env.FACEBOOK_PAGE_ID
-          ? { token: process.env.FACEBOOK_PAGE_ACCESS_TOKEN, paginaId: process.env.FACEBOOK_PAGE_ID }
+        env("FACEBOOK_PAGE_ACCESS_TOKEN") && env("FACEBOOK_PAGE_ID")
+          ? { token: env("FACEBOOK_PAGE_ACCESS_TOKEN"), paginaId: env("FACEBOOK_PAGE_ID") }
           : null,
       twitter:
-        process.env.TWITTER_API_KEY &&
-        process.env.TWITTER_API_SECRET &&
-        process.env.TWITTER_ACCESS_TOKEN &&
-        process.env.TWITTER_ACCESS_SECRET
+        env("TWITTER_API_KEY") && env("TWITTER_API_SECRET") && env("TWITTER_ACCESS_TOKEN") && env("TWITTER_ACCESS_SECRET")
           ? {
-              apiKey: process.env.TWITTER_API_KEY,
-              apiSecret: process.env.TWITTER_API_SECRET,
-              accessToken: process.env.TWITTER_ACCESS_TOKEN,
-              accessSecret: process.env.TWITTER_ACCESS_SECRET,
+              apiKey: env("TWITTER_API_KEY"),
+              apiSecret: env("TWITTER_API_SECRET"),
+              accessToken: env("TWITTER_ACCESS_TOKEN"),
+              accessSecret: env("TWITTER_ACCESS_SECRET"),
             }
           : null,
       linkedin:
-        process.env.LINKEDIN_ACCESS_TOKEN && process.env.LINKEDIN_AUTHOR_URN
-          ? { token: process.env.LINKEDIN_ACCESS_TOKEN, autorUrn: process.env.LINKEDIN_AUTHOR_URN }
+        env("LINKEDIN_ACCESS_TOKEN") && env("LINKEDIN_AUTHOR_URN")
+          ? { token: env("LINKEDIN_ACCESS_TOKEN"), autorUrn: env("LINKEDIN_AUTHOR_URN") }
           : null,
     },
   },
