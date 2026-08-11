@@ -44,7 +44,9 @@ importantes pra não misturar:
 - Recebe mensagens (texto, imagem, áudio, vídeo, documento) via webhook
 - Baixa e guarda mídias localmente (pasta `media/`)
 - Guarda histórico (conversas e mensagens) no **Turso** (SQLite hospedado, gratuito)
-- Painel web em `/painel` (protegido por usuário/senha) para ver conversas e responder
+- Painel web em `/painel` (protegido por usuário/senha) para ver conversas e responder,
+  com status de conversa (Novo/Em andamento/Resolvido), notas por contato, respostas
+  prontas reutilizáveis e busca por texto dentro das mensagens
 - Suporta **múltiplos números de WhatsApp Business** ao mesmo tempo, com abas no painel
 - Atualiza status de entrega/leitura das mensagens enviadas
 - Envio em massa via **Template de Mensagem** (botão 📢 no painel), para contatos que ainda não conversaram

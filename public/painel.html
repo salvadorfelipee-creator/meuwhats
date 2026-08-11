@@ -120,8 +120,55 @@
   #vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: var(--text-muted); background: var(--bg-alt); gap: 8px; }
   #vazio .icone { font-size: 64px; opacity: 0.3; }
 
+  /* ── WhatsApp: abas de status (estilo Chatwoot) ──────────────── */
+  #abas-status { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .aba-status { background: transparent; border: none; padding: 6px 11px; border-radius: 20px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
+  .aba-status:hover { background: var(--bg-alt); }
+  .aba-status.ativa { background: var(--accent-soft); color: var(--accent); }
+
+  .status-cor-novo { background: #4a90d9; }
+  .status-cor-andamento { background: #e0a83e; }
+  .status-cor-resolvido { background: #2fa860; }
+  .conversa-avatar-wrap { position: relative; flex-shrink: 0; }
+  .status-dot { position: absolute; bottom: -1px; right: -1px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--card); }
+
+  /* ── WhatsApp: sidebar de informações do contato ─────────────── */
+  #info-contato { width: 280px; background: var(--card); border-left: 1px solid var(--border); flex-shrink: 0; overflow-y: auto; padding: 20px 18px; }
+  #info-contato .avatar { width: 64px; height: 64px; font-size: 22px; margin: 0 auto 10px; }
+  #info-contato .nome { font-weight: 700; font-size: 16px; text-align: center; }
+  #info-contato .telefone { font-size: 12.5px; color: var(--text-muted); text-align: center; margin-top: 2px; }
+  .info-secao { margin-top: 22px; }
+  .info-secao label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .3px; margin-bottom: 8px; }
+  .status-botoes { display: flex; flex-direction: column; gap: 6px; }
+  .status-botao { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-alt); font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; }
+  .status-botao .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .status-botao.ativo { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  #info-nota { width: 100%; min-height: 100px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 13.5px; font-family: inherit; resize: vertical; background: var(--bg-alt); }
+  #info-nota:focus { outline: none; border-color: var(--accent); background: var(--card); }
+  #info-nota-salvo { font-size: 11.5px; color: var(--text-muted); margin-top: 6px; display: none; }
+  #btn-info-contato.ativado { color: var(--accent); background: var(--bg-alt); }
+
+  /* ── WhatsApp: respostas prontas ──────────────────────────────── */
+  #respostas-prontas-popover { display: none; position: absolute; bottom: 62px; left: 16px; width: 300px; max-height: 320px; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 5; }
+  #respostas-prontas-popover.aberto { display: block; }
+  .resposta-pronta-item { padding: 10px 14px; border-bottom: 1px solid var(--bg-alt); cursor: pointer; }
+  .resposta-pronta-item:hover { background: var(--bg-alt); }
+  .resposta-pronta-item .atalho { font-weight: 700; font-size: 12.5px; color: var(--accent); }
+  .resposta-pronta-item .texto { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  #respostas-prontas-gerenciar { display: block; text-align: center; padding: 10px; font-size: 12.5px; font-weight: 600; color: var(--accent); cursor: pointer; }
+  #resposta-wrap { position: relative; }
+  .lista-respostas-prontas-modal { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 200px; overflow-y: auto; }
+  .resposta-pronta-modal-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-alt); border-radius: 6px; }
+  .resposta-pronta-modal-item .atalho { font-weight: 700; font-size: 12.5px; flex-shrink: 0; }
+  .resposta-pronta-modal-item .texto { flex: 1; font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .resposta-pronta-modal-item button { background: transparent; border: none; color: #c0392b; cursor: pointer; font-size: 14px; }
+
+  @media (max-width: 1100px) {
+    #info-contato, #btn-info-contato { display: none !important; }
+  }
+
   /* ── Modal envio em massa ─────────────────────────────────── */
-  #modal-massa { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 10; }
+  #modal-massa, #modal-respostas-prontas { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 10; }
   .modal-conteudo { background: var(--card); border-radius: 12px; padding: 20px 24px; width: 480px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
   .modal-conteudo h3 { margin: 0 0 14px; }
   .modal-conteudo label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
@@ -301,20 +348,31 @@
         </span>
       </div>
       <div id="abas-numeros"></div>
-      <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa..." /></div>
+      <div id="abas-status">
+        <button class="aba-status ativa" data-status="todas" type="button">Todas</button>
+        <button class="aba-status" data-status="novo" type="button">🔵 Novo</button>
+        <button class="aba-status" data-status="andamento" type="button">🟡 Andamento</button>
+        <button class="aba-status" data-status="resolvido" type="button">🟢 Resolvido</button>
+      </div>
+      <div id="busca-wrap"><input id="busca" placeholder="Buscar conversa ou mensagem..." /></div>
       <div id="lista-conversas"></div>
     </div>
     <div id="conversa-atual" style="display:none;">
       <div id="chat-header">
         <button id="btn-voltar-lista" title="Voltar pra lista">←</button>
         <div class="avatar" id="chat-avatar"></div>
-        <div>
+        <div style="flex:1;">
           <div class="nome" id="chat-nome"></div>
           <div class="telefone" id="chat-telefone"></div>
         </div>
+        <button id="btn-info-contato" title="Informações do contato">ℹ️</button>
       </div>
       <div id="mensagens"></div>
       <div id="resposta-wrap">
+        <div id="respostas-prontas-popover">
+          <div id="respostas-prontas-itens"></div>
+          <div id="respostas-prontas-gerenciar">⚙️ Gerenciar respostas prontas</div>
+        </div>
         <div id="resposta-preview">
           <img id="resposta-preview-img" />
           <button type="button" id="resposta-preview-remover" title="Remover imagem">✕</button>
@@ -322,9 +380,25 @@
         <form id="form-resposta">
           <input type="file" id="anexar-imagem-input" accept="image/*" hidden />
           <button type="button" id="anexar-imagem" title="Anexar imagem">📎</button>
+          <button type="button" id="abrir-respostas-prontas" title="Respostas prontas">⚡</button>
           <input id="texto-resposta" placeholder="Digite uma mensagem..." autocomplete="off" />
           <button type="submit">Enviar</button>
         </form>
+      </div>
+    </div>
+    <div id="info-contato" style="display:none;">
+      <div class="avatar" id="info-avatar"></div>
+      <div class="nome" id="info-nome"></div>
+      <div class="telefone" id="info-telefone"></div>
+      <div class="info-secao">
+        <label>Status</label>
+        <div class="status-botoes" id="info-status-botoes"></div>
+      </div>
+      <div class="info-secao">
+        <label>Notas sobre o contato</label>
+        <textarea id="info-nota" placeholder="Anotações, histórico, o que já foi combinado..."></textarea>
+        <button id="info-nota-salvar" class="btn-secundario" type="button" style="margin-top:8px;">Salvar nota</button>
+        <div id="info-nota-salvo">Salvo ✓</div>
       </div>
     </div>
     <div id="vazio">
@@ -514,6 +588,22 @@
       <button id="massa-enviar" type="button">Enviar</button>
     </div>
     <div id="massa-resultado"></div>
+  </div>
+</div>
+
+<div id="modal-respostas-prontas">
+  <div class="modal-conteudo">
+    <h3>Respostas prontas</h3>
+    <div style="font-size:12.5px; color:var(--text-muted);">Atalhos de texto que você usa toda hora — clique em ⚡ na conversa pra inserir um.</div>
+    <div id="lista-respostas-prontas-modal" class="lista-respostas-prontas-modal"></div>
+    <label>Nome do atalho (ex.: Saudação)</label>
+    <input id="rp-atalho" placeholder="Saudação" />
+    <label>Texto</label>
+    <textarea id="rp-texto" placeholder="Olá! Tudo bem? Como posso te ajudar hoje?"></textarea>
+    <div class="modal-botoes">
+      <button id="rp-fechar" type="button">Fechar</button>
+      <button id="rp-adicionar" type="button">Adicionar</button>
+    </div>
   </div>
 </div>
 
@@ -713,13 +803,40 @@ async function carregarConversas() {
   renderizarConversas();
 }
 
+const STATUS_INFO = {
+  novo: { label: "Novo", cor: "status-cor-novo", emoji: "🔵" },
+  andamento: { label: "Em andamento", cor: "status-cor-andamento", emoji: "🟡" },
+  resolvido: { label: "Resolvido", cor: "status-cor-resolvido", emoji: "🟢" },
+};
+let abaStatusAtiva = "todas";
+let telefonesEncontradosPorMensagem = null; // null = busca de texto não está ativa
+
+let buscaMsgTimeout = null;
+async function buscarPorMensagem(termo) {
+  if (!termo || !numeroAtivoId) {
+    telefonesEncontradosPorMensagem = null;
+    return;
+  }
+  try {
+    const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/buscar?q=${encodeURIComponent(termo)}`);
+    const resultados = await res.json();
+    telefonesEncontradosPorMensagem = new Set(resultados.map((r) => r.phone));
+  } catch {
+    telefonesEncontradosPorMensagem = null;
+  }
+  renderizarConversas();
+}
+
 function renderizarConversas() {
   const filtro = document.getElementById("busca").value.trim().toLowerCase();
   const lista = document.getElementById("lista-conversas");
   lista.innerHTML = "";
-  const filtradas = conversasCache.filter((c) =>
-    (c.name || "").toLowerCase().includes(filtro) || c.phone.includes(filtro)
-  );
+  const porStatus = abaStatusAtiva === "todas" ? conversasCache : conversasCache.filter((c) => (c.status || "novo") === abaStatusAtiva);
+  const filtradas = porStatus.filter((c) => {
+    if (!filtro) return true;
+    if ((c.name || "").toLowerCase().includes(filtro) || c.phone.includes(filtro)) return true;
+    return telefonesEncontradosPorMensagem && telefonesEncontradosPorMensagem.has(c.phone);
+  });
   if (!filtradas.length) {
     lista.innerHTML = `<div class="lista-vazia" style="padding:16px;">${
       conversasCache.length ? "Nenhuma conversa encontrada pra essa busca." : "Nenhuma conversa por aqui ainda."
@@ -727,10 +844,14 @@ function renderizarConversas() {
     return;
   }
   for (const c of filtradas) {
+    const status = STATUS_INFO[c.status] || STATUS_INFO.novo;
     const div = document.createElement("div");
     div.className = "conversa" + (c.phone === telefoneAtual ? " ativa" : "");
     div.innerHTML = `
-      <div class="avatar">${iniciais(c.name || c.phone)}</div>
+      <div class="conversa-avatar-wrap">
+        <div class="avatar">${iniciais(c.name || c.phone)}</div>
+        <div class="status-dot ${status.cor}" title="${status.label}"></div>
+      </div>
       <div class="conversa-info">
         <div class="conversa-linha1">
           <span class="conversa-nome">${escapeHtml(c.name || c.phone)}</span>
@@ -744,6 +865,68 @@ function renderizarConversas() {
   }
 }
 
+document.querySelectorAll(".aba-status").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".aba-status").forEach((b) => b.classList.remove("ativa"));
+    btn.classList.add("ativa");
+    abaStatusAtiva = btn.dataset.status;
+    renderizarConversas();
+  });
+});
+
+let infoContatoVisivel = true;
+
+function renderizarInfoContato(conversa, phone) {
+  document.getElementById("info-avatar").textContent = iniciais(conversa?.name || phone);
+  document.getElementById("info-nome").textContent = conversa?.name || phone;
+  document.getElementById("info-telefone").textContent = phone;
+  document.getElementById("info-nota").value = conversa?.nota || "";
+  document.getElementById("info-nota-salvo").style.display = "none";
+  const statusAtual = conversa?.status || "novo";
+  document.getElementById("info-status-botoes").innerHTML = Object.entries(STATUS_INFO)
+    .map(([chave, info]) => `
+      <button type="button" class="status-botao ${chave === statusAtual ? "ativo" : ""}" data-status="${chave}">
+        <span class="dot ${info.cor}"></span>${info.label}
+      </button>
+    `)
+    .join("");
+  document.querySelectorAll("#info-status-botoes .status-botao").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/${encodeURIComponent(phone)}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: btn.dataset.status }),
+      });
+      const c = conversasCache.find((x) => x.phone === phone);
+      if (c) c.status = btn.dataset.status;
+      renderizarInfoContato(c, phone);
+      renderizarConversas();
+    });
+  });
+  document.getElementById("info-contato").style.display = infoContatoVisivel ? "block" : "none";
+}
+
+document.getElementById("btn-info-contato").addEventListener("click", () => {
+  infoContatoVisivel = !infoContatoVisivel;
+  document.getElementById("btn-info-contato").classList.toggle("ativado", infoContatoVisivel);
+  document.getElementById("info-contato").style.display = infoContatoVisivel ? "block" : "none";
+});
+
+document.getElementById("info-nota-salvar").addEventListener("click", async () => {
+  if (!telefoneAtual || !numeroAtivoId) return;
+  const nota = document.getElementById("info-nota").value;
+  await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/${encodeURIComponent(telefoneAtual)}/nota`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nota }),
+  });
+  const c = conversasCache.find((x) => x.phone === telefoneAtual);
+  if (c) c.nota = nota;
+  const aviso = document.getElementById("info-nota-salvo");
+  aviso.style.display = "block";
+  setTimeout(() => (aviso.style.display = "none"), 2000);
+});
+
 function selecionarConversa(phone) {
   telefoneAtual = phone;
   const conversa = conversasCache.find((c) => c.phone === phone);
@@ -753,6 +936,7 @@ function selecionarConversa(phone) {
   document.getElementById("chat-nome").textContent = conversa?.name || phone;
   document.getElementById("chat-telefone").textContent = conversa?.name ? phone : "";
   document.getElementById("view-whatsapp").classList.add("mostrando-conversa"); // no celular, troca lista pela conversa
+  renderizarInfoContato(conversa, phone);
   renderizarConversas();
   carregarMensagens();
 }
@@ -844,7 +1028,105 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-document.getElementById("busca").addEventListener("input", renderizarConversas);
+document.getElementById("busca").addEventListener("input", (e) => {
+  renderizarConversas(); // filtro por nome/telefone é instantâneo
+  clearTimeout(buscaMsgTimeout);
+  const termo = e.target.value.trim();
+  if (!termo) {
+    telefonesEncontradosPorMensagem = null;
+    return;
+  }
+  buscaMsgTimeout = setTimeout(() => buscarPorMensagem(termo), 350); // busca no texto das mensagens, com debounce
+});
+
+// ─ Respostas prontas ─
+let respostasProntasCache = [];
+
+async function carregarRespostasProntas() {
+  const res = await fetch("/painel/api/respostas-prontas");
+  respostasProntasCache = await res.json();
+  renderizarRespostasProntasPopover();
+  renderizarRespostasProntasModal();
+}
+
+function renderizarRespostasProntasPopover() {
+  const div = document.getElementById("respostas-prontas-itens");
+  if (!respostasProntasCache.length) {
+    div.innerHTML = `<div class="lista-vazia" style="padding:14px;">Nenhuma resposta pronta ainda.</div>`;
+    return;
+  }
+  div.innerHTML = respostasProntasCache
+    .map(
+      (r) => `<div class="resposta-pronta-item" data-id="${r.id}">
+        <div class="atalho">${escapeHtml(r.atalho)}</div>
+        <div class="texto">${escapeHtml(r.texto)}</div>
+      </div>`
+    )
+    .join("");
+  document.querySelectorAll(".resposta-pronta-item").forEach((el) => {
+    el.addEventListener("click", () => {
+      const r = respostasProntasCache.find((x) => String(x.id) === el.dataset.id);
+      const input = document.getElementById("texto-resposta");
+      input.value = r.texto;
+      input.focus();
+      document.getElementById("respostas-prontas-popover").classList.remove("aberto");
+    });
+  });
+}
+
+function renderizarRespostasProntasModal() {
+  document.getElementById("lista-respostas-prontas-modal").innerHTML = respostasProntasCache.length
+    ? respostasProntasCache
+        .map(
+          (r) => `<div class="resposta-pronta-modal-item">
+            <span class="atalho">${escapeHtml(r.atalho)}</span>
+            <span class="texto">${escapeHtml(r.texto)}</span>
+            <button type="button" onclick="excluirRespostaPronta(${r.id})" title="Excluir">🗑️</button>
+          </div>`
+        )
+        .join("")
+    : `<div class="lista-vazia">Nenhuma ainda — adicione a primeira abaixo.</div>`;
+}
+
+async function excluirRespostaPronta(id) {
+  await fetch(`/painel/api/respostas-prontas/${id}`, { method: "DELETE" });
+  carregarRespostasProntas();
+}
+
+document.getElementById("abrir-respostas-prontas").addEventListener("click", () => {
+  document.getElementById("respostas-prontas-popover").classList.toggle("aberto");
+});
+
+document.addEventListener("click", (e) => {
+  const popover = document.getElementById("respostas-prontas-popover");
+  const botao = document.getElementById("abrir-respostas-prontas");
+  if (popover.classList.contains("aberto") && !popover.contains(e.target) && e.target !== botao) {
+    popover.classList.remove("aberto");
+  }
+});
+
+document.getElementById("respostas-prontas-gerenciar").addEventListener("click", () => {
+  document.getElementById("respostas-prontas-popover").classList.remove("aberto");
+  document.getElementById("modal-respostas-prontas").style.display = "flex";
+});
+
+document.getElementById("rp-fechar").addEventListener("click", () => {
+  document.getElementById("modal-respostas-prontas").style.display = "none";
+});
+
+document.getElementById("rp-adicionar").addEventListener("click", async () => {
+  const atalho = document.getElementById("rp-atalho").value.trim();
+  const texto = document.getElementById("rp-texto").value.trim();
+  if (!atalho || !texto) return;
+  await fetch("/painel/api/respostas-prontas", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ atalho, texto }),
+  });
+  document.getElementById("rp-atalho").value = "";
+  document.getElementById("rp-texto").value = "";
+  carregarRespostasProntas();
+});
 
 // ─ Anexar imagem na resposta do WhatsApp ─
 let respostaImagemBase64 = null;
@@ -1571,6 +1853,7 @@ document.getElementById("editor-processar").addEventListener("click", async () =
 
 atualizarBotaoNotif();
 carregarNumeros().then(carregarConversas).then(verificarNovasMensagens);
+carregarRespostasProntas();
 setInterval(() => {
   carregarConversas();
   carregarMensagens();

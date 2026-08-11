@@ -1115,6 +1115,57 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // PATCH /painel/api/conversations/:businessId/:phone/status — muda status da conversa
+    // (novo/andamento/resolvido — estilo Chatwoot)
+    const matchStatus = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/status$/);
+    if (req.method === "PATCH" && matchStatus) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        await db.atualizarStatusConversa(decodeURIComponent(matchStatus[2]), decodeURIComponent(matchStatus[1]), body.status);
+        return send(res, 200, { ok: true });
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+
+    // PATCH /painel/api/conversations/:businessId/:phone/nota — nota/observação sobre o contato
+    const matchNota = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/nota$/);
+    if (req.method === "PATCH" && matchNota) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await db.atualizarNotaConversa(decodeURIComponent(matchNota[2]), decodeURIComponent(matchNota[1]), body.nota || "");
+      return send(res, 200, { ok: true });
+    }
+
+    // GET /painel/api/conversations/:businessId/buscar?q=... — busca texto dentro das mensagens
+    const matchBuscarMsg = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/buscar$/);
+    if (req.method === "GET" && matchBuscarMsg) {
+      if (!requireAuth(req, res)) return;
+      const termo = (url.searchParams.get("q") || "").trim();
+      if (!termo) return send(res, 200, []);
+      return send(res, 200, await db.buscarMensagens(decodeURIComponent(matchBuscarMsg[1]), termo));
+    }
+
+    // GET/POST /painel/api/respostas-prontas — respostas rápidas reutilizáveis
+    if (req.method === "GET" && path_ === "/painel/api/respostas-prontas") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.respostasProntasListar());
+    }
+    if (req.method === "POST" && path_ === "/painel/api/respostas-prontas") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.atalho || !body.texto) return send(res, 400, { error: "Informe atalho e texto" });
+      const id = await db.respostaProntaCriar(body.atalho.trim(), body.texto.trim());
+      return send(res, 200, { id });
+    }
+    const matchRespostaProntaDel = path_.match(/^\/painel\/api\/respostas-prontas\/(\d+)$/);
+    if (req.method === "DELETE" && matchRespostaProntaDel) {
+      if (!requireAuth(req, res)) return;
+      await db.respostaProntaExcluir(Number(matchRespostaProntaDel[1]));
+      return send(res, 200, { ok: true });
+    }
+
     // POST /painel/api/broadcast/:businessId — envio em massa via template
     const matchBroadcast = path_.match(/^\/painel\/api\/broadcast\/([^/]+)$/);
     if (req.method === "POST" && matchBroadcast) {

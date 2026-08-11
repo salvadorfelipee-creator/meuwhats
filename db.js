@@ -104,6 +104,19 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "janela_lembrete_at")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN janela_lembrete_at INTEGER`);
   }
+  if (!infoConversations.rows.some((r) => r.name === "status")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN status TEXT NOT NULL DEFAULT 'novo'`);
+  }
+  if (!infoConversations.rows.some((r) => r.name === "nota")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN nota TEXT`);
+  }
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    atalho TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
 
   await client.execute(`CREATE TABLE IF NOT EXISTS instagram_dm_contacts (
     instagram_user_id TEXT PRIMARY KEY,
@@ -251,6 +264,63 @@ async function getConversation(phone, businessNumberId) {
     args: [phone, businessNumberId],
   });
   return result.rows[0] || null;
+}
+
+const STATUS_VALIDOS = ["novo", "andamento", "resolvido"];
+
+async function atualizarStatusConversa(phone, businessNumberId, status) {
+  await ready;
+  if (!STATUS_VALIDOS.includes(status)) throw new Error(`Status inválido: ${status}`);
+  await client.execute({
+    sql: `UPDATE conversations SET status = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [status, phone, businessNumberId],
+  });
+}
+
+async function atualizarNotaConversa(phone, businessNumberId, nota) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET nota = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [nota || null, phone, businessNumberId],
+  });
+}
+
+// Busca por texto dentro do corpo das mensagens (não só nome/telefone, que já é filtrado
+// no cliente) — devolve 1 linha por conversa que tem alguma mensagem batendo, com o texto
+// que bateu, pra usar como resultado de busca "estilo Chatwoot".
+async function buscarMensagens(businessNumberId, termo) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT phone, body, created_at FROM messages
+          WHERE business_number_id = ? AND body LIKE ? AND type = 'text'
+          ORDER BY created_at DESC LIMIT 100`,
+    args: [businessNumberId, `%${termo}%`],
+  });
+  const porTelefone = new Map();
+  for (const row of result.rows) {
+    if (!porTelefone.has(row.phone)) porTelefone.set(row.phone, row); // mais recente primeiro
+  }
+  return Array.from(porTelefone.values());
+}
+
+async function respostasProntasListar() {
+  await ready;
+  const result = await client.execute(`SELECT * FROM respostas_prontas ORDER BY atalho ASC`);
+  return result.rows;
+}
+
+async function respostaProntaCriar(atalho, texto) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO respostas_prontas (atalho, texto, created_at) VALUES (?, ?, ?)`,
+    args: [atalho, texto, Date.now()],
+  });
+  return result.lastInsertRowid;
+}
+
+async function respostaProntaExcluir(id) {
+  await ready;
+  await client.execute({ sql: `DELETE FROM respostas_prontas WHERE id = ?`, args: [id] });
 }
 
 async function insertMessage(msg) {
@@ -515,4 +585,10 @@ module.exports = {
   reelsListarRecentes,
   reelsConfigGet,
   reelsConfigSet,
+  atualizarStatusConversa,
+  atualizarNotaConversa,
+  buscarMensagens,
+  respostasProntasListar,
+  respostaProntaCriar,
+  respostaProntaExcluir,
 };
