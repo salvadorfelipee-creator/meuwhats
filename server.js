@@ -1461,23 +1461,31 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
-    // POST /painel/api/reels/editor/processar — editor manual: processa um vídeo enviado
-    // do computador (multipart, streaming pro disco) com as opções escolhidas (moldura,
-    // qualidade, música opcional) e devolve o link do resultado pra baixar. Não publica em
-    // rede nenhuma nem mexe na fila.
+    // POST /painel/api/reels/editor/processar — editor manual: recebe o vídeo (multipart,
+    // streaming pro disco) e devolve um jobId NA HORA, sem esperar o ffmpeg terminar — o
+    // processamento roda em segundo plano. Necessário porque o proxy do Render derruba a
+    // conexão (502) se a resposta demorar demais, e um vídeo maior pode passar desse tempo.
     if (req.method === "POST" && path_ === "/painel/api/reels/editor/processar") {
       if (!requireAuth(req, res)) return;
       try {
         const { campos, arquivos } = await receberMultipart(req);
         if (!arquivos.video) return send(res, 400, { error: "Envie um vídeo" });
-        const resultado = await reels.processarUploadAvulso(arquivos.video, arquivos.musica, {
+        const jobId = reels.iniciarProcessamentoAvulso(arquivos.video, arquivos.musica, {
           moldura: campos.moldura,
           qualidade: campos.qualidade,
         });
-        return send(res, 200, resultado);
+        return send(res, 200, { jobId });
       } catch (err) {
         return send(res, 500, { error: err.message });
       }
+    }
+
+    // GET /painel/api/reels/editor/status/:jobId — consulta o progresso de um processamento
+    // do editor manual iniciado acima (o painel faz polling nisso a cada poucos segundos)
+    const matchJobEditor = path_.match(/^\/painel\/api\/reels\/editor\/status\/([a-f0-9]+)$/);
+    if (req.method === "GET" && matchJobEditor) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, reels.statusJobEditor(matchJobEditor[1]));
     }
 
     // POST /painel/api/reels/editor/publicar — publica direto no Instagram um vídeo já

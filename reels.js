@@ -85,10 +85,31 @@ async function processarUploadAvulso(brutoPath, musicaPath, opcoes = {}) {
   }
 }
 
+// Fila em memória dos processamentos do editor manual em andamento — permite responder o
+// upload na hora (sem o proxy do Render derrubar a conexão por demora) e o painel ir
+// consultando o progresso, em vez de segurar a requisição HTTP até o ffmpeg terminar.
+// Some se o processo reiniciar, mas o job em si também não sobreviveria a isso mesmo.
+const jobsEditor = new Map();
+
+function iniciarProcessamentoAvulso(brutoPath, musicaPath, opcoes) {
+  const jobId = crypto.randomBytes(8).toString("hex");
+  jobsEditor.set(jobId, { status: "processando" });
+  processarUploadAvulso(brutoPath, musicaPath, opcoes)
+    .then((resultado) => jobsEditor.set(jobId, { status: "pronto", url: resultado.url }))
+    .catch((err) => jobsEditor.set(jobId, { status: "erro", erro: err.message }));
+  return jobId;
+}
+
+function statusJobEditor(jobId) {
+  return jobsEditor.get(jobId) || { status: "erro", erro: "Processamento não encontrado (talvez o servidor tenha reiniciado)." };
+}
+
 module.exports = {
   sincronizarFila,
   publicarProximoPendente,
   processarUploadAvulso,
+  iniciarProcessamentoAvulso,
+  statusJobEditor,
   resumo: db.reelsResumo,
   listarRecentes: db.reelsListarRecentes,
   reenfileirar: db.reelsReenfileirar,

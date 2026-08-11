@@ -1860,6 +1860,26 @@ async function publicarItemEditor(i) {
   renderizarEditorLista();
 }
 
+function esperar(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Depois do upload, o servidor responde na hora com um jobId e processa em segundo plano —
+// aqui só fica perguntando "já terminou?" a cada poucos segundos, em vez de segurar 1
+// requisição HTTP até o ffmpeg acabar (isso batia no limite de tempo do proxy do Render
+// pra vídeo maior, e derrubava a conexão com 502 mesmo o processamento estando ok).
+async function esperarJobEditor(jobId) {
+  const tentativasMax = 150; // ~5 minutos (2s entre tentativas)
+  for (let i = 0; i < tentativasMax; i++) {
+    const res = await fetch(`/painel/api/reels/editor/status/${jobId}`);
+    const data = await res.json();
+    if (data.status === "pronto") return { url: data.url };
+    if (data.status === "erro") throw new Error(data.erro || "Falha ao processar");
+    await esperar(2000);
+  }
+  throw new Error("Demorou demais pra processar (mais de 5 minutos) — tente um vídeo menor.");
+}
+
 document.getElementById("editor-processar").addEventListener("click", async () => {
   const botao = document.getElementById("editor-processar");
   botao.disabled = true;
@@ -1876,10 +1896,11 @@ document.getElementById("editor-processar").addEventListener("click", async () =
       formData.append("qualidade", document.getElementById("editor-qualidade").value);
       if (editorMusicaFile) formData.append("musica", editorMusicaFile);
       const res = await fetch("/painel/api/reels/editor/processar", { method: "POST", body: formData });
-      const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}) — o vídeo pode ser grande demais ou o servidor reiniciou no meio do processamento.` }));
+      const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}) ao enviar o vídeo.` }));
       if (data.error) throw new Error(data.error);
+      const resultado = await esperarJobEditor(data.jobId);
       item.status = "pronto";
-      item.url = data.url;
+      item.url = resultado.url;
     } catch (err) {
       item.status = "erro";
       item.erro = err.message;

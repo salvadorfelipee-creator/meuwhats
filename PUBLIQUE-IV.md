@@ -130,9 +130,16 @@ de Google pra usar só o editor manual.
 O upload é feito via **multipart** (arquivo enviado direto pro disco, streaming) — não em
 base64 dentro de JSON. Um vídeo grande como base64 numa string só multiplicava o uso de
 memória e já derrubou o servidor no plano free do Render (erro "Unexpected end of JSON
-input" no navegador). Se o erro voltar a acontecer com vídeo muito grande (dezenas/centenas
-de MB), é sinal de que passou do que o plano free do Render aguenta processar de uma vez —
-nesse caso vale tentar em pedaços menores ou considerar um plano pago do Render.
+input" no navegador).
+
+O processamento também é **assíncrono**: o upload responde na hora com um `jobId` e o
+ffmpeg roda em segundo plano — o painel fica perguntando `.../editor/status/:jobId` a cada
+2s até terminar. Isso existe porque o proxy do Render derruba a conexão (502) se a resposta
+demorar demais dentro de 1 requisição só, e processar vídeo grande pode passar desse tempo
+mesmo sem faltar memória. Se o 502/erro voltar a acontecer mesmo assim com vídeo muito
+grande (dezenas/centenas de MB), é sinal de que passou do que o plano free do Render
+aguenta processar de uma vez — nesse caso vale tentar um vídeo menor ou considerar um plano
+pago do Render.
 
 ### Arquitetura
 
