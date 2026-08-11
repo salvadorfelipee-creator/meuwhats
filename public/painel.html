@@ -1818,7 +1818,7 @@ function renderizarEditorLista() {
       const classe = item.status === "erro" ? "erro" : item.status === "pronto" || item.status === "publicado" ? "ok" : "";
       const rotulos = {
         pendente: "na fila",
-        processando: "processando...",
+        processando: `processando...${item.segundos ? ` (${Math.floor(item.segundos / 60)}min${item.segundos % 60}s)` : ""}`,
         pronto: "pronto",
         publicando: "publicando no Instagram...",
         publicado: "publicado no Instagram",
@@ -1867,17 +1867,28 @@ function esperar(ms) {
 // Depois do upload, o servidor responde na hora com um jobId e processa em segundo plano —
 // aqui só fica perguntando "já terminou?" a cada poucos segundos, em vez de segurar 1
 // requisição HTTP até o ffmpeg acabar (isso batia no limite de tempo do proxy do Render
-// pra vídeo maior, e derrubava a conexão com 502 mesmo o processamento estando ok).
-async function esperarJobEditor(jobId) {
-  const tentativasMax = 150; // ~5 minutos (2s entre tentativas)
+// pra vídeo maior, e derrubava a conexão com 502 mesmo o processamento estando ok). Com só
+// 1 núcleo (pra não estourar memória), processar pode demorar vários minutos no plano free
+// do Render — por isso o limite de espera é bem folgado (30min) em vez de curto.
+async function esperarJobEditor(jobId, aoAtualizarProgresso) {
+  const tentativasMax = 900; // ~30 minutos (2s entre tentativas)
   for (let i = 0; i < tentativasMax; i++) {
-    const res = await fetch(`/painel/api/reels/editor/status/${jobId}`);
-    const data = await res.json();
+    let data;
+    try {
+      const res = await fetch(`/painel/api/reels/editor/status/${jobId}`);
+      data = await res.json();
+    } catch {
+      // resposta não-JSON (ex.: página de erro do Render se o servidor reiniciar no meio)
+      // — trata como "ainda processando" e continua tentando, em vez de desistir na hora
+      await esperar(2000);
+      continue;
+    }
     if (data.status === "pronto") return { url: data.url };
     if (data.status === "erro") throw new Error(data.erro || "Falha ao processar");
+    if (aoAtualizarProgresso) aoAtualizarProgresso(i * 2);
     await esperar(2000);
   }
-  throw new Error("Demorou demais pra processar (mais de 5 minutos) — tente um vídeo menor.");
+  throw new Error("Demorou demais pra processar (mais de 30 minutos) — tente um vídeo menor.");
 }
 
 document.getElementById("editor-processar").addEventListener("click", async () => {
@@ -1898,7 +1909,10 @@ document.getElementById("editor-processar").addEventListener("click", async () =
       const res = await fetch("/painel/api/reels/editor/processar", { method: "POST", body: formData });
       const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}) ao enviar o vídeo.` }));
       if (data.error) throw new Error(data.error);
-      const resultado = await esperarJobEditor(data.jobId);
+      const resultado = await esperarJobEditor(data.jobId, (segundos) => {
+        item.segundos = segundos;
+        renderizarEditorLista();
+      });
       item.status = "pronto";
       item.url = resultado.url;
     } catch (err) {
