@@ -110,10 +110,12 @@ const EXT_BY_MIME = {
 };
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
-// Recebe 1 vídeo enviado via multipart/form-data e grava direto em disco via streaming
-// (não acumula o arquivo inteiro na memória) — usado pelo upload direto de Reels no painel
-// (server.js: POST /painel/api/reels/upload). Devolve o caminho do arquivo temporário e o
-// nome original, pra depois ler e mandar pro Drive.
+// Recebe 1 vídeo (+ campo de texto opcional "legenda") enviado via multipart/form-data e
+// grava o vídeo direto em disco via streaming (não acumula o arquivo inteiro na memória) —
+// usado pelo upload direto de Reels no painel (POST /painel/api/reels/upload). Devolve o
+// caminho do arquivo temporário, o nome original e a legenda (se veio). Importante: o
+// campo "legenda" precisa vir ANTES do arquivo no FormData do cliente, senão pode chegar
+// depois do "finish" do arquivo e ser perdido.
 function receberVideoTemp(req) {
   return new Promise((resolve, reject) => {
     let bb;
@@ -123,6 +125,10 @@ function receberVideoTemp(req) {
       return reject(err);
     }
     let recebeuArquivo = false;
+    let legenda = "";
+    bb.on("field", (nome, valor) => {
+      if (nome === "legenda") legenda = valor;
+    });
     bb.on("file", (_campo, stream, info) => {
       recebeuArquivo = true;
       const arquivoPath = path.join(os.tmpdir(), `reel-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`);
@@ -135,7 +141,7 @@ function receberVideoTemp(req) {
           fs.unlink(arquivoPath, () => {});
           return reject(new Error("Vídeo muito grande (limite 150MB)"));
         }
-        resolve({ arquivoPath, nomeOriginal: info.filename || "video.mp4" });
+        resolve({ arquivoPath, nomeOriginal: info.filename || "video.mp4", legenda });
       });
       writeStream.on("error", reject);
     });
@@ -1384,11 +1390,12 @@ const server = http.createServer(async (req, res) => {
     // GET /painel/api/reels/status — resumo da fila + últimos itens (Publique IV → Reels em massa)
     if (req.method === "GET" && path_ === "/painel/api/reels/status") {
       if (!requireAuth(req, res)) return;
-      const [resumoFila, recentes, pausado, postsPorDia] = await Promise.all([
+      const [resumoFila, recentes, pausado, postsPorDia, legendaPadrao] = await Promise.all([
         reels.resumo(),
         reels.listarRecentes(30),
         reels.configGet("pausado"),
         reels.configGet("posts_por_dia"),
+        reels.configGet("legenda_padrao"),
       ]);
       // pausado = null (nunca configurado) conta como pausado — mesmo default do agendador
       return send(res, 200, {
@@ -1396,6 +1403,7 @@ const server = http.createServer(async (req, res) => {
         recentes,
         pausado: pausado !== "0",
         postsPorDia: Number(postsPorDia) || 5,
+        legendaPadrao: legendaPadrao || "",
       });
     }
 
@@ -1409,8 +1417,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, quantidade });
     }
 
+    // POST /painel/api/reels/legenda-padrao — legenda usada em todo vídeo que não tiver
+    // uma legenda própria definida no upload
+    if (req.method === "POST" && path_ === "/painel/api/reels/legenda-padrao") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await reels.configSet("legenda_padrao", body.legenda || "");
+      return send(res, 200, { ok: true });
+    }
+
     // POST /painel/api/reels/upload — sobe um vídeo direto do computador pra fila (via
-    // Drive, sem precisar abrir o Drive por fora) e já sincroniza na hora.
+    // Drive, sem precisar abrir o Drive por fora) e já sincroniza na hora. Legenda é
+    // opcional — se não vier, usa a legenda padrão configurada na hora de publicar.
     if (req.method === "POST" && path_ === "/painel/api/reels/upload") {
       if (!requireAuth(req, res)) return;
       let arquivoPath;
@@ -1418,7 +1436,7 @@ const server = http.createServer(async (req, res) => {
         const recebido = await receberVideoTemp(req);
         arquivoPath = recebido.arquivoPath;
         const buffer = fs.readFileSync(arquivoPath);
-        const arquivoDrive = await reels.enviarVideo(buffer, recebido.nomeOriginal);
+        const arquivoDrive = await reels.enviarVideo(buffer, recebido.nomeOriginal, recebido.legenda);
         return send(res, 200, { ok: true, nome: arquivoDrive.name });
       } catch (err) {
         return send(res, 500, { error: err.message });

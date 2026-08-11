@@ -12,7 +12,7 @@ const fb = require("./facebook");
 const PUBLICAR_MEDIA_DIR = path.join(__dirname, "media", "publicar");
 fs.mkdirSync(PUBLICAR_MEDIA_DIR, { recursive: true });
 
-const LEGENDA_PADRAO =
+const LEGENDA_PADRAO_FALLBACK =
   "FelizCred — correspondente bancário. Crédito consignado, antecipação de FGTS e mais, 100% digital pelo WhatsApp. #felizcred #credito #consignado #fgts";
 
 function env(nome) {
@@ -59,7 +59,8 @@ async function publicarProximoPendente() {
     fs.writeFileSync(finalPath, bytes);
 
     const videoUrl = `${baseUrl()}/publicar-media/${finalNome}`;
-    const legenda = item.legenda || LEGENDA_PADRAO;
+    const legendaPadrao = (await db.reelsConfigGet("legenda_padrao")) || LEGENDA_PADRAO_FALLBACK;
+    const legenda = item.legenda || legendaPadrao;
     const resultado = {};
 
     try {
@@ -97,12 +98,15 @@ async function publicarProximoPendente() {
 // Upload direto do painel: sobe o vídeo pra pasta do Drive configurada (sem precisar abrir
 // o Drive por fora) e já sincroniza a fila na sequência, pra aparecer em "pendentes" na
 // hora. A pasta precisa estar compartilhada com a Service Account em permissão de Editor
-// (não só Leitor, que bastava só pra ler/baixar).
-async function enviarVideo(buffer, nomeArquivo) {
+// (não só Leitor, que bastava só pra ler/baixar). `legenda` é opcional — só esse vídeo usa
+// um texto diferente do padrão; se não vier, cai na legenda padrão configurada (ou no
+// fallback fixo) na hora de publicar.
+async function enviarVideo(buffer, nomeArquivo, legenda) {
   const folderId = process.env.GOOGLE_DRIVE_REELS_FOLDER_ID;
   if (!folderId) throw new Error("GOOGLE_DRIVE_REELS_FOLDER_ID não configurado.");
   const arquivo = await drive.enviarVideo(folderId, nomeArquivo, buffer);
   await sincronizarFila();
+  if (legenda) await db.reelsDefinirLegenda(arquivo.id, legenda);
   return arquivo;
 }
 

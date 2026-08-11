@@ -108,6 +108,10 @@ são recalculados automaticamente, espalhados entre 08:00–22:00 conforme a qua
 14/dia ≈ 100/semana). Sem limite de quantos vídeos ficam na fila — pode sincronizar a pasta
 do Drive com quantos vídeos quiser, o agendador vai consumindo no ritmo configurado.
 
+**Legenda**: tem um campo de "Legenda padrão" no card (usada em todo vídeo que não tiver
+uma legenda própria). No upload, cada vídeo também tem um campo opcional pra legenda só
+dele — se deixar em branco, cai na padrão.
+
 Fica **pausado por padrão** — só começa a publicar sozinho depois de ligar o botão "Ativar
 agendamento" no painel (aba 🚀 Publicar → card "Reels em massa").
 

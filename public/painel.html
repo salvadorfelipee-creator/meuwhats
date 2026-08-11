@@ -549,10 +549,14 @@
           processar nada.
         </div>
 
+        <label>Legenda padrão (usada em todo vídeo que não tiver uma legenda própria)</label>
+        <textarea id="reels-legenda-padrao" placeholder="Legenda usada nos Reels..." style="margin-bottom:14px;"></textarea>
+
         <label>Enviar vídeo(s) pra fila</label>
         <input type="file" id="reels-upload-input" accept="video/*" multiple hidden />
         <div class="page-header-acoes" style="margin-bottom:10px;">
           <button id="reels-upload-escolher" class="btn-secundario" type="button">Escolher vídeo(s)</button>
+          <button id="reels-upload-enviar" class="btn-primario" type="button" style="display:none;">Enviar</button>
           <button id="reels-sincronizar" class="btn-secundario" type="button">Sincronizar de novo</button>
         </div>
         <div id="reels-upload-lista" class="resultado-lista" style="margin-bottom:14px;"></div>
@@ -1682,6 +1686,9 @@ async function carregarReels() {
     botaoToggle.dataset.pausado = data.pausado ? "1" : "0";
 
     document.getElementById("reels-posts-por-dia").value = data.postsPorDia || 5;
+    if (document.activeElement !== document.getElementById("reels-legenda-padrao")) {
+      document.getElementById("reels-legenda-padrao").value = data.legendaPadrao || "";
+    }
 
     document.getElementById("reels-lista").innerHTML = data.recentes
       .map((item) => {
@@ -1748,25 +1755,44 @@ document.getElementById("reels-upload-escolher").addEventListener("click", () =>
 
 function renderizarReelsUploadLista() {
   document.getElementById("reels-upload-lista").innerHTML = reelsUploadArquivos
-    .map((item) => {
+    .map((item, i) => {
       const classe = item.status === "erro" ? "erro" : item.status === "pronto" ? "ok" : "";
-      const rotulos = { pendente: "na fila", enviando: "enviando...", pronto: "enviado", erro: `erro: ${escapeHtml(item.erro || "")}` };
-      return `<div class="resultado-item ${classe}"><span class="status">${escapeHtml(item.file.name)} — ${rotulos[item.status]}</span></div>`;
+      const rotulos = { escolhido: "pronto pra enviar", enviando: "enviando...", pronto: "enviado", erro: `erro: ${escapeHtml(item.erro || "")}` };
+      const legendaCampo =
+        item.status === "escolhido"
+          ? `<input type="text" data-legenda-index="${i}" placeholder="Legenda deste vídeo (opcional — usa a padrão se deixar em branco)" style="flex-basis:100%; margin-top:6px;" />`
+          : "";
+      return `<div class="resultado-item ${classe}" style="flex-wrap:wrap;">
+        <span class="status">${escapeHtml(item.file.name)} — ${rotulos[item.status]}</span>
+        ${legendaCampo}
+      </div>`;
     })
     .join("");
 }
 
-document.getElementById("reels-upload-input").addEventListener("change", async (e) => {
-  reelsUploadArquivos = Array.from(e.target.files).map((file) => ({ file, status: "pendente", erro: null }));
+document.getElementById("reels-upload-input").addEventListener("change", (e) => {
+  reelsUploadArquivos = Array.from(e.target.files).map((file) => ({ file, legenda: "", status: "escolhido", erro: null }));
   renderizarReelsUploadLista();
+  document.getElementById("reels-upload-enviar").style.display = reelsUploadArquivos.length ? "inline-block" : "none";
+});
 
-  const botao = document.getElementById("reels-upload-escolher");
-  botao.disabled = true;
+document.getElementById("reels-upload-enviar").addEventListener("click", async () => {
+  // lê as legendas digitadas antes de começar a enviar (os campos somem conforme cada
+  // item vira "enviando")
+  document.querySelectorAll("[data-legenda-index]").forEach((input) => {
+    reelsUploadArquivos[Number(input.dataset.legendaIndex)].legenda = input.value.trim();
+  });
+
+  const botaoEnviar = document.getElementById("reels-upload-enviar");
+  const botaoEscolher = document.getElementById("reels-upload-escolher");
+  botaoEnviar.disabled = true;
+  botaoEscolher.disabled = true;
   for (const item of reelsUploadArquivos) {
     item.status = "enviando";
     renderizarReelsUploadLista();
     try {
       const formData = new FormData();
+      if (item.legenda) formData.append("legenda", item.legenda); // precisa vir ANTES do arquivo
       formData.append("video", item.file);
       const res = await fetch("/painel/api/reels/upload", { method: "POST", body: formData });
       const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}).` }));
@@ -1778,9 +1804,19 @@ document.getElementById("reels-upload-input").addEventListener("change", async (
     }
     renderizarReelsUploadLista();
   }
-  botao.disabled = false;
+  botaoEnviar.disabled = false;
+  botaoEscolher.disabled = false;
+  botaoEnviar.style.display = "none";
   document.getElementById("reels-upload-input").value = "";
   carregarReels();
+});
+
+document.getElementById("reels-legenda-padrao").addEventListener("change", async (e) => {
+  await fetch("/painel/api/reels/legenda-padrao", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ legenda: e.target.value }),
+  });
 });
 
 document.getElementById("reels-toggle").addEventListener("click", async () => {

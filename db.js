@@ -484,6 +484,14 @@ async function reelsSincronizarFila(arquivos) {
   return adicionados;
 }
 
+async function reelsDefinirLegenda(driveFileId, legenda) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE reels_queue SET legenda = ? WHERE drive_file_id = ?`,
+    args: [legenda || null, driveFileId],
+  });
+}
+
 async function reelsProximosPendentes(quantidade) {
   await ready;
   const result = await client.execute({
@@ -577,6 +585,7 @@ module.exports = {
   salvarLeadCotaCerta,
   listarLeadsCotaCerta,
   reelsSincronizarFila,
+  reelsDefinirLegenda,
   reelsProximosPendentes,
   reelsMarcarPostado,
   reelsMarcarErro,
