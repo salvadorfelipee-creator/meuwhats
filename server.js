@@ -120,7 +120,11 @@ function receberMultipart(req) {
   return new Promise((resolve, reject) => {
     let bb;
     try {
-      bb = busboy({ headers: req.headers, limits: { fileSize: 300 * 1024 * 1024 } });
+      // Limite conservador: mesmo com upload em streaming, o ffmpeg em si (decodificar +
+      // processar + reencodar) consome memória proporcional ao vídeo, e o plano free do
+      // Render tem pouca RAM — vídeo grande demais derruba o processo inteiro no meio do
+      // processamento. 150MB é generoso pra um Reels normal (segundos a poucos minutos).
+      bb = busboy({ headers: req.headers, limits: { fileSize: 150 * 1024 * 1024 } });
     } catch (err) {
       return reject(err);
     }
@@ -148,7 +152,7 @@ function receberMultipart(req) {
           writeStream.on("finish", () => {
             if (estourouLimite) {
               fs.unlink(arquivoPath, () => {});
-              return rej(new Error("Arquivo muito grande (limite 300MB)"));
+              return rej(new Error("Arquivo muito grande (limite 150MB) — comprima o vídeo antes ou divida em partes menores"));
             }
             arquivos[nomeCampo] = arquivoPath;
             res();

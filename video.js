@@ -35,7 +35,11 @@ async function processarVideo(entradaPath, saidaPath, opcoes = {}) {
   const moldura = opcoes.moldura === "nenhuma" ? "nenhuma" : "felizcred";
   const { w, h } = RESOLUCOES[opcoes.qualidade] || RESOLUCOES["1080p"];
 
-  const args = ["-y", "-i", entradaPath];
+  // -threads 1: limita decode/filtro/encode a 1 thread. Sem isso o ffmpeg usa todos os
+  // núcleos disponíveis em paralelo, e cada thread mantém seus próprios buffers de
+  // frame — no plano free do Render (pouca RAM) isso multiplicava o pico de memória e
+  // derrubava o processo inteiro (o servidor reiniciava no meio do processamento).
+  const args = ["-y", "-threads", "1", "-i", entradaPath];
   let proximoIndice = 1; // índice 0 já é o vídeo de entrada
   let filtroVideo = `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1[vid]`;
 
@@ -62,7 +66,7 @@ async function processarVideo(entradaPath, saidaPath, opcoes = {}) {
     "-map", "[out]",
     ...mapAudio,
     "-c:v", "libx264",
-    "-preset", "veryfast",
+    "-preset", "ultrafast", // menos memória/CPU que veryfast — troca um pouco de compressão por confiabilidade num host com pouca RAM
     "-crf", "23",
     "-c:a", "aac",
     "-b:a", "128k",

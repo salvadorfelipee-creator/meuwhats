@@ -136,10 +136,17 @@ O processamento também é **assíncrono**: o upload responde na hora com um `jo
 ffmpeg roda em segundo plano — o painel fica perguntando `.../editor/status/:jobId` a cada
 2s até terminar. Isso existe porque o proxy do Render derruba a conexão (502) se a resposta
 demorar demais dentro de 1 requisição só, e processar vídeo grande pode passar desse tempo
-mesmo sem faltar memória. Se o 502/erro voltar a acontecer mesmo assim com vídeo muito
-grande (dezenas/centenas de MB), é sinal de que passou do que o plano free do Render
-aguenta processar de uma vez — nesse caso vale tentar um vídeo menor ou considerar um plano
-pago do Render.
+mesmo sem faltar memória.
+
+Ainda assim, o processo inteiro (não só a requisição) pode cair com vídeo grande — nesse
+caso o polling recebe uma página de erro do próprio Render em vez de JSON (erro tipo
+"Unexpected token '<' ... is not valid JSON" no navegador, porque veio HTML e não JSON).
+Camadas de proteção adicionadas contra isso: `video.js` roda o ffmpeg com `-threads 1` e
+preset `ultrafast` (menos pico de memória que rodar em paralelo com `veryfast`), e o limite
+de upload caiu de 300MB pra **150MB** (`server.js`, `receberMultipart`). Se o erro voltar a
+acontecer mesmo assim com vídeo grande (dezenas/centenas de MB), é sinal de que passou do
+que o plano free do Render aguenta processar de uma vez — nesse caso vale comprimir o vídeo
+antes, tentar um vídeo menor, ou considerar um plano pago do Render (mais RAM/CPU).
 
 ### Arquitetura
 
