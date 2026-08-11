@@ -1,7 +1,10 @@
 const http = require("http");
 const https = require("https");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const crypto = require("crypto");
+const busboy = require("busboy");
 
 const db = require("./db");
 const wa = require("./whatsapp");
@@ -108,6 +111,46 @@ const EXT_BY_MIME = {
 };
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
+// Recebe um upload multipart/form-data (1 arquivo) e grava direto em disco via streaming —
+// diferente do parseBody (JSON em base64), não acumula o arquivo inteiro na memória do
+// processo. Necessário pra vídeo: um upload base64 de dezenas de MB dentro de uma string
+// JSON gigante já derrubou o servidor por estouro de memória no plano free do Render.
+function receberVideoMultipart(req) {
+  return new Promise((resolve, reject) => {
+    let bb;
+    try {
+      bb = busboy({ headers: req.headers, limits: { files: 1, fileSize: 300 * 1024 * 1024 } });
+    } catch (err) {
+      return reject(err);
+    }
+    let recebeuArquivo = false; // marcado assim que o campo de arquivo chega, não quando termina de gravar
+    bb.on("file", (_campo, stream, _info) => {
+      recebeuArquivo = true;
+      const arquivoPath = path.join(os.tmpdir(), `upload-${crypto.randomBytes(6).toString("hex")}.mp4`);
+      const writeStream = fs.createWriteStream(arquivoPath);
+      let estourouLimite = false;
+      stream.on("limit", () => (estourouLimite = true));
+      stream.pipe(writeStream);
+      // "finish" (disco) sempre chega DEPOIS do "close" do busboy (que só marca fim da
+      // leitura da rede) — resolver aqui, não no "close", evita resolver com o arquivo
+      // ainda incompleto no disco.
+      writeStream.on("finish", () => {
+        if (estourouLimite) {
+          fs.unlink(arquivoPath, () => {});
+          return reject(new Error("Vídeo muito grande (limite 300MB)"));
+        }
+        resolve(arquivoPath);
+      });
+      writeStream.on("error", reject);
+    });
+    bb.on("error", reject);
+    bb.on("close", () => {
+      if (!recebeuArquivo) reject(new Error("Nenhum arquivo enviado"));
+    });
+    req.pipe(bb);
+  });
+}
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let data = "";
@@ -1395,14 +1438,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     // POST /painel/api/reels/editor/processar — editor manual: aplica a moldura FelizCred
-    // num vídeo enviado do computador e devolve o link do resultado pra baixar. Não publica
-    // em rede nenhuma nem mexe na fila — é só "aplicar moldura e baixar" avulso.
+    // num vídeo enviado do computador (multipart, streaming pro disco) e devolve o link do
+    // resultado pra baixar. Não publica em rede nenhuma nem mexe na fila.
     if (req.method === "POST" && path_ === "/painel/api/reels/editor/processar") {
       if (!requireAuth(req, res)) return;
-      const body = await parseBody(req);
-      if (!body.videoBase64) return send(res, 400, { error: "Envie um vídeo" });
       try {
-        const resultado = await reels.processarUploadAvulso(body.videoBase64);
+        const arquivoPath = await receberVideoMultipart(req);
+        const resultado = await reels.processarUploadAvulso(arquivoPath);
         return send(res, 200, resultado);
       } catch (err) {
         return send(res, 500, { error: err.message });

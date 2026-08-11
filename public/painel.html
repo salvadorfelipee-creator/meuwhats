@@ -1815,15 +1815,6 @@ async function publicarItemEditor(i) {
   renderizarEditorLista();
 }
 
-function lerComoDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 document.getElementById("editor-processar").addEventListener("click", async () => {
   const botao = document.getElementById("editor-processar");
   botao.disabled = true;
@@ -1832,13 +1823,12 @@ document.getElementById("editor-processar").addEventListener("click", async () =
     item.status = "processando";
     renderizarEditorLista();
     try {
-      const dataUrl = await lerComoDataUrl(item.file);
-      const res = await fetch("/painel/api/reels/editor/processar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoBase64: dataUrl }),
-      });
-      const data = await res.json();
+      // Upload direto do arquivo (multipart) em vez de base64 dentro de JSON — vídeo
+      // grande como base64 numa string só já derrubou o servidor por estouro de memória.
+      const formData = new FormData();
+      formData.append("video", item.file);
+      const res = await fetch("/painel/api/reels/editor/processar", { method: "POST", body: formData });
+      const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}) — o vídeo pode ser grande demais ou o servidor reiniciou no meio do processamento.` }));
       if (data.error) throw new Error(data.error);
       item.status = "pronto";
       item.url = data.url;
