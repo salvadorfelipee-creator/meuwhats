@@ -566,7 +566,16 @@
         <div id="reels-espaco" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;"></div>
         <div id="reels-resumo" class="reels-stats"></div>
         <button id="reels-testar" class="btn-primario" type="button" style="margin-top:14px;">Publicar 1 agora (teste)</button>
-        <div id="reels-lista" class="resultado-lista"></div>
+
+        <div style="margin-top:22px; padding-top:18px; border-top:1px solid var(--border);">
+          <h4 style="margin:0 0 10px;">📋 Fila (pendentes, com previsão de data)</h4>
+          <div id="reels-fila" class="resultado-lista"></div>
+        </div>
+
+        <div style="margin-top:22px; padding-top:18px; border-top:1px solid var(--border);">
+          <h4 style="margin:0 0 10px;">Histórico recente</h4>
+          <div id="reels-lista" class="resultado-lista"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1701,11 +1710,14 @@ async function carregarReels() {
       espacoDiv.textContent = "";
     }
 
+    // "Histórico recente" mostra só quem já saiu da fila (publicado/erro) — quem ainda tá
+    // pendente aparece na seção "Fila" de baixo, com data prevista e ações.
     document.getElementById("reels-lista").innerHTML = data.recentes
+      .filter((item) => item.status !== "pending")
       .map((item) => {
         const resultado = item.resultado ? JSON.parse(item.resultado) : null;
-        const classe = item.status === "error" ? "erro" : item.status === "posted" ? "ok" : "";
-        let statusTexto = item.status === "pending" ? "na fila" : "";
+        const classe = item.status === "error" ? "erro" : "ok";
+        let statusTexto = "";
         let links = "";
         if (item.status === "posted" && resultado) {
           const redes = Object.entries(resultado).filter(([, r]) => r.ok);
@@ -1720,14 +1732,74 @@ async function carregarReels() {
           ${item.status === "error" ? `<button type="button" class="btn-secundario" onclick="reenfileirarReel(${item.id})">Tentar de novo</button>` : ""}
         </div>`;
       })
-      .join("");
+      .join("") || `<div class="lista-vazia">Nada publicado ainda.</div>`;
   } catch (err) {
     document.getElementById("reels-lista").innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
   }
+  carregarFilaReels();
 }
 
 async function reenfileirarReel(id) {
   await fetch(`/painel/api/reels/${id}/reenfileirar`, { method: "POST" });
+  carregarReels();
+}
+
+function formatarDataCurta(ts) {
+  return new Date(ts).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+async function carregarFilaReels() {
+  const div = document.getElementById("reels-fila");
+  try {
+    const res = await fetch("/painel/api/reels/fila");
+    const itens = await res.json();
+    if (!itens.length) {
+      div.innerHTML = `<div class="lista-vazia">Fila vazia — envie vídeo(s) acima.</div>`;
+      return;
+    }
+    div.innerHTML = itens
+      .map((item) => {
+        const dataInput = item.agendado_para ? new Date(item.agendado_para).toISOString().slice(0, 10) : "";
+        return `<div class="resultado-item" style="flex-wrap:wrap;">
+          <span class="status">${escapeHtml(item.nome_arquivo || item.drive_file_id)} — previsto: ${formatarDataCurta(item.data_prevista)}</span>
+          <label style="font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+            Não antes de: <input type="date" value="${dataInput}" onchange="salvarDataFila(${item.id}, this.value)" />
+          </label>
+          <button type="button" class="btn-secundario" onclick="publicarFilaAgora(${item.id})">Publicar agora</button>
+          <button type="button" class="btn-secundario" onclick="removerFila(${item.id})">Remover</button>
+        </div>`;
+      })
+      .join("");
+  } catch (err) {
+    div.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
+  }
+}
+
+async function salvarDataFila(id, valor) {
+  await fetch(`/painel/api/reels/${id}/data`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: valor || null }),
+  });
+  carregarFilaReels();
+}
+
+async function publicarFilaAgora(id) {
+  if (!confirm("Publicar esse vídeo agora, fora da ordem da fila?")) return;
+  try {
+    const res = await fetch(`/painel/api/reels/${id}/publicar-agora`, { method: "POST" });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    alert("Publicado!");
+  } catch (err) {
+    alert(`Falha ao publicar: ${err.message}`);
+  }
+  carregarReels();
+}
+
+async function removerFila(id) {
+  if (!confirm("Remover esse vídeo da fila? Ele será apagado do armazenamento também.")) return;
+  await fetch(`/painel/api/reels/${id}`, { method: "DELETE" });
   carregarReels();
 }
 
@@ -1769,29 +1841,35 @@ function renderizarReelsUploadLista() {
     .map((item, i) => {
       const classe = item.status === "erro" ? "erro" : item.status === "pronto" ? "ok" : "";
       const rotulos = { escolhido: "pronto pra enviar", enviando: "enviando...", pronto: "enviado", erro: `erro: ${escapeHtml(item.erro || "")}` };
-      const legendaCampo =
+      const camposExtras =
         item.status === "escolhido"
-          ? `<input type="text" data-legenda-index="${i}" placeholder="Legenda deste vídeo (opcional — usa a padrão se deixar em branco)" style="flex-basis:100%; margin-top:6px;" />`
+          ? `<input type="text" data-legenda-index="${i}" placeholder="Legenda deste vídeo (opcional — usa a padrão se deixar em branco)" style="flex:1; min-width:220px; margin-top:6px;" />
+             <label style="flex-shrink:0; margin-top:6px; font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+               Não publicar antes de: <input type="date" data-data-index="${i}" style="width:auto;" />
+             </label>`
           : "";
       return `<div class="resultado-item ${classe}" style="flex-wrap:wrap;">
         <span class="status">${escapeHtml(item.file.name)} — ${rotulos[item.status]}</span>
-        ${legendaCampo}
+        ${camposExtras}
       </div>`;
     })
     .join("");
 }
 
 document.getElementById("reels-upload-input").addEventListener("change", (e) => {
-  reelsUploadArquivos = Array.from(e.target.files).map((file) => ({ file, legenda: "", status: "escolhido", erro: null }));
+  reelsUploadArquivos = Array.from(e.target.files).map((file) => ({ file, legenda: "", data: "", status: "escolhido", erro: null }));
   renderizarReelsUploadLista();
   document.getElementById("reels-upload-enviar").style.display = reelsUploadArquivos.length ? "inline-block" : "none";
 });
 
 document.getElementById("reels-upload-enviar").addEventListener("click", async () => {
-  // lê as legendas digitadas antes de começar a enviar (os campos somem conforme cada
+  // lê legenda/data digitadas antes de começar a enviar (os campos somem conforme cada
   // item vira "enviando")
   document.querySelectorAll("[data-legenda-index]").forEach((input) => {
     reelsUploadArquivos[Number(input.dataset.legendaIndex)].legenda = input.value.trim();
+  });
+  document.querySelectorAll("[data-data-index]").forEach((input) => {
+    reelsUploadArquivos[Number(input.dataset.dataIndex)].data = input.value;
   });
 
   const botaoEnviar = document.getElementById("reels-upload-enviar");
@@ -1803,7 +1881,9 @@ document.getElementById("reels-upload-enviar").addEventListener("click", async (
     renderizarReelsUploadLista();
     try {
       const formData = new FormData();
-      if (item.legenda) formData.append("legenda", item.legenda); // precisa vir ANTES do arquivo
+      // campos de texto precisam vir ANTES do arquivo no FormData (ver server.js)
+      if (item.legenda) formData.append("legenda", item.legenda);
+      if (item.data) formData.append("data", item.data);
       formData.append("video", item.file);
       const res = await fetch("/painel/api/reels/upload", { method: "POST", body: formData });
       const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}).` }));

@@ -169,6 +169,12 @@ const ready = (async () => {
   if (!infoReelsQueue.rows.some((r) => r.name === "arquivo_apagado")) {
     await client.execute(`ALTER TABLE reels_queue ADD COLUMN arquivo_apagado INTEGER NOT NULL DEFAULT 0`);
   }
+  if (!infoReelsQueue.rows.some((r) => r.name === "agendado_para")) {
+    // "não publicar antes desta data" — não é um horário exato, é um piso; o vídeo só
+    // entra na leva de publicação quando essa data chegar (ou fica sem data = publica na
+    // ordem normal da fila, sem restrição).
+    await client.execute(`ALTER TABLE reels_queue ADD COLUMN agendado_para INTEGER`);
+  }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS reels_config (
     chave TEXT PRIMARY KEY,
@@ -497,13 +503,51 @@ async function reelsDefinirLegenda(driveFileId, legenda) {
   });
 }
 
+// Só considera pendente elegível quem não tem data mínima, ou cuja data mínima já chegou —
+// "agendado_para" é um piso ("não antes disso"), não um horário exato obrigatório.
 async function reelsProximosPendentes(quantidade) {
   await ready;
   const result = await client.execute({
-    sql: `SELECT * FROM reels_queue WHERE status = 'pending' ORDER BY posicao ASC LIMIT ?`,
-    args: [quantidade],
+    sql: `SELECT * FROM reels_queue
+          WHERE status = 'pending' AND (agendado_para IS NULL OR agendado_para <= ?)
+          ORDER BY posicao ASC LIMIT ?`,
+    args: [Date.now(), quantidade],
   });
   return result.rows;
+}
+
+// Fila inteira de pendentes (não só os elegíveis agora) — pra mostrar no painel com data
+// prevista de cada um, mesmo os que ainda estão esperando a data mínima chegar.
+async function reelsFilaCompleta() {
+  await ready;
+  const result = await client.execute(
+    `SELECT * FROM reels_queue WHERE status = 'pending' ORDER BY posicao ASC`
+  );
+  return result.rows;
+}
+
+async function reelsBuscarPorId(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM reels_queue WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+async function reelsBuscarPorDriveFileId(driveFileId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM reels_queue WHERE drive_file_id = ?`, args: [driveFileId] });
+  return result.rows[0] || null;
+}
+
+async function reelsDefinirData(id, timestampMs) {
+  await ready;
+  await client.execute({ sql: `UPDATE reels_queue SET agendado_para = ? WHERE id = ?`, args: [timestampMs, id] });
+}
+
+// Some com o item da fila (usado pelo botão "Remover") — o arquivo no R2 é apagado por
+// quem chamar isso (reels.js), aqui só cuida da linha no banco.
+async function reelsRemover(id) {
+  await ready;
+  await client.execute({ sql: `DELETE FROM reels_queue WHERE id = ?`, args: [id] });
 }
 
 async function reelsMarcarPostado(id, resultado) {
@@ -609,6 +653,11 @@ module.exports = {
   reelsSincronizarFila,
   reelsDefinirLegenda,
   reelsProximosPendentes,
+  reelsFilaCompleta,
+  reelsBuscarPorId,
+  reelsBuscarPorDriveFileId,
+  reelsDefinirData,
+  reelsRemover,
   reelsMarcarPostado,
   reelsMarcarErro,
   reelsReenfileirar,

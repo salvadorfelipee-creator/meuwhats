@@ -115,6 +115,16 @@ são recalculados automaticamente, espalhados entre 08:00–22:00 conforme a qua
 **Legenda**: campo de "Legenda padrão" no card (usada em todo vídeo que não tiver uma legenda
 própria) + campo opcional por vídeo no upload (se deixar em branco, cai na padrão).
 
+**Data mínima por vídeo (opcional)**: no upload, ou depois direto na fila, dá pra marcar
+"não publicar antes de" uma data pra um vídeo específico — não é um horário exato obrigatório,
+é um piso: o vídeo só entra na leva normal de publicação quando essa data chegar (sem data,
+publica na ordem normal da fila). A seção **"📋 Fila"** no card mostra todo vídeo pendente com
+uma **data prevista** (estimativa recalculada toda vez a partir da posição na fila + ritmo
+configurado — não é gravada, muda se a quantidade/dia mudar), e por item:
+- **Publicar agora** — publica esse vídeo específico na hora, fora da ordem (ignora a data
+  mínima de propósito, é uma ação manual e explícita).
+- **Remover** — tira da fila e apaga do R2 (usuário mudou de ideia sobre aquele vídeo).
+
 Fica **pausado por padrão** — só começa a publicar sozinho depois de ligar o botão "Ativar
 agendamento" no painel (aba 🚀 Publicar → card "Reels em massa").
 
@@ -125,27 +135,34 @@ r2.js       cliente S3-compatível pro Cloudflare R2 (SDK oficial da AWS, @aws-s
             + @aws-sdk/s3-request-presigner — R2 é compatível com a API do S3) — enviar,
             listar, gerar URL assinada temporária, apagar, somar uso total do bucket.
 reels.js    orquestrador: enviarVideo() (upload do painel → R2 → sincroniza, bloqueia se
-            espaço quase cheio), sincronizarFila() (R2 → banco), publicarProximoPendente()
-            (URL assinada → publica em Instagram + Facebook) e limparAntigos() (apaga do R2
-            quem foi publicado há mais de 24h).
+            espaço quase cheio), sincronizarFila() (R2 → banco), publicarItem()
+            (função compartilhada: URL assinada → publica em Instagram + Facebook),
+            publicarProximoPendente() (próximo elegível, respeita data mínima) e
+            publicarItemEspecifico() (um vídeo específico, ignora ordem/data — botão
+            manual), listarFilaComEstimativa() (fila + data prevista calculada),
+            definirData()/removerItem() e limparAntigos() (apaga do R2 quem foi
+            publicado há mais de 24h).
 instagram.js → publicarReels() (fluxo de container de vídeo — media_type REELS, polling
             até o Instagram terminar de processar antes de publicar).
 facebook.js → publicarReels() (API de Reels da Página — fluxo "hosted file": start →
             aponta a URL do vídeo → polling do status → finish/publish).
 db.js       tabela reels_queue (coluna `drive_file_id` guarda a **key do objeto no R2** —
             nome mantido por compatibilidade, não é mais literalmente do Drive; status
-            pending/posted/error, `arquivo_apagado` controla a limpeza de 24h) +
-            reels_config (liga/desliga, posts_por_dia, legenda_padrao, controle de horário).
-server.js   rotas (POST /painel/api/reels/upload, GET .../status, POST .../sincronizar,
-            .../pausar, .../posts-por-dia, .../legenda-padrao, .../publicar-agora,
-            .../:id/reenfileirar) + o setInterval que checa a cada minuto se bateu algum
-            horário do dia (calcularHorariosDoDia() gera os horários dinamicamente a
-            partir da quantidade configurada) + setInterval de hora em hora que roda a
-            limpeza do R2. Upload usa multipart/streaming (`busboy`) — nunca base64/JSON.
+            pending/posted/error, `arquivo_apagado` controla a limpeza de 24h,
+            `agendado_para` é a data mínima opcional) + reels_config (liga/desliga,
+            posts_por_dia, legenda_padrao, controle de horário).
+server.js   rotas (POST /painel/api/reels/upload, GET .../status, GET .../fila,
+            POST .../sincronizar, .../pausar, .../posts-por-dia, .../legenda-padrao,
+            .../publicar-agora, .../:id/reenfileirar, .../:id/publicar-agora,
+            .../:id/data, DELETE .../:id) + o setInterval que checa a cada minuto se
+            bateu algum horário do dia (calcularHorariosDoDia() gera os horários
+            dinamicamente a partir da quantidade configurada) + setInterval de hora em
+            hora que roda a limpeza do R2. Upload usa multipart/streaming (`busboy`) —
+            nunca base64/JSON.
 public/painel.html  card "🎬 Reels em massa" na aba Publicar: legenda padrão, upload em
-            lote com legenda por vídeo, indicador de espaço usado no R2, quantidade/dia,
-            resumo (pendentes/publicados/com erro), liga/desliga, testar publicando 1
-            agora, lista dos últimos itens com link de cada rede publicada.
+            lote com legenda + data mínima por vídeo, indicador de espaço usado no R2,
+            quantidade/dia, resumo, seção "Fila" (pendentes com data prevista + publicar
+            agora/remover por item), "Histórico recente" (publicado/erro).
 ```
 
 **Facebook Reels ainda não testado contra API real** (código escrito seguindo a documentação
@@ -163,17 +180,18 @@ Instagram Reels já está testado e funcionando (ver seção Status).
 
 ### Status
 
-- Cloudflare R2: bucket `felizcred-reels` criado (11/08/2026). Falta configurar as 4
-  variáveis acima no Render com as credenciais reais (Access Key ID/Secret ainda não
-  repassados) — depois disso, primeiro teste real de upload + publicação.
+- Cloudflare R2: ✅ ao vivo e testado (11/08/2026) — token gerado, as 4 variáveis
+  configuradas no Render, e testado direto contra a API real (enviar, listar, gerar URL
+  assinada, apagar), tudo funcionando. Primeiros vídeos reais já enviados pelo painel.
+- Fila avançada (data mínima por vídeo, "Publicar agora" de um item específico, "Remover")
+  testada de ponta a ponta contra a API real do R2 (upload com legenda+data, listar com
+  data prevista, limpar data, remover — confirmado sumindo do R2 também).
 - Google Drive (tentativa anterior, abandonada): Service Account e pasta continuam existindo
   mas não são mais usadas por nada no código — `GOOGLE_SERVICE_ACCOUNT_JSON` e
-  `GOOGLE_DRIVE_REELS_FOLDER_ID` podem ser removidas do Render quando quiser (não fazem mais
-  nada, só ocupam espaço na lista de variáveis).
-- Rotas do painel testadas localmente (fila vazia, pausar/ativar, quantidade/dia, legenda
-  padrão, upload sem credencial → erro claro).
+  `GOOGLE_DRIVE_REELS_FOLDER_ID` podem ser removidas do Render quando quiser.
 - Publicação: Instagram Reels já testado e funcionando em produção. Facebook Reels é código
-  novo (11/08/2026), seguindo a documentação oficial, mas **ainda sem teste real**.
+  novo (11/08/2026), seguindo a documentação oficial, mas **ainda sem teste real** — falta
+  publicar um vídeo de verdade pra confirmar.
 
 ## Contas — como adicionar uma nova
 

@@ -110,12 +110,12 @@ const EXT_BY_MIME = {
 };
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
-// Recebe 1 vídeo (+ campo de texto opcional "legenda") enviado via multipart/form-data e
-// grava o vídeo direto em disco via streaming (não acumula o arquivo inteiro na memória) —
-// usado pelo upload direto de Reels no painel (POST /painel/api/reels/upload). Devolve o
-// caminho do arquivo temporário, o nome original e a legenda (se veio). Importante: o
-// campo "legenda" precisa vir ANTES do arquivo no FormData do cliente, senão pode chegar
-// depois do "finish" do arquivo e ser perdido.
+// Recebe 1 vídeo (+ campos de texto opcionais "legenda" e "data") enviado via
+// multipart/form-data e grava o vídeo direto em disco via streaming (não acumula o arquivo
+// inteiro na memória) — usado pelo upload direto de Reels no painel (POST
+// /painel/api/reels/upload). Devolve o caminho do arquivo temporário, o nome original, a
+// legenda e a data mínima (se vieram). Importante: os campos de texto precisam vir ANTES
+// do arquivo no FormData do cliente, senão podem chegar depois do "finish" e serem perdidos.
 function receberVideoTemp(req) {
   return new Promise((resolve, reject) => {
     let bb;
@@ -126,8 +126,10 @@ function receberVideoTemp(req) {
     }
     let recebeuArquivo = false;
     let legenda = "";
+    let dataMinima = "";
     bb.on("field", (nome, valor) => {
       if (nome === "legenda") legenda = valor;
+      if (nome === "data") dataMinima = valor;
     });
     bb.on("file", (_campo, stream, info) => {
       recebeuArquivo = true;
@@ -141,7 +143,7 @@ function receberVideoTemp(req) {
           fs.unlink(arquivoPath, () => {});
           return reject(new Error("Vídeo muito grande (limite 150MB)"));
         }
-        resolve({ arquivoPath, nomeOriginal: info.filename || "video.mp4", legenda });
+        resolve({ arquivoPath, nomeOriginal: info.filename || "video.mp4", legenda, dataMinima });
       });
       writeStream.on("error", reject);
     });
@@ -1429,8 +1431,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     // POST /painel/api/reels/upload — sobe um vídeo direto do computador pra fila (R2, sem
-    // precisar abrir nenhum site por fora) e já sincroniza na hora. Legenda é opcional —
-    // se não vier, usa a legenda padrão configurada na hora de publicar.
+    // precisar abrir nenhum site por fora) e já sincroniza na hora. Legenda e data mínima
+    // são opcionais — sem legenda usa a padrão, sem data publica na ordem normal da fila.
     if (req.method === "POST" && path_ === "/painel/api/reels/upload") {
       if (!requireAuth(req, res)) return;
       let arquivoPath;
@@ -1438,12 +1440,63 @@ const server = http.createServer(async (req, res) => {
         const recebido = await receberVideoTemp(req);
         arquivoPath = recebido.arquivoPath;
         const buffer = fs.readFileSync(arquivoPath);
-        const arquivoR2 = await reels.enviarVideo(buffer, recebido.nomeOriginal, recebido.legenda);
+        const arquivoR2 = await reels.enviarVideo(buffer, recebido.nomeOriginal, recebido.legenda, recebido.dataMinima);
         return send(res, 200, { ok: true, nome: arquivoR2.name });
       } catch (err) {
         return send(res, 500, { error: err.message });
       } finally {
         if (arquivoPath) fs.unlink(arquivoPath, () => {});
+      }
+    }
+
+    // GET /painel/api/reels/fila — fila completa de pendentes, com data prevista calculada
+    // pra cada um (estimativa, não é gravada — muda se a quantidade/dia ou a ordem mudar)
+    if (req.method === "GET" && path_ === "/painel/api/reels/fila") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await reels.listarFilaComEstimativa());
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
+    // POST /painel/api/reels/:id/publicar-agora — publica ESSE vídeo específico na hora,
+    // fora da ordem da fila (ação manual e explícita, ignora data mínima de propósito)
+    const matchPublicarItem = path_.match(/^\/painel\/api\/reels\/(\d+)\/publicar-agora$/);
+    if (req.method === "POST" && matchPublicarItem) {
+      if (!requireAuth(req, res)) return;
+      try {
+        const resultado = await reels.publicarItemEspecifico(Number(matchPublicarItem[1]));
+        return send(res, 200, resultado);
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
+    // POST /painel/api/reels/:id/data — define (ou limpa, se {data: null}) a data mínima
+    // de publicação de um vídeo específico da fila
+    const matchDataItem = path_.match(/^\/painel\/api\/reels\/(\d+)\/data$/);
+    if (req.method === "POST" && matchDataItem) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        await reels.definirData(Number(matchDataItem[1]), body.data || null);
+        return send(res, 200, { ok: true });
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
+    // DELETE /painel/api/reels/:id — tira um vídeo da fila (e apaga do R2) antes dele
+    // ser publicado — usado quando o usuário muda de ideia sobre um vídeo específico
+    const matchRemoverItem = path_.match(/^\/painel\/api\/reels\/(\d+)$/);
+    if (req.method === "DELETE" && matchRemoverItem) {
+      if (!requireAuth(req, res)) return;
+      try {
+        await reels.removerItem(Number(matchRemoverItem[1]));
+        return send(res, 200, { ok: true });
+      } catch (err) {
+        return send(res, 500, { error: err.message });
       }
     }
 

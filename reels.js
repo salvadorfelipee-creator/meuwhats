@@ -46,10 +46,9 @@ async function sincronizarFila() {
 // baixa o vídeo pro próprio disco, só pede pro R2 gerar um link temporário e a Meta busca
 // direto de lá. Cada rede é tentada de forma independente; conta como sucesso se AO MENOS
 // UMA publicar. O arquivo em si só é apagado do R2 depois de 24h (ver limparAntigos()).
-async function publicarProximoPendente() {
-  const [item] = await db.reelsProximosPendentes(1);
-  if (!item) return { vazio: true };
-
+// Usada tanto pelo agendador automático quanto pelo botão "Publicar agora" de um item
+// específico da fila.
+async function publicarItem(item) {
   try {
     const videoUrl = await r2.urlAssinada(item.drive_file_id);
     const legendaPadrao = (await db.reelsConfigGet("legenda_padrao")) || LEGENDA_PADRAO_FALLBACK;
@@ -86,10 +85,69 @@ async function publicarProximoPendente() {
   }
 }
 
+// Pega o próximo elegível na ordem da fila (respeitando data mínima, se tiver) — usado
+// pelo agendador automático e pelo botão genérico "Publicar 1 agora (teste)".
+async function publicarProximoPendente() {
+  const [item] = await db.reelsProximosPendentes(1);
+  if (!item) return { vazio: true };
+  return publicarItem(item);
+}
+
+// Publica um vídeo ESPECÍFICO da fila agora, fora de ordem — ignora a posição e a data
+// mínima (é uma ação manual e explícita do usuário, não faz sentido bloquear por data).
+async function publicarItemEspecifico(id) {
+  const item = await db.reelsBuscarPorId(id);
+  if (!item) throw new Error("Vídeo não encontrado na fila.");
+  if (item.status !== "pending") throw new Error(`Esse vídeo já está "${item.status}", não está mais pendente.`);
+  return publicarItem(item);
+}
+
+// Fila completa (todo pendente, não só quem já está elegível) com uma data PREVISTA pra
+// cada um — só uma estimativa pra dar visibilidade no painel, não é gravada em lugar
+// nenhum: calculada de novo toda vez a partir da posição na fila e do ritmo configurado.
+// Item com data mínima própria "empurra" a estimativa pra não ficar antes dela.
+async function listarFilaComEstimativa() {
+  const [itens, postsPorDiaConfig] = await Promise.all([db.reelsFilaCompleta(), db.reelsConfigGet("posts_por_dia")]);
+  const porDia = Math.max(Number(postsPorDiaConfig) || 5, 1);
+
+  let cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  let contadorNoDia = 0;
+
+  return itens.map((item) => {
+    if (item.agendado_para && item.agendado_para > cursor.getTime()) {
+      cursor = new Date(item.agendado_para);
+      cursor.setHours(0, 0, 0, 0);
+      contadorNoDia = 0;
+    }
+    if (contadorNoDia >= porDia) {
+      cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+      contadorNoDia = 0;
+    }
+    contadorNoDia++;
+    return { ...item, data_prevista: cursor.getTime() };
+  });
+}
+
+async function definirData(id, dataString) {
+  const timestamp = dataString ? new Date(`${dataString}T00:00:00`).getTime() : null;
+  await db.reelsDefinirData(id, timestamp);
+}
+
+// Remove da fila e apaga o arquivo do R2 — usado pelo botão "Remover" (usuário mudou de
+// ideia sobre algum vídeo específico antes dele ser publicado).
+async function removerItem(id) {
+  const item = await db.reelsBuscarPorId(id);
+  if (!item) throw new Error("Vídeo não encontrado na fila.");
+  await r2.apagarVideo(item.drive_file_id).catch(() => {}); // segue removendo do banco mesmo se já não existir no R2
+  await db.reelsRemover(id);
+}
+
 // Upload direto do painel: sobe o vídeo pro R2 (sem precisar abrir nenhum site por fora) e
-// já sincroniza a fila na sequência, pra aparecer em "pendentes" na hora. `legenda` é
-// opcional — só esse vídeo usa um texto diferente do padrão.
-async function enviarVideo(buffer, nomeArquivo, legenda) {
+// já sincroniza a fila na sequência, pra aparecer em "pendentes" na hora. `legenda` e
+// `dataMinima` (string "AAAA-MM-DD") são opcionais — só esse vídeo usa um texto diferente
+// do padrão / só esse vídeo não publica antes dessa data.
+async function enviarVideo(buffer, nomeArquivo, legenda, dataMinima) {
   const espaco = await espacoUsado();
   if (espaco.bloqueado) {
     throw new Error(`Espaço quase cheio (${espaco.percentual}% de 10GB usado) — apague vídeos antigos ou espere a limpeza automática antes de subir mais.`);
@@ -98,6 +156,12 @@ async function enviarVideo(buffer, nomeArquivo, legenda) {
   const arquivo = await r2.enviarVideo(key, buffer);
   await sincronizarFila();
   if (legenda) await db.reelsDefinirLegenda(arquivo.id, legenda);
+  if (dataMinima) {
+    // sincronizarFila() já inseriu a linha (drive_file_id = arquivo.id) — busca o id
+    // numérico dela pra poder gravar a data com a mesma função usada pela fila completa.
+    const linha = await db.reelsBuscarPorDriveFileId(arquivo.id);
+    if (linha) await definirData(linha.id, dataMinima);
+  }
   return arquivo;
 }
 
@@ -122,6 +186,10 @@ module.exports = {
   sincronizarFila,
   enviarVideo,
   publicarProximoPendente,
+  publicarItemEspecifico,
+  listarFilaComEstimativa,
+  definirData,
+  removerItem,
   limparAntigos,
   espacoUsado,
   resumo: db.reelsResumo,
