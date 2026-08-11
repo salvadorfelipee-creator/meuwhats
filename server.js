@@ -1438,6 +1438,25 @@ server.listen(PORT, () => {
   console.log("─".repeat(50));
 });
 
+// ─── LIMPEZA DE MÍDIA TEMPORÁRIA DO PUBLIQUE IV ──────────────────────────────
+// Imagem/vídeo enviados pra publicar (ou processados pelo editor manual de moldura) ficam
+// em PUBLICAR_MEDIA_DIR só o tempo necessário — Meta/Instagram precisam buscar a URL na
+// hora de publicar, e o botão "Baixar" do editor precisa de um tempo de sobra. Sem essa
+// limpeza, arquivo processado nunca era apagado e ia acumulando disco sem limite.
+const MEDIA_MAX_IDADE_MS = 24 * 60 * 60 * 1000;
+setInterval(() => {
+  fs.readdir(PUBLICAR_MEDIA_DIR, (err, arquivos) => {
+    if (err) return;
+    const agora = Date.now();
+    for (const nome of arquivos) {
+      const arquivoPath = path.join(PUBLICAR_MEDIA_DIR, nome);
+      fs.stat(arquivoPath, (err, info) => {
+        if (!err && agora - info.mtimeMs > MEDIA_MAX_IDADE_MS) fs.unlink(arquivoPath, () => {});
+      });
+    }
+  });
+}, 60 * 60 * 1000);
+
 // ─── AUTO-PING (manter o Render acordado) ────────────────────────────────────
 // O free tier do Render hiberna após ~15 min sem tráfego. O próprio servidor
 // chama /ping pela URL pública a cada 10 min, contando como tráfego de entrada.
