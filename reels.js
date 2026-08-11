@@ -63,9 +63,31 @@ async function publicarProximoPendente() {
   }
 }
 
+// Editor manual: recebe 1 vídeo enviado do computador (data URL, mesmo formato que o
+// upload de imagem do Publique IV), aplica a moldura e devolve o link pra baixar o
+// resultado — não publica em rede nenhuma, é só "aplicar moldura e baixar" avulso.
+async function processarUploadAvulso(dataUrl) {
+  const match = /^data:(video\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || "");
+  if (!match) throw new Error("Formato de vídeo inválido");
+
+  const tmpId = crypto.randomBytes(6).toString("hex");
+  const brutoPath = path.join(os.tmpdir(), `editor-bruto-${tmpId}.mp4`);
+  const finalNome = `editor-${tmpId}.mp4`;
+  const finalPath = path.join(PUBLICAR_MEDIA_DIR, finalNome);
+
+  try {
+    fs.writeFileSync(brutoPath, Buffer.from(match[2], "base64"));
+    await video.aplicarMoldura(brutoPath, finalPath);
+    return { url: `${baseUrl()}/publicar-media/${finalNome}` };
+  } finally {
+    fs.unlink(brutoPath, () => {});
+  }
+}
+
 module.exports = {
   sincronizarFila,
   publicarProximoPendente,
+  processarUploadAvulso,
   resumo: db.reelsResumo,
   listarRecentes: db.reelsListarRecentes,
   reenfileirar: db.reelsReenfileirar,

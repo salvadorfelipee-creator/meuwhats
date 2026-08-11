@@ -1343,6 +1343,21 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // POST /painel/api/reels/editor/processar — editor manual: aplica a moldura FelizCred
+    // num vídeo enviado do computador e devolve o link do resultado pra baixar. Não publica
+    // em rede nenhuma nem mexe na fila — é só "aplicar moldura e baixar" avulso.
+    if (req.method === "POST" && path_ === "/painel/api/reels/editor/processar") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.videoBase64) return send(res, 400, { error: "Envie um vídeo" });
+      try {
+        const resultado = await reels.processarUploadAvulso(body.videoBase64);
+        return send(res, 200, resultado);
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // GET /painel/api/ads/campanhas — lista campanhas com métricas
     if (req.method === "GET" && path_ === "/painel/api/ads/campanhas") {
       if (!requireAuth(req, res)) return;

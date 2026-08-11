@@ -477,6 +477,19 @@
         <div id="reels-resumo" class="reels-stats"></div>
         <button id="reels-testar" class="btn-primario" type="button" style="margin-top:14px;">Publicar 1 agora (teste)</button>
         <div id="reels-lista" class="resultado-lista"></div>
+
+        <div style="margin-top:22px; padding-top:18px; border-top:1px solid var(--border);">
+          <h4 style="margin:0 0 6px;">✂️ Editor manual — aplicar moldura em vídeos avulsos</h4>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+            Sobe vídeo(s) do computador, aplica a mesma moldura FelizCred e devolve o link pra baixar — não publica em nenhuma rede nem mexe na fila.
+          </div>
+          <input type="file" id="editor-video-input" accept="video/*" multiple hidden />
+          <div class="page-header-acoes" style="margin-bottom:10px;">
+            <button id="editor-selecionar" class="btn-secundario" type="button">Escolher vídeo(s)</button>
+            <button id="editor-processar" class="btn-primario" type="button" disabled>Aplicar moldura</button>
+          </div>
+          <div id="editor-lista" class="resultado-lista"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1455,6 +1468,68 @@ document.getElementById("reels-testar").addEventListener("click", async () => {
     botao.disabled = false;
     botao.textContent = "Publicar 1 agora (teste)";
   }
+});
+
+// ─── Editor manual de moldura (avulso, não publica) ─────────────────────────
+let editorArquivos = [];
+
+document.getElementById("editor-selecionar").addEventListener("click", () => {
+  document.getElementById("editor-video-input").click();
+});
+
+document.getElementById("editor-video-input").addEventListener("change", (e) => {
+  editorArquivos = Array.from(e.target.files).map((file) => ({ file, status: "pendente", url: null, erro: null }));
+  document.getElementById("editor-processar").disabled = editorArquivos.length === 0;
+  renderizarEditorLista();
+});
+
+function renderizarEditorLista() {
+  document.getElementById("editor-lista").innerHTML = editorArquivos
+    .map((item) => {
+      const classe = item.status === "erro" ? "erro" : item.status === "pronto" ? "ok" : "";
+      const rotulos = { pendente: "na fila", processando: "processando...", pronto: "pronto", erro: `erro: ${escapeHtml(item.erro || "")}` };
+      return `<div class="resultado-item ${classe}">
+        <span class="status">${escapeHtml(item.file.name)} — ${rotulos[item.status]}</span>
+        ${item.status === "pronto" ? `<a href="${item.url}" target="_blank" rel="noopener" download>Baixar →</a>` : ""}
+      </div>`;
+    })
+    .join("");
+}
+
+function lerComoDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById("editor-processar").addEventListener("click", async () => {
+  const botao = document.getElementById("editor-processar");
+  botao.disabled = true;
+  for (const item of editorArquivos) {
+    if (item.status === "pronto") continue;
+    item.status = "processando";
+    renderizarEditorLista();
+    try {
+      const dataUrl = await lerComoDataUrl(item.file);
+      const res = await fetch("/painel/api/reels/editor/processar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoBase64: dataUrl }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      item.status = "pronto";
+      item.url = data.url;
+    } catch (err) {
+      item.status = "erro";
+      item.erro = err.message;
+    }
+    renderizarEditorLista();
+  }
+  botao.disabled = false;
 });
 
 atualizarBotaoNotif();
