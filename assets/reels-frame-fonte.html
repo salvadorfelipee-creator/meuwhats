@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!--
+  Fonte da moldura dos Reels (assets/reels-frame.png). Pra gerar de novo depois de editar:
+    node assets/gerar-moldura.js
+  Isso abre este arquivo no Chromium (Playwright) e tira um print transparente 1080x1920.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; width: 1080px; height: 1920px; background: transparent; overflow: hidden; }
+  .logo { position: absolute; top: 78px; left: 0; width: 1080px; text-align: center;
+    font-family: Arial, Helvetica, sans-serif; font-weight: 800; font-size: 64px; letter-spacing: -1px; }
+  .logo .feliz { color: #eaf2ff; }
+  .logo .cred { color: #00C853; }
+  .tagline { position: absolute; top: 168px; left: 0; width: 1080px; text-align: center;
+    font-family: Arial, Helvetica, sans-serif; font-weight: 400; font-size: 28px; color: #8ea3c4; letter-spacing: 1px; }
+  .cta { position: absolute; bottom: 92px; left: 0; width: 1080px; text-align: center; }
+  .cta span { display: inline-block; background: #00C853; color: #0A1628; font-family: Arial, Helvetica, sans-serif;
+    font-weight: 800; font-size: 30px; padding: 20px 56px; border-radius: 40px; letter-spacing: .5px; }
+</style>
+</head>
+<body>
+  <!-- A janela (retângulo transparente x=56,y=248,largura=968,altura=1330) precisa bater com
+       a mesma posição usada em video.js — se mudar aqui, mudar lá também. -->
+  <svg width="1080" height="1920" style="position:absolute;top:0;left:0;">
+    <defs>
+      <mask id="hole">
+        <rect width="1080" height="1920" fill="white"/>
+        <rect x="56" y="248" width="968" height="1330" rx="48" fill="black"/>
+      </mask>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#0A1628"/>
+        <stop offset="1" stop-color="#112240"/>
+      </linearGradient>
+    </defs>
+    <circle cx="-40" cy="-40" r="220" fill="#00C853" opacity="0.9"/>
+    <circle cx="1120" cy="1960" r="260" fill="#00C853" opacity="0.9"/>
+    <circle cx="1060" cy="60" r="90" fill="#69f0ae" opacity="0.55"/>
+    <circle cx="20" cy="1880" r="110" fill="#69f0ae" opacity="0.55"/>
+    <rect width="1080" height="1920" fill="url(#bg)" mask="url(#hole)"/>
+    <rect x="56" y="248" width="968" height="1330" rx="48" fill="none" stroke="#00C853" stroke-width="6"/>
+  </svg>
+  <div class="logo"><span class="feliz">Feliz</span><span class="cred">Cred</span></div>
+  <div class="tagline">CORRESPONDENTE BANCÁRIO</div>
+  <div class="cta"><span>Fale com a gente →</span></div>
+</body>
+</html>

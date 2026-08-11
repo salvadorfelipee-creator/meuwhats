@@ -94,8 +94,29 @@ agendamento" no painel (aba 🚀 Publicar → card "Reels em massa").
 arredondada transparente no meio e a marca **FelizCred** no topo + botão "Fale com a gente"
 embaixo. `video.js` recorta/redimensiona cada vídeo pra preencher o quadro 1080×1920 e
 sobrepõe esse PNG por cima — o vídeo só aparece através da janela, tudo ao redor é a moldura.
-Pra trocar o design (cores, texto, tamanho da janela), é só gerar um novo PNG no mesmo
-formato e substituir o arquivo — nenhum código muda.
+
+**Pra trocar o design**: o mais rápido é só pedir aqui (cor, texto, tamanho da janela) — eu
+edito e gero de novo em minutos. Se preferir mexer você mesmo: o "código-fonte" da moldura é
+`assets/reels-frame-fonte.html` (HTML/SVG simples); depois de editar, rodar
+`node assets/gerar-moldura.js` regenera o PNG (usa Playwright, já instalado no projeto). Dá
+pra editar direto num programa de design também (Canva/Figma/Photoshop) — só precisa exportar
+um PNG 1080×1920 com transparência numa janela de 968×1330 começando em (56, 248), e
+substituir `assets/reels-frame.png` — nesse caso não mexe no HTML nem no script.
+
+### Editor manual (upload direto do computador, sem Drive)
+
+Pra quem tem vídeo no computador em vez de no Drive: aba Publicar → card Reels → seção
+"✂️ Editor manual". Aceita **vários vídeos de uma vez** (seleção múltipla) e processa **um
+por vez, em sequência automática** (não em paralelo — o processamento de vídeo consome CPU,
+rodar vários ao mesmo tempo derrubaria o servidor no plano free do Render). Pra cada vídeo
+pronto tem dois botões:
+
+- **Baixar** — pega o arquivo já com a moldura aplicada, sem publicar em nada.
+- **Publicar no Instagram** — publica direto como Reels, usando a legenda escrita no campo
+  acima da lista.
+
+Esse caminho é **independente do Drive e da fila automática** — não precisa configurar nada
+de Google pra usar só o editor manual.
 
 ### Arquitetura
 

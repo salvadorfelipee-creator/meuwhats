@@ -483,6 +483,8 @@
           <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
             Sobe vídeo(s) do computador, aplica a mesma moldura FelizCred e devolve o link pra baixar — não publica em nenhuma rede nem mexe na fila.
           </div>
+          <label>Legenda (usada se você publicar direto no Instagram)</label>
+          <textarea id="editor-legenda" placeholder="Legenda do Reels..." style="margin-bottom:10px;"></textarea>
           <input type="file" id="editor-video-input" accept="video/*" multiple hidden />
           <div class="page-header-acoes" style="margin-bottom:10px;">
             <button id="editor-selecionar" class="btn-secundario" type="button">Escolher vídeo(s)</button>
@@ -1485,15 +1487,50 @@ document.getElementById("editor-video-input").addEventListener("change", (e) => 
 
 function renderizarEditorLista() {
   document.getElementById("editor-lista").innerHTML = editorArquivos
-    .map((item) => {
-      const classe = item.status === "erro" ? "erro" : item.status === "pronto" ? "ok" : "";
-      const rotulos = { pendente: "na fila", processando: "processando...", pronto: "pronto", erro: `erro: ${escapeHtml(item.erro || "")}` };
+    .map((item, i) => {
+      const classe = item.status === "erro" ? "erro" : item.status === "pronto" || item.status === "publicado" ? "ok" : "";
+      const rotulos = {
+        pendente: "na fila",
+        processando: "processando...",
+        pronto: "pronto",
+        publicando: "publicando no Instagram...",
+        publicado: "publicado no Instagram",
+        erro: `erro: ${escapeHtml(item.erro || "")}`,
+      };
+      const acoes = [];
+      if (item.status === "pronto") {
+        acoes.push(`<a href="${item.url}" target="_blank" rel="noopener" download>Baixar →</a>`);
+        acoes.push(`<button type="button" class="btn-secundario" onclick="publicarItemEditor(${i})">Publicar no Instagram</button>`);
+      }
+      if (item.status === "publicado" && item.link) acoes.push(`<a href="${item.link}" target="_blank" rel="noopener">Ver publicação →</a>`);
       return `<div class="resultado-item ${classe}">
         <span class="status">${escapeHtml(item.file.name)} — ${rotulos[item.status]}</span>
-        ${item.status === "pronto" ? `<a href="${item.url}" target="_blank" rel="noopener" download>Baixar →</a>` : ""}
+        ${acoes.join("")}
       </div>`;
     })
     .join("");
+}
+
+async function publicarItemEditor(i) {
+  const item = editorArquivos[i];
+  item.status = "publicando";
+  renderizarEditorLista();
+  try {
+    const legenda = document.getElementById("editor-legenda").value.trim();
+    const res = await fetch("/painel/api/reels/editor/publicar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: item.url, legenda }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    item.status = "publicado";
+    item.link = data.link;
+  } catch (err) {
+    item.status = "pronto";
+    alert(`Falha ao publicar: ${err.message}`);
+  }
+  renderizarEditorLista();
 }
 
 function lerComoDataUrl(file) {

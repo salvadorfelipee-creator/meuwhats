@@ -1358,6 +1358,20 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // POST /painel/api/reels/editor/publicar — publica direto no Instagram um vídeo já
+    // processado pelo editor manual (usa a URL devolvida por .../editor/processar).
+    if (req.method === "POST" && path_ === "/painel/api/reels/editor/publicar") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.url) return send(res, 400, { error: "Falta a URL do vídeo processado" });
+      try {
+        const resultado = await ig.publicarReels({ videoUrl: body.url, legenda: body.legenda || "" });
+        return send(res, 200, resultado);
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // GET /painel/api/ads/campanhas — lista campanhas com métricas
     if (req.method === "GET" && path_ === "/painel/api/ads/campanhas") {
       if (!requireAuth(req, res)) return;
