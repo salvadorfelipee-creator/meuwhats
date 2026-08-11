@@ -68,49 +68,52 @@ fora; como a imagem já vai virar uma publicação pública mesmo, isso não é 
 nova de dado sensível. O disco do Render é efêmero (perde arquivo a cada deploy), mas isso
 não é problema aqui — a imagem só precisa existir pelos segundos que a Meta leva pra buscá-la.
 
-## Reels em massa (Google Drive → Instagram + Facebook, agendado)
+## Reels em massa (Cloudflare R2 → Instagram + Facebook, agendado)
 
 Além da publicação manual de 1 clique, o Publique IV tem uma segunda engrenagem pensada
 pra publicar um **acervo grande de vídeos já prontos** (editados fora — CapCut, etc., moldura
 e tudo já aplicado) sozinho, aos poucos, sem precisar subir cada um na mão.
 
-**Decisão importante (11/08/2026)**: esse sistema **não processa vídeo nenhum** — não tem
-mais ffmpeg, moldura, editor manual, nem qualquer coisa parecida. O vídeo já vem pronto de
-fora; o servidor só baixa e publica. Isso foi uma escolha deliberada: rodar ffmpeg no plano
-free do Render derrubava o processo por falta de memória em vídeos de tamanho normal (~78MB já
-bastava) — ver `feedback_content_rights_video_sourcing` e o histórico da conversa de
-11/08/2026 pra detalhes de todas as tentativas de correção que não resolveram de vez. Sem
-processamento nenhum, esse problema simplesmente não existe mais, e não precisa de nenhuma
-infraestrutura extra (chegou a se cogitar Oracle Cloud pra rodar o ffmpeg à parte — descartado
-junto com a decisão de sempre editar por fora).
+**Decisão 1 (11/08/2026)**: esse sistema **não processa vídeo nenhum** — não tem ffmpeg,
+moldura, editor manual, nem nada parecido. O vídeo já vem pronto de fora; o servidor só
+publica. Rodar ffmpeg no plano free do Render derrubava o processo por falta de memória em
+vídeos de tamanho normal (~78MB já bastava) — ver `feedback_content_rights_video_sourcing` e
+o histórico da conversa de 11/08/2026.
+
+**Decisão 2 (11/08/2026)**: o "depósito" dos vídeos é a **Cloudflare R2**, não o Google
+Drive. Drive foi tentado primeiro (Service Account do Google lendo/publicando de uma pasta),
+mas trombou num limite real e definitivo do Google: **Service Account não tem cota de
+armazenamento própria** fora do Google Workspace — consegue *ler* arquivo que alguém
+compartilha com ela, mas não consegue *criar* arquivo novo (erro `storageQuotaExceeded`,
+confirmado ao vivo tentando em duas pastas diferentes). Não tinha como contornar isso sem OAuth
+delegado (mais complexo) — R2 resolve sem esse problema, tem SDK S3-compatível padrão, e o
+plano free (10GB, permanente, não expira em 12 meses) é mais que suficiente pra uma fila de
+vídeos que roda e limpa sozinha.
 
 Como funciona:
 
 1. Você edita os vídeos por fora (moldura, cortes, tudo).
 2. Sobe pra fila **direto pelo painel** — botão "Escolher vídeo(s)" no card, aceita vários de
-   uma vez. Por baixo dos panos o servidor manda cada um pro Google Drive (`drive.js` →
-   `enviarVideo()`), que é só o "depósito" — você nunca precisa abrir o Drive manualmente, é
-   tudo pelo painel mesmo. (Também dá pra jogar vídeo direto na pasta do Drive por fora, se
-   preferir, e clicar em "Sincronizar de novo".)
-3. O servidor lê essa pasta e monta uma **fila** no banco (tabela `reels_queue`), na ordem
-   alfabética dos nomes dos arquivos.
-4. Ao longo do dia, em horários espalhados entre **08:00 e 22:00** (horário de Brasília), o
-   agendador pega o **próximo vídeo pendente**, baixa do Drive e publica como Reels — **no
-   Instagram e no Facebook ao mesmo tempo** (as duas contam como sucesso independente uma da
-   outra; se uma falhar, a outra publica normalmente).
-5. O vídeo baixado é apagado do disco logo depois de publicar — só existe pelo tempo da
-   publicação (o Drive continua sendo a fonte/backup, nada fica duplicado permanentemente no
-   servidor — importante porque o disco do Render é efêmero e não aguentaria guardar uma fila
-   de semanas).
+   uma vez, com um campo de legenda opcional por vídeo. Por baixo dos panos o servidor manda
+   cada um pro bucket do R2 (`r2.js` → `enviarVideo()`) e já sincroniza a fila.
+3. Ao longo do dia, em horários espalhados entre **08:00 e 22:00** (horário de Brasília), o
+   agendador pega o **próximo vídeo pendente**, gera uma **URL assinada temporária** do R2 (o
+   servidor nunca baixa o vídeo pro próprio disco — a Meta busca direto do R2) e publica como
+   Reels — **no Instagram e no Facebook ao mesmo tempo** (contam como sucesso independente uma
+   da outra; se uma falhar, a outra publica normalmente).
+4. O arquivo fica no R2 por **24h depois de publicado**, depois é apagado sozinho (limpeza
+   automática de hora em hora, `reels.limparAntigos()`) — não acumula espaço/custo.
+
+**Bloqueio de espaço**: antes de cada upload, o servidor confere quanto já está usado no
+bucket — a partir de 9GB (de um limite grátis de 10GB) recusa novo upload com aviso claro, em
+vez de deixar estourar e começar a cobrar.
 
 **Quantidade por dia é configurável** (campo "Quantos posts por dia" no card) — os horários
 são recalculados automaticamente, espalhados entre 08:00–22:00 conforme a quantidade (ex.:
-14/dia ≈ 100/semana). Sem limite de quantos vídeos ficam na fila — pode sincronizar a pasta
-do Drive com quantos vídeos quiser, o agendador vai consumindo no ritmo configurado.
+14/dia ≈ 100/semana). Sem limite de quantos vídeos ficam na fila.
 
-**Legenda**: tem um campo de "Legenda padrão" no card (usada em todo vídeo que não tiver
-uma legenda própria). No upload, cada vídeo também tem um campo opcional pra legenda só
-dele — se deixar em branco, cai na padrão.
+**Legenda**: campo de "Legenda padrão" no card (usada em todo vídeo que não tiver uma legenda
+própria) + campo opcional por vídeo no upload (se deixar em branco, cai na padrão).
 
 Fica **pausado por padrão** — só começa a publicar sozinho depois de ligar o botão "Ativar
 agendamento" no painel (aba 🚀 Publicar → card "Reels em massa").
@@ -118,62 +121,59 @@ agendamento" no painel (aba 🚀 Publicar → card "Reels em massa").
 ### Arquitetura
 
 ```
-drive.js    autenticação de Service Account do Google (JWT assinado na mão, sem SDK) +
-            listar/baixar/**enviar** vídeos numa pasta do Drive.
-reels.js    orquestrador: enviarVideo() (upload do painel → Drive → sincroniza),
-            sincronizarFila() (Drive → banco) e publicarProximoPendente() (baixa, publica
-            em Instagram + Facebook, limpa o arquivo temporário).
+r2.js       cliente S3-compatível pro Cloudflare R2 (SDK oficial da AWS, @aws-sdk/client-s3
+            + @aws-sdk/s3-request-presigner — R2 é compatível com a API do S3) — enviar,
+            listar, gerar URL assinada temporária, apagar, somar uso total do bucket.
+reels.js    orquestrador: enviarVideo() (upload do painel → R2 → sincroniza, bloqueia se
+            espaço quase cheio), sincronizarFila() (R2 → banco), publicarProximoPendente()
+            (URL assinada → publica em Instagram + Facebook) e limparAntigos() (apaga do R2
+            quem foi publicado há mais de 24h).
 instagram.js → publicarReels() (fluxo de container de vídeo — media_type REELS, polling
             até o Instagram terminar de processar antes de publicar).
 facebook.js → publicarReels() (API de Reels da Página — fluxo "hosted file": start →
-            aponta a URL pública do vídeo → polling do status → finish/publish).
-db.js       tabela reels_queue (status: pending/posted/error, guarda o resultado por rede
-            em JSON) + reels_config (liga/desliga, posts_por_dia, controle de que horário
-            já postou hoje).
+            aponta a URL do vídeo → polling do status → finish/publish).
+db.js       tabela reels_queue (coluna `drive_file_id` guarda a **key do objeto no R2** —
+            nome mantido por compatibilidade, não é mais literalmente do Drive; status
+            pending/posted/error, `arquivo_apagado` controla a limpeza de 24h) +
+            reels_config (liga/desliga, posts_por_dia, legenda_padrao, controle de horário).
 server.js   rotas (POST /painel/api/reels/upload, GET .../status, POST .../sincronizar,
-            .../pausar, .../posts-por-dia, .../publicar-agora, .../:id/reenfileirar) + o
-            setInterval que checa a cada minuto se bateu algum horário do dia
-            (calcularHorariosDoDia() gera os horários dinamicamente a partir da
-            quantidade configurada). Upload usa multipart/streaming (`busboy`) igual o
-            resto do projeto pra arquivo grande — nunca base64 dentro de JSON.
-public/painel.html  card "🎬 Reels em massa" na aba Publicar: botão de enviar vídeo(s)
-            direto (upload em lote, sequencial), campo de quantidade/dia, resumo
-            (pendentes/publicados/com erro), sincronizar manual, liga/desliga, testar
-            publicando 1 agora, lista dos últimos itens com link de cada rede publicada.
+            .../pausar, .../posts-por-dia, .../legenda-padrao, .../publicar-agora,
+            .../:id/reenfileirar) + o setInterval que checa a cada minuto se bateu algum
+            horário do dia (calcularHorariosDoDia() gera os horários dinamicamente a
+            partir da quantidade configurada) + setInterval de hora em hora que roda a
+            limpeza do R2. Upload usa multipart/streaming (`busboy`) — nunca base64/JSON.
+public/painel.html  card "🎬 Reels em massa" na aba Publicar: legenda padrão, upload em
+            lote com legenda por vídeo, indicador de espaço usado no R2, quantidade/dia,
+            resumo (pendentes/publicados/com erro), liga/desliga, testar publicando 1
+            agora, lista dos últimos itens com link de cada rede publicada.
 ```
 
 **Facebook Reels ainda não testado contra API real** (código escrito seguindo a documentação
-oficial da Meta, mesmo padrão do resto do projeto pra funcionalidade nova) — só vai ser
-confirmado quando o primeiro vídeo de verdade passar pela fila com o agendamento ligado.
-Instagram Reels já está testado e funcionando (ver seção Status mais abaixo).
+oficial da Meta) — só vai confirmar quando o primeiro vídeo de verdade passar pela fila.
+Instagram Reels já está testado e funcionando (ver seção Status).
 
 ### Configuração (variáveis de ambiente)
 
-- `GOOGLE_SERVICE_ACCOUNT_JSON` — conteúdo inteiro do JSON da Service Account (Console do
-  Google Cloud → APIs e serviços → Credenciais → Criar credenciais → Conta de serviço →
-  aba Chaves → Adicionar chave → JSON).
-- `GOOGLE_DRIVE_REELS_FOLDER_ID` — ID da pasta do Drive com os vídeos (pega da URL:
-  `drive.google.com/drive/folders/ESSE_ID_AQUI`).
-- A pasta do Drive precisa estar **compartilhada com o e-mail da Service Account**
-  (algo tipo `nome@projeto.iam.gserviceaccount.com`, aparece na tela da conta de serviço),
-  permissão de **Editor** (não só Leitor — desde que o upload direto do painel existe, o
-  servidor também precisa escrever na pasta, não só ler).
+- `R2_ENDPOINT` — endpoint da conta na Cloudflare (aparece nas configurações do bucket, algo
+  tipo `https://SEUID.r2.cloudflarestorage.com`; se colar com o nome do bucket no final o
+  código corta sozinho, não precisa editar).
+- `R2_BUCKET` — nome do bucket (ex. `felizcred-reels`).
+- `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` — gerados em R2 → Manage R2 API Tokens →
+  Create API Token, permissão **Object Read & Write** no bucket.
 
 ### Status
 
-- Google Drive: Service Account criada e autenticação testada de verdade pra **leitura**
-  (11/08/2026, `drive.listarVideos()` confirmado funcionando). `GOOGLE_SERVICE_ACCOUNT_JSON`
-  já configurado no Render, escopo trocado de `drive.readonly` pra `drive` completo (precisa
-  de escrita agora pro upload). `enviarVideo()` (upload) é código novo, **ainda sem teste
-  real** — depende da pasta estar compartilhada em Editor e do `GOOGLE_DRIVE_REELS_FOLDER_ID`
-  configurado, nenhum dos dois pronto ainda.
-- `GOOGLE_DRIVE_REELS_FOLDER_ID` ainda **não configurado** — falta o usuário criar/escolher a
-  pasta real, compartilhar com a Service Account em **Editor** e passar o ID.
-- Rotas do painel testadas localmente (fila vazia, pausar/ativar, quantidade/dia, sincronizar
-  sem credencial → erro claro).
+- Cloudflare R2: bucket `felizcred-reels` criado (11/08/2026). Falta configurar as 4
+  variáveis acima no Render com as credenciais reais (Access Key ID/Secret ainda não
+  repassados) — depois disso, primeiro teste real de upload + publicação.
+- Google Drive (tentativa anterior, abandonada): Service Account e pasta continuam existindo
+  mas não são mais usadas por nada no código — `GOOGLE_SERVICE_ACCOUNT_JSON` e
+  `GOOGLE_DRIVE_REELS_FOLDER_ID` podem ser removidas do Render quando quiser (não fazem mais
+  nada, só ocupam espaço na lista de variáveis).
+- Rotas do painel testadas localmente (fila vazia, pausar/ativar, quantidade/dia, legenda
+  padrão, upload sem credencial → erro claro).
 - Publicação: Instagram Reels já testado e funcionando em produção. Facebook Reels é código
-  novo (11/08/2026), seguindo a documentação oficial, mas **ainda sem teste real** — só vai
-  confirmar quando rodar com um vídeo de verdade.
+  novo (11/08/2026), seguindo a documentação oficial, mas **ainda sem teste real**.
 
 ## Contas — como adicionar uma nova
 

@@ -1390,12 +1390,13 @@ const server = http.createServer(async (req, res) => {
     // GET /painel/api/reels/status — resumo da fila + últimos itens (Publique IV → Reels em massa)
     if (req.method === "GET" && path_ === "/painel/api/reels/status") {
       if (!requireAuth(req, res)) return;
-      const [resumoFila, recentes, pausado, postsPorDia, legendaPadrao] = await Promise.all([
+      const [resumoFila, recentes, pausado, postsPorDia, legendaPadrao, espaco] = await Promise.all([
         reels.resumo(),
         reels.listarRecentes(30),
         reels.configGet("pausado"),
         reels.configGet("posts_por_dia"),
         reels.configGet("legenda_padrao"),
+        reels.espacoUsado().catch(() => null), // null se as credenciais do R2 ainda não estiverem configuradas
       ]);
       // pausado = null (nunca configurado) conta como pausado — mesmo default do agendador
       return send(res, 200, {
@@ -1404,6 +1405,7 @@ const server = http.createServer(async (req, res) => {
         pausado: pausado !== "0",
         postsPorDia: Number(postsPorDia) || 5,
         legendaPadrao: legendaPadrao || "",
+        espaco,
       });
     }
 
@@ -1426,9 +1428,9 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
-    // POST /painel/api/reels/upload — sobe um vídeo direto do computador pra fila (via
-    // Drive, sem precisar abrir o Drive por fora) e já sincroniza na hora. Legenda é
-    // opcional — se não vier, usa a legenda padrão configurada na hora de publicar.
+    // POST /painel/api/reels/upload — sobe um vídeo direto do computador pra fila (R2, sem
+    // precisar abrir nenhum site por fora) e já sincroniza na hora. Legenda é opcional —
+    // se não vier, usa a legenda padrão configurada na hora de publicar.
     if (req.method === "POST" && path_ === "/painel/api/reels/upload") {
       if (!requireAuth(req, res)) return;
       let arquivoPath;
@@ -1436,8 +1438,8 @@ const server = http.createServer(async (req, res) => {
         const recebido = await receberVideoTemp(req);
         arquivoPath = recebido.arquivoPath;
         const buffer = fs.readFileSync(arquivoPath);
-        const arquivoDrive = await reels.enviarVideo(buffer, recebido.nomeOriginal, recebido.legenda);
-        return send(res, 200, { ok: true, nome: arquivoDrive.name });
+        const arquivoR2 = await reels.enviarVideo(buffer, recebido.nomeOriginal, recebido.legenda);
+        return send(res, 200, { ok: true, nome: arquivoR2.name });
       } catch (err) {
         return send(res, 500, { error: err.message });
       } finally {
@@ -1445,7 +1447,7 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // POST /painel/api/reels/sincronizar — puxa a lista atual da pasta do Drive pra fila
+    // POST /painel/api/reels/sincronizar — puxa a lista atual do bucket R2 pra fila
     if (req.method === "POST" && path_ === "/painel/api/reels/sincronizar") {
       if (!requireAuth(req, res)) return;
       try {
@@ -1636,8 +1638,8 @@ setInterval(async () => {
 // ─── AGENDADOR DE REELS EM MASSA (Publique IV) ──────────────────────────────
 // A cada minuto, checa (no horário de Brasília) se bateu um dos horários do dia — se sim,
 // e ainda não postou nesse horário hoje, publica o próximo vídeo pendente (Instagram +
-// Facebook, sem processar — vídeo já vem pronto do Drive, editado por fora). Fica pausado
-// por padrão até alguém configurar o Drive e ligar pelo painel.
+// Facebook, sem processar — vídeo já vem pronto do R2, editado por fora). Fica pausado
+// por padrão até alguém configurar o R2 e ligar pelo painel.
 //
 // A quantidade de posts/dia é configurável (reels_config.posts_por_dia, padrão 5) — os
 // horários são espalhados automaticamente entre 08:00 e 22:00 conforme a quantidade, em
@@ -1688,3 +1690,14 @@ setInterval(async () => {
     console.error("Erro no agendador de Reels:", err.message);
   }
 }, 60 * 1000);
+
+// Limpeza do R2: apaga vídeo publicado há mais de 24h — evita acumular espaço/aproximar do
+// limite do plano free (10GB). Roda a cada hora, não precisa ser mais frequente que isso.
+setInterval(async () => {
+  try {
+    const { apagados } = await reels.limparAntigos();
+    if (apagados) console.log(`🗑️ Limpeza do R2: ${apagados} vídeo(s) publicado(s) há mais de 24h apagado(s).`);
+  } catch (err) {
+    console.error("Erro na limpeza automática do R2:", err.message);
+  }
+}, 60 * 60 * 1000);

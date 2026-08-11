@@ -1,64 +1,57 @@
-const fs = require("fs");
-const path = require("path");
 const crypto = require("crypto");
 
 const db = require("./db");
-const drive = require("./drive");
+const r2 = require("./r2");
 const ig = require("./instagram");
 const fb = require("./facebook");
 
-// Mesma pasta pública que o server.js usa pro upload manual do Publique IV — o vídeo
-// baixado do Drive precisa ficar aqui pro Instagram/Facebook conseguirem buscá-lo.
-const PUBLICAR_MEDIA_DIR = path.join(__dirname, "media", "publicar");
-fs.mkdirSync(PUBLICAR_MEDIA_DIR, { recursive: true });
-
 const LEGENDA_PADRAO_FALLBACK =
   "FelizCred — correspondente bancário. Crédito consignado, antecipação de FGTS e mais, 100% digital pelo WhatsApp. #felizcred #credito #consignado #fgts";
+
+// Plano free do R2: 10GB de armazenamento. Bloqueia upload novo perto do limite pra nunca
+// estourar (e começar a ser cobrado) — 9GB dá uma folga confortável de ~1GB.
+const LIMITE_BYTES = 10 * 1024 * 1024 * 1024;
+const BLOQUEIO_BYTES = 9 * 1024 * 1024 * 1024;
+
+// Vídeo já publicado (nas redes que deram certo) fica esse tempo no R2 antes de ser
+// apagado — só uma folga de segurança, não precisa manter depois de publicado.
+const IDADE_LIMPEZA_MS = 24 * 60 * 60 * 1000;
 
 function env(nome) {
   const valor = process.env[nome];
   return valor ? valor.trim() : valor;
 }
 
-function baseUrl() {
-  return (process.env.PUBLIC_URL || "https://meuwhats.onrender.com").replace(/\/$/, "");
-}
-
-// Credenciais do Facebook lidas direto do env (mesmo padrão do publique.js) — o Instagram
-// não precisa disso porque instagram.js já cai no token/conta padrão sozinho quando nenhuma
-// credencial explícita é passada.
 function credenciaisFacebook() {
   const token = env("FACEBOOK_PAGE_ACCESS_TOKEN");
   const paginaId = env("FACEBOOK_PAGE_ID");
   return token && paginaId ? { token, paginaId } : null;
 }
 
-// Puxa a lista atual da pasta do Drive e adiciona à fila quem ainda não está nela.
-// Idempotente — chamar de novo só pega os vídeos novos.
+async function espacoUsado() {
+  const usados = await r2.usoTotalBytes();
+  return { usados, limite: LIMITE_BYTES, percentual: Math.round((usados / LIMITE_BYTES) * 100), bloqueado: usados >= BLOQUEIO_BYTES };
+}
+
+// Puxa a lista atual do bucket e adiciona à fila quem ainda não está nela. Idempotente —
+// chamar de novo só pega os vídeos novos (útil se algum vídeo foi colocado direto no R2
+// por fora, embora o normal seja usar o botão de upload do painel).
 async function sincronizarFila() {
-  const folderId = process.env.GOOGLE_DRIVE_REELS_FOLDER_ID;
-  if (!folderId) throw new Error("GOOGLE_DRIVE_REELS_FOLDER_ID não configurado.");
-  const arquivos = await drive.listarVideos(folderId);
+  const arquivos = await r2.listarVideos();
   const adicionados = await db.reelsSincronizarFila(arquivos);
   return { encontrados: arquivos.length, adicionados };
 }
 
-// Baixa do Drive (vídeo já pronto, editado por fora — sem processamento nenhum aqui) e
-// publica em todas as redes com vídeo configuradas (Instagram + Facebook). Cada rede é
-// tentada de forma independente; a publicação conta como sucesso se AO MENOS UMA rede
-// publicar — o resultado detalhado (por rede) fica salvo pra mostrar no painel.
+// Publica em Instagram + Facebook direto de uma URL assinada do R2 — o servidor nunca
+// baixa o vídeo pro próprio disco, só pede pro R2 gerar um link temporário e a Meta busca
+// direto de lá. Cada rede é tentada de forma independente; conta como sucesso se AO MENOS
+// UMA publicar. O arquivo em si só é apagado do R2 depois de 24h (ver limparAntigos()).
 async function publicarProximoPendente() {
   const [item] = await db.reelsProximosPendentes(1);
   if (!item) return { vazio: true };
 
-  const finalNome = `reel-${crypto.randomBytes(6).toString("hex")}.mp4`;
-  const finalPath = path.join(PUBLICAR_MEDIA_DIR, finalNome);
-
   try {
-    const bytes = await drive.baixarVideo(item.drive_file_id);
-    fs.writeFileSync(finalPath, bytes);
-
-    const videoUrl = `${baseUrl()}/publicar-media/${finalNome}`;
+    const videoUrl = await r2.urlAssinada(item.drive_file_id);
     const legendaPadrao = (await db.reelsConfigGet("legenda_padrao")) || LEGENDA_PADRAO_FALLBACK;
     const legenda = item.legenda || legendaPadrao;
     const resultado = {};
@@ -90,30 +83,47 @@ async function publicarProximoPendente() {
   } catch (err) {
     await db.reelsMarcarErro(item.id, err.message);
     throw err;
-  } finally {
-    fs.unlink(finalPath, () => {}); // best-effort — disco do Render é efêmero mesmo
   }
 }
 
-// Upload direto do painel: sobe o vídeo pra pasta do Drive configurada (sem precisar abrir
-// o Drive por fora) e já sincroniza a fila na sequência, pra aparecer em "pendentes" na
-// hora. A pasta precisa estar compartilhada com a Service Account em permissão de Editor
-// (não só Leitor, que bastava só pra ler/baixar). `legenda` é opcional — só esse vídeo usa
-// um texto diferente do padrão; se não vier, cai na legenda padrão configurada (ou no
-// fallback fixo) na hora de publicar.
+// Upload direto do painel: sobe o vídeo pro R2 (sem precisar abrir nenhum site por fora) e
+// já sincroniza a fila na sequência, pra aparecer em "pendentes" na hora. `legenda` é
+// opcional — só esse vídeo usa um texto diferente do padrão.
 async function enviarVideo(buffer, nomeArquivo, legenda) {
-  const folderId = process.env.GOOGLE_DRIVE_REELS_FOLDER_ID;
-  if (!folderId) throw new Error("GOOGLE_DRIVE_REELS_FOLDER_ID não configurado.");
-  const arquivo = await drive.enviarVideo(folderId, nomeArquivo, buffer);
+  const espaco = await espacoUsado();
+  if (espaco.bloqueado) {
+    throw new Error(`Espaço quase cheio (${espaco.percentual}% de 10GB usado) — apague vídeos antigos ou espere a limpeza automática antes de subir mais.`);
+  }
+  const key = `${Date.now()}-${crypto.randomBytes(4).toString("hex")}-${nomeArquivo}`;
+  const arquivo = await r2.enviarVideo(key, buffer);
   await sincronizarFila();
   if (legenda) await db.reelsDefinirLegenda(arquivo.id, legenda);
   return arquivo;
+}
+
+// Apaga do R2 quem já foi publicado há mais de 24h — evita acumular espaço/custo depois
+// que o vídeo já cumpriu sua função. Roda periodicamente (ver server.js).
+async function limparAntigos() {
+  const itens = await db.reelsPostadosParaLimpar(IDADE_LIMPEZA_MS);
+  let apagados = 0;
+  for (const item of itens) {
+    try {
+      await r2.apagarVideo(item.drive_file_id);
+      await db.reelsMarcarArquivoApagado(item.id);
+      apagados++;
+    } catch (err) {
+      console.error(`Falha ao apagar do R2 (id ${item.id}):`, err.message);
+    }
+  }
+  return { apagados };
 }
 
 module.exports = {
   sincronizarFila,
   enviarVideo,
   publicarProximoPendente,
+  limparAntigos,
+  espacoUsado,
   resumo: db.reelsResumo,
   listarRecentes: db.reelsListarRecentes,
   reenfileirar: db.reelsReenfileirar,

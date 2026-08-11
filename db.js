@@ -165,6 +165,11 @@ const ready = (async () => {
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_reels_queue_status ON reels_queue(status, posicao)`);
 
+  const infoReelsQueue = await client.execute(`PRAGMA table_info(reels_queue)`);
+  if (!infoReelsQueue.rows.some((r) => r.name === "arquivo_apagado")) {
+    await client.execute(`ALTER TABLE reels_queue ADD COLUMN arquivo_apagado INTEGER NOT NULL DEFAULT 0`);
+  }
+
   await client.execute(`CREATE TABLE IF NOT EXISTS reels_config (
     chave TEXT PRIMARY KEY,
     valor TEXT
@@ -524,6 +529,23 @@ async function reelsReenfileirar(id) {
   await client.execute({ sql: `UPDATE reels_queue SET status = 'pending' WHERE id = ?`, args: [id] });
 }
 
+// Itens já publicados há mais de X ms cujo arquivo ainda não foi apagado do R2 — usado pela
+// limpeza automática (não quer acumular espaço, mas dá uma folga de 24h antes de apagar).
+async function reelsPostadosParaLimpar(idadeMinimaMs) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT id, drive_file_id FROM reels_queue
+          WHERE status = 'posted' AND arquivo_apagado = 0 AND posted_at <= ?`,
+    args: [Date.now() - idadeMinimaMs],
+  });
+  return result.rows;
+}
+
+async function reelsMarcarArquivoApagado(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE reels_queue SET arquivo_apagado = 1 WHERE id = ?`, args: [id] });
+}
+
 async function reelsResumo() {
   await ready;
   const result = await client.execute(
@@ -590,6 +612,8 @@ module.exports = {
   reelsMarcarPostado,
   reelsMarcarErro,
   reelsReenfileirar,
+  reelsPostadosParaLimpar,
+  reelsMarcarArquivoApagado,
   reelsResumo,
   reelsListarRecentes,
   reelsConfigGet,

@@ -563,6 +563,7 @@
 
         <label>Quantos posts por dia</label>
         <input id="reels-posts-por-dia" type="number" min="1" max="48" style="margin-bottom:14px; max-width:120px;" />
+        <div id="reels-espaco" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;"></div>
         <div id="reels-resumo" class="reels-stats"></div>
         <button id="reels-testar" class="btn-primario" type="button" style="margin-top:14px;">Publicar 1 agora (teste)</button>
         <div id="reels-lista" class="resultado-lista"></div>
@@ -1668,7 +1669,7 @@ document.getElementById("perfil-fb-salvar").addEventListener("click", async () =
     .join("");
 });
 
-// ─── Reels em massa (Google Drive) ──────────────────────────────────────────
+// ─── Reels em massa (Cloudflare R2) ─────────────────────────────────────────
 async function carregarReels() {
   try {
     const res = await fetch("/painel/api/reels/status");
@@ -1688,6 +1689,16 @@ async function carregarReels() {
     document.getElementById("reels-posts-por-dia").value = data.postsPorDia || 5;
     if (document.activeElement !== document.getElementById("reels-legenda-padrao")) {
       document.getElementById("reels-legenda-padrao").value = data.legendaPadrao || "";
+    }
+
+    const espacoDiv = document.getElementById("reels-espaco");
+    if (data.espaco) {
+      const usadoGB = (data.espaco.usados / 1024 / 1024 / 1024).toFixed(2);
+      const limiteGB = (data.espaco.limite / 1024 / 1024 / 1024).toFixed(0);
+      espacoDiv.textContent = `Espaço usado: ${usadoGB}GB de ${limiteGB}GB (${data.espaco.percentual}%)${data.espaco.bloqueado ? " — cheio, upload bloqueado até a limpeza automática liberar espaço" : ""}`;
+      espacoDiv.style.color = data.espaco.bloqueado ? "#c0392b" : "var(--text-muted)";
+    } else {
+      espacoDiv.textContent = "";
     }
 
     document.getElementById("reels-lista").innerHTML = data.recentes
@@ -1736,7 +1747,7 @@ document.getElementById("reels-sincronizar").addEventListener("click", async () 
     const res = await fetch("/painel/api/reels/sincronizar", { method: "POST" });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    alert(`${data.encontrados} vídeo(s) na pasta do Drive, ${data.adicionados} novo(s) adicionado(s) à fila.`);
+    alert(`${data.encontrados} vídeo(s) no armazenamento, ${data.adicionados} novo(s) adicionado(s) à fila.`);
     carregarReels();
   } catch (err) {
     alert(`Falha ao sincronizar: ${err.message}`);
@@ -1746,7 +1757,7 @@ document.getElementById("reels-sincronizar").addEventListener("click", async () 
   }
 });
 
-// ─── Upload direto de vídeos pra fila de Reels (sem abrir o Drive por fora) ─
+// ─── Upload direto de vídeos pra fila de Reels ──────────────────────────────
 let reelsUploadArquivos = [];
 
 document.getElementById("reels-upload-escolher").addEventListener("click", () => {
@@ -1838,7 +1849,7 @@ document.getElementById("reels-testar").addEventListener("click", async () => {
     const res = await fetch("/painel/api/reels/publicar-agora", { method: "POST" });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
-    if (data.vazio) alert("Fila vazia — sincronize com o Drive primeiro.");
+    if (data.vazio) alert("Fila vazia — envie um vídeo primeiro.");
     carregarReels();
   } catch (err) {
     alert(`Falha ao publicar: ${err.message}`);
