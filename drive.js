@@ -31,7 +31,7 @@ async function obterAccessToken() {
   const claims = base64url(
     JSON.stringify({
       iss: client_email,
-      scope: "https://www.googleapis.com/auth/drive.readonly",
+      scope: "https://www.googleapis.com/auth/drive",
       aud: "https://oauth2.googleapis.com/token",
       iat: agora,
       exp: agora + 3600,
@@ -116,4 +116,46 @@ async function baixarVideo(fileId) {
   return driveRequest(`/drive/v3/files/${fileId}?alt=media`, { binary: true });
 }
 
-module.exports = { listarVideos, baixarVideo };
+// Sobe um vídeo pra dentro de uma pasta do Drive — usado pelo upload direto do painel
+// (server.js: POST /painel/api/reels/upload), pra não precisar abrir o Drive por fora.
+// Precisa que a pasta esteja compartilhada com a Service Account em permissão de
+// Editor/Colaborador, não só Leitor (esse era suficiente só pra listar/baixar).
+async function enviarVideo(folderId, nomeArquivo, buffer, mimeType = "video/mp4") {
+  const token = await obterAccessToken();
+  const boundary = "publiqueiv" + crypto.randomBytes(8).toString("hex");
+  const metadata = JSON.stringify({ name: nomeArquivo, parents: [folderId] });
+  const corpo = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`, "utf8"),
+    buffer,
+    Buffer.from(`\r\n--${boundary}--`, "utf8"),
+  ]);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        method: "POST",
+        hostname: "www.googleapis.com",
+        path: "/upload/drive/v3/files?uploadType=multipart&fields=id,name",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": `multipart/related; boundary=${boundary}`,
+          "Content-Length": corpo.length,
+        },
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          const buf = Buffer.concat(chunks);
+          if (res.statusCode >= 400) return reject(new Error(`Falha ao subir vídeo pro Drive (${res.statusCode}): ${buf.toString("utf8")}`));
+          resolve(JSON.parse(buf.toString("utf8")));
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(corpo);
+    req.end();
+  });
+}
+
+module.exports = { listarVideos, baixarVideo, enviarVideo };

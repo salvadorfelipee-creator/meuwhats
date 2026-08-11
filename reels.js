@@ -94,8 +94,21 @@ async function publicarProximoPendente() {
   }
 }
 
+// Upload direto do painel: sobe o vídeo pra pasta do Drive configurada (sem precisar abrir
+// o Drive por fora) e já sincroniza a fila na sequência, pra aparecer em "pendentes" na
+// hora. A pasta precisa estar compartilhada com a Service Account em permissão de Editor
+// (não só Leitor, que bastava só pra ler/baixar).
+async function enviarVideo(buffer, nomeArquivo) {
+  const folderId = process.env.GOOGLE_DRIVE_REELS_FOLDER_ID;
+  if (!folderId) throw new Error("GOOGLE_DRIVE_REELS_FOLDER_ID não configurado.");
+  const arquivo = await drive.enviarVideo(folderId, nomeArquivo, buffer);
+  await sincronizarFila();
+  return arquivo;
+}
+
 module.exports = {
   sincronizarFila,
+  enviarVideo,
   publicarProximoPendente,
   resumo: db.reelsResumo,
   listarRecentes: db.reelsListarRecentes,

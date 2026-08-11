@@ -538,17 +538,25 @@
 
       <div class="card publicar-card" id="reels-card" style="margin-top:20px;">
         <div class="page-header" style="margin-bottom:6px;">
-          <h3 style="margin:0;">🎬 Reels em massa (Google Drive)</h3>
+          <h3 style="margin:0;">🎬 Reels em massa</h3>
           <div class="page-header-acoes">
-            <button id="reels-sincronizar" class="btn-secundario" type="button">Sincronizar com o Drive</button>
             <button id="reels-toggle" class="btn-secundario" type="button">Ativar agendamento</button>
           </div>
         </div>
         <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
           Publica no Instagram e no Facebook automaticamente, espalhado ao longo do dia (08:00–22:00, horário de
-          Brasília). Os vídeos já vêm prontos (editados fora, moldura já aplicada) — o servidor só baixa do Drive
-          e publica, sem processar nada.
+          Brasília). Os vídeos já vêm prontos (editados fora, moldura já aplicada) — o servidor só publica, sem
+          processar nada.
         </div>
+
+        <label>Enviar vídeo(s) pra fila</label>
+        <input type="file" id="reels-upload-input" accept="video/*" multiple hidden />
+        <div class="page-header-acoes" style="margin-bottom:10px;">
+          <button id="reels-upload-escolher" class="btn-secundario" type="button">Escolher vídeo(s)</button>
+          <button id="reels-sincronizar" class="btn-secundario" type="button">Sincronizar de novo</button>
+        </div>
+        <div id="reels-upload-lista" class="resultado-lista" style="margin-bottom:14px;"></div>
+
         <label>Quantos posts por dia</label>
         <input id="reels-posts-por-dia" type="number" min="1" max="48" style="margin-bottom:14px; max-width:120px;" />
         <div id="reels-resumo" class="reels-stats"></div>
@@ -1727,8 +1735,52 @@ document.getElementById("reels-sincronizar").addEventListener("click", async () 
     alert(`Falha ao sincronizar: ${err.message}`);
   } finally {
     botao.disabled = false;
-    botao.textContent = "Sincronizar com o Drive";
+    botao.textContent = "Sincronizar de novo";
   }
+});
+
+// ─── Upload direto de vídeos pra fila de Reels (sem abrir o Drive por fora) ─
+let reelsUploadArquivos = [];
+
+document.getElementById("reels-upload-escolher").addEventListener("click", () => {
+  document.getElementById("reels-upload-input").click();
+});
+
+function renderizarReelsUploadLista() {
+  document.getElementById("reels-upload-lista").innerHTML = reelsUploadArquivos
+    .map((item) => {
+      const classe = item.status === "erro" ? "erro" : item.status === "pronto" ? "ok" : "";
+      const rotulos = { pendente: "na fila", enviando: "enviando...", pronto: "enviado", erro: `erro: ${escapeHtml(item.erro || "")}` };
+      return `<div class="resultado-item ${classe}"><span class="status">${escapeHtml(item.file.name)} — ${rotulos[item.status]}</span></div>`;
+    })
+    .join("");
+}
+
+document.getElementById("reels-upload-input").addEventListener("change", async (e) => {
+  reelsUploadArquivos = Array.from(e.target.files).map((file) => ({ file, status: "pendente", erro: null }));
+  renderizarReelsUploadLista();
+
+  const botao = document.getElementById("reels-upload-escolher");
+  botao.disabled = true;
+  for (const item of reelsUploadArquivos) {
+    item.status = "enviando";
+    renderizarReelsUploadLista();
+    try {
+      const formData = new FormData();
+      formData.append("video", item.file);
+      const res = await fetch("/painel/api/reels/upload", { method: "POST", body: formData });
+      const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}).` }));
+      if (data.error) throw new Error(data.error);
+      item.status = "pronto";
+    } catch (err) {
+      item.status = "erro";
+      item.erro = err.message;
+    }
+    renderizarReelsUploadLista();
+  }
+  botao.disabled = false;
+  document.getElementById("reels-upload-input").value = "";
+  carregarReels();
 });
 
 document.getElementById("reels-toggle").addEventListener("click", async () => {

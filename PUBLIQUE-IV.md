@@ -86,16 +86,22 @@ junto com a decisão de sempre editar por fora).
 
 Como funciona:
 
-1. Você edita os vídeos por fora (moldura, cortes, tudo) e guarda numa pasta do **Google
-   Drive**.
-2. O servidor lê essa pasta (só leitura, via Service Account) e monta uma **fila** no banco
-   (tabela `reels_queue`), na ordem alfabética dos nomes dos arquivos.
-3. Ao longo do dia, em horários espalhados entre **08:00 e 22:00** (horário de Brasília), o
+1. Você edita os vídeos por fora (moldura, cortes, tudo).
+2. Sobe pra fila **direto pelo painel** — botão "Escolher vídeo(s)" no card, aceita vários de
+   uma vez. Por baixo dos panos o servidor manda cada um pro Google Drive (`drive.js` →
+   `enviarVideo()`), que é só o "depósito" — você nunca precisa abrir o Drive manualmente, é
+   tudo pelo painel mesmo. (Também dá pra jogar vídeo direto na pasta do Drive por fora, se
+   preferir, e clicar em "Sincronizar de novo".)
+3. O servidor lê essa pasta e monta uma **fila** no banco (tabela `reels_queue`), na ordem
+   alfabética dos nomes dos arquivos.
+4. Ao longo do dia, em horários espalhados entre **08:00 e 22:00** (horário de Brasília), o
    agendador pega o **próximo vídeo pendente**, baixa do Drive e publica como Reels — **no
    Instagram e no Facebook ao mesmo tempo** (as duas contam como sucesso independente uma da
    outra; se uma falhar, a outra publica normalmente).
-4. O vídeo baixado é apagado do disco logo depois de publicar — só existe pelo tempo da
-   publicação (o Drive continua sendo a fonte, nada fica duplicado permanentemente aqui).
+5. O vídeo baixado é apagado do disco logo depois de publicar — só existe pelo tempo da
+   publicação (o Drive continua sendo a fonte/backup, nada fica duplicado permanentemente no
+   servidor — importante porque o disco do Render é efêmero e não aguentaria guardar uma fila
+   de semanas).
 
 **Quantidade por dia é configurável** (campo "Quantos posts por dia" no card) — os horários
 são recalculados automaticamente, espalhados entre 08:00–22:00 conforme a quantidade (ex.:
@@ -109,9 +115,10 @@ agendamento" no painel (aba 🚀 Publicar → card "Reels em massa").
 
 ```
 drive.js    autenticação de Service Account do Google (JWT assinado na mão, sem SDK) +
-            listar/baixar vídeos de uma pasta do Drive.
-reels.js    orquestrador: sincronizarFila() (Drive → banco) e publicarProximoPendente()
-            (baixa, publica em Instagram + Facebook, limpa o arquivo temporário).
+            listar/baixar/**enviar** vídeos numa pasta do Drive.
+reels.js    orquestrador: enviarVideo() (upload do painel → Drive → sincroniza),
+            sincronizarFila() (Drive → banco) e publicarProximoPendente() (baixa, publica
+            em Instagram + Facebook, limpa o arquivo temporário).
 instagram.js → publicarReels() (fluxo de container de vídeo — media_type REELS, polling
             até o Instagram terminar de processar antes de publicar).
 facebook.js → publicarReels() (API de Reels da Página — fluxo "hosted file": start →
@@ -119,12 +126,15 @@ facebook.js → publicarReels() (API de Reels da Página — fluxo "hosted file"
 db.js       tabela reels_queue (status: pending/posted/error, guarda o resultado por rede
             em JSON) + reels_config (liga/desliga, posts_por_dia, controle de que horário
             já postou hoje).
-server.js   rotas (GET /painel/api/reels/status, POST .../sincronizar, .../pausar,
-            .../posts-por-dia, .../publicar-agora, .../:id/reenfileirar) + o setInterval
-            que checa a cada minuto se bateu algum horário do dia (calcularHorariosDoDia()
-            gera os horários dinamicamente a partir da quantidade configurada).
-public/painel.html  card "🎬 Reels em massa" na aba Publicar: campo de quantidade/dia,
-            resumo (pendentes/publicados/com erro), sincronizar, liga/desliga, testar
+server.js   rotas (POST /painel/api/reels/upload, GET .../status, POST .../sincronizar,
+            .../pausar, .../posts-por-dia, .../publicar-agora, .../:id/reenfileirar) + o
+            setInterval que checa a cada minuto se bateu algum horário do dia
+            (calcularHorariosDoDia() gera os horários dinamicamente a partir da
+            quantidade configurada). Upload usa multipart/streaming (`busboy`) igual o
+            resto do projeto pra arquivo grande — nunca base64 dentro de JSON.
+public/painel.html  card "🎬 Reels em massa" na aba Publicar: botão de enviar vídeo(s)
+            direto (upload em lote, sequencial), campo de quantidade/dia, resumo
+            (pendentes/publicados/com erro), sincronizar manual, liga/desliga, testar
             publicando 1 agora, lista dos últimos itens com link de cada rede publicada.
 ```
 
@@ -142,14 +152,19 @@ Instagram Reels já está testado e funcionando (ver seção Status mais abaixo)
   `drive.google.com/drive/folders/ESSE_ID_AQUI`).
 - A pasta do Drive precisa estar **compartilhada com o e-mail da Service Account**
   (algo tipo `nome@projeto.iam.gserviceaccount.com`, aparece na tela da conta de serviço),
-  permissão de **Leitor** já é suficiente.
+  permissão de **Editor** (não só Leitor — desde que o upload direto do painel existe, o
+  servidor também precisa escrever na pasta, não só ler).
 
 ### Status
 
-- Google Drive: Service Account criada e autenticação testada de verdade (11/08/2026,
-  `drive.listarVideos()` confirmado funcionando). `GOOGLE_SERVICE_ACCOUNT_JSON` já
-  configurado no Render. `GOOGLE_DRIVE_REELS_FOLDER_ID` ainda **não configurado** — falta
-  o usuário compartilhar a pasta real (com vídeos editados por fora) e passar o ID.
+- Google Drive: Service Account criada e autenticação testada de verdade pra **leitura**
+  (11/08/2026, `drive.listarVideos()` confirmado funcionando). `GOOGLE_SERVICE_ACCOUNT_JSON`
+  já configurado no Render, escopo trocado de `drive.readonly` pra `drive` completo (precisa
+  de escrita agora pro upload). `enviarVideo()` (upload) é código novo, **ainda sem teste
+  real** — depende da pasta estar compartilhada em Editor e do `GOOGLE_DRIVE_REELS_FOLDER_ID`
+  configurado, nenhum dos dois pronto ainda.
+- `GOOGLE_DRIVE_REELS_FOLDER_ID` ainda **não configurado** — falta o usuário criar/escolher a
+  pasta real, compartilhar com a Service Account em **Editor** e passar o ID.
 - Rotas do painel testadas localmente (fila vazia, pausar/ativar, quantidade/dia, sincronizar
   sem credencial → erro claro).
 - Publicação: Instagram Reels já testado e funcionando em produção. Facebook Reels é código

@@ -1,7 +1,9 @@
 const http = require("http");
 const https = require("https");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const busboy = require("busboy");
 
 const db = require("./db");
 const wa = require("./whatsapp");
@@ -108,6 +110,43 @@ const EXT_BY_MIME = {
 };
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
+// Recebe 1 vídeo enviado via multipart/form-data e grava direto em disco via streaming
+// (não acumula o arquivo inteiro na memória) — usado pelo upload direto de Reels no painel
+// (server.js: POST /painel/api/reels/upload). Devolve o caminho do arquivo temporário e o
+// nome original, pra depois ler e mandar pro Drive.
+function receberVideoTemp(req) {
+  return new Promise((resolve, reject) => {
+    let bb;
+    try {
+      bb = busboy({ headers: req.headers, limits: { fileSize: 150 * 1024 * 1024 } });
+    } catch (err) {
+      return reject(err);
+    }
+    let recebeuArquivo = false;
+    bb.on("file", (_campo, stream, info) => {
+      recebeuArquivo = true;
+      const arquivoPath = path.join(os.tmpdir(), `reel-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`);
+      const writeStream = fs.createWriteStream(arquivoPath);
+      let estourouLimite = false;
+      stream.on("limit", () => (estourouLimite = true));
+      stream.pipe(writeStream);
+      writeStream.on("finish", () => {
+        if (estourouLimite) {
+          fs.unlink(arquivoPath, () => {});
+          return reject(new Error("Vídeo muito grande (limite 150MB)"));
+        }
+        resolve({ arquivoPath, nomeOriginal: info.filename || "video.mp4" });
+      });
+      writeStream.on("error", reject);
+    });
+    bb.on("error", reject);
+    bb.on("close", () => {
+      if (!recebeuArquivo) reject(new Error("Nenhum arquivo enviado"));
+    });
+    req.pipe(bb);
+  });
+}
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let data = "";
@@ -1368,6 +1407,24 @@ const server = http.createServer(async (req, res) => {
       const quantidade = Math.min(Math.max(Number(body.quantidade) || 1, 1), 48);
       await reels.configSet("posts_por_dia", String(quantidade));
       return send(res, 200, { ok: true, quantidade });
+    }
+
+    // POST /painel/api/reels/upload — sobe um vídeo direto do computador pra fila (via
+    // Drive, sem precisar abrir o Drive por fora) e já sincroniza na hora.
+    if (req.method === "POST" && path_ === "/painel/api/reels/upload") {
+      if (!requireAuth(req, res)) return;
+      let arquivoPath;
+      try {
+        const recebido = await receberVideoTemp(req);
+        arquivoPath = recebido.arquivoPath;
+        const buffer = fs.readFileSync(arquivoPath);
+        const arquivoDrive = await reels.enviarVideo(buffer, recebido.nomeOriginal);
+        return send(res, 200, { ok: true, nome: arquivoDrive.name });
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      } finally {
+        if (arquivoPath) fs.unlink(arquivoPath, () => {});
+      }
     }
 
     // POST /painel/api/reels/sincronizar — puxa a lista atual da pasta do Drive pra fila
