@@ -546,9 +546,15 @@
           </div>
         </div>
         <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
-          Publica 5 Reels por dia sozinho (09:00, 12:15, 15:30, 18:45, 21:00 — horário de Brasília), aplicando a
-          moldura FelizCred em cada vídeo antes de postar. A fila vem da pasta do Google Drive configurada no servidor.
+          Publica 5 Reels por dia sozinho (09:00, 12:15, 15:30, 18:45, 21:00 — horário de Brasília). A fila vem
+          da pasta do Google Drive configurada no servidor.
         </div>
+        <label>Moldura da fila automática</label>
+        <select id="reels-moldura" style="margin-bottom:14px;">
+          <option value="felizcred">FelizCred (aplica marca + janela)</option>
+          <option value="nenhuma">Sem moldura (só ajusta formato)</option>
+          <option value="pular">Sem processamento (vídeo já vem pronto de fora)</option>
+        </select>
         <div id="reels-resumo" class="reels-stats"></div>
         <button id="reels-testar" class="btn-primario" type="button" style="margin-top:14px;">Publicar 1 agora (teste)</button>
         <div id="reels-lista" class="resultado-lista"></div>
@@ -565,6 +571,7 @@
               <select id="editor-moldura">
                 <option value="felizcred">FelizCred (marca + janela)</option>
                 <option value="nenhuma">Sem moldura (só corta pro formato)</option>
+                <option value="pular">Sem processamento (já editado — publica como está)</option>
               </select>
             </div>
             <div>
@@ -1712,6 +1719,8 @@ async function carregarReels() {
     botaoToggle.classList.toggle("ativado", !data.pausado);
     botaoToggle.dataset.pausado = data.pausado ? "1" : "0";
 
+    document.getElementById("reels-moldura").value = data.moldura || "felizcred";
+
     document.getElementById("reels-lista").innerHTML = data.recentes
       .map((item) => {
         const resultado = item.resultado ? JSON.parse(item.resultado) : null;
@@ -1733,6 +1742,14 @@ async function reenfileirarReel(id) {
   await fetch(`/painel/api/reels/${id}/reenfileirar`, { method: "POST" });
   carregarReels();
 }
+
+document.getElementById("reels-moldura").addEventListener("change", async (e) => {
+  await fetch("/painel/api/reels/moldura", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ moldura: e.target.value }),
+  });
+});
 
 document.getElementById("reels-sincronizar").addEventListener("click", async () => {
   const botao = document.getElementById("reels-sincronizar");

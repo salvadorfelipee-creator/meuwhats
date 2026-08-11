@@ -103,6 +103,15 @@ pra editar direto num programa de design também (Canva/Figma/Photoshop) — só
 um PNG 1080×1920 com transparência numa janela de 968×1330 começando em (56, 248), e
 substituir `assets/reels-frame.png` — nesse caso não mexe no HTML nem no script.
 
+### Vídeo já editado por fora ("pular" processamento)
+
+Se o vídeo já vem pronto de outro programa (CapCut, etc. — moldura própria já aplicada,
+formato certo), não precisa passar pelo ffmpeg daqui: escolha **"Sem processamento"** como
+moldura — tanto no editor manual quanto na fila automática do Drive (seletor "Moldura da
+fila automática" no card Reels). Nesse modo o servidor só copia o arquivo e publica, sem
+decodificar/recodificar nada — instantâneo e sem risco de estourar memória, porque o
+trabalho pesado já foi feito no computador de quem editou, não no servidor.
+
 ### Editor manual (upload direto do computador, sem Drive)
 
 Pra quem tem vídeo no computador em vez de no Drive: aba Publicar → card Reels → seção

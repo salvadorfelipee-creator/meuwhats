@@ -1416,13 +1416,23 @@ const server = http.createServer(async (req, res) => {
     // GET /painel/api/reels/status — resumo da fila + últimos itens (Publique IV → Reels em massa)
     if (req.method === "GET" && path_ === "/painel/api/reels/status") {
       if (!requireAuth(req, res)) return;
-      const [resumoFila, recentes, pausado] = await Promise.all([
+      const [resumoFila, recentes, pausado, moldura] = await Promise.all([
         reels.resumo(),
         reels.listarRecentes(30),
         reels.configGet("pausado"),
+        reels.configGet("moldura_padrao"),
       ]);
       // pausado = null (nunca configurado) conta como pausado — mesmo default do agendador
-      return send(res, 200, { resumo: resumoFila, recentes, pausado: pausado !== "0" });
+      return send(res, 200, { resumo: resumoFila, recentes, pausado: pausado !== "0", moldura: moldura || "felizcred" });
+    }
+
+    // POST /painel/api/reels/moldura — define a moldura usada pela fila automática do
+    // Drive ("felizcred" | "nenhuma" | "pular" — pular = vídeo já vem pronto de fora)
+    if (req.method === "POST" && path_ === "/painel/api/reels/moldura") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await reels.configSet("moldura_padrao", body.moldura || "felizcred");
+      return send(res, 200, { ok: true });
     }
 
     // POST /painel/api/reels/sincronizar — puxa a lista atual da pasta do Drive pra fila

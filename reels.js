@@ -45,7 +45,16 @@ async function publicarProximoPendente() {
   try {
     const bytes = await drive.baixarVideo(item.drive_file_id);
     fs.writeFileSync(brutoPath, bytes);
-    await video.processarVideo(brutoPath, finalPath, { moldura: "felizcred", qualidade: "1080p" });
+
+    // "pular" = vídeo já vem pronto de fora (editado no CapCut, etc.) — não roda ffmpeg
+    // nenhuma vez, só publica o arquivo como está. Configurável no painel porque é uma
+    // escolha por conta/fluxo (toda a pasta do Drive é ou não pré-editada), não por vídeo.
+    const moldura = (await db.reelsConfigGet("moldura_padrao")) || "felizcred";
+    if (moldura === "pular") {
+      fs.copyFileSync(brutoPath, finalPath);
+    } else {
+      await video.processarVideo(brutoPath, finalPath, { moldura, qualidade: "1080p" });
+    }
 
     const videoUrl = `${baseUrl()}/publicar-media/${finalNome}`;
     const legenda = item.legenda || LEGENDA_PADRAO;
@@ -73,11 +82,16 @@ async function processarUploadAvulso(brutoPath, musicaPath, opcoes = {}) {
   const finalPath = path.join(PUBLICAR_MEDIA_DIR, finalNome);
 
   try {
-    await video.processarVideo(brutoPath, finalPath, {
-      moldura: opcoes.moldura,
-      qualidade: opcoes.qualidade,
-      musicaPath: musicaPath || null,
-    });
+    if (opcoes.moldura === "pular") {
+      // vídeo já pronto de fora — só copia pra pasta pública, sem rodar ffmpeg nenhuma vez
+      fs.copyFileSync(brutoPath, finalPath);
+    } else {
+      await video.processarVideo(brutoPath, finalPath, {
+        moldura: opcoes.moldura,
+        qualidade: opcoes.qualidade,
+        musicaPath: musicaPath || null,
+      });
+    }
     return { url: `${baseUrl()}/publicar-media/${finalNome}` };
   } finally {
     fs.unlink(brutoPath, () => {});
