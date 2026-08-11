@@ -1065,18 +1065,33 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await db.listMessages(phone, businessId));
     }
 
-    // POST /painel/api/conversations/:businessId/:phone/reply — responder uma conversa
+    // POST /painel/api/conversations/:businessId/:phone/reply — responder uma conversa.
+    // Aceita texto puro OU imagemBase64 (com ou sem legenda em `text`) — mesmo mecanismo de
+    // upload/URL pública do Publique IV (salvarImagemPublicar + /publicar-media/).
     const matchReply = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/reply$/);
     if (req.method === "POST" && matchReply) {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchReply[1]);
       const phone = decodeURIComponent(matchReply[2]);
       const body = await parseBody(req);
-      if (!body.text || !body.text.trim()) return send(res, 400, { error: "Texto vazio" });
+      const texto = (body.text || "").trim();
+      if (!texto && !body.imagemBase64) return send(res, 400, { error: "Mensagem vazia" });
+
+      let imagemUrl = null;
+      if (body.imagemBase64) {
+        try {
+          const filename = salvarImagemPublicar(body.imagemBase64);
+          imagemUrl = `https://${req.headers.host}/publicar-media/${filename}`;
+        } catch (err) {
+          return send(res, 400, { error: err.message });
+        }
+      }
 
       let result;
       try {
-        result = await wa.sendText(businessId, phone, body.text);
+        result = imagemUrl
+          ? await wa.sendImage(businessId, phone, imagemUrl, texto || undefined)
+          : await wa.sendText(businessId, phone, texto);
       } catch (err) {
         return send(res, 502, { error: `Falha ao enviar pelo WhatsApp: ${err.message}` });
       }
@@ -1089,8 +1104,9 @@ const server = http.createServer(async (req, res) => {
         phone,
         business_number_id: businessId,
         direction: "out",
-        type: "text",
-        body: body.text,
+        type: imagemUrl ? "image" : "text",
+        body: texto || null,
+        media_path: imagemUrl,
         wa_message_id: waId,
         status: "sent",
         created_at: now,

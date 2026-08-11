@@ -51,6 +51,27 @@ async function sendText(fromPhoneNumberId, to, text) {
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+// Envia uma imagem por link público (o WhatsApp busca a URL, não precisa subir binário pra
+// Meta antes) — usado pelo anexo de imagem no painel. `caption` é opcional.
+async function sendImage(fromPhoneNumberId, to, imageUrl, caption) {
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        to,
+        type: "image",
+        image: { link: imageUrl, ...(caption ? { caption } : {}) },
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao enviar imagem: ${JSON.stringify(json)}`);
+  return json; // { messages: [{ id: "wamid..." }], ... }
+}
+
 async function sendButtons(fromPhoneNumberId, to, bodyText, buttons) {
   // buttons: [{ id, title }] — a API aceita no máximo 3 botões, título com até 20 caracteres
   const { status, buffer } = await graphRequest(
@@ -182,4 +203,4 @@ async function downloadMedia(mediaId) {
   return { buffer, mimeType: info.mime_type };
 }
 
-module.exports = { sendText, sendButtons, sendList, sendTemplate, downloadMedia, markAsRead };
+module.exports = { sendText, sendImage, sendButtons, sendList, sendTemplate, downloadMedia, markAsRead };

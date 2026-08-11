@@ -103,11 +103,19 @@
   .msg .hora { font-size: 11px; color: var(--text-muted); margin-top: 2px; text-align: right; }
   .msg .erro-msg { font-size: 12px; color: #c0392b; margin-top: 4px; }
 
-  #form-resposta { display: flex; gap: 8px; padding: 12px 16px; background: var(--card); border-top: 1px solid var(--border); }
+  #resposta-wrap { background: var(--card); border-top: 1px solid var(--border); }
+  #resposta-preview { display: none; align-items: center; gap: 10px; padding: 10px 16px 0; }
+  #resposta-preview img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; }
+  #resposta-preview-remover { background: var(--bg-alt); border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; color: var(--text-muted); font-size: 12px; }
+  #resposta-preview-remover:hover { background: var(--border); }
+  #form-resposta { display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+  #anexar-imagem { background: transparent; border: none; font-size: 20px; cursor: pointer; padding: 4px 6px; border-radius: 8px; flex-shrink: 0; }
+  #anexar-imagem:hover { background: var(--bg-alt); }
   #texto-resposta { flex: 1; padding: 11px 16px; border: 1px solid var(--border); border-radius: 22px; font-size: 14.5px; background: var(--bg-alt); }
   #texto-resposta:focus { outline: none; border-color: var(--accent); background: var(--card); }
-  #form-resposta button { padding: 0 22px; border: none; border-radius: 22px; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
-  #form-resposta button:hover { opacity: 0.9; }
+  #form-resposta button[type="submit"] { padding: 0 22px; border: none; border-radius: 22px; background: var(--accent); color: #fff; cursor: pointer; font-weight: 600; }
+  #form-resposta button[type="submit"]:hover { opacity: 0.9; }
+  #form-resposta button:disabled { opacity: 0.5; cursor: not-allowed; }
 
   #vazio { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; color: var(--text-muted); background: var(--bg-alt); gap: 8px; }
   #vazio .icone { font-size: 64px; opacity: 0.3; }
@@ -261,10 +269,18 @@
         </div>
       </div>
       <div id="mensagens"></div>
-      <form id="form-resposta">
-        <input id="texto-resposta" placeholder="Digite uma mensagem..." autocomplete="off" />
-        <button type="submit">Enviar</button>
-      </form>
+      <div id="resposta-wrap">
+        <div id="resposta-preview">
+          <img id="resposta-preview-img" />
+          <button type="button" id="resposta-preview-remover" title="Remover imagem">✕</button>
+        </div>
+        <form id="form-resposta">
+          <input type="file" id="anexar-imagem-input" accept="image/*" hidden />
+          <button type="button" id="anexar-imagem" title="Anexar imagem">📎</button>
+          <input id="texto-resposta" placeholder="Digite uma mensagem..." autocomplete="off" />
+          <button type="submit">Enviar</button>
+        </form>
+      </div>
     </div>
     <div id="vazio">
       <div class="icone">💬</div>
@@ -748,29 +764,56 @@ function escapeHtml(s) {
 
 document.getElementById("busca").addEventListener("input", renderizarConversas);
 
+// ─ Anexar imagem na resposta do WhatsApp ─
+let respostaImagemBase64 = null;
+const anexarInput = document.getElementById("anexar-imagem-input");
+
+document.getElementById("anexar-imagem").addEventListener("click", () => anexarInput.click());
+
+anexarInput.addEventListener("change", async () => {
+  const file = anexarInput.files[0];
+  if (!file || !file.type.startsWith("image/")) return;
+  try {
+    respostaImagemBase64 = await redimensionarImagem(file);
+    document.getElementById("resposta-preview-img").src = respostaImagemBase64;
+    document.getElementById("resposta-preview").style.display = "flex";
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+document.getElementById("resposta-preview-remover").addEventListener("click", () => {
+  respostaImagemBase64 = null;
+  anexarInput.value = "";
+  document.getElementById("resposta-preview").style.display = "none";
+});
+
 document.getElementById("form-resposta").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = document.getElementById("texto-resposta");
-  const botao = e.target.querySelector("button");
+  const botao = e.target.querySelector('button[type="submit"]');
   const texto = input.value.trim();
-  if (!texto || !telefoneAtual || !numeroAtivoId) return;
+  if ((!texto && !respostaImagemBase64) || !telefoneAtual || !numeroAtivoId) return;
 
   botao.disabled = true;
   try {
     const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/${encodeURIComponent(telefoneAtual)}/reply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: texto }),
+      body: JSON.stringify({ text: texto, ...(respostaImagemBase64 ? { imagemBase64: respostaImagemBase64 } : {}) }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.error) {
       throw new Error(data.error || `Falha ao enviar (${res.status})`);
     }
     input.value = "";
+    respostaImagemBase64 = null;
+    anexarInput.value = "";
+    document.getElementById("resposta-preview").style.display = "none";
     carregarMensagens();
     carregarConversas();
   } catch (err) {
-    alert(`Não foi possível enviar a mensagem: ${err.message}\n\nO texto continua no campo, tente de novo.`);
+    alert(`Não foi possível enviar a mensagem: ${err.message}\n\nO texto/imagem continuam prontos, tente de novo.`);
   } finally {
     botao.disabled = false;
   }
