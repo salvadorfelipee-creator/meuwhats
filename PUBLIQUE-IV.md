@@ -68,116 +68,70 @@ fora; como a imagem já vai virar uma publicação pública mesmo, isso não é 
 nova de dado sensível. O disco do Render é efêmero (perde arquivo a cada deploy), mas isso
 não é problema aqui — a imagem só precisa existir pelos segundos que a Meta leva pra buscá-la.
 
-## Reels em massa (Google Drive → Instagram, agendado)
+## Reels em massa (Google Drive → Instagram + Facebook, agendado)
 
 Além da publicação manual de 1 clique, o Publique IV tem uma segunda engrenagem pensada
-pra publicar um **acervo grande de vídeos prontos** (ex.: 1500 Reels editados) sozinho, aos
-poucos, sem precisar subir cada um na mão.
+pra publicar um **acervo grande de vídeos já prontos** (editados fora — CapCut, etc., moldura
+e tudo já aplicado) sozinho, aos poucos, sem precisar subir cada um na mão.
+
+**Decisão importante (11/08/2026)**: esse sistema **não processa vídeo nenhum** — não tem
+mais ffmpeg, moldura, editor manual, nem qualquer coisa parecida. O vídeo já vem pronto de
+fora; o servidor só baixa e publica. Isso foi uma escolha deliberada: rodar ffmpeg no plano
+free do Render derrubava o processo por falta de memória em vídeos de tamanho normal (~78MB já
+bastava) — ver `feedback_content_rights_video_sourcing` e o histórico da conversa de
+11/08/2026 pra detalhes de todas as tentativas de correção que não resolveram de vez. Sem
+processamento nenhum, esse problema simplesmente não existe mais, e não precisa de nenhuma
+infraestrutura extra (chegou a se cogitar Oracle Cloud pra rodar o ffmpeg à parte — descartado
+junto com a decisão de sempre editar por fora).
 
 Como funciona:
 
-1. Você guarda os vídeos numa pasta do **Google Drive**.
+1. Você edita os vídeos por fora (moldura, cortes, tudo) e guarda numa pasta do **Google
+   Drive**.
 2. O servidor lê essa pasta (só leitura, via Service Account) e monta uma **fila** no banco
    (tabela `reels_queue`), na ordem alfabética dos nomes dos arquivos.
-3. Todo dia, em 5 horários fixos (09:00, 12:15, 15:30, 18:45, 21:00 — horário de Brasília), o
-   agendador pega o **próximo vídeo pendente**, baixa do Drive, aplica a **moldura FelizCred**
-   (ver abaixo) e publica como Reels no Instagram.
-4. Cada vídeo processado é apagado do disco depois de publicado — só existe pelo tempo da
-   publicação (o Drive continua sendo a fonte, nada é duplicado permanentemente no servidor).
+3. Ao longo do dia, em horários espalhados entre **08:00 e 22:00** (horário de Brasília), o
+   agendador pega o **próximo vídeo pendente**, baixa do Drive e publica como Reels — **no
+   Instagram e no Facebook ao mesmo tempo** (as duas contam como sucesso independente uma da
+   outra; se uma falhar, a outra publica normalmente).
+4. O vídeo baixado é apagado do disco logo depois de publicar — só existe pelo tempo da
+   publicação (o Drive continua sendo a fonte, nada fica duplicado permanentemente aqui).
+
+**Quantidade por dia é configurável** (campo "Quantos posts por dia" no card) — os horários
+são recalculados automaticamente, espalhados entre 08:00–22:00 conforme a quantidade (ex.:
+14/dia ≈ 100/semana). Sem limite de quantos vídeos ficam na fila — pode sincronizar a pasta
+do Drive com quantos vídeos quiser, o agendador vai consumindo no ritmo configurado.
 
 Fica **pausado por padrão** — só começa a publicar sozinho depois de ligar o botão "Ativar
 agendamento" no painel (aba 🚀 Publicar → card "Reels em massa").
-
-### A moldura
-
-`assets/reels-frame.png` é um PNG 1080×1920 com fundo navy (cor da marca), uma "janela"
-arredondada transparente no meio e a marca **FelizCred** no topo + botão "Fale com a gente"
-embaixo. `video.js` recorta/redimensiona cada vídeo pra preencher o quadro 1080×1920 e
-sobrepõe esse PNG por cima — o vídeo só aparece através da janela, tudo ao redor é a moldura.
-
-**Pra trocar o design**: o mais rápido é só pedir aqui (cor, texto, tamanho da janela) — eu
-edito e gero de novo em minutos. Se preferir mexer você mesmo: o "código-fonte" da moldura é
-`assets/reels-frame-fonte.html` (HTML/SVG simples); depois de editar, rodar
-`node assets/gerar-moldura.js` regenera o PNG (usa Playwright, já instalado no projeto). Dá
-pra editar direto num programa de design também (Canva/Figma/Photoshop) — só precisa exportar
-um PNG 1080×1920 com transparência numa janela de 968×1330 começando em (56, 248), e
-substituir `assets/reels-frame.png` — nesse caso não mexe no HTML nem no script.
-
-### Vídeo já editado por fora ("pular" processamento)
-
-Se o vídeo já vem pronto de outro programa (CapCut, etc. — moldura própria já aplicada,
-formato certo), não precisa passar pelo ffmpeg daqui: escolha **"Sem processamento"** como
-moldura — tanto no editor manual quanto na fila automática do Drive (seletor "Moldura da
-fila automática" no card Reels). Nesse modo o servidor só copia o arquivo e publica, sem
-decodificar/recodificar nada — instantâneo e sem risco de estourar memória, porque o
-trabalho pesado já foi feito no computador de quem editou, não no servidor.
-
-### Editor manual (upload direto do computador, sem Drive)
-
-Pra quem tem vídeo no computador em vez de no Drive: aba Publicar → card Reels → seção
-"✂️ Editor manual". Aceita **vários vídeos de uma vez** (seleção múltipla) e processa **um
-por vez, em sequência automática** (não em paralelo — o processamento de vídeo consome CPU,
-rodar vários ao mesmo tempo derrubaria o servidor no plano free do Render).
-
-Opções aplicadas a todos os vídeos do lote de uma vez:
-
-- **Moldura**: "FelizCred" (janela + marca, padrão) ou "Sem moldura" (só recorta/redimensiona
-  pro formato Reels, sem overlay nenhum).
-- **Qualidade**: 1080×1920 (padrão) ou 720×1280 (arquivo menor).
-- **Música** (opcional): sobe um áudio e ele **substitui** a trilha original inteira (não
-  mixa com a narração — se quiser manter o áudio original, não anexe música).
-
-Pra cada vídeo pronto tem dois botões:
-
-- **Baixar** — pega o arquivo processado, sem publicar em nada.
-- **Publicar no Instagram** — publica direto como Reels, usando a legenda escrita no campo
-  acima da lista.
-
-Esse caminho é **independente do Drive e da fila automática** — não precisa configurar nada
-de Google pra usar só o editor manual.
-
-O upload é feito via **multipart** (arquivo enviado direto pro disco, streaming) — não em
-base64 dentro de JSON. Um vídeo grande como base64 numa string só multiplicava o uso de
-memória e já derrubou o servidor no plano free do Render (erro "Unexpected end of JSON
-input" no navegador).
-
-O processamento também é **assíncrono**: o upload responde na hora com um `jobId` e o
-ffmpeg roda em segundo plano — o painel fica perguntando `.../editor/status/:jobId` a cada
-2s até terminar. Isso existe porque o proxy do Render derruba a conexão (502) se a resposta
-demorar demais dentro de 1 requisição só, e processar vídeo grande pode passar desse tempo
-mesmo sem faltar memória.
-
-Ainda assim, o processo inteiro (não só a requisição) pode cair com vídeo grande — nesse
-caso o polling recebe uma página de erro do próprio Render em vez de JSON (erro tipo
-"Unexpected token '<' ... is not valid JSON" no navegador, porque veio HTML e não JSON).
-Camadas de proteção adicionadas contra isso: `video.js` roda o ffmpeg com `-threads 1` e
-preset `ultrafast` (menos pico de memória que rodar em paralelo com `veryfast`), e o limite
-de upload caiu de 300MB pra **150MB** (`server.js`, `receberMultipart`). Se o erro voltar a
-acontecer mesmo assim com vídeo grande (dezenas/centenas de MB), é sinal de que passou do
-que o plano free do Render aguenta processar de uma vez — nesse caso vale comprimir o vídeo
-antes, tentar um vídeo menor, ou considerar um plano pago do Render (mais RAM/CPU).
 
 ### Arquitetura
 
 ```
 drive.js    autenticação de Service Account do Google (JWT assinado na mão, sem SDK) +
             listar/baixar vídeos de uma pasta do Drive.
-video.js    aplicarMoldura() — ffmpeg (via ffmpeg-static, empacotado no projeto porque o
-            Render não tem ffmpeg instalado por padrão) recorta o vídeo pro formato Reels
-            e sobrepõe assets/reels-frame.png.
 reels.js    orquestrador: sincronizarFila() (Drive → banco) e publicarProximoPendente()
-            (baixa, aplica moldura, publica, limpa arquivos temporários).
-instagram.js → publicarReels() (fluxo de container de vídeo — igual à imagem, mas
-            media_type REELS e um polling bem mais longo, vídeo demora mais pra processar).
-db.js       tabela reels_queue (status: pending/posted/error) + reels_config (liga/desliga,
-            controle de qual horário já postou hoje).
+            (baixa, publica em Instagram + Facebook, limpa o arquivo temporário).
+instagram.js → publicarReels() (fluxo de container de vídeo — media_type REELS, polling
+            até o Instagram terminar de processar antes de publicar).
+facebook.js → publicarReels() (API de Reels da Página — fluxo "hosted file": start →
+            aponta a URL pública do vídeo → polling do status → finish/publish).
+db.js       tabela reels_queue (status: pending/posted/error, guarda o resultado por rede
+            em JSON) + reels_config (liga/desliga, posts_por_dia, controle de que horário
+            já postou hoje).
 server.js   rotas (GET /painel/api/reels/status, POST .../sincronizar, .../pausar,
-            .../publicar-agora, .../:id/reenfileirar) + o setInterval que checa a cada
-            minuto se bateu algum dos 5 horários do dia.
-public/painel.html  card "🎬 Reels em massa" na aba Publicar: resumo (pendentes/publicados/
-            com erro), botão de sincronizar, liga/desliga do agendamento, botão de testar
-            publicando 1 agora, e lista dos últimos itens com link de quem já foi publicado.
+            .../posts-por-dia, .../publicar-agora, .../:id/reenfileirar) + o setInterval
+            que checa a cada minuto se bateu algum horário do dia (calcularHorariosDoDia()
+            gera os horários dinamicamente a partir da quantidade configurada).
+public/painel.html  card "🎬 Reels em massa" na aba Publicar: campo de quantidade/dia,
+            resumo (pendentes/publicados/com erro), sincronizar, liga/desliga, testar
+            publicando 1 agora, lista dos últimos itens com link de cada rede publicada.
 ```
+
+**Facebook Reels ainda não testado contra API real** (código escrito seguindo a documentação
+oficial da Meta, mesmo padrão do resto do projeto pra funcionalidade nova) — só vai ser
+confirmado quando o primeiro vídeo de verdade passar pela fila com o agendamento ligado.
+Instagram Reels já está testado e funcionando (ver seção Status mais abaixo).
 
 ### Configuração (variáveis de ambiente)
 
@@ -192,12 +146,15 @@ public/painel.html  card "🎬 Reels em massa" na aba Publicar: resumo (pendente
 
 ### Status
 
-- Código completo e testado localmente: pipeline de moldura (ffmpeg real, verificado
-  visualmente), rotas do painel (fila vazia, pausar/ativar, sincronizar sem credencial →
-  erro claro), UI do card renderizando certo.
-- **Pendente**: criar a Service Account do Google e configurar as duas variáveis acima —
-  depois disso, o primeiro teste real (1 vídeo, botão "Publicar 1 agora") fica pra ser feito
-  puxando um vídeo de verdade da pasta, antes de ligar o agendamento automático dos 1500.
+- Google Drive: Service Account criada e autenticação testada de verdade (11/08/2026,
+  `drive.listarVideos()` confirmado funcionando). `GOOGLE_SERVICE_ACCOUNT_JSON` já
+  configurado no Render. `GOOGLE_DRIVE_REELS_FOLDER_ID` ainda **não configurado** — falta
+  o usuário compartilhar a pasta real (com vídeos editados por fora) e passar o ID.
+- Rotas do painel testadas localmente (fila vazia, pausar/ativar, quantidade/dia, sincronizar
+  sem credencial → erro claro).
+- Publicação: Instagram Reels já testado e funcionando em produção. Facebook Reels é código
+  novo (11/08/2026), seguindo a documentação oficial, mas **ainda sem teste real** — só vai
+  confirmar quando rodar com um vídeo de verdade.
 
 ## Contas — como adicionar uma nova
 

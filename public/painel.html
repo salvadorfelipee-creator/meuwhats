@@ -268,7 +268,6 @@
   .reels-stat.posted .num { color: #1e8e3e; }
   .reels-stat.error .num { color: #c0392b; }
   #reels-toggle.ativado { background: #1e8e3e; border-color: transparent; color: #fff; }
-  .editor-opcoes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px; }
 
   .preview-coluna { position: sticky; top: 0; }
   .preview-rotulo { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
@@ -546,60 +545,15 @@
           </div>
         </div>
         <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
-          Publica 5 Reels por dia sozinho (09:00, 12:15, 15:30, 18:45, 21:00 — horário de Brasília). A fila vem
-          da pasta do Google Drive configurada no servidor.
+          Publica no Instagram e no Facebook automaticamente, espalhado ao longo do dia (08:00–22:00, horário de
+          Brasília). Os vídeos já vêm prontos (editados fora, moldura já aplicada) — o servidor só baixa do Drive
+          e publica, sem processar nada.
         </div>
-        <label>Moldura da fila automática</label>
-        <select id="reels-moldura" style="margin-bottom:14px;">
-          <option value="felizcred">FelizCred (aplica marca + janela)</option>
-          <option value="nenhuma">Sem moldura (só ajusta formato)</option>
-          <option value="pular">Sem processamento (vídeo já vem pronto de fora)</option>
-        </select>
+        <label>Quantos posts por dia</label>
+        <input id="reels-posts-por-dia" type="number" min="1" max="48" style="margin-bottom:14px; max-width:120px;" />
         <div id="reels-resumo" class="reels-stats"></div>
         <button id="reels-testar" class="btn-primario" type="button" style="margin-top:14px;">Publicar 1 agora (teste)</button>
         <div id="reels-lista" class="resultado-lista"></div>
-
-        <div style="margin-top:22px; padding-top:18px; border-top:1px solid var(--border);">
-          <h4 style="margin:0 0 6px;">✂️ Editor manual — processar vídeos avulsos em lote</h4>
-          <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
-            Sobe vídeo(s) do computador e aplica as opções abaixo em todos — devolve o link pra baixar (ou publica direto). Não mexe na fila automática.
-          </div>
-
-          <div class="editor-opcoes-grid">
-            <div>
-              <label>Moldura</label>
-              <select id="editor-moldura">
-                <option value="felizcred">FelizCred (marca + janela)</option>
-                <option value="nenhuma">Sem moldura (só corta pro formato)</option>
-                <option value="pular">Sem processamento (já editado — publica como está)</option>
-              </select>
-            </div>
-            <div>
-              <label>Qualidade</label>
-              <select id="editor-qualidade">
-                <option value="1080p">1080p (padrão)</option>
-                <option value="720p">720p (arquivo menor)</option>
-              </select>
-            </div>
-          </div>
-
-          <label>Música (opcional — substitui o áudio original pela música enviada)</label>
-          <div class="page-header-acoes" style="margin-bottom:10px;">
-            <input type="file" id="editor-musica-input" accept="audio/*" hidden />
-            <button id="editor-musica-escolher" class="btn-secundario" type="button">Escolher música</button>
-            <span id="editor-musica-nome" style="font-size:12.5px; color:var(--text-muted);">Nenhuma</span>
-            <button id="editor-musica-remover" class="btn-secundario" type="button" style="display:none;">Remover</button>
-          </div>
-
-          <label>Legenda (usada se você publicar direto no Instagram)</label>
-          <textarea id="editor-legenda" placeholder="Legenda do Reels..." style="margin-bottom:10px;"></textarea>
-          <input type="file" id="editor-video-input" accept="video/*" multiple hidden />
-          <div class="page-header-acoes" style="margin-bottom:10px;">
-            <button id="editor-selecionar" class="btn-secundario" type="button">Escolher vídeo(s)</button>
-            <button id="editor-processar" class="btn-primario" type="button" disabled>Processar</button>
-          </div>
-          <div id="editor-lista" class="resultado-lista"></div>
-        </div>
       </div>
     </div>
   </div>
@@ -1719,16 +1673,24 @@ async function carregarReels() {
     botaoToggle.classList.toggle("ativado", !data.pausado);
     botaoToggle.dataset.pausado = data.pausado ? "1" : "0";
 
-    document.getElementById("reels-moldura").value = data.moldura || "felizcred";
+    document.getElementById("reels-posts-por-dia").value = data.postsPorDia || 5;
 
     document.getElementById("reels-lista").innerHTML = data.recentes
       .map((item) => {
         const resultado = item.resultado ? JSON.parse(item.resultado) : null;
         const classe = item.status === "error" ? "erro" : item.status === "posted" ? "ok" : "";
-        const statusTexto = item.status === "pending" ? "na fila" : item.status === "posted" ? "publicado" : `erro: ${escapeHtml(resultado?.erro || "")}`;
+        let statusTexto = item.status === "pending" ? "na fila" : "";
+        let links = "";
+        if (item.status === "posted" && resultado) {
+          const redes = Object.entries(resultado).filter(([, r]) => r.ok);
+          statusTexto = `publicado (${redes.map(([rede]) => rede).join(", ")})`;
+          links = redes.map(([rede, r]) => `<a href="${r.link}" target="_blank" rel="noopener">Ver ${rede} →</a>`).join(" ");
+        } else if (item.status === "error") {
+          statusTexto = `erro: ${escapeHtml(resultado?.erro || "")}`;
+        }
         return `<div class="resultado-item ${classe}">
           <span class="status">${escapeHtml(item.nome_arquivo || item.drive_file_id)} — ${statusTexto}</span>
-          ${item.status === "posted" && resultado?.link ? `<a href="${resultado.link}" target="_blank" rel="noopener">Ver →</a>` : ""}
+          ${links}
           ${item.status === "error" ? `<button type="button" class="btn-secundario" onclick="reenfileirarReel(${item.id})">Tentar de novo</button>` : ""}
         </div>`;
       })
@@ -1743,11 +1705,11 @@ async function reenfileirarReel(id) {
   carregarReels();
 }
 
-document.getElementById("reels-moldura").addEventListener("change", async (e) => {
-  await fetch("/painel/api/reels/moldura", {
+document.getElementById("reels-posts-por-dia").addEventListener("change", async (e) => {
+  await fetch("/painel/api/reels/posts-por-dia", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ moldura: e.target.value }),
+    body: JSON.stringify({ quantidade: Number(e.target.value) }),
   });
 });
 
@@ -1796,149 +1758,6 @@ document.getElementById("reels-testar").addEventListener("click", async () => {
     botao.disabled = false;
     botao.textContent = "Publicar 1 agora (teste)";
   }
-});
-
-// ─── Editor manual de moldura (avulso, não publica) ─────────────────────────
-let editorArquivos = [];
-let editorMusicaFile = null;
-
-document.getElementById("editor-selecionar").addEventListener("click", () => {
-  document.getElementById("editor-video-input").click();
-});
-
-document.getElementById("editor-musica-escolher").addEventListener("click", () => {
-  document.getElementById("editor-musica-input").click();
-});
-
-document.getElementById("editor-musica-input").addEventListener("change", (e) => {
-  editorMusicaFile = e.target.files[0] || null;
-  document.getElementById("editor-musica-nome").textContent = editorMusicaFile ? editorMusicaFile.name : "Nenhuma";
-  document.getElementById("editor-musica-remover").style.display = editorMusicaFile ? "inline-block" : "none";
-});
-
-document.getElementById("editor-musica-remover").addEventListener("click", () => {
-  editorMusicaFile = null;
-  document.getElementById("editor-musica-input").value = "";
-  document.getElementById("editor-musica-nome").textContent = "Nenhuma";
-  document.getElementById("editor-musica-remover").style.display = "none";
-});
-
-document.getElementById("editor-video-input").addEventListener("change", (e) => {
-  editorArquivos = Array.from(e.target.files).map((file) => ({ file, status: "pendente", url: null, erro: null }));
-  document.getElementById("editor-processar").disabled = editorArquivos.length === 0;
-  renderizarEditorLista();
-});
-
-function renderizarEditorLista() {
-  document.getElementById("editor-lista").innerHTML = editorArquivos
-    .map((item, i) => {
-      const classe = item.status === "erro" ? "erro" : item.status === "pronto" || item.status === "publicado" ? "ok" : "";
-      const rotulos = {
-        pendente: "na fila",
-        processando: `processando...${item.segundos ? ` (${Math.floor(item.segundos / 60)}min${item.segundos % 60}s)` : ""}`,
-        pronto: "pronto",
-        publicando: "publicando no Instagram...",
-        publicado: "publicado no Instagram",
-        erro: `erro: ${escapeHtml(item.erro || "")}`,
-      };
-      const acoes = [];
-      if (item.status === "pronto") {
-        acoes.push(`<a href="${item.url}" target="_blank" rel="noopener" download>Baixar →</a>`);
-        acoes.push(`<button type="button" class="btn-secundario" onclick="publicarItemEditor(${i})">Publicar no Instagram</button>`);
-      }
-      if (item.status === "publicado" && item.link) acoes.push(`<a href="${item.link}" target="_blank" rel="noopener">Ver publicação →</a>`);
-      return `<div class="resultado-item ${classe}">
-        <span class="status">${escapeHtml(item.file.name)} — ${rotulos[item.status]}</span>
-        ${acoes.join("")}
-      </div>`;
-    })
-    .join("");
-}
-
-async function publicarItemEditor(i) {
-  const item = editorArquivos[i];
-  item.status = "publicando";
-  renderizarEditorLista();
-  try {
-    const legenda = document.getElementById("editor-legenda").value.trim();
-    const res = await fetch("/painel/api/reels/editor/publicar", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: item.url, legenda }),
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    item.status = "publicado";
-    item.link = data.link;
-  } catch (err) {
-    item.status = "pronto";
-    alert(`Falha ao publicar: ${err.message}`);
-  }
-  renderizarEditorLista();
-}
-
-function esperar(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Depois do upload, o servidor responde na hora com um jobId e processa em segundo plano —
-// aqui só fica perguntando "já terminou?" a cada poucos segundos, em vez de segurar 1
-// requisição HTTP até o ffmpeg acabar (isso batia no limite de tempo do proxy do Render
-// pra vídeo maior, e derrubava a conexão com 502 mesmo o processamento estando ok). Com só
-// 1 núcleo (pra não estourar memória), processar pode demorar vários minutos no plano free
-// do Render — por isso o limite de espera é bem folgado (30min) em vez de curto.
-async function esperarJobEditor(jobId, aoAtualizarProgresso) {
-  const tentativasMax = 900; // ~30 minutos (2s entre tentativas)
-  for (let i = 0; i < tentativasMax; i++) {
-    let data;
-    try {
-      const res = await fetch(`/painel/api/reels/editor/status/${jobId}`);
-      data = await res.json();
-    } catch {
-      // resposta não-JSON (ex.: página de erro do Render se o servidor reiniciar no meio)
-      // — trata como "ainda processando" e continua tentando, em vez de desistir na hora
-      await esperar(2000);
-      continue;
-    }
-    if (data.status === "pronto") return { url: data.url };
-    if (data.status === "erro") throw new Error(data.erro || "Falha ao processar");
-    if (aoAtualizarProgresso) aoAtualizarProgresso(i * 2);
-    await esperar(2000);
-  }
-  throw new Error("Demorou demais pra processar (mais de 30 minutos) — tente um vídeo menor.");
-}
-
-document.getElementById("editor-processar").addEventListener("click", async () => {
-  const botao = document.getElementById("editor-processar");
-  botao.disabled = true;
-  for (const item of editorArquivos) {
-    if (item.status === "pronto") continue;
-    item.status = "processando";
-    renderizarEditorLista();
-    try {
-      // Upload direto do arquivo (multipart) em vez de base64 dentro de JSON — vídeo
-      // grande como base64 numa string só já derrubou o servidor por estouro de memória.
-      const formData = new FormData();
-      formData.append("video", item.file);
-      formData.append("moldura", document.getElementById("editor-moldura").value);
-      formData.append("qualidade", document.getElementById("editor-qualidade").value);
-      if (editorMusicaFile) formData.append("musica", editorMusicaFile);
-      const res = await fetch("/painel/api/reels/editor/processar", { method: "POST", body: formData });
-      const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}) ao enviar o vídeo.` }));
-      if (data.error) throw new Error(data.error);
-      const resultado = await esperarJobEditor(data.jobId, (segundos) => {
-        item.segundos = segundos;
-        renderizarEditorLista();
-      });
-      item.status = "pronto";
-      item.url = resultado.url;
-    } catch (err) {
-      item.status = "erro";
-      item.erro = err.message;
-    }
-    renderizarEditorLista();
-  }
-  botao.disabled = false;
 });
 
 atualizarBotaoNotif();

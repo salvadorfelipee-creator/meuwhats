@@ -1,10 +1,7 @@
 const http = require("http");
 const https = require("https");
 const fs = require("fs");
-const os = require("os");
 const path = require("path");
-const crypto = require("crypto");
-const busboy = require("busboy");
 
 const db = require("./db");
 const wa = require("./whatsapp");
@@ -111,74 +108,6 @@ const EXT_BY_MIME = {
 };
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
-// Recebe um upload multipart/form-data (arquivo(s) + campos de texto) e grava cada
-// arquivo direto em disco via streaming — diferente do parseBody (JSON em base64), não
-// acumula tudo na memória do processo. Necessário pra vídeo: um upload base64 de dezenas
-// de MB dentro de uma string JSON gigante já derrubou o servidor por estouro de memória
-// no plano free do Render. Devolve { campos: {chave: valor}, arquivos: {campo: caminho} }.
-function receberMultipart(req) {
-  return new Promise((resolve, reject) => {
-    let bb;
-    try {
-      // Limite conservador: mesmo com upload em streaming, o ffmpeg em si (decodificar +
-      // processar + reencodar) consome memória proporcional ao vídeo, e o plano free do
-      // Render tem pouca RAM — vídeo grande demais derruba o processo inteiro no meio do
-      // processamento. 150MB é generoso pra um Reels normal (segundos a poucos minutos).
-      bb = busboy({ headers: req.headers, limits: { fileSize: 150 * 1024 * 1024 } });
-    } catch (err) {
-      return reject(err);
-    }
-    const campos = {};
-    const arquivos = {};
-    const promessasArquivos = [];
-    let deuErro = false;
-
-    bb.on("field", (nome, valor) => {
-      campos[nome] = valor;
-    });
-
-    bb.on("file", (nomeCampo, stream, info) => {
-      const ext = path.extname(info.filename || "") || ".dat";
-      const arquivoPath = path.join(os.tmpdir(), `upload-${crypto.randomBytes(6).toString("hex")}${ext}`);
-      const writeStream = fs.createWriteStream(arquivoPath);
-      let estourouLimite = false;
-      stream.on("limit", () => (estourouLimite = true));
-      stream.pipe(writeStream);
-      // "finish" (disco) sempre chega DEPOIS do "close" do busboy (que só marca fim da
-      // leitura da rede) — por isso a promise de cada arquivo resolve no "finish", e só
-      // agregamos tudo no "close" do busboy (ver Promise.all abaixo).
-      promessasArquivos.push(
-        new Promise((res, rej) => {
-          writeStream.on("finish", () => {
-            if (estourouLimite) {
-              fs.unlink(arquivoPath, () => {});
-              return rej(new Error("Arquivo muito grande (limite 150MB) — comprima o vídeo antes ou divida em partes menores"));
-            }
-            arquivos[nomeCampo] = arquivoPath;
-            res();
-          });
-          writeStream.on("error", rej);
-        })
-      );
-    });
-
-    bb.on("error", (err) => {
-      deuErro = true;
-      reject(err);
-    });
-    bb.on("close", async () => {
-      if (deuErro) return;
-      try {
-        await Promise.all(promessasArquivos);
-        resolve({ campos, arquivos });
-      } catch (err) {
-        reject(err);
-      }
-    });
-    req.pipe(bb);
-  });
-}
-
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let data = "";
@@ -1416,23 +1345,29 @@ const server = http.createServer(async (req, res) => {
     // GET /painel/api/reels/status — resumo da fila + últimos itens (Publique IV → Reels em massa)
     if (req.method === "GET" && path_ === "/painel/api/reels/status") {
       if (!requireAuth(req, res)) return;
-      const [resumoFila, recentes, pausado, moldura] = await Promise.all([
+      const [resumoFila, recentes, pausado, postsPorDia] = await Promise.all([
         reels.resumo(),
         reels.listarRecentes(30),
         reels.configGet("pausado"),
-        reels.configGet("moldura_padrao"),
+        reels.configGet("posts_por_dia"),
       ]);
       // pausado = null (nunca configurado) conta como pausado — mesmo default do agendador
-      return send(res, 200, { resumo: resumoFila, recentes, pausado: pausado !== "0", moldura: moldura || "felizcred" });
+      return send(res, 200, {
+        resumo: resumoFila,
+        recentes,
+        pausado: pausado !== "0",
+        postsPorDia: Number(postsPorDia) || 5,
+      });
     }
 
-    // POST /painel/api/reels/moldura — define a moldura usada pela fila automática do
-    // Drive ("felizcred" | "nenhuma" | "pular" — pular = vídeo já vem pronto de fora)
-    if (req.method === "POST" && path_ === "/painel/api/reels/moldura") {
+    // POST /painel/api/reels/posts-por-dia — configura quantos posts/dia o agendador
+    // automático publica (espalhados entre 08:00 e 22:00, ver server.js)
+    if (req.method === "POST" && path_ === "/painel/api/reels/posts-por-dia") {
       if (!requireAuth(req, res)) return;
       const body = await parseBody(req);
-      await reels.configSet("moldura_padrao", body.moldura || "felizcred");
-      return send(res, 200, { ok: true });
+      const quantidade = Math.min(Math.max(Number(body.quantidade) || 1, 1), 48);
+      await reels.configSet("posts_por_dia", String(quantidade));
+      return send(res, 200, { ok: true, quantidade });
     }
 
     // POST /painel/api/reels/sincronizar — puxa a lista atual da pasta do Drive pra fila
@@ -1473,47 +1408,6 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       await reels.reenfileirar(Number(matchReelsRetry[1]));
       return send(res, 200, { ok: true });
-    }
-
-    // POST /painel/api/reels/editor/processar — editor manual: recebe o vídeo (multipart,
-    // streaming pro disco) e devolve um jobId NA HORA, sem esperar o ffmpeg terminar — o
-    // processamento roda em segundo plano. Necessário porque o proxy do Render derruba a
-    // conexão (502) se a resposta demorar demais, e um vídeo maior pode passar desse tempo.
-    if (req.method === "POST" && path_ === "/painel/api/reels/editor/processar") {
-      if (!requireAuth(req, res)) return;
-      try {
-        const { campos, arquivos } = await receberMultipart(req);
-        if (!arquivos.video) return send(res, 400, { error: "Envie um vídeo" });
-        const jobId = reels.iniciarProcessamentoAvulso(arquivos.video, arquivos.musica, {
-          moldura: campos.moldura,
-          qualidade: campos.qualidade,
-        });
-        return send(res, 200, { jobId });
-      } catch (err) {
-        return send(res, 500, { error: err.message });
-      }
-    }
-
-    // GET /painel/api/reels/editor/status/:jobId — consulta o progresso de um processamento
-    // do editor manual iniciado acima (o painel faz polling nisso a cada poucos segundos)
-    const matchJobEditor = path_.match(/^\/painel\/api\/reels\/editor\/status\/([a-f0-9]+)$/);
-    if (req.method === "GET" && matchJobEditor) {
-      if (!requireAuth(req, res)) return;
-      return send(res, 200, reels.statusJobEditor(matchJobEditor[1]));
-    }
-
-    // POST /painel/api/reels/editor/publicar — publica direto no Instagram um vídeo já
-    // processado pelo editor manual (usa a URL devolvida por .../editor/processar).
-    if (req.method === "POST" && path_ === "/painel/api/reels/editor/publicar") {
-      if (!requireAuth(req, res)) return;
-      const body = await parseBody(req);
-      if (!body.url) return send(res, 400, { error: "Falta a URL do vídeo processado" });
-      try {
-        const resultado = await ig.publicarReels({ videoUrl: body.url, legenda: body.legenda || "" });
-        return send(res, 200, resultado);
-      } catch (err) {
-        return send(res, 500, { error: err.message });
-      }
     }
 
     // GET /painel/api/ads/campanhas — lista campanhas com métricas
@@ -1665,13 +1559,33 @@ setInterval(async () => {
 }, 60 * 1000);
 
 // ─── AGENDADOR DE REELS EM MASSA (Publique IV) ──────────────────────────────
-// A cada minuto, checa (no horário de Brasília) se bateu um dos horários da fila —
-// se sim, e ainda não postou nesse horário hoje, publica o próximo vídeo pendente.
-// Fica pausado por padrão até alguém configurar o Drive e ligar pelo painel.
-const REEL_HORARIOS = ["09:00", "12:15", "15:30", "18:45", "21:00"];
+// A cada minuto, checa (no horário de Brasília) se bateu um dos horários do dia — se sim,
+// e ainda não postou nesse horário hoje, publica o próximo vídeo pendente (Instagram +
+// Facebook, sem processar — vídeo já vem pronto do Drive, editado por fora). Fica pausado
+// por padrão até alguém configurar o Drive e ligar pelo painel.
+//
+// A quantidade de posts/dia é configurável (reels_config.posts_por_dia, padrão 5) — os
+// horários são espalhados automaticamente entre 08:00 e 22:00 conforme a quantidade, em
+// vez de uma lista fixa, pra caber tanto "5 por dia" quanto "15 por dia" (~100/semana).
+function calcularHorariosDoDia(quantidade) {
+  const inicioMin = 8 * 60;
+  const fimMin = 22 * 60;
+  const passo = quantidade > 1 ? (fimMin - inicioMin) / (quantidade - 1) : 0;
+  const horarios = [];
+  for (let i = 0; i < quantidade; i++) {
+    const minutos = Math.round(inicioMin + passo * i);
+    horarios.push(`${String(Math.floor(minutos / 60)).padStart(2, "0")}:${String(minutos % 60).padStart(2, "0")}`);
+  }
+  return horarios;
+}
+
 setInterval(async () => {
   try {
     if ((await reels.configGet("pausado")) !== "0") return; // padrão: pausado até ligar no painel
+
+    const quantidadeConfigurada = Number(await reels.configGet("posts_por_dia")) || 5;
+    const quantidade = Math.min(Math.max(quantidadeConfigurada, 1), 48);
+    const horarios = calcularHorariosDoDia(quantidade);
 
     const agora = new Date();
     const hoje = agora.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
@@ -1680,7 +1594,7 @@ setInterval(async () => {
       hour: "2-digit",
       minute: "2-digit",
     });
-    if (!REEL_HORARIOS.includes(horaAtual)) return;
+    if (!horarios.includes(horaAtual)) return;
 
     const chaveSlot = `postado_${hoje}_${horaAtual}`;
     if ((await reels.configGet(chaveSlot)) === "1") return; // já postou nesse horário hoje
@@ -1688,7 +1602,13 @@ setInterval(async () => {
 
     const resultado = await reels.publicarProximoPendente();
     if (resultado.vazio) console.log("🎬 Fila de Reels vazia — nada pra postar.");
-    else console.log(`🎬 Reels publicado automaticamente (${horaAtual}):`, resultado.resultado?.link);
+    else {
+      const links = Object.entries(resultado.resultado)
+        .filter(([, r]) => r.ok)
+        .map(([rede, r]) => `${rede}: ${r.link}`)
+        .join(" | ");
+      console.log(`🎬 Reels publicado automaticamente (${horaAtual}): ${links}`);
+    }
   } catch (err) {
     console.error("Erro no agendador de Reels:", err.message);
   }
