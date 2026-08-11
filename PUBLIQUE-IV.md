@@ -146,9 +146,10 @@ esse exige o produto "Community Management API" aprovado).
 - **LinkedIn (perfil pessoal)**: ✅ ao vivo e testado (10/08/2026) — post real publicado e
   confirmado. Token expira em ~60 dias (sem troca por longa duração como o Facebook — precisa
   refazer o login OAuth quando vencer, ver `CHAVES-LOCAL.md`).
-- **LinkedIn (Página da empresa)**: Página criada, mas postar nela precisa do produto
-  "Community Management API", que exige aplicação/aprovação da LinkedIn (não é self-serve) —
-  pendente.
+- **LinkedIn (Página da empresa)**: Página criada, formulário de acesso ao "Community
+  Management API" enviado em 11/08/2026 (App separado, exigência da própria LinkedIn — esse
+  produto não pode dividir App com outros). Aguardando aprovação da LinkedIn (pode pedir
+  verificação por e-mail via "Microsoft Vetting Services") — ver `CHAVES-LOCAL.md`.
 - **X/Twitter**: código escrito seguindo a documentação oficial, mas **ainda não testado
   contra API real** — a conta de desenvolvedor não existe ainda.
 
