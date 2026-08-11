@@ -233,6 +233,41 @@
   .ads-status.PAUSED { background: var(--bg-alt); color: var(--text-muted); }
   .ads-metricas { font-size: 12px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
   .ads-card button { margin-top: 10px; font-size: 12px; padding: 5px 12px; border-radius: 6px; border: none; cursor: pointer; background: var(--accent); color: #fff; }
+
+  #btn-voltar-lista { display: none; background: transparent; border: none; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; color: var(--text); flex-shrink: 0; }
+  #btn-voltar-lista:hover { background: var(--bg-alt); }
+
+  /* ── Responsivo (celular/tablet estreito) ─────────────────────
+     Barra de navegação vira uma faixa embaixo (padrão de app mobile), grids de
+     2 colunas viram 1, e o WhatsApp mostra lista OU conversa por vez (nunca as
+     duas lado a lado — não cabe), com botão de voltar. */
+  @media (max-width: 768px) {
+    #app { flex-direction: column; height: 100dvh; }
+    #nav-rail {
+      width: 100%; height: 56px; flex-direction: row; padding: 0 6px; gap: 2px;
+      order: 2; justify-content: space-around; border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    #nav-rail .brand { display: none; }
+    .nav-item { width: 44px; height: 44px; }
+
+    .view { order: 1; }
+
+    .page-wrap { padding: 16px; }
+    .cards-grid { grid-template-columns: 1fr; }
+    .cols-2 { grid-template-columns: 1fr; }
+    .publicar-grid { grid-template-columns: 1fr; }
+    .preview-coluna { position: static; }
+
+    #conversas { width: 100%; }
+    #view-whatsapp.mostrando-conversa #conversas { display: none; }
+    #view-whatsapp:not(.mostrando-conversa) #conversa-atual { display: none !important; }
+    #btn-voltar-lista { display: block; }
+
+    #mensagens { padding: 16px 5%; }
+    .msg { max-width: 85%; }
+
+    .modal-conteudo { width: 92vw; }
+  }
 </style>
 </head>
 <body>
@@ -262,6 +297,7 @@
     </div>
     <div id="conversa-atual" style="display:none;">
       <div id="chat-header">
+        <button id="btn-voltar-lista" title="Voltar pra lista">←</button>
         <div class="avatar" id="chat-avatar"></div>
         <div>
           <div class="nome" id="chat-nome"></div>
@@ -675,9 +711,14 @@ function selecionarConversa(phone) {
   document.getElementById("chat-avatar").textContent = iniciais(conversa?.name || phone);
   document.getElementById("chat-nome").textContent = conversa?.name || phone;
   document.getElementById("chat-telefone").textContent = conversa?.name ? phone : "";
+  document.getElementById("view-whatsapp").classList.add("mostrando-conversa"); // no celular, troca lista pela conversa
   renderizarConversas();
   carregarMensagens();
 }
+
+document.getElementById("btn-voltar-lista").addEventListener("click", () => {
+  document.getElementById("view-whatsapp").classList.remove("mostrando-conversa");
+});
 
 function formatarHoraMsg(ts) {
   return new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
