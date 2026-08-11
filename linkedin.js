@@ -1,8 +1,13 @@
 const https = require("https");
 
-// Formato exigido pela LinkedIn-Version: AAAAMM. Atualizar de vez em quando (LinkedIn
-// costuma aceitar versões de alguns meses atrás sem quebrar).
-const LINKEDIN_VERSION = "202506";
+// Formato exigido pela LinkedIn-Version: AAAAMM. Testado ao vivo em 10/08/2026: a LinkedIn
+// rejeitou versões de meses anteriores (426 NONEXISTENT_VERSION) e só aceitou o mês atual —
+// diferente da maioria das APIs versionadas, aqui não dá margem de alguns meses pra trás.
+// Por isso calcula na hora em vez de um valor fixo (evitaria essa mesma quebra de novo).
+function versaoAtual() {
+  const agora = new Date();
+  return `${agora.getFullYear()}${String(agora.getMonth() + 1).padStart(2, "0")}`;
+}
 
 function request(token, method, requestPath, body) {
   return new Promise((resolve, reject) => {
@@ -14,7 +19,7 @@ function request(token, method, requestPath, body) {
         path: requestPath,
         headers: {
           Authorization: `Bearer ${token}`,
-          "LinkedIn-Version": LINKEDIN_VERSION,
+          "LinkedIn-Version": versaoAtual(),
           "X-Restli-Protocol-Version": "2.0.0",
           ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {}),
         },
@@ -58,7 +63,8 @@ async function publicar({ texto, link }, { token, autorUrn }) {
 
   const { status, json, headers } = await request(token, "POST", "/rest/posts", body);
   if (status >= 400) throw new Error(`Falha ao publicar no LinkedIn: ${JSON.stringify(json)}`);
-  return { id: headers["x-restli-id"] };
+  const id = headers["x-restli-id"];
+  return { id, link: id ? `https://www.linkedin.com/feed/update/${id}/` : null };
 }
 
 module.exports = { publicar };

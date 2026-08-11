@@ -143,9 +143,13 @@ esse exige o produto "Community Management API" aprovado).
 
 - **Instagram e Facebook**: ✅ ao vivo e testado (10/08/2026) — publicação real feita e
   confirmada nas duas redes, incluindo o card de perfil da Página (capa/foto/"sobre"/telefone).
-- **X/Twitter e LinkedIn**: código escrito seguindo a documentação oficial de cada API, mas
-  **ainda não testado contra API real** — nenhuma das duas contas de desenvolvedor existe
-  ainda. Antes de confiar em publicação automática nelas, criar as credenciais (ver seção
-  acima) e fazer um primeiro teste manual.
+- **LinkedIn (perfil pessoal)**: ✅ ao vivo e testado (10/08/2026) — post real publicado e
+  confirmado. Token expira em ~60 dias (sem troca por longa duração como o Facebook — precisa
+  refazer o login OAuth quando vencer, ver `CHAVES-LOCAL.md`).
+- **LinkedIn (Página da empresa)**: Página criada, mas postar nela precisa do produto
+  "Community Management API", que exige aplicação/aprovação da LinkedIn (não é self-serve) —
+  pendente.
+- **X/Twitter**: código escrito seguindo a documentação oficial, mas **ainda não testado
+  contra API real** — a conta de desenvolvedor não existe ainda.
 
 Pendências de conta/chave: ver `CHAVES-LOCAL.md`.
