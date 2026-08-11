@@ -268,6 +268,7 @@
   .reels-stat.posted .num { color: #1e8e3e; }
   .reels-stat.error .num { color: #c0392b; }
   #reels-toggle.ativado { background: #1e8e3e; border-color: transparent; color: #fff; }
+  .editor-opcoes-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 10px; }
 
   .preview-coluna { position: sticky; top: 0; }
   .preview-rotulo { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
@@ -553,16 +554,42 @@
         <div id="reels-lista" class="resultado-lista"></div>
 
         <div style="margin-top:22px; padding-top:18px; border-top:1px solid var(--border);">
-          <h4 style="margin:0 0 6px;">✂️ Editor manual — aplicar moldura em vídeos avulsos</h4>
+          <h4 style="margin:0 0 6px;">✂️ Editor manual — processar vídeos avulsos em lote</h4>
           <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
-            Sobe vídeo(s) do computador, aplica a mesma moldura FelizCred e devolve o link pra baixar — não publica em nenhuma rede nem mexe na fila.
+            Sobe vídeo(s) do computador e aplica as opções abaixo em todos — devolve o link pra baixar (ou publica direto). Não mexe na fila automática.
           </div>
+
+          <div class="editor-opcoes-grid">
+            <div>
+              <label>Moldura</label>
+              <select id="editor-moldura">
+                <option value="felizcred">FelizCred (marca + janela)</option>
+                <option value="nenhuma">Sem moldura (só corta pro formato)</option>
+              </select>
+            </div>
+            <div>
+              <label>Qualidade</label>
+              <select id="editor-qualidade">
+                <option value="1080p">1080p (padrão)</option>
+                <option value="720p">720p (arquivo menor)</option>
+              </select>
+            </div>
+          </div>
+
+          <label>Música (opcional — substitui o áudio original pela música enviada)</label>
+          <div class="page-header-acoes" style="margin-bottom:10px;">
+            <input type="file" id="editor-musica-input" accept="audio/*" hidden />
+            <button id="editor-musica-escolher" class="btn-secundario" type="button">Escolher música</button>
+            <span id="editor-musica-nome" style="font-size:12.5px; color:var(--text-muted);">Nenhuma</span>
+            <button id="editor-musica-remover" class="btn-secundario" type="button" style="display:none;">Remover</button>
+          </div>
+
           <label>Legenda (usada se você publicar direto no Instagram)</label>
           <textarea id="editor-legenda" placeholder="Legenda do Reels..." style="margin-bottom:10px;"></textarea>
           <input type="file" id="editor-video-input" accept="video/*" multiple hidden />
           <div class="page-header-acoes" style="margin-bottom:10px;">
             <button id="editor-selecionar" class="btn-secundario" type="button">Escolher vídeo(s)</button>
-            <button id="editor-processar" class="btn-primario" type="button" disabled>Aplicar moldura</button>
+            <button id="editor-processar" class="btn-primario" type="button" disabled>Processar</button>
           </div>
           <div id="editor-lista" class="resultado-lista"></div>
         </div>
@@ -1756,9 +1783,27 @@ document.getElementById("reels-testar").addEventListener("click", async () => {
 
 // ─── Editor manual de moldura (avulso, não publica) ─────────────────────────
 let editorArquivos = [];
+let editorMusicaFile = null;
 
 document.getElementById("editor-selecionar").addEventListener("click", () => {
   document.getElementById("editor-video-input").click();
+});
+
+document.getElementById("editor-musica-escolher").addEventListener("click", () => {
+  document.getElementById("editor-musica-input").click();
+});
+
+document.getElementById("editor-musica-input").addEventListener("change", (e) => {
+  editorMusicaFile = e.target.files[0] || null;
+  document.getElementById("editor-musica-nome").textContent = editorMusicaFile ? editorMusicaFile.name : "Nenhuma";
+  document.getElementById("editor-musica-remover").style.display = editorMusicaFile ? "inline-block" : "none";
+});
+
+document.getElementById("editor-musica-remover").addEventListener("click", () => {
+  editorMusicaFile = null;
+  document.getElementById("editor-musica-input").value = "";
+  document.getElementById("editor-musica-nome").textContent = "Nenhuma";
+  document.getElementById("editor-musica-remover").style.display = "none";
 });
 
 document.getElementById("editor-video-input").addEventListener("change", (e) => {
@@ -1827,6 +1872,9 @@ document.getElementById("editor-processar").addEventListener("click", async () =
       // grande como base64 numa string só já derrubou o servidor por estouro de memória.
       const formData = new FormData();
       formData.append("video", item.file);
+      formData.append("moldura", document.getElementById("editor-moldura").value);
+      formData.append("qualidade", document.getElementById("editor-qualidade").value);
+      if (editorMusicaFile) formData.append("musica", editorMusicaFile);
       const res = await fetch("/painel/api/reels/editor/processar", { method: "POST", body: formData });
       const data = await res.json().catch(() => ({ error: `Resposta inválida do servidor (${res.status}) — o vídeo pode ser grande demais ou o servidor reiniciou no meio do processamento.` }));
       if (data.error) throw new Error(data.error);

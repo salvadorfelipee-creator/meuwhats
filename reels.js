@@ -45,7 +45,7 @@ async function publicarProximoPendente() {
   try {
     const bytes = await drive.baixarVideo(item.drive_file_id);
     fs.writeFileSync(brutoPath, bytes);
-    await video.aplicarMoldura(brutoPath, finalPath);
+    await video.processarVideo(brutoPath, finalPath, { moldura: "felizcred", qualidade: "1080p" });
 
     const videoUrl = `${baseUrl()}/publicar-media/${finalNome}`;
     const legenda = item.legenda || LEGENDA_PADRAO;
@@ -65,18 +65,23 @@ async function publicarProximoPendente() {
 
 // Editor manual: recebe o CAMINHO de um vídeo já salvo em disco (o servidor grava direto
 // via streaming multipart — ver server.js — em vez de carregar tudo em base64 na memória,
-// que estourava RAM no plano free do Render com vídeo grande). Aplica a moldura e devolve
-// o link pra baixar o resultado — não publica em rede nenhuma.
-async function processarUploadAvulso(brutoPath) {
+// que estourava RAM no plano free do Render com vídeo grande). Processa conforme as opções
+// (moldura/qualidade/música) e devolve o link pra baixar o resultado — não publica em nada.
+async function processarUploadAvulso(brutoPath, musicaPath, opcoes = {}) {
   const tmpId = crypto.randomBytes(6).toString("hex");
   const finalNome = `editor-${tmpId}.mp4`;
   const finalPath = path.join(PUBLICAR_MEDIA_DIR, finalNome);
 
   try {
-    await video.aplicarMoldura(brutoPath, finalPath);
+    await video.processarVideo(brutoPath, finalPath, {
+      moldura: opcoes.moldura,
+      qualidade: opcoes.qualidade,
+      musicaPath: musicaPath || null,
+    });
     return { url: `${baseUrl()}/publicar-media/${finalNome}` };
   } finally {
     fs.unlink(brutoPath, () => {});
+    if (musicaPath) fs.unlink(musicaPath, () => {});
   }
 }
 

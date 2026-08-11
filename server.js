@@ -111,41 +111,65 @@ const EXT_BY_MIME = {
 };
 
 // ─── UTILS ───────────────────────────────────────────────────────────────────
-// Recebe um upload multipart/form-data (1 arquivo) e grava direto em disco via streaming —
-// diferente do parseBody (JSON em base64), não acumula o arquivo inteiro na memória do
-// processo. Necessário pra vídeo: um upload base64 de dezenas de MB dentro de uma string
-// JSON gigante já derrubou o servidor por estouro de memória no plano free do Render.
-function receberVideoMultipart(req) {
+// Recebe um upload multipart/form-data (arquivo(s) + campos de texto) e grava cada
+// arquivo direto em disco via streaming — diferente do parseBody (JSON em base64), não
+// acumula tudo na memória do processo. Necessário pra vídeo: um upload base64 de dezenas
+// de MB dentro de uma string JSON gigante já derrubou o servidor por estouro de memória
+// no plano free do Render. Devolve { campos: {chave: valor}, arquivos: {campo: caminho} }.
+function receberMultipart(req) {
   return new Promise((resolve, reject) => {
     let bb;
     try {
-      bb = busboy({ headers: req.headers, limits: { files: 1, fileSize: 300 * 1024 * 1024 } });
+      bb = busboy({ headers: req.headers, limits: { fileSize: 300 * 1024 * 1024 } });
     } catch (err) {
       return reject(err);
     }
-    let recebeuArquivo = false; // marcado assim que o campo de arquivo chega, não quando termina de gravar
-    bb.on("file", (_campo, stream, _info) => {
-      recebeuArquivo = true;
-      const arquivoPath = path.join(os.tmpdir(), `upload-${crypto.randomBytes(6).toString("hex")}.mp4`);
+    const campos = {};
+    const arquivos = {};
+    const promessasArquivos = [];
+    let deuErro = false;
+
+    bb.on("field", (nome, valor) => {
+      campos[nome] = valor;
+    });
+
+    bb.on("file", (nomeCampo, stream, info) => {
+      const ext = path.extname(info.filename || "") || ".dat";
+      const arquivoPath = path.join(os.tmpdir(), `upload-${crypto.randomBytes(6).toString("hex")}${ext}`);
       const writeStream = fs.createWriteStream(arquivoPath);
       let estourouLimite = false;
       stream.on("limit", () => (estourouLimite = true));
       stream.pipe(writeStream);
       // "finish" (disco) sempre chega DEPOIS do "close" do busboy (que só marca fim da
-      // leitura da rede) — resolver aqui, não no "close", evita resolver com o arquivo
-      // ainda incompleto no disco.
-      writeStream.on("finish", () => {
-        if (estourouLimite) {
-          fs.unlink(arquivoPath, () => {});
-          return reject(new Error("Vídeo muito grande (limite 300MB)"));
-        }
-        resolve(arquivoPath);
-      });
-      writeStream.on("error", reject);
+      // leitura da rede) — por isso a promise de cada arquivo resolve no "finish", e só
+      // agregamos tudo no "close" do busboy (ver Promise.all abaixo).
+      promessasArquivos.push(
+        new Promise((res, rej) => {
+          writeStream.on("finish", () => {
+            if (estourouLimite) {
+              fs.unlink(arquivoPath, () => {});
+              return rej(new Error("Arquivo muito grande (limite 300MB)"));
+            }
+            arquivos[nomeCampo] = arquivoPath;
+            res();
+          });
+          writeStream.on("error", rej);
+        })
+      );
     });
-    bb.on("error", reject);
-    bb.on("close", () => {
-      if (!recebeuArquivo) reject(new Error("Nenhum arquivo enviado"));
+
+    bb.on("error", (err) => {
+      deuErro = true;
+      reject(err);
+    });
+    bb.on("close", async () => {
+      if (deuErro) return;
+      try {
+        await Promise.all(promessasArquivos);
+        resolve({ campos, arquivos });
+      } catch (err) {
+        reject(err);
+      }
     });
     req.pipe(bb);
   });
@@ -1437,14 +1461,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
-    // POST /painel/api/reels/editor/processar — editor manual: aplica a moldura FelizCred
-    // num vídeo enviado do computador (multipart, streaming pro disco) e devolve o link do
-    // resultado pra baixar. Não publica em rede nenhuma nem mexe na fila.
+    // POST /painel/api/reels/editor/processar — editor manual: processa um vídeo enviado
+    // do computador (multipart, streaming pro disco) com as opções escolhidas (moldura,
+    // qualidade, música opcional) e devolve o link do resultado pra baixar. Não publica em
+    // rede nenhuma nem mexe na fila.
     if (req.method === "POST" && path_ === "/painel/api/reels/editor/processar") {
       if (!requireAuth(req, res)) return;
       try {
-        const arquivoPath = await receberVideoMultipart(req);
-        const resultado = await reels.processarUploadAvulso(arquivoPath);
+        const { campos, arquivos } = await receberMultipart(req);
+        if (!arquivos.video) return send(res, 400, { error: "Envie um vídeo" });
+        const resultado = await reels.processarUploadAvulso(arquivos.video, arquivos.musica, {
+          moldura: campos.moldura,
+          qualidade: campos.qualidade,
+        });
         return send(res, 200, resultado);
       } catch (err) {
         return send(res, 500, { error: err.message });

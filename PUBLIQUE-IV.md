@@ -108,15 +108,31 @@ substituir `assets/reels-frame.png` — nesse caso não mexe no HTML nem no scri
 Pra quem tem vídeo no computador em vez de no Drive: aba Publicar → card Reels → seção
 "✂️ Editor manual". Aceita **vários vídeos de uma vez** (seleção múltipla) e processa **um
 por vez, em sequência automática** (não em paralelo — o processamento de vídeo consome CPU,
-rodar vários ao mesmo tempo derrubaria o servidor no plano free do Render). Pra cada vídeo
-pronto tem dois botões:
+rodar vários ao mesmo tempo derrubaria o servidor no plano free do Render).
 
-- **Baixar** — pega o arquivo já com a moldura aplicada, sem publicar em nada.
+Opções aplicadas a todos os vídeos do lote de uma vez:
+
+- **Moldura**: "FelizCred" (janela + marca, padrão) ou "Sem moldura" (só recorta/redimensiona
+  pro formato Reels, sem overlay nenhum).
+- **Qualidade**: 1080×1920 (padrão) ou 720×1280 (arquivo menor).
+- **Música** (opcional): sobe um áudio e ele **substitui** a trilha original inteira (não
+  mixa com a narração — se quiser manter o áudio original, não anexe música).
+
+Pra cada vídeo pronto tem dois botões:
+
+- **Baixar** — pega o arquivo processado, sem publicar em nada.
 - **Publicar no Instagram** — publica direto como Reels, usando a legenda escrita no campo
   acima da lista.
 
 Esse caminho é **independente do Drive e da fila automática** — não precisa configurar nada
 de Google pra usar só o editor manual.
+
+O upload é feito via **multipart** (arquivo enviado direto pro disco, streaming) — não em
+base64 dentro de JSON. Um vídeo grande como base64 numa string só multiplicava o uso de
+memória e já derrubou o servidor no plano free do Render (erro "Unexpected end of JSON
+input" no navegador). Se o erro voltar a acontecer com vídeo muito grande (dezenas/centenas
+de MB), é sinal de que passou do que o plano free do Render aguenta processar de uma vez —
+nesse caso vale tentar em pedaços menores ou considerar um plano pago do Render.
 
 ### Arquitetura
 

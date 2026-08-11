@@ -4,6 +4,11 @@ const ffmpegPath = require("ffmpeg-static");
 
 const MOLDURA = path.join(__dirname, "assets", "reels-frame.png");
 
+const RESOLUCOES = {
+  "1080p": { w: 1080, h: 1920 },
+  "720p": { w: 720, h: 1280 },
+};
+
 function executarFfmpeg(args) {
   return new Promise((resolve, reject) => {
     const proc = spawn(ffmpegPath, args);
@@ -17,27 +22,55 @@ function executarFfmpeg(args) {
   });
 }
 
-// Recorta/redimensiona o vídeo pra preencher 1080x1920 (formato Reels) e sobrepõe a
-// moldura (assets/reels-frame.png — navy com um furo arredondado + marca FelizCred),
-// deixando o vídeo visível só dentro da "janela" da moldura. Reencoda em H.264 pra
-// garantir compatibilidade com o Instagram/Facebook independente do codec original.
-async function aplicarMoldura(entradaPath, saidaPath) {
-  await executarFfmpeg([
-    "-y",
-    "-i", entradaPath,
-    "-i", MOLDURA,
-    "-filter_complex",
-    "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[vid];[vid][1:v]overlay=0:0:format=auto[out]",
+// Processa um vídeo pro formato Reels: recorta/redimensiona, opcionalmente sobrepõe a
+// moldura FelizCred e/ou troca a trilha de áudio por uma música enviada. Reencoda em
+// H.264/AAC pra garantir compatibilidade com Instagram/Facebook independente da entrada.
+//
+// opcoes:
+//   moldura   "felizcred" (padrão) | "nenhuma" — com ou sem a marca/janela por cima
+//   qualidade "1080p" (padrão) | "720p"
+//   musicaPath  caminho de um áudio local (opcional) — SUBSTITUI o áudio original inteiro
+//               (mais simples e previsível do que misturar volumes com a narração)
+async function processarVideo(entradaPath, saidaPath, opcoes = {}) {
+  const moldura = opcoes.moldura === "nenhuma" ? "nenhuma" : "felizcred";
+  const { w, h } = RESOLUCOES[opcoes.qualidade] || RESOLUCOES["1080p"];
+
+  const args = ["-y", "-i", entradaPath];
+  let proximoIndice = 1; // índice 0 já é o vídeo de entrada
+  let filtroVideo = `[0:v]scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},setsar=1[vid]`;
+
+  if (moldura === "felizcred") {
+    const indiceMoldura = proximoIndice++;
+    args.push("-i", MOLDURA);
+    // a moldura é sempre 1080x1920 — se a saída pedida for outra resolução, escala ela junto
+    filtroVideo += `;[${indiceMoldura}:v]scale=${w}:${h}[frm];[vid][frm]overlay=0:0:format=auto[out]`;
+  } else {
+    filtroVideo += ";[vid]copy[out]";
+  }
+
+  const mapAudio = [];
+  if (opcoes.musicaPath) {
+    const indiceMusica = proximoIndice++;
+    args.push("-stream_loop", "-1", "-i", opcoes.musicaPath);
+    mapAudio.push("-map", `${indiceMusica}:a`, "-shortest");
+  } else {
+    mapAudio.push("-map", "0:a?");
+  }
+
+  args.push(
+    "-filter_complex", filtroVideo,
     "-map", "[out]",
-    "-map", "0:a?",
+    ...mapAudio,
     "-c:v", "libx264",
     "-preset", "veryfast",
     "-crf", "23",
     "-c:a", "aac",
     "-b:a", "128k",
     "-movflags", "+faststart",
-    saidaPath,
-  ]);
+    saidaPath
+  );
+
+  await executarFfmpeg(args);
 }
 
-module.exports = { aplicarMoldura };
+module.exports = { processarVideo };
