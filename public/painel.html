@@ -213,6 +213,15 @@
   .resultado-item a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
   .resultado-item a:hover { text-decoration: underline; }
 
+  .reels-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .reels-stat { flex: 1; min-width: 110px; background: var(--bg); border-radius: 10px; padding: 12px 14px; text-align: center; }
+  .reels-stat .num { font-size: 22px; font-weight: 800; color: var(--text); }
+  .reels-stat .rotulo { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .reels-stat.pending .num { color: var(--accent); }
+  .reels-stat.posted .num { color: #1e8e3e; }
+  .reels-stat.error .num { color: #c0392b; }
+  #reels-toggle.ativado { background: #1e8e3e; border-color: transparent; color: #fff; }
+
   .preview-coluna { position: sticky; top: 0; }
   .preview-rotulo { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 10px; }
   .preview-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
@@ -452,6 +461,23 @@
         </div>
         <div id="perfil-fb-resultado" style="margin-top:14px;"></div>
       </div>
+
+      <div class="card publicar-card" id="reels-card" style="margin-top:20px;">
+        <div class="page-header" style="margin-bottom:6px;">
+          <h3 style="margin:0;">🎬 Reels em massa (Google Drive)</h3>
+          <div class="page-header-acoes">
+            <button id="reels-sincronizar" class="btn-secundario" type="button">Sincronizar com o Drive</button>
+            <button id="reels-toggle" class="btn-secundario" type="button">Ativar agendamento</button>
+          </div>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
+          Publica 5 Reels por dia sozinho (09:00, 12:15, 15:30, 18:45, 21:00 — horário de Brasília), aplicando a
+          moldura FelizCred em cada vídeo antes de postar. A fila vem da pasta do Google Drive configurada no servidor.
+        </div>
+        <div id="reels-resumo" class="reels-stats"></div>
+        <button id="reels-testar" class="btn-primario" type="button" style="margin-top:14px;">Publicar 1 agora (teste)</button>
+        <div id="reels-lista" class="resultado-lista"></div>
+      </div>
     </div>
   </div>
 
@@ -492,7 +518,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     if (btn.dataset.view === "instagram") carregarTudoInstagram();
     if (btn.dataset.view === "ads") carregarCampanhas();
     if (btn.dataset.view === "telegram") carregarContatosTelegram();
-    if (btn.dataset.view === "publicar") carregarContasPublicar();
+    if (btn.dataset.view === "publicar") { carregarContasPublicar(); carregarReels(); }
   });
 });
 
@@ -1343,6 +1369,92 @@ document.getElementById("perfil-fb-salvar").addEventListener("click", async () =
       r.ok ? "atualizado" : escapeHtml(r.erro)
     }</span></div>`)
     .join("");
+});
+
+// ─── Reels em massa (Google Drive) ──────────────────────────────────────────
+async function carregarReels() {
+  try {
+    const res = await fetch("/painel/api/reels/status");
+    const data = await res.json();
+
+    document.getElementById("reels-resumo").innerHTML = `
+      <div class="reels-stat pending"><div class="num">${data.resumo.pending}</div><div class="rotulo">pendentes</div></div>
+      <div class="reels-stat posted"><div class="num">${data.resumo.posted}</div><div class="rotulo">publicados</div></div>
+      <div class="reels-stat error"><div class="num">${data.resumo.error}</div><div class="rotulo">com erro</div></div>
+    `;
+
+    const botaoToggle = document.getElementById("reels-toggle");
+    botaoToggle.textContent = data.pausado ? "Ativar agendamento" : "Pausar agendamento";
+    botaoToggle.classList.toggle("ativado", !data.pausado);
+    botaoToggle.dataset.pausado = data.pausado ? "1" : "0";
+
+    document.getElementById("reels-lista").innerHTML = data.recentes
+      .map((item) => {
+        const resultado = item.resultado ? JSON.parse(item.resultado) : null;
+        const classe = item.status === "error" ? "erro" : item.status === "posted" ? "ok" : "";
+        const statusTexto = item.status === "pending" ? "na fila" : item.status === "posted" ? "publicado" : `erro: ${escapeHtml(resultado?.erro || "")}`;
+        return `<div class="resultado-item ${classe}">
+          <span class="status">${escapeHtml(item.nome_arquivo || item.drive_file_id)} — ${statusTexto}</span>
+          ${item.status === "posted" && resultado?.link ? `<a href="${resultado.link}" target="_blank" rel="noopener">Ver →</a>` : ""}
+          ${item.status === "error" ? `<button type="button" class="btn-secundario" onclick="reenfileirarReel(${item.id})">Tentar de novo</button>` : ""}
+        </div>`;
+      })
+      .join("");
+  } catch (err) {
+    document.getElementById("reels-lista").innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
+  }
+}
+
+async function reenfileirarReel(id) {
+  await fetch(`/painel/api/reels/${id}/reenfileirar`, { method: "POST" });
+  carregarReels();
+}
+
+document.getElementById("reels-sincronizar").addEventListener("click", async () => {
+  const botao = document.getElementById("reels-sincronizar");
+  botao.disabled = true;
+  botao.textContent = "Sincronizando...";
+  try {
+    const res = await fetch("/painel/api/reels/sincronizar", { method: "POST" });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    alert(`${data.encontrados} vídeo(s) na pasta do Drive, ${data.adicionados} novo(s) adicionado(s) à fila.`);
+    carregarReels();
+  } catch (err) {
+    alert(`Falha ao sincronizar: ${err.message}`);
+  } finally {
+    botao.disabled = false;
+    botao.textContent = "Sincronizar com o Drive";
+  }
+});
+
+document.getElementById("reels-toggle").addEventListener("click", async () => {
+  const botao = document.getElementById("reels-toggle");
+  const pausadoAtual = botao.dataset.pausado === "1";
+  await fetch("/painel/api/reels/pausar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pausado: !pausadoAtual }),
+  });
+  carregarReels();
+});
+
+document.getElementById("reels-testar").addEventListener("click", async () => {
+  const botao = document.getElementById("reels-testar");
+  botao.disabled = true;
+  botao.textContent = "Publicando...";
+  try {
+    const res = await fetch("/painel/api/reels/publicar-agora", { method: "POST" });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    if (data.vazio) alert("Fila vazia — sincronize com o Drive primeiro.");
+    carregarReels();
+  } catch (err) {
+    alert(`Falha ao publicar: ${err.message}`);
+  } finally {
+    botao.disabled = false;
+    botao.textContent = "Publicar 1 agora (teste)";
+  }
 });
 
 atualizarBotaoNotif();

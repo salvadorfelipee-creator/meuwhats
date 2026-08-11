@@ -9,6 +9,7 @@ const ig = require("./instagram");
 const ads = require("./ads");
 const tg = require("./telegram");
 const publique = require("./publique");
+const reels = require("./reels");
 const { notificarLeadCotaCerta } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
@@ -1290,6 +1291,58 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // GET /painel/api/reels/status — resumo da fila + últimos itens (Publique IV → Reels em massa)
+    if (req.method === "GET" && path_ === "/painel/api/reels/status") {
+      if (!requireAuth(req, res)) return;
+      const [resumoFila, recentes, pausado] = await Promise.all([
+        reels.resumo(),
+        reels.listarRecentes(30),
+        reels.configGet("pausado"),
+      ]);
+      // pausado = null (nunca configurado) conta como pausado — mesmo default do agendador
+      return send(res, 200, { resumo: resumoFila, recentes, pausado: pausado !== "0" });
+    }
+
+    // POST /painel/api/reels/sincronizar — puxa a lista atual da pasta do Drive pra fila
+    if (req.method === "POST" && path_ === "/painel/api/reels/sincronizar") {
+      if (!requireAuth(req, res)) return;
+      try {
+        const resultado = await reels.sincronizarFila();
+        return send(res, 200, resultado);
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
+    // POST /painel/api/reels/pausar — liga/desliga o agendador automático
+    if (req.method === "POST" && path_ === "/painel/api/reels/pausar") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await reels.configSet("pausado", body.pausado ? "1" : "0");
+      return send(res, 200, { ok: true });
+    }
+
+    // POST /painel/api/reels/publicar-agora — publica o próximo pendente na hora (sem
+    // esperar o horário agendado), útil pra testar o fluxo inteiro com 1 vídeo antes de
+    // deixar os 1500 rodando sozinhos.
+    if (req.method === "POST" && path_ === "/painel/api/reels/publicar-agora") {
+      if (!requireAuth(req, res)) return;
+      try {
+        const resultado = await reels.publicarProximoPendente();
+        return send(res, 200, resultado);
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
+    // POST /painel/api/reels/:id/reenfileirar — devolve um vídeo com erro pra fila
+    const matchReelsRetry = path_.match(/^\/painel\/api\/reels\/(\d+)\/reenfileirar$/);
+    if (req.method === "POST" && matchReelsRetry) {
+      if (!requireAuth(req, res)) return;
+      await reels.reenfileirar(Number(matchReelsRetry[1]));
+      return send(res, 200, { ok: true });
+    }
+
     // GET /painel/api/ads/campanhas — lista campanhas com métricas
     if (req.method === "GET" && path_ === "/painel/api/ads/campanhas") {
       if (!requireAuth(req, res)) return;
@@ -1416,5 +1469,35 @@ setInterval(async () => {
     }
   } catch (err) {
     console.error("Erro no verificador de janela de 24h:", err.message);
+  }
+}, 60 * 1000);
+
+// ─── AGENDADOR DE REELS EM MASSA (Publique IV) ──────────────────────────────
+// A cada minuto, checa (no horário de Brasília) se bateu um dos horários da fila —
+// se sim, e ainda não postou nesse horário hoje, publica o próximo vídeo pendente.
+// Fica pausado por padrão até alguém configurar o Drive e ligar pelo painel.
+const REEL_HORARIOS = ["09:00", "12:15", "15:30", "18:45", "21:00"];
+setInterval(async () => {
+  try {
+    if ((await reels.configGet("pausado")) !== "0") return; // padrão: pausado até ligar no painel
+
+    const agora = new Date();
+    const hoje = agora.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
+    const horaAtual = agora.toLocaleTimeString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    if (!REEL_HORARIOS.includes(horaAtual)) return;
+
+    const chaveSlot = `postado_${hoje}_${horaAtual}`;
+    if ((await reels.configGet(chaveSlot)) === "1") return; // já postou nesse horário hoje
+    await reels.configSet(chaveSlot, "1");
+
+    const resultado = await reels.publicarProximoPendente();
+    if (resultado.vazio) console.log("🎬 Fila de Reels vazia — nada pra postar.");
+    else console.log(`🎬 Reels publicado automaticamente (${horaAtual}):`, resultado.resultado?.link);
+  } catch (err) {
+    console.error("Erro no agendador de Reels:", err.message);
   }
 }, 60 * 1000);

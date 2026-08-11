@@ -135,6 +135,27 @@ const ready = (async () => {
     email_enviado INTEGER DEFAULT 0,
     created_at INTEGER NOT NULL
   )`);
+
+  // Fila de Reels agendados (Publique IV → vídeos em massa do Google Drive).
+  // status: pending | posted | error
+  await client.execute(`CREATE TABLE IF NOT EXISTS reels_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    drive_file_id TEXT NOT NULL UNIQUE,
+    nome_arquivo TEXT,
+    posicao INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    legenda TEXT,
+    resultado TEXT,
+    tentativas INTEGER NOT NULL DEFAULT 0,
+    posted_at INTEGER,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_reels_queue_status ON reels_queue(status, posicao)`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS reels_config (
+    chave TEXT PRIMARY KEY,
+    valor TEXT
+  )`);
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -370,6 +391,101 @@ async function listarLeadsCotaCerta() {
   return result.rows;
 }
 
+// Adiciona à fila os arquivos do Drive que ainda não estão nela (idempotente — pode
+// rodar de novo a qualquer momento pra pegar vídeos novos que você jogar na pasta).
+// Mantém a ordem de chegada: novos entram sempre no fim da fila.
+async function reelsSincronizarFila(arquivos) {
+  await ready;
+  const maxAtual = await client.execute(`SELECT COALESCE(MAX(posicao), 0) AS m FROM reels_queue`);
+  let proxima = (maxAtual.rows[0]?.m || 0) + 1;
+  let adicionados = 0;
+  for (const arq of arquivos) {
+    const result = await client.execute({
+      sql: `INSERT INTO reels_queue (drive_file_id, nome_arquivo, posicao, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(drive_file_id) DO NOTHING`,
+      args: [arq.id, arq.name, proxima, Date.now()],
+    });
+    if (result.rowsAffected > 0) {
+      proxima++;
+      adicionados++;
+    }
+  }
+  return adicionados;
+}
+
+async function reelsProximosPendentes(quantidade) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM reels_queue WHERE status = 'pending' ORDER BY posicao ASC LIMIT ?`,
+    args: [quantidade],
+  });
+  return result.rows;
+}
+
+async function reelsMarcarPostado(id, resultado) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE reels_queue SET status = 'posted', resultado = ?, posted_at = ? WHERE id = ?`,
+    args: [JSON.stringify(resultado || {}), Date.now(), id],
+  });
+}
+
+async function reelsMarcarErro(id, mensagem) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE reels_queue SET status = 'error', resultado = ?, tentativas = tentativas + 1 WHERE id = ?`,
+    args: [JSON.stringify({ erro: mensagem }), id],
+  });
+}
+
+// Devolve um erro pra fila de novo (status volta pra pending) — usado quando o usuário
+// pede pra tentar de novo um vídeo que falhou.
+async function reelsReenfileirar(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE reels_queue SET status = 'pending' WHERE id = ?`, args: [id] });
+}
+
+async function reelsResumo() {
+  await ready;
+  const result = await client.execute(
+    `SELECT status, COUNT(*) AS total FROM reels_queue GROUP BY status`
+  );
+  const resumo = { pending: 0, posted: 0, error: 0, total: 0 };
+  for (const row of result.rows) {
+    resumo[row.status] = row.total;
+    resumo.total += row.total;
+  }
+  return resumo;
+}
+
+async function reelsListarRecentes(limit = 30) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM reels_queue ORDER BY
+            CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
+            posicao ASC
+          LIMIT ?`,
+    args: [limit],
+  });
+  return result.rows;
+}
+
+async function reelsConfigGet(chave) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT valor FROM reels_config WHERE chave = ?`, args: [chave] });
+  return result.rows[0]?.valor ?? null;
+}
+
+async function reelsConfigSet(chave, valor) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO reels_config (chave, valor) VALUES (?, ?)
+          ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor`,
+    args: [chave, valor],
+  });
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -390,4 +506,13 @@ module.exports = {
   telegramListContacts,
   salvarLeadCotaCerta,
   listarLeadsCotaCerta,
+  reelsSincronizarFila,
+  reelsProximosPendentes,
+  reelsMarcarPostado,
+  reelsMarcarErro,
+  reelsReenfileirar,
+  reelsResumo,
+  reelsListarRecentes,
+  reelsConfigGet,
+  reelsConfigSet,
 };

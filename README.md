@@ -91,6 +91,9 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `TWITTER_ACCESS_TOKEN` / `TWITTER_ACCESS_SECRET` | Token de acesso da conta (gerado no mesmo App) | — |
 | `LINKEDIN_ACCESS_TOKEN` | Token OAuth2 do App LinkedIn (escopo `w_member_social` ou `w_organization_social`) | — |
 | `LINKEDIN_AUTHOR_URN` | `urn:li:person:XXX` (perfil) ou `urn:li:organization:XXX` (Página da empresa) | — |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | Conteúdo inteiro do JSON da Service Account do Google Cloud (Reels em massa — ver PUBLIQUE-IV.md) | — |
+| `GOOGLE_DRIVE_REELS_FOLDER_ID` | ID da pasta do Google Drive com os vídeos a publicar (pega na URL da pasta) | — |
+| `PUBLIC_URL` | URL pública do servidor (usada pelo auto-ping e pra montar a URL do vídeo que o Instagram busca) | `https://meuwhats.onrender.com` |
 
 ⚠️ Defina `PAINEL_USER`/`PAINEL_PASS` com valores próprios — o painel mostra suas conversas.
 

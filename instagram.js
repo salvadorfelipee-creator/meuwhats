@@ -193,6 +193,45 @@ async function publicarImagem({ imagemUrl, legenda, accessToken, accountId }) {
   return { id: publicado.id, link };
 }
 
+// Publica um Reels (vídeo) no feed — usado pela fila de agendamento em massa (ver
+// PUBLIQUE-IV.md, seção Reels). Igual à publicação de imagem, mas com media_type REELS
+// e um tempo de espera bem maior no polling: processar vídeo demora bem mais que imagem.
+async function publicarReels({ videoUrl, legenda, accessToken, accountId }) {
+  const token = accessToken || ACCESS_TOKEN;
+  const conta = accountId || ACCOUNT_ID;
+  const { status, json: container } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${conta}/media`,
+    { media_type: "REELS", video_url: videoUrl, caption: legenda || "", share_to_feed: true },
+    token
+  );
+  if (status >= 400) throw new Error(`Falha ao criar publicação de Reels no Instagram: ${JSON.stringify(container)}`);
+
+  await aguardarContainerPronto(token, container.id, 40, 5000); // até ~3min de processamento
+
+  const { status: s2, json: publicado } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${conta}/media_publish`,
+    { creation_id: container.id },
+    token
+  );
+  if (s2 >= 400) throw new Error(`Falha ao publicar Reels no Instagram: ${JSON.stringify(publicado)}`);
+
+  let link = null;
+  try {
+    const { status: s3, json: dados } = await graphRequest(
+      "GET",
+      `/${GRAPH_VERSION}/${publicado.id}?fields=permalink`,
+      null,
+      token
+    );
+    if (s3 < 400) link = dados.permalink;
+  } catch {
+    // publicação já existe mesmo se essa busca falhar — só não teremos o link pro painel
+  }
+  return { id: publicado.id, link };
+}
+
 module.exports = {
   sendDM,
   getPerfil,
@@ -202,4 +241,5 @@ module.exports = {
   getConversas,
   diagnostico,
   publicarImagem,
+  publicarReels,
 };

@@ -68,6 +68,77 @@ fora; como a imagem já vai virar uma publicação pública mesmo, isso não é 
 nova de dado sensível. O disco do Render é efêmero (perde arquivo a cada deploy), mas isso
 não é problema aqui — a imagem só precisa existir pelos segundos que a Meta leva pra buscá-la.
 
+## Reels em massa (Google Drive → Instagram, agendado)
+
+Além da publicação manual de 1 clique, o Publique IV tem uma segunda engrenagem pensada
+pra publicar um **acervo grande de vídeos prontos** (ex.: 1500 Reels editados) sozinho, aos
+poucos, sem precisar subir cada um na mão.
+
+Como funciona:
+
+1. Você guarda os vídeos numa pasta do **Google Drive**.
+2. O servidor lê essa pasta (só leitura, via Service Account) e monta uma **fila** no banco
+   (tabela `reels_queue`), na ordem alfabética dos nomes dos arquivos.
+3. Todo dia, em 5 horários fixos (09:00, 12:15, 15:30, 18:45, 21:00 — horário de Brasília), o
+   agendador pega o **próximo vídeo pendente**, baixa do Drive, aplica a **moldura FelizCred**
+   (ver abaixo) e publica como Reels no Instagram.
+4. Cada vídeo processado é apagado do disco depois de publicado — só existe pelo tempo da
+   publicação (o Drive continua sendo a fonte, nada é duplicado permanentemente no servidor).
+
+Fica **pausado por padrão** — só começa a publicar sozinho depois de ligar o botão "Ativar
+agendamento" no painel (aba 🚀 Publicar → card "Reels em massa").
+
+### A moldura
+
+`assets/reels-frame.png` é um PNG 1080×1920 com fundo navy (cor da marca), uma "janela"
+arredondada transparente no meio e a marca **FelizCred** no topo + botão "Fale com a gente"
+embaixo. `video.js` recorta/redimensiona cada vídeo pra preencher o quadro 1080×1920 e
+sobrepõe esse PNG por cima — o vídeo só aparece através da janela, tudo ao redor é a moldura.
+Pra trocar o design (cores, texto, tamanho da janela), é só gerar um novo PNG no mesmo
+formato e substituir o arquivo — nenhum código muda.
+
+### Arquitetura
+
+```
+drive.js    autenticação de Service Account do Google (JWT assinado na mão, sem SDK) +
+            listar/baixar vídeos de uma pasta do Drive.
+video.js    aplicarMoldura() — ffmpeg (via ffmpeg-static, empacotado no projeto porque o
+            Render não tem ffmpeg instalado por padrão) recorta o vídeo pro formato Reels
+            e sobrepõe assets/reels-frame.png.
+reels.js    orquestrador: sincronizarFila() (Drive → banco) e publicarProximoPendente()
+            (baixa, aplica moldura, publica, limpa arquivos temporários).
+instagram.js → publicarReels() (fluxo de container de vídeo — igual à imagem, mas
+            media_type REELS e um polling bem mais longo, vídeo demora mais pra processar).
+db.js       tabela reels_queue (status: pending/posted/error) + reels_config (liga/desliga,
+            controle de qual horário já postou hoje).
+server.js   rotas (GET /painel/api/reels/status, POST .../sincronizar, .../pausar,
+            .../publicar-agora, .../:id/reenfileirar) + o setInterval que checa a cada
+            minuto se bateu algum dos 5 horários do dia.
+public/painel.html  card "🎬 Reels em massa" na aba Publicar: resumo (pendentes/publicados/
+            com erro), botão de sincronizar, liga/desliga do agendamento, botão de testar
+            publicando 1 agora, e lista dos últimos itens com link de quem já foi publicado.
+```
+
+### Configuração (variáveis de ambiente)
+
+- `GOOGLE_SERVICE_ACCOUNT_JSON` — conteúdo inteiro do JSON da Service Account (Console do
+  Google Cloud → APIs e serviços → Credenciais → Criar credenciais → Conta de serviço →
+  aba Chaves → Adicionar chave → JSON).
+- `GOOGLE_DRIVE_REELS_FOLDER_ID` — ID da pasta do Drive com os vídeos (pega da URL:
+  `drive.google.com/drive/folders/ESSE_ID_AQUI`).
+- A pasta do Drive precisa estar **compartilhada com o e-mail da Service Account**
+  (algo tipo `nome@projeto.iam.gserviceaccount.com`, aparece na tela da conta de serviço),
+  permissão de **Leitor** já é suficiente.
+
+### Status
+
+- Código completo e testado localmente: pipeline de moldura (ffmpeg real, verificado
+  visualmente), rotas do painel (fila vazia, pausar/ativar, sincronizar sem credencial →
+  erro claro), UI do card renderizando certo.
+- **Pendente**: criar a Service Account do Google e configurar as duas variáveis acima —
+  depois disso, o primeiro teste real (1 vídeo, botão "Publicar 1 agora") fica pra ser feito
+  puxando um vídeo de verdade da pasta, antes de ligar o agendamento automático dos 1500.
+
 ## Contas — como adicionar uma nova
 
 Todo o roteamento de "qual credencial usar" mora num único lugar: o array `CONTAS` no topo
