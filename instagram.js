@@ -112,6 +112,18 @@ async function getConversas() {
   return json.data || [];
 }
 
+// Mensagens de UMA conversa (thread) — usado só pra importar o histórico que já existia
+// antes da gravação automática via webhook começar (ver instagramImportarHistorico em
+// server.js). getConversas() acima só traz participantes/data, não o texto das mensagens.
+async function getMensagensConversa(conversationId, limit = 100) {
+  const { status, json } = await graphRequest(
+    "GET",
+    `/${GRAPH_VERSION}/${conversationId}?fields=messages.limit(${limit}){id,from,to,message,created_time}`
+  );
+  if (status >= 400) throw new Error(`Falha ao ler mensagens da conversa: ${JSON.stringify(json)}`);
+  return json.messages?.data || [];
+}
+
 // Testa, com o token já configurado no servidor, se cada permissão do Instagram
 // está liberada de verdade (Acesso Avançado) — sem precisar de telas da Meta nem
 // de repassar token nenhum. Usado pela rota /painel/api/instagram/diagnostico.
@@ -242,6 +254,7 @@ async function publicarReels({ videoUrl, legenda, accessToken, accountId }) {
 }
 
 module.exports = {
+  ACCOUNT_ID,
   sendDM,
   getPerfil,
   getPerfilUsuario,
@@ -249,6 +262,7 @@ module.exports = {
   listarPublicacoes,
   getComentariosUltimoPost,
   getConversas,
+  getMensagensConversa,
   diagnostico,
   publicarImagem,
   publicarReels,

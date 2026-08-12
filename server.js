@@ -858,7 +858,7 @@ async function processarEntry(entry) {
 // usando business_number_id fixo "instagram" — isso deixa reaproveitar todas as rotas do
 // painel (/painel/api/conversations/:businessId/...) sem duplicar nada, e é o que alimenta
 // a caixa de entrada unificada (WhatsApp + Instagram juntos).
-async function logInstagramInbound(senderId, texto, quando) {
+async function logInstagramInbound(senderId, texto, quando, idExterno) {
   const conversaAnterior = await db.getConversation(senderId, "instagram");
   let nome = conversaAnterior?.name || null;
   if (!nome) {
@@ -877,11 +877,12 @@ async function logInstagramInbound(senderId, texto, quando) {
     type: "text",
     body: texto,
     status: "received",
+    wa_message_id: idExterno || null,
     created_at: quando,
   });
 }
 
-async function logInstagramOutbound(recipientId, texto) {
+async function logInstagramOutbound(recipientId, texto, idExterno) {
   const now = Date.now();
   await db.upsertConversation(recipientId, "instagram", null, now);
   await db.insertMessage({
@@ -891,16 +892,67 @@ async function logInstagramOutbound(recipientId, texto) {
     type: "text",
     body: texto,
     status: "sent",
+    wa_message_id: idExterno || null,
     created_at: now,
   });
+}
+
+// Importa o histórico de DMs que já existiam ANTES da gravação automática via webhook
+// (logInstagramInbound/Outbound acima) começar a rodar — sem isso, só mensagem nova a
+// partir do deploy aparece na caixa de entrada. Rodar uma vez só, pelo botão no painel
+// (idempotente: pode rodar de novo sem duplicar, graças ao dedup por wa_message_id).
+async function instagramImportarHistorico() {
+  const conversas = await ig.getConversas();
+  let conversasImportadas = 0;
+  let mensagensNovas = 0;
+  for (const conversa of conversas) {
+    const participantes = conversa.participants?.data || [];
+    const outro = participantes.find((p) => p.id !== ig.ACCOUNT_ID);
+    if (!outro) continue;
+
+    let mensagens;
+    try {
+      mensagens = await ig.getMensagensConversa(conversa.id);
+    } catch (err) {
+      console.error(`Falha ao importar conversa ${conversa.id} do Instagram:`, err.message);
+      continue;
+    }
+    if (!mensagens.length) continue;
+
+    let ultimaData = 0;
+    // A Graph API devolve mais recente primeiro — grava em ordem cronológica (mais antiga primeiro)
+    for (const msg of mensagens.slice().reverse()) {
+      const quando = new Date(msg.created_time).getTime() || Date.now();
+      ultimaData = Math.max(ultimaData, quando);
+      if (await db.mensagemExistePorId(msg.id)) continue; // já veio por webhook ou importação anterior
+
+      const direction = msg.from?.id === outro.id ? "in" : "out";
+      await db.insertMessage({
+        phone: outro.id,
+        business_number_id: "instagram",
+        direction,
+        type: "text",
+        body: msg.message || "[mensagem sem texto]",
+        status: direction === "out" ? "sent" : "received",
+        wa_message_id: msg.id,
+        created_at: quando,
+      });
+      mensagensNovas++;
+    }
+
+    const nome = outro.username ? `@${outro.username}` : outro.name || null;
+    await db.upsertConversation(outro.id, "instagram", nome, ultimaData);
+    conversasImportadas++;
+  }
+  return { conversasImportadas, mensagensNovas };
 }
 
 async function handleInstagramComment(value) {
   const userId = value.from?.id;
   if (!userId) return;
   try {
-    await ig.sendDM(userId, INSTAGRAM_COMMENT_REPLY);
-    await logInstagramOutbound(userId, INSTAGRAM_COMMENT_REPLY);
+    const result = await ig.sendDM(userId, INSTAGRAM_COMMENT_REPLY);
+    await logInstagramOutbound(userId, INSTAGRAM_COMMENT_REPLY, result.message_id);
     console.log(`📸 Comentário de ${value.from?.username || userId} → DM enviada`);
   } catch (err) {
     console.error("Erro ao responder comentário do Instagram:", err.message);
@@ -913,14 +965,19 @@ async function handleInstagramMessaging(messaging) {
 
   const texto = messaging.message?.text || "";
   const quando = Number(messaging.timestamp) || Date.now();
-  await logInstagramInbound(senderId, texto || (messaging.message?.attachments ? "[anexo recebido]" : "[mensagem sem texto]"), quando);
+  await logInstagramInbound(
+    senderId,
+    texto || (messaging.message?.attachments ? "[anexo recebido]" : "[mensagem sem texto]"),
+    quando,
+    messaging.message?.mid
+  );
 
   const opcao = detectarOpcaoMenuInstagram(texto);
   if (opcao) {
     const resposta = `Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre ${opcao.produto}:\n${linkWhatsAppInstagram(opcao.produto)}`;
     try {
-      await ig.sendDM(senderId, resposta);
-      await logInstagramOutbound(senderId, resposta);
+      const result = await ig.sendDM(senderId, resposta);
+      await logInstagramOutbound(senderId, resposta, result.message_id);
       console.log(`📸 ${senderId} escolheu "${opcao.produto}" → link do WhatsApp enviado`);
     } catch (err) {
       console.error("Erro ao enviar link do WhatsApp (menu Instagram):", err.message);
@@ -931,8 +988,8 @@ async function handleInstagramMessaging(messaging) {
   const isStoryReply = !!messaging.message?.reply_to?.story;
   if (isStoryReply) {
     try {
-      await ig.sendDM(senderId, INSTAGRAM_WELCOME_MESSAGE);
-      await logInstagramOutbound(senderId, INSTAGRAM_WELCOME_MESSAGE);
+      const result = await ig.sendDM(senderId, INSTAGRAM_WELCOME_MESSAGE);
+      await logInstagramOutbound(senderId, INSTAGRAM_WELCOME_MESSAGE, result.message_id);
       console.log(`📸 Reply de story de ${senderId} → DM enviada`);
     } catch (err) {
       console.error("Erro ao responder reply de story do Instagram:", err.message);
@@ -945,8 +1002,8 @@ async function handleInstagramMessaging(messaging) {
 
   await db.instagramMarcarSaudado(senderId);
   try {
-    await ig.sendDM(senderId, INSTAGRAM_WELCOME_MESSAGE);
-    await logInstagramOutbound(senderId, INSTAGRAM_WELCOME_MESSAGE);
+    const result = await ig.sendDM(senderId, INSTAGRAM_WELCOME_MESSAGE);
+    await logInstagramOutbound(senderId, INSTAGRAM_WELCOME_MESSAGE, result.message_id);
     console.log(`📸 Primeira DM de ${senderId} → boas-vindas enviada`);
   } catch (err) {
     console.error("Erro ao enviar boas-vindas do Instagram:", err.message);
@@ -1194,12 +1251,13 @@ const server = http.createServer(async (req, res) => {
         if (body.imagemBase64) {
           return send(res, 400, { error: "Envio de imagem pelo Instagram ainda não é suportado — responda por texto." });
         }
+        let resultIg;
         try {
-          await ig.sendDM(phone, texto);
+          resultIg = await ig.sendDM(phone, texto);
         } catch (err) {
           return send(res, 502, { error: `Falha ao enviar pelo Instagram: ${err.message}` });
         }
-        await logInstagramOutbound(phone, texto);
+        await logInstagramOutbound(phone, texto, resultIg.message_id);
         return send(res, 200, { ok: true });
       }
 
@@ -1338,6 +1396,18 @@ const server = http.createServer(async (req, res) => {
         await new Promise((r) => setTimeout(r, 350));
       }
       return send(res, 200, { resultados });
+    }
+
+    // POST /painel/api/instagram/importar-historico — importa as DMs que já existiam antes
+    // da gravação automática via webhook começar (ver instagramImportarHistorico acima).
+    // Idempotente — pode clicar de novo sem duplicar.
+    if (req.method === "POST" && path_ === "/painel/api/instagram/importar-historico") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await instagramImportarHistorico());
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
     }
 
     // GET /painel/api/instagram/perfil — perfil do Instagram conectado

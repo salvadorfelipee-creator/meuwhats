@@ -1009,6 +1009,7 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `GET /painel/api/instagram/insights`                             | Métricas do último post (auth)              |
 | `POST /painel/api/instagram/reset-boasvindas`                    | Limpa quem já recebeu boas-vindas (auth)    |
 | `GET /painel/api/instagram/diagnostico`                          | Testa basic/manage_comments/manage_messages de verdade, sem precisar de token (auth) |
+| `POST /painel/api/instagram/importar-historico`                  | Importa DMs anteriores ao deploy da gravação automática (idempotente — auth) |
 | `GET /painel/api/instagram/comentarios`                          | Comentários do último post (auth)           |
 | `GET /painel/api/instagram/conversas`                            | Lista conversas (DMs) do Instagram via Graph API — bruta, sem texto; não usada mais pelo painel, as DMs de verdade vêm por `/painel/api/inbox` (auth) |
 | `GET /painel/api/ads/campanhas`                                  | Lista campanhas de anúncios com métricas (auth) |
@@ -1043,7 +1044,19 @@ do WhatsApp, com `business_number_id` fixo `"instagram"` (ver `logInstagramInbou
 (`/painel/api/conversations/:businessId/...`) já funcionam pra Instagram sem rota nova,
 bastando passar `businessId=instagram`. Responder requer a permissão
 `instagram_manage_messages` aprovada (Acesso Avançado) — cheque com
-`/painel/api/instagram/diagnostico` antes de confiar no botão de resposta.
+`/painel/api/instagram/diagnostico` antes de confiar no botão de resposta (ver status dessa
+aprovação na seção "Status da Análise do App" mais abaixo — foi aprovada em 18/07/2026).
+
+**Importante — a gravação só vale pra DMs a partir do deploy**: quem já tinha conversas
+antes disso (ex.: os 25 threads que o diagnóstico já lia via API em 18/07) não aparece
+sozinho na aba Instagram — a aba fica vazia até alguém importar. Botão **"Importar DMs
+existentes"** na tela 📸 Instagram (rota `POST /painel/api/instagram/importar-historico`,
+função `instagramImportarHistorico` em `server.js`) busca todas as conversas via
+`ig.getConversas()` + `ig.getMensagensConversa()` (que lê o texto de cada thread — a
+`getConversas()` sozinha só traz participantes/data, sem corpo de mensagem) e grava o que
+ainda não existe, usando o id nativo da mensagem do Instagram (`msg.id`, coluna
+`wa_message_id` — nome herdado do WhatsApp mas guarda o id de qualquer canal) pra não
+duplicar quem já chegou por webhook. Idempotente, pode clicar de novo à vontade.
 
 **Notificações de mensagem nova** — botão 🔔 no cabeçalho da caixa de entrada pede permissão
 de notificação do navegador (`Notification` API). Com permissão concedida, toda mensagem

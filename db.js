@@ -188,9 +188,22 @@ async function upsertConversation(phone, businessNumberId, name, when) {
           VALUES (?, ?, ?, ?)
           ON CONFLICT(phone, business_number_id) DO UPDATE SET
             name = COALESCE(excluded.name, conversations.name),
-            last_message_at = excluded.last_message_at`,
+            last_message_at = MAX(excluded.last_message_at, COALESCE(conversations.last_message_at, 0))`,
     args: [phone, businessNumberId, name || null, when],
   });
+}
+
+// Mensagem com esse id externo (wa_message_id — nome herdado do WhatsApp, mas guarda o id
+// nativo de qualquer canal) já foi gravada? Usado pra importar histórico sem duplicar quem
+// já chegou por webhook antes da importação rodar (ver instagramImportarHistorico em server.js).
+async function mensagemExistePorId(idExterno) {
+  await ready;
+  if (!idExterno) return false;
+  const result = await client.execute({
+    sql: `SELECT 1 FROM messages WHERE wa_message_id = ? LIMIT 1`,
+    args: [idExterno],
+  });
+  return result.rows.length > 0;
 }
 
 // Tenta "reservar" o direito de enviar o menu automático: só retorna true se o último
@@ -652,6 +665,7 @@ module.exports = {
   listarJanelasParaManter,
   tentarMarcarJanelaLembreteEnviado,
   insertMessage,
+  mensagemExistePorId,
   updateStatusByWaId,
   listConversations,
   listMessages,

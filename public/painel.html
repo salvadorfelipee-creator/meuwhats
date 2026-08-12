@@ -427,8 +427,14 @@
         <div class="card">
           <h3>Conversas (DMs)</h3>
           <div class="lista-vazia" style="margin-top:8px;">
-            As DMs agora aparecem na aba 💬 Conversas, junto com o WhatsApp — dá pra ver o histórico e responder direto por lá.
+            As DMs agora aparecem na aba 💬 Conversas (aba "Instagram" lá em cima), junto com o
+            WhatsApp — dá pra ver o histórico e responder direto por lá. Só chegam automaticamente
+            DMs novas a partir de agora; pra trazer as que já existiam antes, importe uma vez:
           </div>
+          <button id="ig-importar-historico" class="btn-secundario" type="button" style="margin-top:10px;">
+            Importar DMs existentes
+          </button>
+          <div id="ig-importar-resultado" style="margin-top:8px; font-size:12.5px; color:var(--text-muted);"></div>
         </div>
       </div>
     </div>
@@ -1362,6 +1368,23 @@ document.getElementById("ig-reset-boasvindas").addEventListener("click", async (
   const res = await fetch("/painel/api/instagram/reset-boasvindas", { method: "POST" });
   const data = await res.json();
   alert(`Removidos ${data.removidos} registro(s). Próxima DM de qualquer conta vai ser tratada como primeira vez.`);
+});
+
+document.getElementById("ig-importar-historico").addEventListener("click", async () => {
+  const botao = document.getElementById("ig-importar-historico");
+  const resultado = document.getElementById("ig-importar-resultado");
+  botao.disabled = true;
+  resultado.textContent = "Importando (pode levar alguns segundos)...";
+  try {
+    const res = await fetch("/painel/api/instagram/importar-historico", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || `status ${res.status}`);
+    resultado.textContent = `${data.conversasImportadas} conversa(s), ${data.mensagensNovas} mensagem(ns) nova(s) importada(s). Já aparecem na aba Instagram de Conversas.`;
+  } catch (err) {
+    resultado.textContent = `Erro ao importar: ${err.message}`;
+  } finally {
+    botao.disabled = false;
+  }
 });
 
 // ─── Ads Manager ────────────────────────────────────────────────────────────
