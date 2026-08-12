@@ -296,11 +296,11 @@ function saudacaoDoDia() {
   return "boa noite";
 }
 
-function menuInicial() {
-  // Desde 11/07/2026 a primeira mensagem é direto a triagem do anúncio de gerente
-  // (decisão do usuário: vale para todo contato novo, não só quem vem do anúncio).
-  // O menu antigo (ANÚNCIO GERENTE / CONSIGNADO CLT) foi desativado, mas os passos
-  // fluxo_gerente/fluxo_clt continuam no FLUXO_BOTOES para quem clicar em botões antigos.
+// Triagem do anúncio de gerente/supervisor (revisão de FGTS via escritório parceiro) — foi
+// a entrada padrão de 11/07/2026 até 12/08/2026. ARQUIVADA, não desativada: guardada aqui
+// pronta pra virar `menuInicial` de novo (é só trocar a referência abaixo), com todos os
+// passos (fluxo_gerente/gerente_*) intactos no FLUXO_BOTOES.
+function menuInicialGerenteArquivado() {
   return {
     texto:
       `Olá, ${saudacaoDoDia()}! Você clicou no nosso anúncio voltado para quem trabalha ou já trabalhou ` +
@@ -309,6 +309,24 @@ function menuInicial() {
     botoes: [
       { id: "gerente_trabalhou", title: "TRABALHO/TRABALHEI" },
       { id: "gerente_nunca", title: "NUNCA TRABALHEI" },
+    ],
+  };
+}
+
+// Entrada padrão desde 12/08/2026 — foco do dia é Consignado CLT (funil amigável, baseado
+// no padrão real de atendimento: primeiro qualifica o tempo de carteira assinada, só pede
+// os dados de quem já pode simular). Pra reativar a triagem de gerente, troca essa função
+// pelo conteúdo de menuInicialGerenteArquivado() (logo acima).
+function menuInicial() {
+  return {
+    texto:
+      `Olá, ${saudacaoDoDia()}! 😊 Aqui é o Felipe, da Felizcred.\n\n` +
+      "Hoje estou com uma condição boa no Empréstimo Consignado CLT: o desconto sai direto da " +
+      "folha de pagamento, sem consulta ao SPC/Serasa e sem burocracia.\n\n" +
+      "Há quanto tempo você tem carteira assinada no seu trabalho atual?",
+    botoes: [
+      { id: "clt_3mais", title: "3 MESES OU MAIS" },
+      { id: "clt_menos3", title: "MENOS DE 3 MESES" },
     ],
   };
 }
@@ -343,12 +361,16 @@ const LEMBRETE_MINUTOS = {
   gerente_menos2: 15,
   gerente_mais2: 15,
   gerente_autorizo: 20,
+  clt_3mais: 15,
 };
 
 const LEMBRETE_TEXTOS = {
   gerente_autorizo:
     "Olá! Para entrar na agenda de atendimento do escritório parceiro, preciso do seu nome e da sua " +
     "cidade — é só responder aqui 😊",
+  clt_3mais:
+    "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
+    "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
   padrao:
     "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da " +
     "mensagem acima 👆",
@@ -423,7 +445,34 @@ const FLUXO_BOTOES = {
       "Perfeito! Para simular o consignado CLT, é só aguardar um instante que um atendente vai falar com você.\n\n" +
       "Enquanto isso, você pode conhecer nosso site: www.felizcred.com.br",
   },
+  // Funil de Consignado CLT (12/08/2026) — resposta da qualificação de tempo de carteira
+  // assinada, enviada pelo menuInicial() atual. clt_3mais segue pra captura de dados
+  // (handlerCapturaDadosClt); clt_menos3 é terminal, sem mais nada esperado da pessoa.
+  clt_3mais: {
+    texto:
+      "Show! 😊 Pra simular preciso de mais 5 coisinhas, pode mandar tudo numa mensagem só:\n" +
+      "• Nome completo\n• CPF\n• Telefone\n• E-mail\n• Data de nascimento",
+  },
+  clt_menos3: {
+    texto:
+      "Como você ainda não completou 3 meses no seu trabalho atual, não é possível simular agora. " +
+      "Dá uma olhada no app da Carteira de Trabalho Digital pra conferir a data de admissão certinha " +
+      "— no dia que completar os 3 meses, é só me chamar de novo que eu já simulo. 😊\n\n" +
+      "Deixa meu contato salvo: aqui é o Felipe, pode me chamar sempre que precisar!",
+  },
 };
+
+// Depois que a pessoa manda os dados pedidos em clt_3mais — confirma e libera pro
+// atendimento humano (Felipe assume dali pra frente, com os dados já visíveis no
+// histórico da conversa no painel). Mesmo padrão de handlerConfirmacaoAgenda acima.
+async function handlerCapturaDadosClt(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Perfeito! ✅ Já anotei tudo. Agora é só aguardar que eu, Felipe, vou continuar por aqui pra fazer sua simulação. 🙌"
+  );
+  await db.setFluxoPasso(de, businessNumberId, null);
+}
 
 // ─── FLUXO COTA CERTA SEGUROS (número "felizcred n") ────────────────────────
 // Número dedicado à Cota Certa Seguros. Duas entradas possíveis:
@@ -685,7 +734,7 @@ const FLUXO_FELIZCRED = {
   fluxoBotoes: FLUXO_BOTOES,
   lembreteMinutos: LEMBRETE_MINUTOS,
   lembreteTextos: LEMBRETE_TEXTOS,
-  capturaTexto: { gerente_autorizo: handlerConfirmacaoAgenda },
+  capturaTexto: { gerente_autorizo: handlerConfirmacaoAgenda, clt_3mais: handlerCapturaDadosClt },
 };
 
 const FLUXO_COTACERTA = {

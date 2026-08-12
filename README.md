@@ -218,6 +218,13 @@ botões. Vale para **todos os números** configurados. Cliques em botão não re
 corrige bug de 08/07/2026 em que uma rajada de mensagens (processadas em webhooks paralelos)
 disparava um menu para cada mensagem. Tipos `unsupported`/`reaction` não disparam menu.
 
+⚠️ **Arquivado em 12/08/2026, não é mais a entrada padrão** — ver "Funil de Consignado CLT"
+logo abaixo pro que está ativo hoje. Fica documentado aqui porque o código continua intacto
+(`menuInicialGerenteArquivado()` em `server.js`) pronto pra reativar quando quiser: é só trocar
+o que `menuInicial()` retorna pelo conteúdo dessa função arquivada. Os passos `fluxo_gerente`/
+`gerente_*`/`fluxo_clt` também continuam no `FLUXO_BOTOES`, então um clique num botão antigo
+(de alguém que recebeu essa mensagem antes da troca) ainda funciona normalmente.
+
 Fluxo (cada botão tem um `id` que aponta pro próximo passo em `FLUXO_BOTOES`) —
 **reformulado em 11/07/2026** após analisar as conversas do 1º teste A/B:
 
@@ -263,6 +270,34 @@ No histórico do painel, as mensagens enviadas com botões mostram os botões co
   monitor no UptimeRobot (conta do usuário, plano grátis), tipo HTTP(s), URL
   `https://meuwhats.onrender.com/ping`, intervalo 5 min, alerta por e-mail — cobre também
   o caso de o serviço já ter dormido por algum motivo e avisa se o servidor cair.
+
+### Funil de Consignado CLT (12/08/2026) — entrada padrão atual do número Felizcred
+
+Substituiu a triagem de gerente (arquivada acima) como `menuInicial()`. Baseado no padrão
+real de atendimento manual, analisado a partir de conversas exportadas de leads reais
+(pasta local `felizcred-site/logo/chats/`, não versionada — dados de cliente): o atendente
+(Felipe) sempre pergunta o tempo de carteira assinada antes de pedir dados, e o mínimo
+aceito nos exemplos reais foi 3 meses.
+
+- **Primeira mensagem**: saudação + gancho do consignado CLT ("desconto sai direto da folha,
+  sem SPC/Serasa") → botões `3 MESES OU MAIS` / `MENOS DE 3 MESES`.
+  - `3 MESES OU MAIS` (`clt_3mais`) → pede nome completo, CPF, telefone, e-mail e data de
+    nascimento numa mensagem só. Ao responder (`handlerCapturaDadosClt`), confirma
+    recebimento e libera pro atendimento humano — os dados já ficam no histórico da
+    conversa no painel, não precisa repetir nada pro Felipe.
+  - `MENOS DE 3 MESES` (`clt_menos3`) → explica o requisito, orienta a conferir a data de
+    admissão no app da Carteira de Trabalho Digital, convida a voltar quando completar 3
+    meses. **Terminal** — não pede dados, não tem lembrete de continuação.
+
+**O que fica de fora de propósito** (evidenciado nas conversas analisadas, mas não
+automatizável com o que existe hoje): a simulação de crédito de verdade é feita pelo Felipe
+operando o portal de um banco parceiro (C6 ou Facta) em tempo real — manda SMS de 6 dígitos
+ou link de autorização, o cliente responde na hora, o código expira em ~2 min. Não existe
+integração/API dessa consulta no código; é atendimento manual a partir da captura de dados.
+A mensagem de proposta final também segue um padrão (várias opções de parcela + aviso fixo
+de taxa de R$95 só se aprovado + documentos pra fechar) mas ainda não virou resposta pronta
+no painel — candidato natural pra próxima melhoria, usando a funcionalidade que já existe em
+⚡ Respostas prontas.
 
 ### Fluxo por número — Cota Certa Seguros (30/07/2026)
 
