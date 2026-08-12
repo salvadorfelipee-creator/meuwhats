@@ -284,39 +284,57 @@ menu real que ele já usa manualmente foi copiado pro código.
   "1"-"4" ou uma palavra, não clicando em botão, igual acontece de verdade): "Olá, me chamo
   Felipe: escolha uma das opções... 1 - CONSIGNADO CLT / 2 - SEGURO DE CARRO/MOTO /
   3 - EMPRÉSTIMO COM CARRO EM GARANTIA / 4 - FINANCIAR UM VEÍCULO" + aviso do FGTS + telefones
-  + site. Reconhecimento em `detectarOpcaoMenuPrincipal`/`handlerMenuPrincipal` (mesmo padrão
-  de `detectarOpcaoMenuInstagram`): número exato ou palavra-chave dentro da frase. Não
-  reconhecer não responde nada automático (fica pro atendimento manual, e o lembrete sutil
-  do passo `menu_inicial` continua tentando trazer a pessoa de volta).
+  + site. Reconhecimento em `detectarOpcaoMenuPrincipal`/`handlerMenuPrincipal`: número exato
+  ou palavra-chave — mas **exige a mensagem inteira igual à palavra-chave** (`t === chave`,
+  não `.includes()`), tanto aqui quanto em `detectarOpcaoMenuInstagram`: mandar só "fgts"
+  aciona, mandar uma frase qualquer que contenha "fgts" no meio não aciona mais (mudou
+  12/08/2026 depois do usuário ver a palavra disparando dentro de frases sem intenção clara).
+  Não reconhecer não responde nada automático (fica pro atendimento manual, e o lembrete
+  sutil do passo `menu_inicial` continua tentando trazer a pessoa de volta).
   - **Opção 1 (CLT)** → "Para simular o consignado CLT, precisa ter no mínimo 3 meses de
     carteira assinada..." com botões `3 MESES OU MAIS` / `MENOS DE 3 MESES` (passo
     `clt_pergunta_tempo`, esses dois continuam sendo botão de verdade, não texto).
     - `3 MESES OU MAIS` (`clt_3mais`) → pede nome completo, CPF, telefone, e-mail e data de
       nascimento numa mensagem só. `handlerCapturaDadosClt` só confirma e libera pro
       atendimento humano se achar um **CPF de verdade** na resposta (`REGEX_CPF`) — sem
-      isso, pede de novo e mantém o passo (não confirma qualquer texto como se fosse dado,
-      bug real visto em teste: respondeu "Fgts" no meio do fluxo e o bot confirmou como se
-      tivesse recebido a simulação completa).
+      isso, **não reclama na hora**: só reafirma o passo (reseta o relógio do lembrete) e
+      espera quieto, porque a pessoa pode estar mandando os 5 dados aos poucos, em mensagens
+      separadas (nome numa, CPF em outra...). Só cobra de volta depois de ficar um tempo sem
+      novidade nenhuma (`LEMBRETE_TEXTOS.clt_3mais`, 15 min). Antes disso ser corrigido, o bot
+      confirmava QUALQUER texto como "dados recebidos" (bug real visto em teste: respondeu
+      "Fgts" no meio do fluxo e o bot deu como recebida a simulação completa) e reclamava
+      "não consegui identificar seu CPF" a cada mensagem parcial — os dois foram corrigidos
+      no mesmo dia.
     - `MENOS DE 3 MESES` (`clt_menos3`) → explica o requisito, orienta a conferir a data de
       admissão no app da Carteira de Trabalho Digital, convida a voltar quando completar 3
       meses. **Terminal** — não pede dados, não tem lembrete de continuação.
-  - **Opções 2-4** (seguro, carro em garantia, financiamento) → confirmação padrão
-    (`PRODUTO_CONFIRMACAO`) e passa pro atendimento humano — sem fluxo próprio ainda (foco de
-    hoje é só CLT).
+  - **Opção 2 (seguro de carro/moto)** → confirmação padrão (`PRODUTO_CONFIRMACAO`) e passa
+    pro atendimento humano — sem fluxo próprio ainda.
+  - **Opções 3 e 4 (carro em garantia / financiamento)** → cada uma manda seu requisito
+    (garantia: sem restrição no SPC/Serasa **e** carro não pode estar alienado; financiamento:
+    sem restrição no SPC/Serasa) seguido da mesma lista de documentos (`DOCUMENTOS_VEICULO`):
+    foto do documento do veículo (CRLV), endereço completo, profissão e renda, foto do
+    documento pessoal (RG/CNH), e-mail. `handlerCapturaDadosCarroGarantia`/
+    `handlerCapturaDadosFinanciamento` usam o mesmo padrão paciente do CLT, mas o sinal de
+    "dados completos" é achar um **e-mail** na mensagem (`REGEX_EMAIL`) em vez de CPF — não
+    têm CPF pedido, e-mail é o único campo com formato reconhecível na lista. ⚠️ Foto do
+    documento não dispara nada automaticamente (captura de texto só roda pra mensagem de
+    texto) — fica visível no histórico do painel pro Felipe conferir manualmente.
 
 **Fora do horário comercial** (`horarioComercialCotaCerta()` — mesma janela usada pela Cota
 Certa, seg-sex 9h-18h/sáb até 12h, reaproveitada porque é a mesma equipe): em vez do menu, a
 primeira mensagem vira um aviso pedindo pra escrever de novo dentro do horário — não faz
 sentido abrir o funil se não tem ninguém pra rodar a simulação de crédito depois. A
-confirmação de dados recebidos (`handlerCapturaDadosClt`) também ganha esse aviso
-(`avisoForaHorarioCotaCerta()`) quando cai fora do horário, pra não prometer resposta rápida
-à toa.
+confirmação de dados recebidos (`confirmarDadosRecebidos`, reaproveitada pelos 3 funis)
+também ganha esse aviso (`avisoForaHorarioCotaCerta()`) quando cai fora do horário, pra não
+prometer resposta rápida à toa.
 
 **Lembretes ("gancho") são sutis e só disparam pra quem parou no meio de uma resposta
 automática** — se o Felipe já respondeu manualmente pelo painel, `setFluxoPasso(...null)`
 zera o passo e cancela qualquer lembrete pendente daquela conversa (mesmo mecanismo de
 sempre, ver "Lembretes e agenda" acima). Passos novos: `menu_inicial` (15 min, "responda com
-o número da opção"), `clt_pergunta_tempo` (15 min), `clt_3mais` (15 min, já existia).
+o número da opção"), `clt_pergunta_tempo` (15 min), `clt_3mais` (15 min), `carro_garantia_dados`
+(15 min), `financiamento_dados` (15 min).
 
 **O que fica de fora de propósito** (evidenciado nas conversas analisadas, mas não
 automatizável com o que existe hoje): a simulação de crédito de verdade é feita pelo Felipe

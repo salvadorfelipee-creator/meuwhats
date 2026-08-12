@@ -95,12 +95,15 @@ function normalizarTexto(texto) {
     .trim();
 }
 
+// Exige a mensagem inteira igual à palavra-chave (não só "conter" a palavra em algum lugar
+// de uma frase maior) — "fgts" sozinho aciona, "por que o fgts não caiu" não aciona (pedido
+// do usuário depois de ver a palavra disparando dentro de frases sem intenção clara).
 function detectarOpcaoMenuInstagram(texto) {
   const t = normalizarTexto(texto);
   if (!t) return null;
   for (const opcao of INSTAGRAM_OPCOES_MENU) {
     for (const chave of opcao.chaves) {
-      if (chave.length === 1 ? t === chave : t.includes(chave)) return opcao;
+      if (t === chave) return opcao;
     }
   }
   return null;
@@ -348,8 +351,10 @@ function menuInicial() {
   return { texto: TEXTO_MENU_PRINCIPAL };
 }
 
-// Reconhece a opção do menu principal em texto livre — número (1-4) ou palavra-chave dentro
-// da frase, mesmo padrão de detectarOpcaoMenuInstagram.
+// Reconhece a opção do menu principal em texto livre — número (1-4) ou palavra-chave.
+// Exige a mensagem inteira igual à palavra-chave, não só "conter" a palavra em algum lugar
+// de uma frase maior — "fgts" sozinho aciona, "por que o fgts não caiu" não aciona (pedido
+// do usuário depois de ver a palavra disparando dentro de frases sem intenção clara).
 const OPCOES_MENU_PRINCIPAL = [
   { id: "1", chaves: ["1", "clt", "consignado"] },
   { id: "2", chaves: ["2", "seguro"] },
@@ -362,16 +367,26 @@ function detectarOpcaoMenuPrincipal(texto) {
   if (!t) return null;
   for (const opcao of OPCOES_MENU_PRINCIPAL) {
     for (const chave of opcao.chaves) {
-      if (chave.length === 1 ? t === chave : t.includes(chave)) return opcao.id;
+      if (t === chave) return opcao.id;
     }
   }
   return null;
 }
 
-// Resposta de quem clicou/digitou a opção do menu principal. Só a opção 1 (CLT) tem fluxo
-// próprio hoje (foco do dia); 2-4 recebem a confirmação padrão e passam pro atendimento
-// humano — não reconhecer não responde nada automático (fica pro atendimento manual,
-// mesma filosofia do menu do Instagram).
+// Documentos pedidos em garantia/financiamento — mesma lista pros dois (só muda a frase de
+// requisito antes). "Foto do documento" fica sem automação de verdade: capturaTexto só roda
+// pra mensagens de texto, então uma foto sozinha não confirma nada — fica visível no
+// histórico do painel pro Felipe conferir manualmente.
+const DOCUMENTOS_VEICULO =
+  "\n\nPra simular, me envia:\n" +
+  "• Foto do documento do veículo (CRLV)\n" +
+  "• Endereço completo\n" +
+  "• Profissão e renda\n" +
+  "• Foto do seu documento (RG ou CNH)\n" +
+  "• E-mail";
+
+// Resposta de quem clicou/digitou a opção do menu principal. Não reconhecer não responde
+// nada automático (fica pro atendimento manual, mesma filosofia do menu do Instagram).
 async function handlerMenuPrincipal(de, businessNumberId, corpo) {
   const escolha = detectarOpcaoMenuPrincipal(corpo);
   if (escolha === "1") {
@@ -392,12 +407,20 @@ async function handlerMenuPrincipal(de, businessNumberId, corpo) {
     await enviarRespostaAutomatica(
       businessNumberId,
       de,
-      PRODUTO_CONFIRMACAO("o EMPRÉSTIMO COM CARRO EM GARANTIA") + avisoForaHorarioCotaCerta()
+      "Para fazer a simulação do empréstimo com carro em garantia, você não pode ter restrição de crédito " +
+        "no SPC/Serasa, e o carro não pode estar alienado." +
+        DOCUMENTOS_VEICULO
     );
-    await db.setFluxoPasso(de, businessNumberId, null);
+    await db.setFluxoPasso(de, businessNumberId, "carro_garantia_dados");
   } else if (escolha === "4") {
-    await enviarRespostaAutomatica(businessNumberId, de, PRODUTO_CONFIRMACAO("o FINANCIAMENTO DE VEÍCULO") + avisoForaHorarioCotaCerta());
-    await db.setFluxoPasso(de, businessNumberId, null);
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      "Se você já escolheu o modelo do veículo que quer financiar, pra fazer a simulação você não pode ter " +
+        "restrição de crédito no SPC/Serasa." +
+        DOCUMENTOS_VEICULO
+    );
+    await db.setFluxoPasso(de, businessNumberId, "financiamento_dados");
   }
   // Não reconheceu a opção → fica no passo menu_inicial (mantém o lembrete sutil ativo)
 }
@@ -434,6 +457,8 @@ const LEMBRETE_MINUTOS = {
   gerente_autorizo: 20,
   clt_pergunta_tempo: 15,
   clt_3mais: 15,
+  carro_garantia_dados: 15,
+  financiamento_dados: 15,
 };
 
 const LEMBRETE_TEXTOS = {
@@ -451,6 +476,12 @@ const LEMBRETE_TEXTOS = {
   clt_3mais:
     "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
     "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
+  carro_garantia_dados:
+    "Olá! Só lembrando que pra eu simular seu empréstimo com carro em garantia, preciso desses dados 😊\n" +
+    "Foto do documento do veículo, endereço completo, profissão e renda, foto do seu documento e e-mail.",
+  financiamento_dados:
+    "Olá! Só lembrando que pra eu simular o financiamento do seu veículo, preciso desses dados 😊\n" +
+    "Foto do documento do veículo, endereço completo, profissão e renda, foto do seu documento e e-mail.",
   padrao:
     "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da " +
     "mensagem acima 👆",
@@ -542,28 +573,16 @@ const FLUXO_BOTOES = {
   },
 };
 
-// CPF em qualquer formato (com ou sem pontuação) — usado só como sinal de "isso parece
-// dado de verdade", não valida dígito verificador (não é o objetivo aqui).
+// CPF em qualquer formato (com ou sem pontuação) — sinal de "isso parece dado de verdade",
+// não valida dígito verificador (não é o objetivo aqui).
 const REGEX_CPF = /\d{3}\.?\d{3}\.?\d{3}-?\d{2}/;
+// E-mail — usado como sinal de conclusão nos funis de garantia/financiamento (não têm um
+// campo tão identificável quanto o CPF, mas todos pedem e-mail no fim da lista).
+const REGEX_EMAIL = /\S+@\S+\.\S+/;
 
-// Depois que a pessoa manda os dados pedidos em clt_3mais — confirma e libera pro
-// atendimento humano (Felipe assume dali pra frente, com os dados já visíveis no
-// histórico da conversa no painel). Mesmo padrão de handlerConfirmacaoAgenda acima.
-//
-// Antes confirmava QUALQUER texto como "dados recebidos" (bug real: testado em produção
-// respondendo "Fgts" no passo de dados, e o bot confirmou como se fosse a simulação
-// completa). Agora só confirma se achar um CPF na mensagem — sem isso, pede de novo e
-// mantém o passo clt_3mais (não perde o lead, só dá mais uma chance).
-async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
-  if (!REGEX_CPF.test(corpo || "")) {
-    await enviarRespostaAutomatica(
-      businessNumberId,
-      de,
-      "Não consegui identificar seu CPF na mensagem 🤔 Pode reenviar com nome completo, CPF, telefone, " +
-        "e-mail e data de nascimento, tudo numa mensagem só?"
-    );
-    return; // mantém o passo clt_3mais — outra chance, sem perder o lead
-  }
+// Confirmação de dados recebidos + aviso de horário — reaproveitada pelos 3 funis que pedem
+// dados e entregam pro atendimento humano (CLT, carro em garantia, financiamento).
+async function confirmarDadosRecebidos(de, businessNumberId) {
   await enviarRespostaAutomatica(
     businessNumberId,
     de,
@@ -572,6 +591,44 @@ async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
       avisoForaHorarioCotaCerta()
   );
   await db.setFluxoPasso(de, businessNumberId, null);
+}
+
+// Depois que a pessoa manda os dados pedidos em clt_3mais — confirma e libera pro
+// atendimento humano (Felipe assume dali pra frente, com os dados já visíveis no
+// histórico da conversa no painel).
+//
+// Antes confirmava QUALQUER texto como "dados recebidos" (bug real: testado em produção
+// respondendo "Fgts" no passo de dados, e o bot confirmou como se fosse a simulação
+// completa) — e reclamava na hora se a pessoa mandasse os 5 dados aos poucos, em mensagens
+// separadas (ex.: só o nome primeiro), em vez de esperar. Agora: cada mensagem sem CPF só
+// reseta o relógio do lembrete (fica quieto, sem incomodar) — só cobra de volta depois de um
+// tempo sem novidade (LEMBRETE_TEXTOS.clt_3mais), nunca na hora.
+async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
+  if (!REGEX_CPF.test(corpo || "")) {
+    await db.setFluxoPasso(de, businessNumberId, "clt_3mais"); // reafirma o passo, reseta o lembrete
+    return;
+  }
+  await confirmarDadosRecebidos(de, businessNumberId);
+}
+
+// Mesmo padrão do CLT, mas pros funis de carro em garantia e financiamento — sinal de
+// conclusão é achar um e-mail na mensagem (não têm CPF pedido). Fotos de documento não
+// disparam nada aqui (capturaTexto só roda pra mensagem de texto) — ficam visíveis no
+// histórico do painel pro Felipe conferir.
+async function handlerCapturaDadosCarroGarantia(de, businessNumberId, corpo) {
+  if (!REGEX_EMAIL.test(corpo || "")) {
+    await db.setFluxoPasso(de, businessNumberId, "carro_garantia_dados");
+    return;
+  }
+  await confirmarDadosRecebidos(de, businessNumberId);
+}
+
+async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
+  if (!REGEX_EMAIL.test(corpo || "")) {
+    await db.setFluxoPasso(de, businessNumberId, "financiamento_dados");
+    return;
+  }
+  await confirmarDadosRecebidos(de, businessNumberId);
 }
 
 // ─── FLUXO COTA CERTA SEGUROS (número "felizcred n") ────────────────────────
@@ -838,6 +895,8 @@ const FLUXO_FELIZCRED = {
     gerente_autorizo: handlerConfirmacaoAgenda,
     menu_inicial: handlerMenuPrincipal,
     clt_3mais: handlerCapturaDadosClt,
+    carro_garantia_dados: handlerCapturaDadosCarroGarantia,
+    financiamento_dados: handlerCapturaDadosFinanciamento,
   },
 };
 
