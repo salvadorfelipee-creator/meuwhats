@@ -179,6 +179,25 @@ const ready = (async () => {
     chave TEXT PRIMARY KEY,
     valor TEXT
   )`);
+
+  // Agenda de publicações (Publique IV → posts de texto/imagem multi-rede, agendados pelo
+  // usuário um a um, cada um com seu próprio dia+hora — diferente da fila de Reels, aqui não
+  // tem "piloto automático": todo item tem agendado_para definido na criação.
+  await client.execute(`CREATE TABLE IF NOT EXISTS posts_agendados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conta_id TEXT NOT NULL DEFAULT 'felizcred',
+    texto TEXT,
+    link TEXT,
+    imagem_key TEXT,
+    redes TEXT NOT NULL,
+    agendado_para INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    resultado TEXT,
+    tentativas INTEGER NOT NULL DEFAULT 0,
+    posted_at INTEGER,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_posts_agendados_status ON posts_agendados(status, agendado_para)`);
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -655,6 +674,113 @@ async function reelsConfigSet(chave, valor) {
   });
 }
 
+async function agendaCriar({ contaId, texto, link, imagemKey, redes, agendadoPara }) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO posts_agendados (conta_id, texto, link, imagem_key, redes, agendado_para, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    args: [contaId, texto || null, link || null, imagemKey || null, JSON.stringify(redes), agendadoPara, Date.now()],
+  });
+  return Number(result.lastInsertRowid); // vem como BigInt do driver — JSON.stringify não serializa BigInt
+}
+
+// Próximo post cuja hora já chegou — checado a cada minuto pelo agendador (mesmo
+// mecanismo do reelsProximoAgendadoDevido, ver server.js).
+async function agendaProximoDevido() {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM posts_agendados WHERE status = 'pending' AND agendado_para <= ?
+          ORDER BY agendado_para ASC LIMIT 1`,
+    args: [Date.now()],
+  });
+  return result.rows[0] || null;
+}
+
+// Fila inteira de pendentes, mais próximos primeiro — pra mostrar no painel como um
+// calendário/lista de tudo que ainda vai sair.
+async function agendaFilaCompleta() {
+  await ready;
+  const result = await client.execute(`SELECT * FROM posts_agendados WHERE status = 'pending' ORDER BY agendado_para ASC`);
+  return result.rows;
+}
+
+async function agendaBuscarPorId(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM posts_agendados WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+async function agendaDefinirData(id, timestampMs) {
+  await ready;
+  await client.execute({ sql: `UPDATE posts_agendados SET agendado_para = ? WHERE id = ?`, args: [timestampMs, id] });
+}
+
+async function agendaRemover(id) {
+  await ready;
+  await client.execute({ sql: `DELETE FROM posts_agendados WHERE id = ?`, args: [id] });
+}
+
+async function agendaMarcarPostado(id, resultado) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE posts_agendados SET status = 'posted', resultado = ?, posted_at = ? WHERE id = ?`,
+    args: [JSON.stringify(resultado || {}), Date.now(), id],
+  });
+}
+
+async function agendaMarcarErro(id, mensagem) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE posts_agendados SET status = 'error', resultado = ?, tentativas = tentativas + 1 WHERE id = ?`,
+    args: [JSON.stringify({ erro: mensagem }), id],
+  });
+}
+
+async function agendaReenfileirar(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE posts_agendados SET status = 'pending' WHERE id = ?`, args: [id] });
+}
+
+// Posts já publicados há mais de X ms cuja imagem ainda não foi apagada do R2 — mesma lógica
+// de limpeza dos Reels, pra não acumular espaço no bucket (posts sem imagem não entram aqui).
+async function agendaPostadosParaLimpar(idadeMinimaMs) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT id, imagem_key FROM posts_agendados
+          WHERE status = 'posted' AND imagem_key IS NOT NULL AND posted_at <= ?`,
+    args: [Date.now() - idadeMinimaMs],
+  });
+  return result.rows;
+}
+
+async function agendaMarcarImagemApagada(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE posts_agendados SET imagem_key = NULL WHERE id = ?`, args: [id] });
+}
+
+async function agendaResumo() {
+  await ready;
+  const result = await client.execute(`SELECT status, COUNT(*) AS total FROM posts_agendados GROUP BY status`);
+  const resumo = { pending: 0, posted: 0, error: 0, total: 0 };
+  for (const row of result.rows) {
+    resumo[row.status] = row.total;
+    resumo.total += row.total;
+  }
+  return resumo;
+}
+
+async function agendaListarRecentes(limit = 30) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM posts_agendados ORDER BY
+            CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
+            agendado_para DESC
+          LIMIT ?`,
+    args: [limit],
+  });
+  return result.rows;
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -700,4 +826,17 @@ module.exports = {
   respostasProntasListar,
   respostaProntaCriar,
   respostaProntaExcluir,
+  agendaCriar,
+  agendaProximoDevido,
+  agendaFilaCompleta,
+  agendaBuscarPorId,
+  agendaDefinirData,
+  agendaRemover,
+  agendaMarcarPostado,
+  agendaMarcarErro,
+  agendaReenfileirar,
+  agendaPostadosParaLimpar,
+  agendaMarcarImagemApagada,
+  agendaResumo,
+  agendaListarRecentes,
 };

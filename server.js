@@ -12,6 +12,7 @@ const ads = require("./ads");
 const tg = require("./telegram");
 const publique = require("./publique");
 const reels = require("./reels");
+const agenda = require("./agenda");
 const { notificarLeadCotaCerta } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
@@ -212,6 +213,16 @@ function salvarImagemPublicar(dataUrl) {
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   fs.writeFileSync(path.join(PUBLICAR_MEDIA_DIR, filename), Buffer.from(match[2], "base64"));
   return filename;
+}
+
+// Igual a salvarImagemPublicar, mas devolve o buffer decodificado em vez de gravar em disco —
+// usado pela agenda de publicações, que guarda a imagem no R2 (precisa sobreviver a um
+// deploy/restart do Render, diferente da publicação imediata que só precisa durar segundos).
+function decodificarImagemBase64(dataUrl) {
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || "");
+  if (!match) throw new Error("Formato de imagem inválido");
+  const ext = EXT_BY_MIME[match[1]] || "jpg";
+  return { buffer: Buffer.from(match[2], "base64"), contentType: match[1], nomeArquivo: `imagem.${ext}` };
 }
 
 function send(res, status, body, headers = {}) {
@@ -1818,6 +1829,90 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // POST /painel/api/agenda — cria um post agendado (dia+hora exatos, multi-rede). Aceita
+    // imagemBase64 opcional (a imagem sobe pro R2, não pra pasta local — precisa sobreviver
+    // até a data marcada, mesmo que o servidor reinicie nesse meio tempo).
+    if (req.method === "POST" && path_ === "/painel/api/agenda") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        let imagem = {};
+        if (body.imagemBase64) imagem = decodificarImagemBase64(body.imagemBase64);
+        const criado = await agenda.criarAgendamento({
+          contaId: body.contaId,
+          texto: body.texto,
+          link: body.link,
+          redes: body.redes,
+          dataHoraString: body.data,
+          imagemBuffer: imagem.buffer,
+          imagemNomeArquivo: imagem.nomeArquivo,
+          imagemContentType: imagem.contentType,
+        });
+        return send(res, 200, criado);
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+
+    // GET /painel/api/agenda/fila — todos os posts pendentes, ordenados pelo mais próximo
+    if (req.method === "GET" && path_ === "/painel/api/agenda/fila") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await agenda.listarFila());
+    }
+
+    // GET /painel/api/agenda/lista — histórico (pendentes + publicados + com erro)
+    if (req.method === "GET" && path_ === "/painel/api/agenda/lista") {
+      if (!requireAuth(req, res)) return;
+      const [resumo, recentes] = await Promise.all([agenda.resumo(), agenda.listarRecentes(50)]);
+      return send(res, 200, { resumo, recentes });
+    }
+
+    // POST /painel/api/agenda/:id/publicar-agora — publica esse post específico na hora,
+    // fora de ordem (ação manual do usuário)
+    const matchAgendaPublicarAgora = path_.match(/^\/painel\/api\/agenda\/(\d+)\/publicar-agora$/);
+    if (req.method === "POST" && matchAgendaPublicarAgora) {
+      if (!requireAuth(req, res)) return;
+      try {
+        const resultado = await agenda.publicarAgoraEspecifico(Number(matchAgendaPublicarAgora[1]));
+        return send(res, 200, resultado);
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+
+    // POST /painel/api/agenda/:id/data — reagenda um post pendente pra outro dia/hora
+    const matchAgendaData = path_.match(/^\/painel\/api\/agenda\/(\d+)\/data$/);
+    if (req.method === "POST" && matchAgendaData) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        await agenda.definirData(Number(matchAgendaData[1]), body.data);
+        return send(res, 200, { ok: true });
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+
+    // POST /painel/api/agenda/:id/reenfileirar — devolve um post com erro pra fila
+    const matchAgendaReenfileirar = path_.match(/^\/painel\/api\/agenda\/(\d+)\/reenfileirar$/);
+    if (req.method === "POST" && matchAgendaReenfileirar) {
+      if (!requireAuth(req, res)) return;
+      await agenda.reenfileirar(Number(matchAgendaReenfileirar[1]));
+      return send(res, 200, { ok: true });
+    }
+
+    // DELETE /painel/api/agenda/:id — tira um post da agenda (e apaga a imagem do R2)
+    const matchAgendaId = path_.match(/^\/painel\/api\/agenda\/(\d+)$/);
+    if (req.method === "DELETE" && matchAgendaId) {
+      if (!requireAuth(req, res)) return;
+      try {
+        await agenda.removerAgendamento(Number(matchAgendaId[1]));
+        return send(res, 200, { ok: true });
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+
     // GET /painel/api/reels/status — resumo da fila + últimos itens (Publique IV → Reels em massa)
     if (req.method === "GET" && path_ === "/painel/api/reels/status") {
       if (!requireAuth(req, res)) return;
@@ -2148,6 +2243,23 @@ function logPublicacaoReel(prefixo, resultado) {
 
 setInterval(async () => {
   try {
+    // Agenda de publicações (posts de texto/imagem multi-rede) — cada post tem hora exata
+    // própria, sempre ativa (não depende do "pausado" dos Reels, que é outro sistema).
+    const agendado = await agenda.publicarProximoDevido();
+    if (!agendado.vazio) {
+      const links = Object.entries(agendado.resultado)
+        .filter(([, r]) => r.ok)
+        .map(([rede, r]) => `${rede}: ${r.link}`)
+        .join(" | ");
+      console.log(`📅 Post agendado publicado: ${links}`);
+    }
+  } catch (err) {
+    console.error("Erro no agendador de posts (agenda):", err.message);
+  }
+}, 60 * 1000);
+
+setInterval(async () => {
+  try {
     if ((await reels.configGet("pausado")) !== "0") return; // padrão: pausado até ligar no painel
 
     // 1) Vídeo com horário EXATO marcado, checado a cada minuto — tem prioridade sobre o
@@ -2194,5 +2306,11 @@ setInterval(async () => {
     if (apagados) console.log(`🗑️ Limpeza do R2: ${apagados} vídeo(s) publicado(s) há mais de 24h apagado(s).`);
   } catch (err) {
     console.error("Erro na limpeza automática do R2:", err.message);
+  }
+  try {
+    const { apagadas } = await agenda.limparAntigas();
+    if (apagadas) console.log(`🗑️ Limpeza do R2: ${apagadas} imagem(ns) de post agendado apagada(s).`);
+  } catch (err) {
+    console.error("Erro na limpeza automática de posts agendados:", err.message);
   }
 }, 60 * 60 * 1000);

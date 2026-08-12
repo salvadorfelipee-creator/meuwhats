@@ -37,7 +37,10 @@ async function espacoUsado() {
 // chamar de novo só pega os vídeos novos (útil se algum vídeo foi colocado direto no R2
 // por fora, embora o normal seja usar o botão de upload do painel).
 async function sincronizarFila() {
-  const arquivos = await r2.listarVideos();
+  // Ignora o prefixo "posts/" — é onde a agenda de publicações (agenda.js) guarda as
+  // imagens dos posts multi-rede, no mesmo bucket. Sem esse filtro elas virariam "vídeos
+  // fantasma" aqui na fila de Reels.
+  const arquivos = (await r2.listarVideos()).filter((a) => !a.name.startsWith("posts/"));
   const adicionados = await db.reelsSincronizarFila(arquivos);
   return { encontrados: arquivos.length, adicionados };
 }

@@ -501,7 +501,13 @@
           <div class="rede-chips" id="pub-redes"></div>
           <div class="aviso-instagram" id="pub-aviso-instagram">O Instagram está marcado mas não tem imagem — ele vai falhar sem uma foto.</div>
 
-          <button id="pub-publicar" class="btn-publicar" type="button">Publicar agora</button>
+          <label>Agendar para (opcional — deixe em branco pra publicar agora)</label>
+          <input type="datetime-local" id="pub-data" />
+
+          <div style="display:flex; gap:10px; margin-top:8px;">
+            <button id="pub-publicar" class="btn-publicar" type="button" style="margin-top:0;">Publicar agora</button>
+            <button id="pub-agendar" class="btn-publicar" type="button" style="margin-top:0; background:var(--accent-soft); color:var(--accent);">📅 Agendar</button>
+          </div>
           <div id="pub-resultado" class="resultado-lista"></div>
         </div>
 
@@ -543,6 +549,23 @@
           <button id="perfil-fb-salvar" type="button">Atualizar Página</button>
         </div>
         <div id="perfil-fb-resultado" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="card publicar-card" id="agenda-card" style="margin-top:20px;">
+        <div class="page-header" style="margin-bottom:6px;">
+          <h3 style="margin:0;">📅 Agenda de publicações</h3>
+        </div>
+        <div style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
+          Cada post agendado tem seu próprio dia e hora exatos, escolhidos por você no formulário
+          acima (campo "Agendar para"). O servidor confere a cada minuto e publica automaticamente
+          nas redes marcadas, na hora certa — pode agendar quantos quiser, sem limite.
+        </div>
+
+        <h4 style="margin:14px 0 8px;">Fila (pendentes)</h4>
+        <div id="agenda-fila" class="resultado-lista">Carregando...</div>
+
+        <h4 style="margin:20px 0 8px;">Histórico recente</h4>
+        <div id="agenda-lista" class="resultado-lista">Carregando...</div>
       </div>
 
       <div class="card publicar-card" id="reels-card" style="margin-top:20px;">
@@ -648,7 +671,7 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
     if (btn.dataset.view === "instagram") carregarTudoInstagram();
     if (btn.dataset.view === "ads") carregarCampanhas();
     if (btn.dataset.view === "telegram") carregarContatosTelegram();
-    if (btn.dataset.view === "publicar") { carregarContasPublicar(); carregarReels(); }
+    if (btn.dataset.view === "publicar") { carregarContasPublicar(); carregarReels(); carregarAgenda(); }
   });
 });
 
@@ -1675,6 +1698,60 @@ document.getElementById("pub-publicar").addEventListener("click", async () => {
   }
 });
 
+// Mesmo formulário do "Publicar agora" acima, mas manda pra fila da agenda em vez de
+// publicar na hora — usa o campo "Agendar para". Depois de agendar, limpa o formulário (texto
+// + imagem) pra já deixar pronto pro próximo post, já que a ideia é criar vários seguidos.
+document.getElementById("pub-agendar").addEventListener("click", async () => {
+  const contaId = document.getElementById("pub-conta").value;
+  const texto = document.getElementById("pub-texto").value.trim();
+  const link = document.getElementById("pub-link").value.trim();
+  const redes = redesMarcadas();
+  const data = document.getElementById("pub-data").value;
+  const resDiv = document.getElementById("pub-resultado");
+  const botao = document.getElementById("pub-agendar");
+
+  if (!texto && !pubImagemBase64) {
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Preencha ao menos o texto ou a imagem.</span></div>`;
+    return;
+  }
+  if (!redes.length) {
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Marque ao menos uma rede.</span></div>`;
+    return;
+  }
+  if (!data) {
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Escolha o dia e a hora em "Agendar para" (ou use "Publicar agora" pra sair na hora).</span></div>`;
+    return;
+  }
+
+  botao.disabled = true;
+  botao.textContent = "Agendando...";
+  resDiv.innerHTML = "";
+  try {
+    const res = await fetch("/painel/api/agenda", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contaId, texto, link, redes, data, ...(pubImagemBase64 ? { imagemBase64: pubImagemBase64 } : {}) }),
+    });
+    const respData = await res.json();
+    if (respData.error) {
+      resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(respData.error)}</span></div>`;
+      return;
+    }
+    resDiv.innerHTML = `<div class="resultado-item ok"><span class="status">Agendado pra ${formatarDataHora(respData.agendadoPara)} ✅ — já apareceu na Agenda de publicações, abaixo.</span></div>`;
+    // Limpa o formulário pra já deixar pronto pro próximo post (mantém conta e redes marcadas).
+    document.getElementById("pub-texto").value = "";
+    document.getElementById("pub-link").value = "";
+    document.getElementById("pub-data").value = "";
+    document.getElementById("pub-upload-remover").click();
+    carregarAgenda();
+  } catch (err) {
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
+  } finally {
+    botao.disabled = false;
+    botao.textContent = "📅 Agendar";
+  }
+});
+
 document.getElementById("perfil-fb-salvar").addEventListener("click", async () => {
   const contaId = document.getElementById("pub-conta").value;
   const capaUrl = document.getElementById("perfil-fb-capa").value.trim();
@@ -1840,6 +1917,105 @@ async function removerFila(id) {
   if (!confirm("Remover esse vídeo da fila? Ele será apagado do armazenamento também.")) return;
   await fetch(`/painel/api/reels/${id}`, { method: "DELETE" });
   carregarReels();
+}
+
+// ─ Agenda de publicações (posts de texto/imagem multi-rede, dia+hora exatos) ─
+function renderizarItemAgenda(item, mostrarData) {
+  const info = (rede) => REDES_INFO[rede] || { label: rede, sigla: "?" };
+  const chipsRedes = item.redes
+    .map((rede) => `<span class="rede-icone rede-${rede}" title="${info(rede).label}">${info(rede).sigla}</span>`)
+    .join(" ");
+  const textoResumo = (item.texto || "(sem texto)").slice(0, 80) + (item.texto && item.texto.length > 80 ? "…" : "");
+  const miniatura = item.imagemUrl ? `<img src="${item.imagemUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;" />` : "";
+
+  let statusTexto = "";
+  let links = "";
+  if (item.status === "posted") {
+    const resultado = item.resultado ? JSON.parse(item.resultado) : null;
+    const okRedes = resultado ? Object.entries(resultado).filter(([, r]) => r.ok) : [];
+    statusTexto = `publicado (${okRedes.map(([rede]) => rede).join(", ") || "?"})`;
+    links = okRedes.map(([rede, r]) => (r.link ? `<a href="${r.link}" target="_blank" rel="noopener">Ver ${rede} →</a>` : "")).join(" ");
+  } else if (item.status === "error") {
+    const resultado = item.resultado ? JSON.parse(item.resultado) : null;
+    statusTexto = `erro: ${escapeHtml(resultado?.erro || "")}`;
+  }
+
+  return `<div class="resultado-item ${item.status === "error" ? "erro" : item.status === "posted" ? "ok" : ""}" style="flex-wrap:wrap;">
+    ${miniatura}
+    <span class="status">${chipsRedes} — ${escapeHtml(textoResumo)}${
+      mostrarData ? ` — ⏰ ${formatarDataHora(item.agendado_para)}` : statusTexto ? ` — ${statusTexto}` : ""
+    }</span>
+    ${links}
+    ${
+      mostrarData
+        ? `<label style="font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+             Reagendar: <input type="datetime-local" value="${paraDatetimeLocal(item.agendado_para)}" onchange="salvarDataAgenda(${item.id}, this.value)" />
+           </label>
+           <button type="button" class="btn-secundario" onclick="publicarAgendaAgora(${item.id})">Publicar agora</button>
+           <button type="button" class="btn-secundario" onclick="removerAgenda(${item.id})">Remover</button>`
+        : item.status === "error"
+        ? `<button type="button" class="btn-secundario" onclick="reenfileirarAgenda(${item.id})">Tentar de novo</button>`
+        : ""
+    }
+  </div>`;
+}
+
+async function carregarAgenda() {
+  const filaDiv = document.getElementById("agenda-fila");
+  const listaDiv = document.getElementById("agenda-lista");
+  try {
+    const res = await fetch("/painel/api/agenda/fila");
+    const itens = await res.json();
+    filaDiv.innerHTML = itens.length
+      ? itens.map((item) => renderizarItemAgenda(item, true)).join("")
+      : `<div class="lista-vazia">Nenhum post agendado ainda — use "📅 Agendar" no formulário acima.</div>`;
+  } catch (err) {
+    filaDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
+  }
+  try {
+    const res = await fetch("/painel/api/agenda/lista");
+    const data = await res.json();
+    const recentes = (data.recentes || []).filter((item) => item.status !== "pending");
+    listaDiv.innerHTML = recentes.length
+      ? recentes.map((item) => renderizarItemAgenda(item, false)).join("")
+      : `<div class="lista-vazia">Nada publicado pela agenda ainda.</div>`;
+  } catch (err) {
+    listaDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
+  }
+}
+
+async function salvarDataAgenda(id, valor) {
+  if (!valor) return;
+  await fetch(`/painel/api/agenda/${id}/data`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data: valor }),
+  });
+  carregarAgenda();
+}
+
+async function publicarAgendaAgora(id) {
+  if (!confirm("Publicar esse post agora, fora da ordem da agenda?")) return;
+  try {
+    const res = await fetch(`/painel/api/agenda/${id}/publicar-agora`, { method: "POST" });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    alert("Publicado!");
+  } catch (err) {
+    alert(`Falha ao publicar: ${err.message}`);
+  }
+  carregarAgenda();
+}
+
+async function removerAgenda(id) {
+  if (!confirm("Remover esse post da agenda? A imagem (se tiver) será apagada também.")) return;
+  await fetch(`/painel/api/agenda/${id}`, { method: "DELETE" });
+  carregarAgenda();
+}
+
+async function reenfileirarAgenda(id) {
+  await fetch(`/painel/api/agenda/${id}/reenfileirar`, { method: "POST" });
+  carregarAgenda();
 }
 
 document.getElementById("reels-posts-por-dia").addEventListener("change", async (e) => {
