@@ -972,6 +972,21 @@ async function handleInstagramMessaging(messaging) {
     messaging.message?.mid
   );
 
+  // Palavra-chave "menu" reabre o menu inicial a qualquer momento — mesmo pra quem já foi
+  // saudado antes (sem isso, alguém que já recebeu a mensagem de boas-vindas uma vez nunca
+  // mais recebe nada automático, igual aconteceu no teste: "oi" de novo ficou sem resposta).
+  // Espelha o mesmo atalho que já existe no fluxo do WhatsApp (processarEntry).
+  if (normalizarTexto(texto) === "menu") {
+    try {
+      const result = await ig.sendDM(senderId, INSTAGRAM_MENU_MESSAGE);
+      await logInstagramOutbound(senderId, INSTAGRAM_MENU_MESSAGE, result.message_id);
+      console.log(`📸 ${senderId} pediu "menu" → menu reenviado`);
+    } catch (err) {
+      console.error("Erro ao reenviar menu do Instagram:", err.message);
+    }
+    return;
+  }
+
   const opcao = detectarOpcaoMenuInstagram(texto);
   if (opcao) {
     const resposta = `Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre ${opcao.produto}:\n${linkWhatsAppInstagram(opcao.produto)}`;
