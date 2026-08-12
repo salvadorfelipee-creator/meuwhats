@@ -565,10 +565,13 @@
         <input id="reels-posts-por-dia" type="number" min="1" max="48" style="margin-bottom:14px; max-width:120px;" />
         <div id="reels-espaco" style="font-size:12px; color:var(--text-muted); margin-bottom:10px;"></div>
         <div id="reels-resumo" class="reels-stats"></div>
-        <button id="reels-testar" class="btn-primario" type="button" style="margin-top:14px;">Publicar 1 agora (teste)</button>
 
         <div style="margin-top:22px; padding-top:18px; border-top:1px solid var(--border);">
-          <h4 style="margin:0 0 10px;">📋 Fila (pendentes, com previsão de data)</h4>
+          <h4 style="margin:0 0 10px;">📋 Fila (pendentes)</h4>
+          <div style="font-size:12px; color:var(--text-muted); margin-bottom:10px;">
+            Quem não tem horário marcado entra no piloto automático (data prevista abaixo é estimativa). Quem tem
+            horário exato marcado publica naquele horário certinho, furando a fila automática.
+          </div>
           <div id="reels-fila" class="resultado-lista"></div>
         </div>
 
@@ -1744,8 +1747,16 @@ async function reenfileirarReel(id) {
   carregarReels();
 }
 
-function formatarDataCurta(ts) {
-  return new Date(ts).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+function formatarDataHora(ts) {
+  return new Date(ts).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+// Formato que o <input type="datetime-local"> espera ("AAAA-MM-DDTHH:MM"), em horário
+// local — NÃO usar toISOString() aqui, que converte pra UTC e desloca o horário mostrado.
+function paraDatetimeLocal(ts) {
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 async function carregarFilaReels() {
@@ -1759,11 +1770,14 @@ async function carregarFilaReels() {
     }
     div.innerHTML = itens
       .map((item) => {
-        const dataInput = item.agendado_para ? new Date(item.agendado_para).toISOString().slice(0, 10) : "";
+        const dataInput = item.agendado_para ? paraDatetimeLocal(item.agendado_para) : "";
+        const rotuloData = item.exato
+          ? `⏰ agendado: ${formatarDataHora(item.data_prevista)}`
+          : `previsto (automático): ${formatarDataHora(item.data_prevista)}`;
         return `<div class="resultado-item" style="flex-wrap:wrap;">
-          <span class="status">${escapeHtml(item.nome_arquivo || item.drive_file_id)} — previsto: ${formatarDataCurta(item.data_prevista)}</span>
+          <span class="status">${escapeHtml(item.nome_arquivo || item.drive_file_id)} — ${rotuloData}</span>
           <label style="font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px;">
-            Não antes de: <input type="date" value="${dataInput}" onchange="salvarDataFila(${item.id}, this.value)" />
+            Agendar para: <input type="datetime-local" value="${dataInput}" onchange="salvarDataFila(${item.id}, this.value)" />
           </label>
           <button type="button" class="btn-secundario" onclick="publicarFilaAgora(${item.id})">Publicar agora</button>
           <button type="button" class="btn-secundario" onclick="removerFila(${item.id})">Remover</button>
@@ -1845,7 +1859,7 @@ function renderizarReelsUploadLista() {
         item.status === "escolhido"
           ? `<input type="text" data-legenda-index="${i}" placeholder="Legenda deste vídeo (opcional — usa a padrão se deixar em branco)" style="flex:1; min-width:220px; margin-top:6px;" />
              <label style="flex-shrink:0; margin-top:6px; font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:6px;">
-               Não publicar antes de: <input type="date" data-data-index="${i}" style="width:auto;" />
+               Agendar para (opcional): <input type="datetime-local" data-data-index="${i}" style="width:auto;" />
              </label>`
           : "";
       return `<div class="resultado-item ${classe}" style="flex-wrap:wrap;">
@@ -1919,24 +1933,6 @@ document.getElementById("reels-toggle").addEventListener("click", async () => {
     body: JSON.stringify({ pausado: !pausadoAtual }),
   });
   carregarReels();
-});
-
-document.getElementById("reels-testar").addEventListener("click", async () => {
-  const botao = document.getElementById("reels-testar");
-  botao.disabled = true;
-  botao.textContent = "Publicando...";
-  try {
-    const res = await fetch("/painel/api/reels/publicar-agora", { method: "POST" });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error);
-    if (data.vazio) alert("Fila vazia — envie um vídeo primeiro.");
-    carregarReels();
-  } catch (err) {
-    alert(`Falha ao publicar: ${err.message}`);
-  } finally {
-    botao.disabled = false;
-    botao.textContent = "Publicar 1 agora (teste)";
-  }
 });
 
 atualizarBotaoNotif();

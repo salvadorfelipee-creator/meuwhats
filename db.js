@@ -170,9 +170,8 @@ const ready = (async () => {
     await client.execute(`ALTER TABLE reels_queue ADD COLUMN arquivo_apagado INTEGER NOT NULL DEFAULT 0`);
   }
   if (!infoReelsQueue.rows.some((r) => r.name === "agendado_para")) {
-    // "não publicar antes desta data" — não é um horário exato, é um piso; o vídeo só
-    // entra na leva de publicação quando essa data chegar (ou fica sem data = publica na
-    // ordem normal da fila, sem restrição).
+    // Horário exato de publicação (opcional) — data+hora, não só data. Sem isso, o vídeo
+    // publica na ordem normal da fila (piloto automático, N por dia).
     await client.execute(`ALTER TABLE reels_queue ADD COLUMN agendado_para INTEGER`);
   }
 
@@ -503,17 +502,30 @@ async function reelsDefinirLegenda(driveFileId, legenda) {
   });
 }
 
-// Só considera pendente elegível quem não tem data mínima, ou cuja data mínima já chegou —
-// "agendado_para" é um piso ("não antes disso"), não um horário exato obrigatório.
+// Só pega quem NÃO tem horário exato marcado — quem tem horário é publicado pelo caminho
+// dedicado (reelsProximoAgendadoDevido), checado a cada minuto, pra sair na hora certa em
+// vez de esperar o próximo horário automático do dia.
 async function reelsProximosPendentes(quantidade) {
   await ready;
   const result = await client.execute({
-    sql: `SELECT * FROM reels_queue
-          WHERE status = 'pending' AND (agendado_para IS NULL OR agendado_para <= ?)
+    sql: `SELECT * FROM reels_queue WHERE status = 'pending' AND agendado_para IS NULL
           ORDER BY posicao ASC LIMIT ?`,
-    args: [Date.now(), quantidade],
+    args: [quantidade],
   });
   return result.rows;
+}
+
+// Vídeo com horário exato marcado cuja hora já chegou — checado a cada minuto pelo
+// agendador, furando a fila automática pra sair no horário certo (não só "algum dia depois
+// dessa data" — é o horário mesmo, com ~1min de margem).
+async function reelsProximoAgendadoDevido() {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM reels_queue WHERE status = 'pending' AND agendado_para IS NOT NULL AND agendado_para <= ?
+          ORDER BY agendado_para ASC LIMIT 1`,
+    args: [Date.now()],
+  });
+  return result.rows[0] || null;
 }
 
 // Fila inteira de pendentes (não só os elegíveis agora) — pra mostrar no painel com data
@@ -653,6 +665,7 @@ module.exports = {
   reelsSincronizarFila,
   reelsDefinirLegenda,
   reelsProximosPendentes,
+  reelsProximoAgendadoDevido,
   reelsFilaCompleta,
   reelsBuscarPorId,
   reelsBuscarPorDriveFileId,

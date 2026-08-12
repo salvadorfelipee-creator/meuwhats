@@ -1709,10 +1709,29 @@ function calcularHorariosDoDia(quantidade) {
   return horarios;
 }
 
+function logPublicacaoReel(prefixo, resultado) {
+  const links = Object.entries(resultado.resultado)
+    .filter(([, r]) => r.ok)
+    .map(([rede, r]) => `${rede}: ${r.link}`)
+    .join(" | ");
+  console.log(`${prefixo} ${links}`);
+}
+
 setInterval(async () => {
   try {
     if ((await reels.configGet("pausado")) !== "0") return; // padrão: pausado até ligar no painel
 
+    // 1) Vídeo com horário EXATO marcado, checado a cada minuto — tem prioridade sobre o
+    // piloto automático, pra sair perto do horário pedido em vez de esperar o próximo
+    // slot do dia. Só 1 por tick é suficiente (checagem de novo no próximo minuto).
+    const agendado = await reels.publicarProximoAgendado();
+    if (!agendado.vazio) {
+      logPublicacaoReel("🎬 Reels publicado no horário agendado:", agendado);
+      return;
+    }
+
+    // 2) Piloto automático: N por dia, espalhado entre 08:00 e 22:00 — só pega vídeo SEM
+    // horário marcado (quem tem horário já foi tratado acima, no momento certo).
     const quantidadeConfigurada = Number(await reels.configGet("posts_por_dia")) || 5;
     const quantidade = Math.min(Math.max(quantidadeConfigurada, 1), 48);
     const horarios = calcularHorariosDoDia(quantidade);
@@ -1732,13 +1751,7 @@ setInterval(async () => {
 
     const resultado = await reels.publicarProximoPendente();
     if (resultado.vazio) console.log("🎬 Fila de Reels vazia — nada pra postar.");
-    else {
-      const links = Object.entries(resultado.resultado)
-        .filter(([, r]) => r.ok)
-        .map(([rede, r]) => `${rede}: ${r.link}`)
-        .join(" | ");
-      console.log(`🎬 Reels publicado automaticamente (${horaAtual}): ${links}`);
-    }
+    else logPublicacaoReel(`🎬 Reels publicado automaticamente (${horaAtual}):`, resultado);
   } catch (err) {
     console.error("Erro no agendador de Reels:", err.message);
   }

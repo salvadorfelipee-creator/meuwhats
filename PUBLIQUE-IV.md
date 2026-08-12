@@ -110,19 +110,27 @@ vez de deixar estourar e começar a cobrar.
 
 **Quantidade por dia é configurável** (campo "Quantos posts por dia" no card) — os horários
 são recalculados automaticamente, espalhados entre 08:00–22:00 conforme a quantidade (ex.:
-14/dia ≈ 100/semana). Sem limite de quantos vídeos ficam na fila.
+14/dia ≈ 100/semana). Sem limite de quantos vídeos ficam na fila. Isso é o **piloto
+automático** — vale pra todo vídeo que não tiver um horário próprio marcado.
 
 **Legenda**: campo de "Legenda padrão" no card (usada em todo vídeo que não tiver uma legenda
 própria) + campo opcional por vídeo no upload (se deixar em branco, cai na padrão).
 
-**Data mínima por vídeo (opcional)**: no upload, ou depois direto na fila, dá pra marcar
-"não publicar antes de" uma data pra um vídeo específico — não é um horário exato obrigatório,
-é um piso: o vídeo só entra na leva normal de publicação quando essa data chegar (sem data,
-publica na ordem normal da fila). A seção **"📋 Fila"** no card mostra todo vídeo pendente com
-uma **data prevista** (estimativa recalculada toda vez a partir da posição na fila + ritmo
-configurado — não é gravada, muda se a quantidade/dia mudar), e por item:
-- **Publicar agora** — publica esse vídeo específico na hora, fora da ordem (ignora a data
-  mínima de propósito, é uma ação manual e explícita).
+**Horário exato por vídeo (opcional)** — pra quem quer controle fino (ex.: "esses 5 vídeos
+saem hoje, cada um numa hora diferente"): no upload, ou depois direto na fila, dá pra marcar
+**dia e hora exatos** de publicação pra um vídeo específico. Esse vídeo sai do piloto
+automático — o agendador checa a cada minuto se algum vídeo com horário marcado já venceu, e
+publica na hora (com ~1min de margem), furando a fila automática. Sem horário marcado, o
+vídeo continua no piloto automático normal.
+
+A seção **"📋 Fila"** no card mostra todo vídeo pendente: quem tem horário marcado mostra
+esse horário exato (⏰ agendado), quem não tem mostra uma **data prevista** (estimativa do
+piloto automático, recalculada toda vez a partir da posição na fila + ritmo configurado —
+não é gravada, muda se a quantidade/dia mudar). Por item:
+- **Agendar para** — campo de data+hora pra marcar (ou limpar, deixando em branco) o
+  horário exato daquele vídeo específico.
+- **Publicar agora** — publica esse vídeo específico na hora, fora da ordem e ignorando
+  qualquer horário marcado (é uma ação manual e explícita).
 - **Remover** — tira da fila e apaga do R2 (usuário mudou de ideia sobre aquele vídeo).
 
 Fica **pausado por padrão** — só começa a publicar sozinho depois de ligar o botão "Ativar
@@ -137,9 +145,11 @@ r2.js       cliente S3-compatível pro Cloudflare R2 (SDK oficial da AWS, @aws-s
 reels.js    orquestrador: enviarVideo() (upload do painel → R2 → sincroniza, bloqueia se
             espaço quase cheio), sincronizarFila() (R2 → banco), publicarItem()
             (função compartilhada: URL assinada → publica em Instagram + Facebook),
-            publicarProximoPendente() (próximo elegível, respeita data mínima) e
-            publicarItemEspecifico() (um vídeo específico, ignora ordem/data — botão
-            manual), listarFilaComEstimativa() (fila + data prevista calculada),
+            publicarProximoPendente() (piloto automático — só quem NÃO tem horário
+            marcado), publicarProximoAgendado() (quem TEM horário marcado e já venceu —
+            checado a cada minuto, tem prioridade) e publicarItemEspecifico() (um vídeo
+            específico, ignora ordem/horário — botão manual "Publicar agora"),
+            listarFilaComEstimativa() (fila + horário exato ou data prevista calculada),
             definirData()/removerItem() e limparAntigos() (apaga do R2 quem foi
             publicado há mais de 24h).
 instagram.js → publicarReels() (fluxo de container de vídeo — media_type REELS, polling
@@ -149,20 +159,25 @@ facebook.js → publicarReels() (API de Reels da Página — fluxo "hosted file"
 db.js       tabela reels_queue (coluna `drive_file_id` guarda a **key do objeto no R2** —
             nome mantido por compatibilidade, não é mais literalmente do Drive; status
             pending/posted/error, `arquivo_apagado` controla a limpeza de 24h,
-            `agendado_para` é a data mínima opcional) + reels_config (liga/desliga,
-            posts_por_dia, legenda_padrao, controle de horário).
+            `agendado_para` é o horário exato opcional — data+hora, não só data) +
+            reels_config (liga/desliga, posts_por_dia, legenda_padrao, controle de horário).
 server.js   rotas (POST /painel/api/reels/upload, GET .../status, GET .../fila,
             POST .../sincronizar, .../pausar, .../posts-por-dia, .../legenda-padrao,
             .../publicar-agora, .../:id/reenfileirar, .../:id/publicar-agora,
-            .../:id/data, DELETE .../:id) + o setInterval que checa a cada minuto se
-            bateu algum horário do dia (calcularHorariosDoDia() gera os horários
-            dinamicamente a partir da quantidade configurada) + setInterval de hora em
+            .../:id/data, DELETE .../:id) + o setInterval que a cada minuto primeiro
+            checa se algum vídeo com horário marcado já venceu (publicarProximoAgendado,
+            tem prioridade) e só depois checa se bateu algum horário do piloto automático
+            (calcularHorariosDoDia() gera os horários dinamicamente a partir da
+            quantidade configurada) + setInterval de hora em
             hora que roda a limpeza do R2. Upload usa multipart/streaming (`busboy`) —
             nunca base64/JSON.
 public/painel.html  card "🎬 Reels em massa" na aba Publicar: legenda padrão, upload em
-            lote com legenda + data mínima por vídeo, indicador de espaço usado no R2,
-            quantidade/dia, resumo, seção "Fila" (pendentes com data prevista + publicar
-            agora/remover por item), "Histórico recente" (publicado/erro).
+            lote com legenda + horário exato opcional por vídeo, indicador de espaço
+            usado no R2, quantidade/dia (piloto automático), seção "Fila" (pendentes com
+            horário exato ou data prevista, agendar/publicar agora/remover por item),
+            "Histórico recente" (publicado/erro). Sem botão de "publicar 1 de teste"
+            solto — cada ação de publicar-fora-da-ordem agora é por item específico na
+            Fila, mais claro do que um botão genérico.
 ```
 
 **Facebook Reels ainda não testado contra API real** (código escrito seguindo a documentação

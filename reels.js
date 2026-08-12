@@ -85,10 +85,18 @@ async function publicarItem(item) {
   }
 }
 
-// Pega o próximo elegível na ordem da fila (respeitando data mínima, se tiver) — usado
-// pelo agendador automático e pelo botão genérico "Publicar 1 agora (teste)".
+// Pega o próximo pendente SEM horário marcado, na ordem da fila — é o "piloto automático"
+// (N por dia, espalhado), usado pelos horários fixos do agendador (ver server.js).
 async function publicarProximoPendente() {
   const [item] = await db.reelsProximosPendentes(1);
+  if (!item) return { vazio: true };
+  return publicarItem(item);
+}
+
+// Pega o vídeo com horário EXATO marcado cuja hora já chegou (se tiver algum) — checado a
+// cada minuto pelo agendador, furando a fila automática pra sair no horário certo.
+async function publicarProximoAgendado() {
+  const item = await db.reelsProximoAgendadoDevido();
   if (!item) return { vazio: true };
   return publicarItem(item);
 }
@@ -102,35 +110,40 @@ async function publicarItemEspecifico(id) {
   return publicarItem(item);
 }
 
-// Fila completa (todo pendente, não só quem já está elegível) com uma data PREVISTA pra
-// cada um — só uma estimativa pra dar visibilidade no painel, não é gravada em lugar
-// nenhum: calculada de novo toda vez a partir da posição na fila e do ritmo configurado.
-// Item com data mínima própria "empurra" a estimativa pra não ficar antes dela.
+// Fila completa (todo pendente) com uma data/hora PREVISTA pra cada um. Quem tem horário
+// exato marcado (agendado_para) já mostra esse horário direto — é exato, não estimativa.
+// Quem não tem entra no cálculo do piloto automático (N por dia, espalhado entre 08:00 e
+// 22:00) — só uma estimativa recalculada toda vez, não é gravada em lugar nenhum, e muda
+// se a quantidade/dia ou a ordem da fila mudar.
 async function listarFilaComEstimativa() {
   const [itens, postsPorDiaConfig] = await Promise.all([db.reelsFilaCompleta(), db.reelsConfigGet("posts_por_dia")]);
   const porDia = Math.max(Number(postsPorDiaConfig) || 5, 1);
+  const inicioMin = 8 * 60;
+  const fimMin = 22 * 60;
+  const passoMin = porDia > 1 ? (fimMin - inicioMin) / (porDia - 1) : 0;
 
-  let cursor = new Date();
-  cursor.setHours(0, 0, 0, 0);
-  let contadorNoDia = 0;
+  let dia = new Date();
+  dia.setHours(0, 0, 0, 0);
+  let slotNoDia = 0;
 
   return itens.map((item) => {
-    if (item.agendado_para && item.agendado_para > cursor.getTime()) {
-      cursor = new Date(item.agendado_para);
-      cursor.setHours(0, 0, 0, 0);
-      contadorNoDia = 0;
+    if (item.agendado_para) return { ...item, data_prevista: item.agendado_para, exato: true };
+    if (slotNoDia >= porDia) {
+      dia = new Date(dia.getTime() + 24 * 60 * 60 * 1000);
+      slotNoDia = 0;
     }
-    if (contadorNoDia >= porDia) {
-      cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
-      contadorNoDia = 0;
-    }
-    contadorNoDia++;
-    return { ...item, data_prevista: cursor.getTime() };
+    const minutosNoDia = Math.round(inicioMin + passoMin * slotNoDia);
+    const dataPrevista = new Date(dia);
+    dataPrevista.setMinutes(minutosNoDia);
+    slotNoDia++;
+    return { ...item, data_prevista: dataPrevista.getTime(), exato: false };
   });
 }
 
-async function definirData(id, dataString) {
-  const timestamp = dataString ? new Date(`${dataString}T00:00:00`).getTime() : null;
+// dataHoraString no formato do <input type="datetime-local"> ("2026-08-15T14:00") — vazio
+// ou null limpa o agendamento e o vídeo volta pro piloto automático.
+async function definirData(id, dataHoraString) {
+  const timestamp = dataHoraString ? new Date(dataHoraString).getTime() : null;
   await db.reelsDefinirData(id, timestamp);
 }
 
@@ -145,9 +158,9 @@ async function removerItem(id) {
 
 // Upload direto do painel: sobe o vídeo pro R2 (sem precisar abrir nenhum site por fora) e
 // já sincroniza a fila na sequência, pra aparecer em "pendentes" na hora. `legenda` e
-// `dataMinima` (string "AAAA-MM-DD") são opcionais — só esse vídeo usa um texto diferente
-// do padrão / só esse vídeo não publica antes dessa data.
-async function enviarVideo(buffer, nomeArquivo, legenda, dataMinima) {
+// `agendarPara` (string do <input type="datetime-local">) são opcionais — só esse vídeo
+// usa um texto diferente do padrão / só esse vídeo publica num horário exato marcado.
+async function enviarVideo(buffer, nomeArquivo, legenda, agendarPara) {
   const espaco = await espacoUsado();
   if (espaco.bloqueado) {
     throw new Error(`Espaço quase cheio (${espaco.percentual}% de 10GB usado) — apague vídeos antigos ou espere a limpeza automática antes de subir mais.`);
@@ -156,11 +169,11 @@ async function enviarVideo(buffer, nomeArquivo, legenda, dataMinima) {
   const arquivo = await r2.enviarVideo(key, buffer);
   await sincronizarFila();
   if (legenda) await db.reelsDefinirLegenda(arquivo.id, legenda);
-  if (dataMinima) {
+  if (agendarPara) {
     // sincronizarFila() já inseriu a linha (drive_file_id = arquivo.id) — busca o id
-    // numérico dela pra poder gravar a data com a mesma função usada pela fila completa.
+    // numérico dela pra poder gravar o horário com a mesma função usada pela fila completa.
     const linha = await db.reelsBuscarPorDriveFileId(arquivo.id);
-    if (linha) await definirData(linha.id, dataMinima);
+    if (linha) await definirData(linha.id, agendarPara);
   }
   return arquivo;
 }
@@ -186,6 +199,7 @@ module.exports = {
   sincronizarFila,
   enviarVideo,
   publicarProximoPendente,
+  publicarProximoAgendado,
   publicarItemEspecifico,
   listarFilaComEstimativa,
   definirData,
