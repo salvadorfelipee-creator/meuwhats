@@ -142,10 +142,10 @@ module.exports = {
   publicarProximoDevido,
   publicarAgoraEspecifico,
   listarFila,
+  listarRecentes,
   definirData,
   removerAgendamento,
   reenfileirar,
   limparAntigas,
   resumo: db.agendaResumo,
-  listarRecentes: db.agendaListarRecentes,
 };

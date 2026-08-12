@@ -261,6 +261,30 @@
   .resultado-item a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
   .resultado-item a:hover { text-decoration: underline; }
 
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; padding-bottom: 4px; }
+  .cal-dia {
+    position: relative; min-height: 52px; border-radius: 8px; background: var(--bg);
+    border: 1px solid transparent; padding: 6px; cursor: default; font-size: 12.5px; color: var(--text-muted);
+  }
+  .cal-dia.cal-vazio { background: transparent; }
+  .cal-dia.cal-com-post { cursor: pointer; color: var(--text); background: var(--accent-soft); }
+  .cal-dia.cal-com-post:hover { border-color: var(--accent); }
+  .cal-dia.cal-hoje { border-color: var(--accent); }
+  .cal-dia.cal-selecionado { background: var(--accent); color: #fff; }
+  .cal-dia .cal-num { font-weight: 700; }
+  .cal-dia .cal-badge {
+    position: absolute; top: 4px; right: 4px; background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 800; border-radius: 999px; min-width: 16px; height: 16px;
+    display: flex; align-items: center; justify-content: center; padding: 0 3px;
+  }
+  .cal-dia.cal-selecionado .cal-badge { background: #fff; color: var(--accent); }
+  .cal-nav-botao {
+    border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px;
+    width: 30px; height: 30px; cursor: pointer; font-size: 14px;
+  }
+  .cal-nav-botao:hover { background: var(--bg); }
+
   .reels-stats { display: flex; gap: 10px; flex-wrap: wrap; }
   .reels-stat { flex: 1; min-width: 110px; background: var(--bg); border-radius: 10px; padding: 12px 14px; text-align: center; }
   .reels-stat .num { font-size: 22px; font-weight: 800; color: var(--text); }
@@ -561,8 +585,16 @@
           nas redes marcadas, na hora certa — pode agendar quantos quiser, sem limite.
         </div>
 
-        <h4 style="margin:14px 0 8px;">Fila (pendentes)</h4>
-        <div id="agenda-fila" class="resultado-lista">Carregando...</div>
+        <h4 style="margin:14px 0 8px; display:flex; align-items:center; justify-content:space-between;">
+          <span>Fila (pendentes)</span>
+          <div style="display:flex; align-items:center; gap:10px; font-weight:400;">
+            <button type="button" id="agenda-mes-anterior" class="cal-nav-botao">‹</button>
+            <span id="agenda-mes-label" style="min-width:130px; text-align:center; font-size:13px; color:var(--text-muted);"></span>
+            <button type="button" id="agenda-mes-proximo" class="cal-nav-botao">›</button>
+          </div>
+        </h4>
+        <div id="agenda-calendario">Carregando...</div>
+        <div id="agenda-dia-detalhe" style="margin-top:14px;"></div>
 
         <h4 style="margin:20px 0 8px;">Histórico recente</h4>
         <div id="agenda-lista" class="resultado-lista">Carregando...</div>
@@ -1922,9 +1954,9 @@ async function removerFila(id) {
 // ─ Agenda de publicações (posts de texto/imagem multi-rede, dia+hora exatos) ─
 function renderizarItemAgenda(item, mostrarData) {
   const info = (rede) => REDES_INFO[rede] || { label: rede, sigla: "?" };
-  const chipsRedes = item.redes
+  const chipsRedes = `<span style="display:inline-flex; gap:4px; vertical-align:middle;">${item.redes
     .map((rede) => `<span class="rede-icone rede-${rede}" title="${info(rede).label}">${info(rede).sigla}</span>`)
-    .join(" ");
+    .join("")}</span>`;
   const textoResumo = (item.texto || "(sem texto)").slice(0, 80) + (item.texto && item.texto.length > 80 ? "…" : "");
   const miniatura = item.imagemUrl ? `<img src="${item.imagemUrl}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex-shrink:0;" />` : "";
 
@@ -1960,17 +1992,111 @@ function renderizarItemAgenda(item, mostrarData) {
   </div>`;
 }
 
+// A fila vira um calendário de mês em vez de lista corrida — com 200 posts agendados, uma
+// lista "um debaixo do outro" seria impossível de usar. O calendário mostra quantos posts tem
+// em cada dia; clicar num dia mostra só os posts DAQUELE dia.
+let agendaItens = [];
+let agendaMesAtual = (() => {
+  const d = new Date();
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+})();
+let agendaDiaSelecionado = null; // "AAAA-MM-DD", horário local
+
+function dataKeyDoTimestamp(ts) {
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function renderCalendarioAgenda() {
+  const porDia = {};
+  for (const item of agendaItens) {
+    const chave = dataKeyDoTimestamp(item.agendado_para);
+    (porDia[chave] = porDia[chave] || []).push(item);
+  }
+
+  const ano = agendaMesAtual.getFullYear();
+  const mes = agendaMesAtual.getMonth();
+  document.getElementById("agenda-mes-label").textContent = agendaMesAtual
+    .toLocaleDateString("pt-BR", { month: "long", year: "numeric" })
+    .replace(/^./, (c) => c.toUpperCase());
+
+  const primeiroDiaSemana = new Date(ano, mes, 1).getDay(); // 0=domingo
+  const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+  const hojeKey = dataKeyDoTimestamp(Date.now());
+
+  const dow = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => `<div class="cal-dow">${d}</div>`).join("");
+  const celulasVazias = Array.from({ length: primeiroDiaSemana }, () => `<div class="cal-dia cal-vazio"></div>`).join("");
+  const dias = Array.from({ length: diasNoMes }, (_, i) => {
+    const dia = i + 1;
+    const p = (n) => String(n).padStart(2, "0");
+    const chave = `${ano}-${p(mes + 1)}-${p(dia)}`;
+    const itensDoDia = porDia[chave] || [];
+    const classes = ["cal-dia"];
+    if (itensDoDia.length) classes.push("cal-com-post");
+    if (chave === hojeKey) classes.push("cal-hoje");
+    if (chave === agendaDiaSelecionado) classes.push("cal-selecionado");
+    return `<div class="${classes.join(" ")}" ${itensDoDia.length ? `onclick="selecionarDiaAgenda('${chave}')"` : ""}>
+      <div class="cal-num">${dia}</div>
+      ${itensDoDia.length ? `<div class="cal-badge">${itensDoDia.length}</div>` : ""}
+    </div>`;
+  }).join("");
+
+  document.getElementById("agenda-calendario").innerHTML = `<div class="cal-grid">${dow}${celulasVazias}${dias}</div>`;
+}
+
+function renderDiaSelecionadoAgenda() {
+  const div = document.getElementById("agenda-dia-detalhe");
+  if (!agendaDiaSelecionado) {
+    div.innerHTML = agendaItens.length
+      ? `<div class="lista-vazia">Clique num dia marcado no calendário pra ver os posts agendados.</div>`
+      : `<div class="lista-vazia">Nenhum post agendado ainda — use "📅 Agendar" no formulário acima.</div>`;
+    return;
+  }
+  const itensDoDia = agendaItens
+    .filter((item) => dataKeyDoTimestamp(item.agendado_para) === agendaDiaSelecionado)
+    .sort((a, b) => a.agendado_para - b.agendado_para);
+  const [ano, mes, dia] = agendaDiaSelecionado.split("-");
+  const rotulo = `${dia}/${mes}/${ano}`;
+  div.innerHTML = `
+    <div style="font-size:13px; font-weight:700; margin-bottom:8px;">${itensDoDia.length} post(s) em ${rotulo}</div>
+    <div class="resultado-lista">${itensDoDia.map((item) => renderizarItemAgenda(item, true)).join("")}</div>
+  `;
+}
+
+function selecionarDiaAgenda(chave) {
+  agendaDiaSelecionado = agendaDiaSelecionado === chave ? null : chave;
+  renderCalendarioAgenda();
+  renderDiaSelecionadoAgenda();
+}
+
+document.getElementById("agenda-mes-anterior").addEventListener("click", () => {
+  agendaMesAtual = new Date(agendaMesAtual.getFullYear(), agendaMesAtual.getMonth() - 1, 1);
+  renderCalendarioAgenda();
+});
+document.getElementById("agenda-mes-proximo").addEventListener("click", () => {
+  agendaMesAtual = new Date(agendaMesAtual.getFullYear(), agendaMesAtual.getMonth() + 1, 1);
+  renderCalendarioAgenda();
+});
+
 async function carregarAgenda() {
-  const filaDiv = document.getElementById("agenda-fila");
   const listaDiv = document.getElementById("agenda-lista");
   try {
     const res = await fetch("/painel/api/agenda/fila");
-    const itens = await res.json();
-    filaDiv.innerHTML = itens.length
-      ? itens.map((item) => renderizarItemAgenda(item, true)).join("")
-      : `<div class="lista-vazia">Nenhum post agendado ainda — use "📅 Agendar" no formulário acima.</div>`;
+    agendaItens = await res.json();
+    // Ao abrir a aba, já pula direto pro mês do próximo post marcado (não força ficar no mês
+    // atual se todos os posts agendados forem, por exemplo, mês que vem).
+    if (agendaItens.length && !document.getElementById("agenda-calendario").dataset.iniciado) {
+      const proximo = [...agendaItens].sort((a, b) => a.agendado_para - b.agendado_para)[0];
+      agendaMesAtual = new Date(new Date(proximo.agendado_para).getFullYear(), new Date(proximo.agendado_para).getMonth(), 1);
+      document.getElementById("agenda-calendario").dataset.iniciado = "1";
+    }
+    renderCalendarioAgenda();
+    renderDiaSelecionadoAgenda();
   } catch (err) {
-    filaDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
+    document.getElementById("agenda-calendario").innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
   }
   try {
     const res = await fetch("/painel/api/agenda/lista");
