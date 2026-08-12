@@ -13,7 +13,7 @@ se uma falhar (token vencido, rede sem credencial, etc.) as demais continuam nor
 A imagem é **upload direto do computador** (arrastar ou clicar) — não precisa ter a foto
 hospedada em algum lugar antes.
 
-Hoje cobre: **Instagram, Facebook, X/Twitter e LinkedIn.**
+Hoje cobre: **Instagram, Facebook, Threads, X/Twitter e LinkedIn.**
 
 Além de publicar, também dá pra editar o **perfil da Página do Facebook** (capa, foto de
 perfil, texto "Sobre") pelo mesmo painel. **O Instagram não tem essa opção**: a API pública
@@ -28,6 +28,7 @@ esses campos do Instagram continua sendo manual, direto no app.
 | Facebook | mensagem do post | se tiver, publica como foto (`/photos`); sem imagem, publica como texto/link (`/feed`) | usado só quando não há imagem |
 | X/Twitter | corpo do tweet (corta em 280 caracteres se passar, e avisa no resultado) | opcional, sobe como mídia do tweet | não tem campo próprio — se quiser, inclua no texto |
 | LinkedIn | `commentary` do post | **não sobe imagem própria** (exigiria o fluxo de registro de upload da LinkedIn — não implementado) | se tiver, LinkedIn gera a prévia/thumbnail automática do site |
+| Threads | vira o texto do post | opcional, sobe como mídia (`media_type: IMAGE`) | ignorado (Threads não tem campo de link próprio) |
 
 ## Arquitetura
 
@@ -207,6 +208,42 @@ Instagram Reels já está testado e funcionando (ver seção Status).
 - Publicação: Instagram Reels já testado e funcionando em produção. Facebook Reels é código
   novo (11/08/2026), seguindo a documentação oficial, mas **ainda sem teste real** — falta
   publicar um vídeo de verdade pra confirmar.
+
+## Agenda de publicações (posts multi-rede com dia+hora exatos)
+
+Adicionada 12/08/2026. Diferente dos Reels (vídeo, sempre Instagram+Facebook, com "piloto
+automático" espalhando N por dia), aqui é o **usuário quem escolhe o dia e a hora exatos de
+cada post**, de texto/imagem, em **qualquer combinação de redes** — sem limite de quantos
+agendar. Pensada pra criar uma leva grande de posts de uma vez (ex. 50 no mês), um a um.
+
+### Como funciona
+
+O próprio formulário de "Publicar agora" (topo da aba) ganhou um campo **"Agendar para"**
+(`<input type="datetime-local">`) e um segundo botão, **"📅 Agendar"**, ao lado do
+"Publicar agora" de sempre. Preencher esse campo e clicar em "Agendar" (em vez de publicar
+na hora) manda o post pra fila da Agenda, que aparece logo abaixo, em vez de publicar
+imediatamente — o formulário se limpa sozinho (mantendo conta e redes marcadas) pra já deixar
+pronto pro próximo post.
+
+- `agenda.js` — orquestra criação/publicação/remoção, reaproveitando `publique.publicarEmTodos()`
+  por baixo (mesmo critério de sucesso: publica se ao menos uma rede der certo).
+- `posts_agendados` (tabela nova no banco) — cada linha guarda `redes` como array (JSON),
+  `agendado_para` **obrigatório** (sem "piloto automático" aqui — é sempre escolha explícita).
+- Imagem: mesmo bucket R2 dos Reels, mas sob o prefixo `posts/` — `reels.js` filtra esse
+  prefixo no `sincronizarFila()` pra não confundir imagem de post com vídeo de Reels na fila
+  errada.
+- Agendador: checado a cada minuto (mesmo `setInterval` dos Reels agendados, mas
+  independente — não depende do "pausado" dos Reels, que é outro sistema).
+- Limpeza automática apaga a imagem do R2 24h depois de publicada, mesma lógica dos Reels.
+- Painel: card **"Agenda de publicações"** com "Fila (pendentes)" — reagendar, publicar agora
+  fora de ordem, remover — e "Histórico recente", reaproveitando os mesmos componentes
+  visuais já usados na fila de Reels.
+
+### Status
+
+✅ Testado ponta a ponta (12/08/2026): criar, listar, reagendar, publicar-agora e remover
+confirmados contra o R2 real (via banco de teste local) e via HTTP local no servidor de
+verdade — incluindo a garantia de que a imagem de um post não vaza pra fila de Reels.
 
 ## Contas — como adicionar uma nova
 
