@@ -238,12 +238,23 @@ pronto pro próximo post.
 - Painel: card **"Agenda de publicações"** com "Fila (pendentes)" — reagendar, publicar agora
   fora de ordem, remover — e "Histórico recente", reaproveitando os mesmos componentes
   visuais já usados na fila de Reels.
+- **"Fila" é um calendário de mês, não uma lista corrida.** Primeira versão listava tudo "um
+  debaixo do outro" — usuário apontou que com 200 posts agendados isso vira uma rolagem
+  inútil ("por que que não tem uma agenda... imagine se eu tiver duzentas publicações").
+  Redesenhado no mesmo dia: grade do mês com navegação ‹ › entre meses, cada dia mostra um
+  badge com a quantidade de posts marcados, clicar num dia abre só os posts daquele dia (com
+  os controles de reagendar/publicar agora/remover). Ao abrir a aba, já pula pro mês do
+  próximo post agendado.
 
 ### Status
 
 ✅ Testado ponta a ponta (12/08/2026): criar, listar, reagendar, publicar-agora e remover
 confirmados contra o R2 real (via banco de teste local) e via HTTP local no servidor de
-verdade — incluindo a garantia de que a imagem de um post não vaza pra fila de Reels.
+verdade — incluindo a garantia de que a imagem de um post não vaza pra fila de Reels. O
+calendário foi testado visualmente com Playwright (34 posts de teste espalhados no mês,
+navegação entre meses, seleção de dia, histórico com erros reais) — pegou e corrigiu um bug
+real (histórico usava a função crua do banco em vez do wrapper que parseia `redes` pra
+array).
 
 ## Contas — como adicionar uma nova
 
