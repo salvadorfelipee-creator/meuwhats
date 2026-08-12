@@ -357,11 +357,35 @@ limitação do código, é da plataforma). Por isso "primeira DM" funciona como 
 "seguiu e chamou" — a grande maioria de quem segue acaba mandando mensagem (pelo botão do
 anúncio, pelo link da bio, etc.). Curtida isolada sem comentário/DM não dispara nada.
 
-### Menu de 5 opções (18/07/2026) → link direto pro WhatsApp
+### Menu de 5 opções (18/07/2026, fluxo próprio por opção desde 12/08/2026)
 
 Pedido do usuário: quem interage manda a mesma mensagem com um menu de produtos; ao responder
-com o número ou o nome da opção, o bot manda de volta um link `wa.me` já com o texto preenchido,
-levando direto pra conversa no WhatsApp (`INSTAGRAM_WHATSAPP_NUMERO`, padrão `5547997059353`).
+com o número ou o nome da opção, cada uma tem seu próprio comportamento
+(`INSTAGRAM_OPCOES_MENU` em `server.js`):
+
+| Opção | Resposta | Depois |
+|---|---|---|
+| 1️⃣ Seguro de veículo | Direciona pro site `cotacertaseguros.com.br` (formulário → atendimento) | Encerra ali |
+| 2️⃣ Consignado CLT | Explica o requisito (3 meses de carteira assinada) e pede nome, CPF, nascimento, e-mail e telefone | Espera a pessoa mandar os dados |
+| 3️⃣ Saque do FGTS | Pede pra autorizar o banco **BMS** no app do FGTS e mandar o CPF | Espera a pessoa mandar o CPF |
+| 4️⃣ Empréstimo com carro em garantia | Link `wa.me` já com o texto preenchido | Continua no WhatsApp |
+| 5️⃣ Financiamento de veículo | Link `wa.me` já com o texto preenchido | Continua no WhatsApp |
+
+Opções 2 e 3 usam captura de dados: a próxima mensagem da pessoa (qualquer texto) é tratada
+como os dados pedidos — o bot responde `INSTAGRAM_DADOS_RECEBIDOS_MESSAGE` ("Recebemos seus
+dados, aguarde o atendimento") e a partir daí o atendimento é manual, pelo histórico já visível
+na aba Instagram de 💬 Conversas (não há validação de CPF/e-mail, só captura o texto cru).
+Implementado reaproveitando as MESMAS colunas `fluxo_passo`/`fluxo_passo_at` que o WhatsApp já
+usa em `conversations` (a tabela é compartilhada, `business_number_id = "instagram"`) — mesmo
+padrão de `capturaTexto` do fluxo do WhatsApp, só que sem um dispatcher por passo (só dois
+passos possíveis: `"consignado_clt"` e `"saque_fgts"`).
+
+Opções 4 e 5 continuam mandando um link `wa.me` já com o texto preenchido, levando direto pra
+conversa no WhatsApp (`INSTAGRAM_WHATSAPP_NUMERO`, padrão `5547997059353`).
+
+A palavra-chave **"menu"** reabre o menu inicial a qualquer momento (mesmo pra quem já foi
+saudado antes, ou está no meio de uma captura de dados — não cancela a captura em andamento,
+só reenvia o menu).
 
 Texto padrão (`INSTAGRAM_MENU_MESSAGE`, usado tanto no comentário quanto na boas-vindas):
 
@@ -381,15 +405,17 @@ Texto padrão (`INSTAGRAM_MENU_MESSAGE`, usado tanto no comentário quanto na bo
 
 Reconhecimento da resposta (`detectarOpcaoMenuInstagram` em `server.js`): aceita o número
 (`1`–`5`) ou uma palavra-chave por opção (`seguro`, `clt`/`consignado`, `fgts`/`saque`,
-`garantia`, `financiamento`), sem diferenciar maiúscula/acento. Se não reconhecer, não responde
-nada automaticamente (fica pro atendimento manual no painel). Ao reconhecer, envia:
-
-> Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre {produto}:
-> https://wa.me/5547997059353?text=Olá%2C%20vim%20do%20Instagram%20e%20quero%20saber%20sobre%20{produto}
+`garantia`, `financiamento`), sem diferenciar maiúscula/acento — inclusive dentro de uma frase
+solta ("quero simular o FGTS" reconhece `fgts`). Se não reconhecer nem estiver no meio de uma
+captura de dados, não responde nada automaticamente (fica pro atendimento manual no painel).
+Ao reconhecer, cada opção responde o texto da tabela acima (só 4️⃣/5️⃣ ainda mandam o link
+`wa.me`, ex.: `https://wa.me/5547997059353?text=Olá%2C%20vim%20do%20Instagram%20e%20quero%20saber%20sobre%20{produto}`).
 
 Cada texto (menu e mensagem de comentário) pode ser sobrescrito por variável de ambiente
 (`INSTAGRAM_MENU_MESSAGE`, `INSTAGRAM_COMMENT_REPLY`, `INSTAGRAM_WELCOME_MESSAGE`) sem precisar
-mudar código — as duas últimas caem no texto do menu se não forem definidas.
+mudar código — as duas últimas caem no texto do menu se não forem definidas. As respostas das
+opções 1-3 e a de dados recebidos ainda não têm variável de ambiente própria (ficam só no
+código, em `INSTAGRAM_OPCOES_MENU`/`INSTAGRAM_DADOS_RECEBIDOS_MESSAGE`).
 
 ⚠️ **Ainda não testado em produção** — implementado e com sintaxe validada (`node --check`)
 nesta sessão, mas precisa de um deploy + teste real (comentar num post e responder "3", por

@@ -45,15 +45,45 @@ const INSTAGRAM_WELCOME_MESSAGE = process.env.INSTAGRAM_WELCOME_MESSAGE || INSTA
 
 const INSTAGRAM_WHATSAPP_NUMERO = process.env.INSTAGRAM_WHATSAPP_NUMERO || "5547997059353";
 
-// Opções do menu do Instagram → produto e palavras-chave aceitas na resposta do cliente
-// (número da opção sempre aceito; palavras são comparadas sem acento/maiúscula).
+// Opções do menu do Instagram → produto, palavras-chave aceitas na resposta do cliente
+// (número da opção sempre aceito; palavras são comparadas sem acento/maiúscula), e o que
+// acontece ao escolher. Sem `resposta` própria, cai no padrão: link pra continuar no
+// WhatsApp (`linkWhatsAppInstagram`) — é o caso de garantia/financiamento, que continuam
+// indo direto pro WhatsApp. Com `aguardaDados`, a próxima mensagem da pessoa é tratada como
+// os dados pedidos (ver handleInstagramMessaging) em vez de tentar casar com outra opção.
 const INSTAGRAM_OPCOES_MENU = [
-  { produto: "Seguro de veículo", chaves: ["1", "seguro"] },
-  { produto: "Consignado CLT", chaves: ["2", "clt", "consignado"] },
-  { produto: "Saque do FGTS", chaves: ["3", "fgts", "saque"] },
+  {
+    produto: "Seguro de veículo",
+    chaves: ["1", "seguro"],
+    resposta:
+      "Para fazer a cotação do seu seguro, é só acessar o site 🔗 www.cotacertaseguros.com.br, " +
+      "preencher o formulário rapidinho e você já é direcionado(a) para o atendimento com um atendente. 😊",
+  },
+  {
+    produto: "Consignado CLT",
+    chaves: ["2", "clt", "consignado"],
+    resposta:
+      "Para fazer a simulação do consignado CLT, é necessário ter no mínimo 3 meses de carteira " +
+      "assinada no trabalho atual.\n\nPra simular, me envia:\n• Nome completo\n• CPF\n" +
+      "• Data de nascimento\n• E-mail\n• Telefone com WhatsApp",
+    aguardaDados: "consignado_clt",
+  },
+  {
+    produto: "Saque do FGTS",
+    chaves: ["3", "fgts", "saque"],
+    resposta:
+      "Para fazer a simulação do saque do FGTS, é necessário autorizar o banco BMS lá no aplicativo " +
+      "do FGTS. Depois de autorizar, é só me informar o seu CPF que a gente já parte pro atendimento. 😊",
+    aguardaDados: "saque_fgts",
+  },
   { produto: "Empréstimo com carro em garantia", chaves: ["4", "garantia"] },
   { produto: "Financiamento de veículo", chaves: ["5", "financiamento"] },
 ];
+
+// Mensagem de confirmação depois que a pessoa manda os dados pedidos (CPF do FGTS, ou o
+// pacote de dados do consignado CLT) — mesma pros dois fluxos, encerra a captura automática.
+const INSTAGRAM_DADOS_RECEBIDOS_MESSAGE =
+  "Perfeito! ✅ Recebemos seus dados, é só aguardar que um atendente já vai continuar por aqui. 🙌";
 
 const REGEX_ACENTOS = new RegExp("[̀-ͯ]", "g");
 
@@ -987,15 +1017,36 @@ async function handleInstagramMessaging(messaging) {
     return;
   }
 
+  // Conversa esperando os dados de um fluxo (CPF do FGTS, ou pacote de dados do consignado
+  // CLT) — a mensagem atual É os dados pedidos, não tenta casar com outra opção do menu.
+  // Espelha o mesmo padrão do WhatsApp (fluxo_passo / capturaTexto em processarEntry),
+  // reaproveitando as MESMAS colunas da tabela conversations (fluxo já existe pro Instagram
+  // desde que ele passou a usar business_number_id "instagram").
+  const conversaAnterior = await db.getConversation(senderId, "instagram");
+  if (conversaAnterior?.fluxo_passo === "saque_fgts" || conversaAnterior?.fluxo_passo === "consignado_clt") {
+    await db.setFluxoPasso(senderId, "instagram", null);
+    try {
+      const result = await ig.sendDM(senderId, INSTAGRAM_DADOS_RECEBIDOS_MESSAGE);
+      await logInstagramOutbound(senderId, INSTAGRAM_DADOS_RECEBIDOS_MESSAGE, result.message_id);
+      console.log(`📸 ${senderId} enviou os dados de "${conversaAnterior.fluxo_passo}" → confirmado`);
+    } catch (err) {
+      console.error("Erro ao confirmar recebimento de dados (Instagram):", err.message);
+    }
+    return;
+  }
+
   const opcao = detectarOpcaoMenuInstagram(texto);
   if (opcao) {
-    const resposta = `Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre ${opcao.produto}:\n${linkWhatsAppInstagram(opcao.produto)}`;
+    const resposta =
+      opcao.resposta ||
+      `Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre ${opcao.produto}:\n${linkWhatsAppInstagram(opcao.produto)}`;
     try {
       const result = await ig.sendDM(senderId, resposta);
       await logInstagramOutbound(senderId, resposta, result.message_id);
-      console.log(`📸 ${senderId} escolheu "${opcao.produto}" → link do WhatsApp enviado`);
+      if (opcao.aguardaDados) await db.setFluxoPasso(senderId, "instagram", opcao.aguardaDados);
+      console.log(`📸 ${senderId} escolheu "${opcao.produto}" → resposta enviada`);
     } catch (err) {
-      console.error("Erro ao enviar link do WhatsApp (menu Instagram):", err.message);
+      console.error("Erro ao responder opção do menu (Instagram):", err.message);
     }
     return;
   }
