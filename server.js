@@ -313,22 +313,93 @@ function menuInicialGerenteArquivado() {
   };
 }
 
-// Entrada padrão desde 12/08/2026 — foco do dia é Consignado CLT (funil amigável, baseado
-// no padrão real de atendimento: primeiro qualifica o tempo de carteira assinada, só pede
-// os dados de quem já pode simular). Pra reativar a triagem de gerente, troca essa função
-// pelo conteúdo de menuInicialGerenteArquivado() (logo acima).
+// Menu principal (texto exato pedido pelo usuário, é o que o Felipe já manda manualmente
+// hoje — ver felizcred-site/logo/chats/) — respondido por número/palavra em texto livre
+// (detectarOpcaoMenuPrincipal), não por botão, porque é assim que o cliente responde de
+// verdade ("1", "clt" etc.).
+const TEXTO_MENU_PRINCIPAL =
+  "Olá, me chamo Felipe:\n\n" +
+  "Escolha uma das opções para ser atendido:\n" +
+  "Digite a opção desejada:\n\n" +
+  "1 - CONSIGNADO CLT\n" +
+  "2 - SEGURO DE CARRO/MOTO\n" +
+  "3 - EMPRÉSTIMO COM CARRO EM GARANTIA\n" +
+  "4 - FINANCIAR UM VEÍCULO\n\n" +
+  "ATENÇÃO: O saque do FGTS só pode ser simulado se não foi realizado neste ano. A Caixa alterou as regras.\n\n" +
+  "✅ (47) 99705-9353\n" +
+  "✅ (47) 99274-7368\n" +
+  "✅ (47) 3514-3392\n" +
+  "🌐 http://www.felizcred.com.br";
+
+// Entrada padrão desde 12/08/2026 — foco do dia é Consignado CLT. Fora do horário
+// comercial manda um aviso pra reativar depois, em vez do menu (ninguém aqui pra rodar a
+// simulação de crédito de verdade fora desse horário — ver horarioComercialCotaCerta mais
+// abaixo, mesma janela usada pela Cota Certa, mesma equipe). Pra reativar a triagem de
+// gerente, troca essa função pelo conteúdo de menuInicialGerenteArquivado() (logo acima).
 function menuInicial() {
-  return {
-    texto:
-      `Olá, ${saudacaoDoDia()}! 😊 Aqui é o Felipe, da Felizcred.\n\n` +
-      "Hoje estou com uma condição boa no Empréstimo Consignado CLT: o desconto sai direto da " +
-      "folha de pagamento, sem consulta ao SPC/Serasa e sem burocracia.\n\n" +
-      "Há quanto tempo você tem carteira assinada no seu trabalho atual?",
-    botoes: [
-      { id: "clt_3mais", title: "3 MESES OU MAIS" },
-      { id: "clt_menos3", title: "MENOS DE 3 MESES" },
-    ],
-  };
+  if (!horarioComercialCotaCerta()) {
+    return {
+      texto:
+        "Olá! 😊 Aqui é o Felipe, da Felizcred. No momento estamos fora do horário comercial " +
+        "(atendemos de segunda a sexta das 9h às 18h, e aos sábados até o meio-dia).\n\n" +
+        "Por favor, envie sua mensagem dentro do horário comercial pra reativar a conversa que a gente já te atende! 😊",
+    };
+  }
+  return { texto: TEXTO_MENU_PRINCIPAL };
+}
+
+// Reconhece a opção do menu principal em texto livre — número (1-4) ou palavra-chave dentro
+// da frase, mesmo padrão de detectarOpcaoMenuInstagram.
+const OPCOES_MENU_PRINCIPAL = [
+  { id: "1", chaves: ["1", "clt", "consignado"] },
+  { id: "2", chaves: ["2", "seguro"] },
+  { id: "3", chaves: ["3", "garantia"] },
+  { id: "4", chaves: ["4", "financiar", "financiamento"] },
+];
+
+function detectarOpcaoMenuPrincipal(texto) {
+  const t = normalizarTexto(texto);
+  if (!t) return null;
+  for (const opcao of OPCOES_MENU_PRINCIPAL) {
+    for (const chave of opcao.chaves) {
+      if (chave.length === 1 ? t === chave : t.includes(chave)) return opcao.id;
+    }
+  }
+  return null;
+}
+
+// Resposta de quem clicou/digitou a opção do menu principal. Só a opção 1 (CLT) tem fluxo
+// próprio hoje (foco do dia); 2-4 recebem a confirmação padrão e passam pro atendimento
+// humano — não reconhecer não responde nada automático (fica pro atendimento manual,
+// mesma filosofia do menu do Instagram).
+async function handlerMenuPrincipal(de, businessNumberId, corpo) {
+  const escolha = detectarOpcaoMenuPrincipal(corpo);
+  if (escolha === "1") {
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      "Para simular o consignado CLT, precisa ter no mínimo 3 meses de carteira assinada no seu trabalho atual.",
+      [
+        { id: "clt_3mais", title: "3 MESES OU MAIS" },
+        { id: "clt_menos3", title: "MENOS DE 3 MESES" },
+      ]
+    );
+    await db.setFluxoPasso(de, businessNumberId, "clt_pergunta_tempo");
+  } else if (escolha === "2") {
+    await enviarRespostaAutomatica(businessNumberId, de, PRODUTO_CONFIRMACAO("o SEGURO DE CARRO/MOTO") + avisoForaHorarioCotaCerta());
+    await db.setFluxoPasso(de, businessNumberId, null);
+  } else if (escolha === "3") {
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      PRODUTO_CONFIRMACAO("o EMPRÉSTIMO COM CARRO EM GARANTIA") + avisoForaHorarioCotaCerta()
+    );
+    await db.setFluxoPasso(de, businessNumberId, null);
+  } else if (escolha === "4") {
+    await enviarRespostaAutomatica(businessNumberId, de, PRODUTO_CONFIRMACAO("o FINANCIAMENTO DE VEÍCULO") + avisoForaHorarioCotaCerta());
+    await db.setFluxoPasso(de, businessNumberId, null);
+  }
+  // Não reconheceu a opção → fica no passo menu_inicial (mantém o lembrete sutil ativo)
 }
 
 // Lista de produtos oferecida quando a revisão de FGTS não se aplica
@@ -361,6 +432,7 @@ const LEMBRETE_MINUTOS = {
   gerente_menos2: 15,
   gerente_mais2: 15,
   gerente_autorizo: 20,
+  clt_pergunta_tempo: 15,
   clt_3mais: 15,
 };
 
@@ -368,6 +440,14 @@ const LEMBRETE_TEXTOS = {
   gerente_autorizo:
     "Olá! Para entrar na agenda de atendimento do escritório parceiro, preciso do seu nome e da sua " +
     "cidade — é só responder aqui 😊",
+  // menu_inicial é texto livre (não botão) — o lembrete padrão ("toque em uma das opções")
+  // não se aplica aqui, por isso tem o seu próprio, sutil, sem pressionar.
+  menu_inicial:
+    "Olá! Vi que você parou no meio do atendimento 😊 Pra continuar, é só responder com o número da " +
+    "opção (1 a 4) que te mandei ali em cima.",
+  clt_pergunta_tempo:
+    "Olá! Ainda por aí? 😊 Pra eu simular o consignado CLT, só preciso saber se você tem 3 meses ou " +
+    "mais de carteira assinada no seu trabalho atual.",
   clt_3mais:
     "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
     "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
@@ -446,8 +526,8 @@ const FLUXO_BOTOES = {
       "Enquanto isso, você pode conhecer nosso site: www.felizcred.com.br",
   },
   // Funil de Consignado CLT (12/08/2026) — resposta da qualificação de tempo de carteira
-  // assinada, enviada pelo menuInicial() atual. clt_3mais segue pra captura de dados
-  // (handlerCapturaDadosClt); clt_menos3 é terminal, sem mais nada esperado da pessoa.
+  // assinada, enviada por handlerMenuPrincipal (opção 1). clt_3mais segue pra captura de
+  // dados (handlerCapturaDadosClt); clt_menos3 é terminal, sem mais nada esperado da pessoa.
   clt_3mais: {
     texto:
       "Show! 😊 Pra simular preciso de mais 5 coisinhas, pode mandar tudo numa mensagem só:\n" +
@@ -462,14 +542,34 @@ const FLUXO_BOTOES = {
   },
 };
 
+// CPF em qualquer formato (com ou sem pontuação) — usado só como sinal de "isso parece
+// dado de verdade", não valida dígito verificador (não é o objetivo aqui).
+const REGEX_CPF = /\d{3}\.?\d{3}\.?\d{3}-?\d{2}/;
+
 // Depois que a pessoa manda os dados pedidos em clt_3mais — confirma e libera pro
 // atendimento humano (Felipe assume dali pra frente, com os dados já visíveis no
 // histórico da conversa no painel). Mesmo padrão de handlerConfirmacaoAgenda acima.
-async function handlerCapturaDadosClt(de, businessNumberId) {
+//
+// Antes confirmava QUALQUER texto como "dados recebidos" (bug real: testado em produção
+// respondendo "Fgts" no passo de dados, e o bot confirmou como se fosse a simulação
+// completa). Agora só confirma se achar um CPF na mensagem — sem isso, pede de novo e
+// mantém o passo clt_3mais (não perde o lead, só dá mais uma chance).
+async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
+  if (!REGEX_CPF.test(corpo || "")) {
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      "Não consegui identificar seu CPF na mensagem 🤔 Pode reenviar com nome completo, CPF, telefone, " +
+        "e-mail e data de nascimento, tudo numa mensagem só?"
+    );
+    return; // mantém o passo clt_3mais — outra chance, sem perder o lead
+  }
   await enviarRespostaAutomatica(
     businessNumberId,
     de,
-    "Perfeito! ✅ Já anotei tudo. Agora é só aguardar que eu, Felipe, vou continuar por aqui pra fazer sua simulação. 🙌"
+    "Perfeito! ✅ Já anotei tudo, agora é só aguardar atendimento — em breve eu, Felipe, vou te responder " +
+      "por aqui pra fazer sua simulação. 🙌" +
+      avisoForaHorarioCotaCerta()
   );
   await db.setFluxoPasso(de, businessNumberId, null);
 }
@@ -734,7 +834,11 @@ const FLUXO_FELIZCRED = {
   fluxoBotoes: FLUXO_BOTOES,
   lembreteMinutos: LEMBRETE_MINUTOS,
   lembreteTextos: LEMBRETE_TEXTOS,
-  capturaTexto: { gerente_autorizo: handlerConfirmacaoAgenda, clt_3mais: handlerCapturaDadosClt },
+  capturaTexto: {
+    gerente_autorizo: handlerConfirmacaoAgenda,
+    menu_inicial: handlerMenuPrincipal,
+    clt_3mais: handlerCapturaDadosClt,
+  },
 };
 
 const FLUXO_COTACERTA = {
@@ -834,11 +938,14 @@ async function processarEntry(entry) {
             }
           } else {
             // Passo aguardando resposta em texto livre (ex.: nome/cidade, modelo do
-            // veículo, CEP) — cada fluxo define os seus próprios passos de captura.
+            // veículo, CEP, opção do menu principal) — cada fluxo define os seus próprios
+            // passos de captura. `corpo` é repassado pra quem precisa decidir com base no
+            // que a pessoa digitou (ex.: handlerMenuPrincipal); handlers mais simples que
+            // sempre respondem a mesma coisa (ex.: handlerConfirmacaoAgenda) ignoram.
             const handler = fluxo.capturaTexto?.[conversaAnterior?.fluxo_passo];
             if (handler) {
               try {
-                await handler(de, businessNumberId);
+                await handler(de, businessNumberId, corpo);
               } catch (err) {
                 console.error("Erro ao processar captura de texto do fluxo:", err.message);
               }

@@ -271,23 +271,52 @@ No histórico do painel, as mensagens enviadas com botões mostram os botões co
   `https://meuwhats.onrender.com/ping`, intervalo 5 min, alerta por e-mail — cobre também
   o caso de o serviço já ter dormido por algum motivo e avisa se o servidor cair.
 
-### Funil de Consignado CLT (12/08/2026) — entrada padrão atual do número Felizcred
+### Funil de Consignado CLT (12/08/2026, reformulado no mesmo dia) — entrada padrão atual do número Felizcred
 
 Substituiu a triagem de gerente (arquivada acima) como `menuInicial()`. Baseado no padrão
 real de atendimento manual, analisado a partir de conversas exportadas de leads reais
 (pasta local `felizcred-site/logo/chats/`, não versionada — dados de cliente): o atendente
-(Felipe) sempre pergunta o tempo de carteira assinada antes de pedir dados, e o mínimo
-aceito nos exemplos reais foi 3 meses.
+(Felipe) manda um menu numérico em texto puro (não botão), pergunta o tempo de carteira
+assinada antes de pedir dados (mínimo aceito nos exemplos reais: 3 meses), e é assim que o
+menu real que ele já usa manualmente foi copiado pro código.
 
-- **Primeira mensagem**: saudação + gancho do consignado CLT ("desconto sai direto da folha,
-  sem SPC/Serasa") → botões `3 MESES OU MAIS` / `MENOS DE 3 MESES`.
-  - `3 MESES OU MAIS` (`clt_3mais`) → pede nome completo, CPF, telefone, e-mail e data de
-    nascimento numa mensagem só. Ao responder (`handlerCapturaDadosClt`), confirma
-    recebimento e libera pro atendimento humano — os dados já ficam no histórico da
-    conversa no painel, não precisa repetir nada pro Felipe.
-  - `MENOS DE 3 MESES` (`clt_menos3`) → explica o requisito, orienta a conferir a data de
-    admissão no app da Carteira de Trabalho Digital, convida a voltar quando completar 3
-    meses. **Terminal** — não pede dados, não tem lembrete de continuação.
+- **Primeira mensagem** (`TEXTO_MENU_PRINCIPAL`, texto puro — a pessoa responde digitando
+  "1"-"4" ou uma palavra, não clicando em botão, igual acontece de verdade): "Olá, me chamo
+  Felipe: escolha uma das opções... 1 - CONSIGNADO CLT / 2 - SEGURO DE CARRO/MOTO /
+  3 - EMPRÉSTIMO COM CARRO EM GARANTIA / 4 - FINANCIAR UM VEÍCULO" + aviso do FGTS + telefones
+  + site. Reconhecimento em `detectarOpcaoMenuPrincipal`/`handlerMenuPrincipal` (mesmo padrão
+  de `detectarOpcaoMenuInstagram`): número exato ou palavra-chave dentro da frase. Não
+  reconhecer não responde nada automático (fica pro atendimento manual, e o lembrete sutil
+  do passo `menu_inicial` continua tentando trazer a pessoa de volta).
+  - **Opção 1 (CLT)** → "Para simular o consignado CLT, precisa ter no mínimo 3 meses de
+    carteira assinada..." com botões `3 MESES OU MAIS` / `MENOS DE 3 MESES` (passo
+    `clt_pergunta_tempo`, esses dois continuam sendo botão de verdade, não texto).
+    - `3 MESES OU MAIS` (`clt_3mais`) → pede nome completo, CPF, telefone, e-mail e data de
+      nascimento numa mensagem só. `handlerCapturaDadosClt` só confirma e libera pro
+      atendimento humano se achar um **CPF de verdade** na resposta (`REGEX_CPF`) — sem
+      isso, pede de novo e mantém o passo (não confirma qualquer texto como se fosse dado,
+      bug real visto em teste: respondeu "Fgts" no meio do fluxo e o bot confirmou como se
+      tivesse recebido a simulação completa).
+    - `MENOS DE 3 MESES` (`clt_menos3`) → explica o requisito, orienta a conferir a data de
+      admissão no app da Carteira de Trabalho Digital, convida a voltar quando completar 3
+      meses. **Terminal** — não pede dados, não tem lembrete de continuação.
+  - **Opções 2-4** (seguro, carro em garantia, financiamento) → confirmação padrão
+    (`PRODUTO_CONFIRMACAO`) e passa pro atendimento humano — sem fluxo próprio ainda (foco de
+    hoje é só CLT).
+
+**Fora do horário comercial** (`horarioComercialCotaCerta()` — mesma janela usada pela Cota
+Certa, seg-sex 9h-18h/sáb até 12h, reaproveitada porque é a mesma equipe): em vez do menu, a
+primeira mensagem vira um aviso pedindo pra escrever de novo dentro do horário — não faz
+sentido abrir o funil se não tem ninguém pra rodar a simulação de crédito depois. A
+confirmação de dados recebidos (`handlerCapturaDadosClt`) também ganha esse aviso
+(`avisoForaHorarioCotaCerta()`) quando cai fora do horário, pra não prometer resposta rápida
+à toa.
+
+**Lembretes ("gancho") são sutis e só disparam pra quem parou no meio de uma resposta
+automática** — se o Felipe já respondeu manualmente pelo painel, `setFluxoPasso(...null)`
+zera o passo e cancela qualquer lembrete pendente daquela conversa (mesmo mecanismo de
+sempre, ver "Lembretes e agenda" acima). Passos novos: `menu_inicial` (15 min, "responda com
+o número da opção"), `clt_pergunta_tempo` (15 min), `clt_3mais` (15 min, já existia).
 
 **O que fica de fora de propósito** (evidenciado nas conversas analisadas, mas não
 automatizável com o que existe hoje): a simulação de crédito de verdade é feita pelo Felipe
