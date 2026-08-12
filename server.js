@@ -854,11 +854,53 @@ async function processarEntry(entry) {
 }
 
 // ─── PROCESSAR EVENTOS DO INSTAGRAM ──────────────────────────────────────────
+// DMs do Instagram são gravadas nas MESMAS tabelas conversations/messages do WhatsApp,
+// usando business_number_id fixo "instagram" — isso deixa reaproveitar todas as rotas do
+// painel (/painel/api/conversations/:businessId/...) sem duplicar nada, e é o que alimenta
+// a caixa de entrada unificada (WhatsApp + Instagram juntos).
+async function logInstagramInbound(senderId, texto, quando) {
+  const conversaAnterior = await db.getConversation(senderId, "instagram");
+  let nome = conversaAnterior?.name || null;
+  if (!nome) {
+    try {
+      const perfil = await ig.getPerfilUsuario(senderId);
+      nome = perfil.username ? `@${perfil.username}` : perfil.name || null;
+    } catch {
+      // segue sem nome — o painel mostra o ID do Instagram no lugar
+    }
+  }
+  await db.upsertConversation(senderId, "instagram", nome, quando);
+  await db.insertMessage({
+    phone: senderId,
+    business_number_id: "instagram",
+    direction: "in",
+    type: "text",
+    body: texto,
+    status: "received",
+    created_at: quando,
+  });
+}
+
+async function logInstagramOutbound(recipientId, texto) {
+  const now = Date.now();
+  await db.upsertConversation(recipientId, "instagram", null, now);
+  await db.insertMessage({
+    phone: recipientId,
+    business_number_id: "instagram",
+    direction: "out",
+    type: "text",
+    body: texto,
+    status: "sent",
+    created_at: now,
+  });
+}
+
 async function handleInstagramComment(value) {
   const userId = value.from?.id;
   if (!userId) return;
   try {
     await ig.sendDM(userId, INSTAGRAM_COMMENT_REPLY);
+    await logInstagramOutbound(userId, INSTAGRAM_COMMENT_REPLY);
     console.log(`📸 Comentário de ${value.from?.username || userId} → DM enviada`);
   } catch (err) {
     console.error("Erro ao responder comentário do Instagram:", err.message);
@@ -867,15 +909,18 @@ async function handleInstagramComment(value) {
 
 async function handleInstagramMessaging(messaging) {
   const senderId = messaging.sender?.id;
-  if (!senderId) return;
+  if (!senderId || messaging.message?.is_echo) return; // is_echo = eco da própria mensagem que a gente mandou
 
-  const opcao = detectarOpcaoMenuInstagram(messaging.message?.text);
+  const texto = messaging.message?.text || "";
+  const quando = Number(messaging.timestamp) || Date.now();
+  await logInstagramInbound(senderId, texto || (messaging.message?.attachments ? "[anexo recebido]" : "[mensagem sem texto]"), quando);
+
+  const opcao = detectarOpcaoMenuInstagram(texto);
   if (opcao) {
+    const resposta = `Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre ${opcao.produto}:\n${linkWhatsAppInstagram(opcao.produto)}`;
     try {
-      await ig.sendDM(
-        senderId,
-        `Perfeito! ✅ Clica no link pra continuar no WhatsApp sobre ${opcao.produto}:\n${linkWhatsAppInstagram(opcao.produto)}`
-      );
+      await ig.sendDM(senderId, resposta);
+      await logInstagramOutbound(senderId, resposta);
       console.log(`📸 ${senderId} escolheu "${opcao.produto}" → link do WhatsApp enviado`);
     } catch (err) {
       console.error("Erro ao enviar link do WhatsApp (menu Instagram):", err.message);
@@ -887,6 +932,7 @@ async function handleInstagramMessaging(messaging) {
   if (isStoryReply) {
     try {
       await ig.sendDM(senderId, INSTAGRAM_WELCOME_MESSAGE);
+      await logInstagramOutbound(senderId, INSTAGRAM_WELCOME_MESSAGE);
       console.log(`📸 Reply de story de ${senderId} → DM enviada`);
     } catch (err) {
       console.error("Erro ao responder reply de story do Instagram:", err.message);
@@ -900,6 +946,7 @@ async function handleInstagramMessaging(messaging) {
   await db.instagramMarcarSaudado(senderId);
   try {
     await ig.sendDM(senderId, INSTAGRAM_WELCOME_MESSAGE);
+    await logInstagramOutbound(senderId, INSTAGRAM_WELCOME_MESSAGE);
     console.log(`📸 Primeira DM de ${senderId} → boas-vindas enviada`);
   } catch (err) {
     console.error("Erro ao enviar boas-vindas do Instagram:", err.message);
@@ -1096,6 +1143,24 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, PHONE_NUMBERS);
     }
 
+    // GET /painel/api/inbox — conversas de TODOS os canais juntas (cada número de WhatsApp
+    // configurado + Instagram), ordenadas pela mensagem mais recente. Alimenta a caixa de
+    // entrada unificada do painel — cada conversa já sai marcada com o canal e o
+    // business_number_id certo pra usar nas rotas abaixo (mensagens/responder/status/nota).
+    if (req.method === "GET" && path_ === "/painel/api/inbox") {
+      if (!requireAuth(req, res)) return;
+      const listas = await Promise.all([
+        ...PHONE_NUMBERS.map((n) => db.listConversations(n.id)),
+        db.listConversations("instagram"),
+      ]);
+      const conversas = listas.flat().map((c) => ({
+        ...c,
+        channel: c.business_number_id === "instagram" ? "instagram" : "whatsapp",
+      }));
+      conversas.sort((a, b) => (b.last_message_at || 0) - (a.last_message_at || 0));
+      return send(res, 200, conversas);
+    }
+
     // GET /painel/api/conversations/:businessId — lista de conversas de um número
     const matchConversations = path_.match(/^\/painel\/api\/conversations\/([^/]+)$/);
     if (req.method === "GET" && matchConversations) {
@@ -1124,6 +1189,19 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const texto = (body.text || "").trim();
       if (!texto && !body.imagemBase64) return send(res, 400, { error: "Mensagem vazia" });
+
+      if (businessId === "instagram") {
+        if (body.imagemBase64) {
+          return send(res, 400, { error: "Envio de imagem pelo Instagram ainda não é suportado — responda por texto." });
+        }
+        try {
+          await ig.sendDM(phone, texto);
+        } catch (err) {
+          return send(res, 502, { error: `Falha ao enviar pelo Instagram: ${err.message}` });
+        }
+        await logInstagramOutbound(phone, texto);
+        return send(res, 200, { ok: true });
+      }
 
       let imagemUrl = null;
       if (body.imagemBase64) {

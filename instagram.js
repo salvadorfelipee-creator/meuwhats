@@ -94,6 +94,15 @@ async function getComentariosUltimoPost() {
   return comentarios.data || [];
 }
 
+// Perfil de quem mandou uma DM (nome/username) — usado só pra mostrar um nome legível
+// na caixa de entrada em vez do ID numérico. Best-effort: se a Meta não liberar (perfil
+// fora da janela de mensageria, ou permissão insuficiente), quem chama trata o erro.
+async function getPerfilUsuario(userId) {
+  const { status, json } = await graphRequest("GET", `/${GRAPH_VERSION}/${userId}?fields=name,username`);
+  if (status >= 400) throw new Error(`Falha ao obter perfil do remetente: ${JSON.stringify(json)}`);
+  return json;
+}
+
 async function getConversas() {
   const { status, json } = await graphRequest(
     "GET",
@@ -235,6 +244,7 @@ async function publicarReels({ videoUrl, legenda, accessToken, accountId }) {
 module.exports = {
   sendDM,
   getPerfil,
+  getPerfilUsuario,
   getInsightsUltimoPost,
   listarPublicacoes,
   getComentariosUltimoPost,

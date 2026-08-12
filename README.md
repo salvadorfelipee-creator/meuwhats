@@ -995,6 +995,7 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `POST /webhook`                                                 | Recebe mensagens/status                     |
 | `GET /painel`                                                   | Painel web (auth)                           |
 | `GET /painel/api/numbers`                                       | Lista números configurados (auth)           |
+| `GET /painel/api/inbox`                                          | Caixa de entrada unificada — conversas de todos os números + Instagram juntas (auth) |
 | `GET /painel/api/conversations/:businessId`                     | Lista conversas de um número (auth)         |
 | `GET /painel/api/conversations/:businessId/:phone/messages`     | Mensagens de uma conversa (auth)            |
 | `POST /painel/api/conversations/:businessId/:phone/reply`       | Envia resposta de texto (auth)              |
@@ -1009,7 +1010,7 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `POST /painel/api/instagram/reset-boasvindas`                    | Limpa quem já recebeu boas-vindas (auth)    |
 | `GET /painel/api/instagram/diagnostico`                          | Testa basic/manage_comments/manage_messages de verdade, sem precisar de token (auth) |
 | `GET /painel/api/instagram/comentarios`                          | Comentários do último post (auth)           |
-| `GET /painel/api/instagram/conversas`                            | Lista conversas (DMs) do Instagram (auth)   |
+| `GET /painel/api/instagram/conversas`                            | Lista conversas (DMs) do Instagram via Graph API — bruta, sem texto; não usada mais pelo painel, as DMs de verdade vêm por `/painel/api/inbox` (auth) |
 | `GET /painel/api/ads/campanhas`                                  | Lista campanhas de anúncios com métricas (auth) |
 | `POST /painel/api/ads/:id/status`                                | Pausa/ativa campanha, conjunto ou anúncio (auth) |
 | `POST /webhook/telegram`                                          | Recebe updates do bot do Telegram (`/start`, contato compartilhado) |
@@ -1021,26 +1022,39 @@ Redesenhado em 26/06/2026 para um layout minimalista (paleta neutra/terracota, s
 dependências novas — continua HTML/CSS/JS puro, sem build step) com uma navegação lateral
 de ícones que troca entre três telas dentro da mesma página:
 
-- **💬 WhatsApp** — lista de conversas + chat (era a tela única antes), envio em massa
-  continua em modal.
-- **📸 Instagram** — perfil conectado, métricas do último post, comentários do último post
-  e lista de conversas (DMs), botão de resetar boas-vindas (usa as rotas
-  `/comentarios` e `/conversas` criadas junto com esse redesign).
+- **💬 Conversas** — caixa de entrada única (11/08/2026): junta WhatsApp (todos os números
+  configurados) e DMs do Instagram na mesma lista, ordenada pela mensagem mais recente, com
+  uma etiqueta de canal em cada linha (`💬 {número}` ou `📸 Instagram`). Não existe mais aba
+  por número — clicar numa conversa já sabe por onde responder. Chat, status, nota e busca
+  funcionam igual para os dois canais; envio de imagem continua exclusivo do WhatsApp (a
+  API de DM do Instagram usada aqui só manda texto). Envio em massa continua em modal, mas
+  agora tem um seletor explícito de "Enviar pelo número" (só WhatsApp, broadcast usa
+  template — Instagram não entra nessa).
+- **📸 Instagram** — perfil conectado, métricas do último post e comentários do último post,
+  botão de resetar boas-vindas. As DMs saíram daqui (ver acima).
 - **📊 Ads Manager** — lista de campanhas (era um modal antes, agora é página própria),
   pausar/ativar.
 - **📨 Telegram** — lista de contatos (leads) captados pelo bot, com telefone, username e
   parâmetro de origem (campanha) quando disponível.
 
-**Notificações de mensagem nova (WhatsApp)** — botão 🔔 no cabeçalho da aba WhatsApp pede
-permissão de notificação do navegador (`Notification` API). Com permissão concedida, toda
-mensagem recebida (em qualquer um dos números configurados em `PHONE_NUMBERS_JSON`, mesmo
-o que não está com a aba aberta no momento) dispara uma notificação do navegador e marca um
-indicador visual (bolinha laranja) na aba do número e no ícone 💬 do menu lateral; clicar na
-notificação leva direto pra conversa. Implementado via polling de 5s (`verificarNovasMensagens`
-em `painel.html`) comparando `last_message_at`/`last_direction` de `/painel/api/conversations/:businessId`
-— precisou adicionar `last_direction` na query `listConversations` em `db.js` pra saber se a
-última mensagem foi recebida (não notifica para mensagens que você mesmo enviou). Funciona
-só com a aba do navegador aberta (sem service worker / push em segundo plano).
+**Como as DMs do Instagram são gravadas**: usam as MESMAS tabelas `conversations`/`messages`
+do WhatsApp, com `business_number_id` fixo `"instagram"` (ver `logInstagramInbound`/
+`logInstagramOutbound` em `server.js`) — por isso todas as rotas de conversa
+(`/painel/api/conversations/:businessId/...`) já funcionam pra Instagram sem rota nova,
+bastando passar `businessId=instagram`. Responder requer a permissão
+`instagram_manage_messages` aprovada (Acesso Avançado) — cheque com
+`/painel/api/instagram/diagnostico` antes de confiar no botão de resposta.
+
+**Notificações de mensagem nova** — botão 🔔 no cabeçalho da caixa de entrada pede permissão
+de notificação do navegador (`Notification` API). Com permissão concedida, toda mensagem
+recebida (em qualquer número configurado em `PHONE_NUMBERS_JSON` ou no Instagram, mesmo sem
+a aba aberta) dispara uma notificação do navegador e marca um indicador visual (bolinha
+laranja) no ícone 💬 do menu lateral; clicar na notificação leva direto pra conversa.
+Implementado via polling de 5s (`verificarNovasMensagens` em `painel.html`) comparando
+`last_message_at`/`last_direction` de `/painel/api/inbox` — precisou adicionar
+`last_direction` na query `listConversations` em `db.js` pra saber se a última mensagem foi
+recebida (não notifica para mensagens que você mesmo enviou). Funciona só com a aba do
+navegador aberta (sem service worker / push em segundo plano).
 
 Se quiser ir além de HTML/CSS/JS puro no futuro (ex.: migrar para React/Tailwind/shadcn),
 isso é uma mudança de arquitetura grande (build step novo, mudar como `server.js` serve os

@@ -60,10 +60,7 @@
   #conversas-header span.titulo { font-size: 17px; font-weight: 700; }
   #conversas-header .acoes button { background: transparent; border: none; color: var(--text-muted); font-size: 17px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
   #conversas-header .acoes button:hover { background: var(--bg-alt); color: var(--text); }
-  #abas-numeros { display: flex; padding: 0 12px; gap: 4px; border-bottom: 1px solid var(--border); }
-  .aba-numero { position: relative; padding: 9px 14px 9px 12px; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; }
-  .aba-numero.ativa { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-  .aba-numero.tem-novas::after { content: ""; position: absolute; top: 6px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .canal-badge { flex-shrink: 0; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--bg-alt); color: var(--text-muted); white-space: nowrap; }
 
   .nav-item { position: relative; }
   .nav-item.tem-novas::after { content: ""; position: absolute; top: 4px; right: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--sidebar); }
@@ -78,8 +75,8 @@
   .conversa.ativa { background: var(--accent-soft); }
   .avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--sidebar); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; flex-shrink: 0; }
   .conversa-info { flex: 1; min-width: 0; }
-  .conversa-linha1 { display: flex; justify-content: space-between; align-items: baseline; }
-  .conversa-nome { font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conversa-linha1 { display: flex; align-items: baseline; gap: 6px; }
+  .conversa-nome { font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
   .conversa-hora { font-size: 12px; color: var(--text-muted); flex-shrink: 0; margin-left: 8px; }
   .conversa-preview { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
@@ -330,8 +327,8 @@
 <div id="app">
   <nav id="nav-rail">
     <div class="brand">FC</div>
-    <button class="nav-item active" data-view="whatsapp" title="WhatsApp">💬</button>
-    <button class="nav-item" data-view="instagram" title="Instagram">📸</button>
+    <button class="nav-item active" data-view="whatsapp" title="Conversas (WhatsApp + Instagram)">💬</button>
+    <button class="nav-item" data-view="instagram" title="Instagram (perfil e métricas)">📸</button>
     <button class="nav-item" data-view="ads" title="Ads Manager">📊</button>
     <button class="nav-item" data-view="telegram" title="Telegram">📨</button>
     <button class="nav-item" data-view="publicar" title="Publicar (Publique IV)">🚀</button>
@@ -341,13 +338,12 @@
   <div id="view-whatsapp" class="view ativa">
     <div id="conversas">
       <div id="conversas-header">
-        <span class="titulo">WhatsApp</span>
+        <span class="titulo">Conversas</span>
         <span class="acoes">
           <button id="btn-notif" title="Ativar notificações de novas mensagens">🔔</button>
           <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
         </span>
       </div>
-      <div id="abas-numeros"></div>
       <div id="abas-status">
         <button class="aba-status ativa" data-status="todas" type="button">Todas</button>
         <button class="aba-status" data-status="novo" type="button">🔵 Novo</button>
@@ -426,7 +422,9 @@
         </div>
         <div class="card">
           <h3>Conversas (DMs)</h3>
-          <div id="ig-conversas" style="margin-top:8px;">Carregando...</div>
+          <div class="lista-vazia" style="margin-top:8px;">
+            As DMs agora aparecem na aba 💬 Conversas, junto com o WhatsApp — dá pra ver o histórico e responder direto por lá.
+          </div>
         </div>
       </div>
     </div>
@@ -588,6 +586,8 @@
 <div id="modal-massa">
   <div class="modal-conteudo">
     <h3>Envio em massa (template)</h3>
+    <label>Enviar pelo número</label>
+    <select id="massa-numero"></select>
     <label>Nome do template (aprovado na Meta)</label>
     <input id="massa-template" value="aviso_taxa_clt" />
     <label>Idioma</label>
@@ -643,33 +643,25 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
 async function carregarNumeros() {
   const res = await fetch("/painel/api/numbers");
   numeros = await res.json();
-  if (!numeroAtivoId && numeros.length) numeroAtivoId = numeros[0].id;
-  renderizarAbas();
+  atualizarSelectMassa();
 }
 
-function renderizarAbas() {
-  const wrap = document.getElementById("abas-numeros");
-  wrap.innerHTML = "";
-  for (const n of numeros) {
-    const div = document.createElement("div");
-    div.className = "aba-numero" + (n.id === numeroAtivoId ? " ativa" : "") + (naoLidosPorNumero.has(n.id) ? " tem-novas" : "");
-    div.textContent = n.label || n.id;
-    div.onclick = () => {
-      naoLidosPorNumero.delete(n.id);
-      atualizarBadgeNav();
-      if (numeroAtivoId === n.id) { renderizarAbas(); return; }
-      numeroAtivoId = n.id;
-      telefoneAtual = null;
-      document.getElementById("conversa-atual").style.display = "none";
-      document.getElementById("vazio").style.display = "flex";
-      renderizarAbas();
-      carregarConversas();
-    };
-    wrap.appendChild(div);
-  }
+// Rótulo exibido em cada linha da caixa de entrada unificada — canal + (no caso do
+// WhatsApp) qual dos números configurados, já que "instagram" é um id sintético fixo
+// (ver logInstagramInbound em server.js) e os outros ids vêm de PHONE_NUMBERS_JSON.
+function rotuloCanal(c) {
+  if (c.channel === "instagram") return "📸 Instagram";
+  const numero = numeros.find((n) => n.id === c.business_number_id);
+  return `💬 ${numero?.label || c.business_number_id}`;
 }
 
-// ─── Notificações de novas mensagens (nos dois números de WhatsApp) ────────
+function atualizarSelectMassa() {
+  const select = document.getElementById("massa-numero");
+  if (!select) return;
+  select.innerHTML = numeros.map((n) => `<option value="${n.id}">${escapeHtml(n.label || n.id)}</option>`).join("");
+}
+
+// ─── Notificações de novas mensagens (todos os números de WhatsApp + Instagram) ────
 let ultimaMsgConhecida = {}; // chave `${numeroId}|${phone}` -> last_message_at já visto
 let primeiraVerificacaoFeita = false;
 let naoLidosPorNumero = new Set();
@@ -711,6 +703,12 @@ function atualizarBadgeNav() {
   navWhats.classList.toggle("tem-novas", naoLidosPorNumero.size > 0);
 }
 
+// Rótulo do canal/número pra usar em notificações — reaproveita rotuloCanal(), mas com
+// uma "conversa" mínima só com os campos que ele precisa.
+function rotuloNumero(businessNumberId) {
+  return rotuloCanal({ business_number_id: businessNumberId, channel: businessNumberId === "instagram" ? "instagram" : "whatsapp" });
+}
+
 function atualizarBotaoNotif() {
   const btn = document.getElementById("btn-notif");
   if (typeof Notification === "undefined") { btn.style.display = "none"; return; }
@@ -725,56 +723,46 @@ document.getElementById("btn-notif").addEventListener("click", () => {
   Notification.requestPermission().then(atualizarBotaoNotif);
 });
 
-function notificarNovaMensagem(numero, conversa) {
-  const olhandoAgora = numeroAtivoId === numero.id && telefoneAtual === conversa.phone && document.hasFocus();
+function notificarNovaMensagem(conversa) {
+  const businessNumberId = conversa.business_number_id;
+  const olhandoAgora = numeroAtivoId === businessNumberId && telefoneAtual === conversa.phone && document.hasFocus();
   if (olhandoAgora) return;
 
-  naoLidosPorNumero.add(numero.id);
-  renderizarAbas();
+  naoLidosPorNumero.add(businessNumberId);
   atualizarBadgeNav();
   tocarSomNotificacao();
 
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-  const notif = new Notification(`${numero.label || numero.id} · ${conversa.name || conversa.phone}`, {
+  const notif = new Notification(`${rotuloNumero(businessNumberId)} · ${conversa.name || conversa.phone}`, {
     body: previewTexto(conversa) || "Nova mensagem",
-    tag: `wa-${numero.id}-${conversa.phone}`,
+    tag: `inbox-${businessNumberId}-${conversa.phone}`,
   });
   notif.onclick = () => {
     window.focus();
     document.querySelector('.nav-item[data-view="whatsapp"]').click();
-    naoLidosPorNumero.delete(numero.id);
-    if (numeroAtivoId !== numero.id) {
-      numeroAtivoId = numero.id;
-      telefoneAtual = null;
-      renderizarAbas();
-      carregarConversas().then(() => selecionarConversa(conversa.phone));
-    } else {
-      renderizarAbas();
-      selecionarConversa(conversa.phone);
-    }
+    naoLidosPorNumero.delete(businessNumberId);
+    carregarConversas().then(() => selecionarConversa(conversa.phone, businessNumberId));
     atualizarBadgeNav();
   };
 }
 
 async function verificarNovasMensagens() {
-  for (const n of numeros) {
-    let lista;
-    try {
-      const res = await fetch(`/painel/api/conversations/${encodeURIComponent(n.id)}`);
-      lista = await res.json();
-    } catch {
-      continue;
-    }
-    for (const c of lista) {
-      const chave = `${n.id}|${c.phone}`;
-      const visto = ultimaMsgConhecida[chave];
-      const ehNova = c.last_message_at && (!visto || c.last_message_at > visto);
-      if (ehNova) {
-        if (primeiraVerificacaoFeita && c.last_direction === "in") {
-          notificarNovaMensagem(n, c);
-        }
-        ultimaMsgConhecida[chave] = c.last_message_at;
+  let lista;
+  try {
+    const res = await fetch("/painel/api/inbox");
+    lista = await res.json();
+  } catch {
+    return;
+  }
+  for (const c of lista) {
+    const chave = `${c.business_number_id}|${c.phone}`;
+    const visto = ultimaMsgConhecida[chave];
+    const ehNova = c.last_message_at && (!visto || c.last_message_at > visto);
+    if (ehNova) {
+      if (primeiraVerificacaoFeita && c.last_direction === "in") {
+        notificarNovaMensagem(c);
       }
+      ultimaMsgConhecida[chave] = c.last_message_at;
     }
   }
   primeiraVerificacaoFeita = true;
@@ -804,9 +792,8 @@ function formatarHoraCurta(ts) {
 }
 
 async function carregarConversas() {
-  if (!numeroAtivoId) return;
   try {
-    const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}`);
+    const res = await fetch("/painel/api/inbox");
     if (!res.ok) throw new Error(`status ${res.status}`);
     conversasCache = await res.json();
   } catch (err) {
@@ -826,14 +813,23 @@ let telefonesEncontradosPorMensagem = null; // null = busca de texto não está 
 
 let buscaMsgTimeout = null;
 async function buscarPorMensagem(termo) {
-  if (!termo || !numeroAtivoId) {
+  if (!termo) {
     telefonesEncontradosPorMensagem = null;
     return;
   }
+  // Busca no texto das mensagens em todos os canais (cada número de WhatsApp + Instagram),
+  // já que a caixa de entrada agora mistura todos juntos.
+  const ids = [...numeros.map((n) => n.id), "instagram"];
   try {
-    const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/buscar?q=${encodeURIComponent(termo)}`);
-    const resultados = await res.json();
-    telefonesEncontradosPorMensagem = new Set(resultados.map((r) => r.phone));
+    const listas = await Promise.all(
+      ids.map((id) =>
+        fetch(`/painel/api/conversations/${encodeURIComponent(id)}/buscar?q=${encodeURIComponent(termo)}`)
+          .then((r) => r.json())
+          .then((resultados) => resultados.map((r) => `${id}|${r.phone}`))
+          .catch(() => [])
+      )
+    );
+    telefonesEncontradosPorMensagem = new Set(listas.flat());
   } catch {
     telefonesEncontradosPorMensagem = null;
   }
@@ -848,7 +844,7 @@ function renderizarConversas() {
   const filtradas = porStatus.filter((c) => {
     if (!filtro) return true;
     if ((c.name || "").toLowerCase().includes(filtro) || c.phone.includes(filtro)) return true;
-    return telefonesEncontradosPorMensagem && telefonesEncontradosPorMensagem.has(c.phone);
+    return telefonesEncontradosPorMensagem && telefonesEncontradosPorMensagem.has(`${c.business_number_id}|${c.phone}`);
   });
   if (!filtradas.length) {
     lista.innerHTML = `<div class="lista-vazia" style="padding:16px;">${
@@ -858,8 +854,9 @@ function renderizarConversas() {
   }
   for (const c of filtradas) {
     const status = STATUS_INFO[c.status] || STATUS_INFO.novo;
+    const ativa = c.phone === telefoneAtual && c.business_number_id === numeroAtivoId;
     const div = document.createElement("div");
-    div.className = "conversa" + (c.phone === telefoneAtual ? " ativa" : "");
+    div.className = "conversa" + (ativa ? " ativa" : "");
     div.innerHTML = `
       <div class="conversa-avatar-wrap">
         <div class="avatar">${iniciais(c.name || c.phone)}</div>
@@ -868,12 +865,13 @@ function renderizarConversas() {
       <div class="conversa-info">
         <div class="conversa-linha1">
           <span class="conversa-nome">${escapeHtml(c.name || c.phone)}</span>
+          <span class="canal-badge">${rotuloCanal(c)}</span>
           <span class="conversa-hora">${formatarHoraCurta(c.last_message_at)}</span>
         </div>
         <div class="conversa-preview">${escapeHtml(previewTexto(c))}</div>
       </div>
     `;
-    div.onclick = () => selecionarConversa(c.phone);
+    div.onclick = () => selecionarConversa(c.phone, c.business_number_id);
     lista.appendChild(div);
   }
 }
@@ -910,7 +908,7 @@ function renderizarInfoContato(conversa, phone) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: btn.dataset.status }),
       });
-      const c = conversasCache.find((x) => x.phone === phone);
+      const c = conversasCache.find((x) => x.phone === phone && x.business_number_id === numeroAtivoId);
       if (c) c.status = btn.dataset.status;
       renderizarInfoContato(c, phone);
       renderizarConversas();
@@ -933,21 +931,22 @@ document.getElementById("info-nota-salvar").addEventListener("click", async () =
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ nota }),
   });
-  const c = conversasCache.find((x) => x.phone === telefoneAtual);
+  const c = conversasCache.find((x) => x.phone === telefoneAtual && x.business_number_id === numeroAtivoId);
   if (c) c.nota = nota;
   const aviso = document.getElementById("info-nota-salvo");
   aviso.style.display = "block";
   setTimeout(() => (aviso.style.display = "none"), 2000);
 });
 
-function selecionarConversa(phone) {
+function selecionarConversa(phone, businessNumberId) {
   telefoneAtual = phone;
-  const conversa = conversasCache.find((c) => c.phone === phone);
+  numeroAtivoId = businessNumberId;
+  const conversa = conversasCache.find((c) => c.phone === phone && c.business_number_id === businessNumberId);
   document.getElementById("conversa-atual").style.display = "flex";
   document.getElementById("vazio").style.display = "none";
   document.getElementById("chat-avatar").textContent = iniciais(conversa?.name || phone);
   document.getElementById("chat-nome").textContent = conversa?.name || phone;
-  document.getElementById("chat-telefone").textContent = conversa?.name ? phone : "";
+  document.getElementById("chat-telefone").textContent = conversa ? rotuloCanal(conversa) : "";
   document.getElementById("view-whatsapp").classList.add("mostrando-conversa"); // no celular, troca lista pela conversa
   renderizarInfoContato(conversa, phone);
   renderizarConversas();
@@ -1198,6 +1197,7 @@ document.getElementById("form-resposta").addEventListener("submit", async (e) =>
 
 document.getElementById("btn-massa").addEventListener("click", () => {
   document.getElementById("massa-resultado").textContent = "";
+  atualizarSelectMassa();
   document.getElementById("modal-massa").style.display = "flex";
 });
 
@@ -1206,6 +1206,7 @@ document.getElementById("massa-cancelar").addEventListener("click", () => {
 });
 
 document.getElementById("massa-enviar").addEventListener("click", async () => {
+  const numeroEnvio = document.getElementById("massa-numero").value;
   const template = document.getElementById("massa-template").value.trim();
   const idioma = document.getElementById("massa-idioma").value.trim() || "pt_BR";
   const bodyPreview = document.getElementById("massa-preview").value;
@@ -1216,13 +1217,13 @@ document.getElementById("massa-enviar").addEventListener("click", async () => {
   });
 
   const resDiv = document.getElementById("massa-resultado");
-  if (!template || !numeroAtivoId || !contacts.length) {
+  if (!template || !numeroEnvio || !contacts.length) {
     resDiv.textContent = "Preencha o template e ao menos um contato.";
     return;
   }
 
   resDiv.textContent = `Enviando para ${contacts.length} contato(s)...`;
-  const res = await fetch(`/painel/api/broadcast/${encodeURIComponent(numeroAtivoId)}`, {
+  const res = await fetch(`/painel/api/broadcast/${encodeURIComponent(numeroEnvio)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ template, language: idioma, contacts, bodyPreview }),
@@ -1322,37 +1323,10 @@ async function carregarComentariosInstagram() {
   }
 }
 
-async function carregarConversasInstagram() {
-  const div = document.getElementById("ig-conversas");
-  try {
-    const res = await fetch("/painel/api/instagram/conversas");
-    const conversas = await res.json();
-    if (conversas.error) throw new Error(conversas.error);
-    if (!conversas.length) {
-      div.innerHTML = `<div class="lista-vazia">Nenhuma conversa por aqui ainda.</div>`;
-      return;
-    }
-    div.innerHTML = conversas.map((c) => {
-      const participante = (c.participants?.data || []).map((p) => p.username || p.name).filter(Boolean).join(", ");
-      return `
-        <div class="ig-item">
-          <div class="ig-item-topo">
-            <span>${escapeHtml(participante || c.id)}</span>
-            <span class="ig-item-hora">${formatarHoraIg(c.updated_time)}</span>
-          </div>
-        </div>
-      `;
-    }).join("");
-  } catch (err) {
-    div.innerHTML = `<div class="ig-erro">${escapeHtml(err.message)}</div>`;
-  }
-}
-
 function carregarTudoInstagram() {
   carregarPerfilInstagram();
   carregarInsightsInstagram();
   carregarComentariosInstagram();
-  carregarConversasInstagram();
 }
 
 document.getElementById("ig-atualizar").addEventListener("click", carregarTudoInstagram);
