@@ -16,7 +16,7 @@
     --text-muted: #6B6A66;
     --border: #E8E6DE;
     --card: #FFFFFF;
-    --radius: 12px;
+    --radius: 14px;
   }
   * { box-sizing: border-box; }
   body {
@@ -56,11 +56,14 @@
 
   /* ── WhatsApp: lista de conversas ────────────────────────── */
   #conversas { width: 360px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
-  #conversas-header { padding: 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
-  #conversas-header span.titulo { font-size: 17px; font-weight: 700; }
+  #conversas-header { padding: 18px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  #conversas-header span.titulo { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
   #conversas-header .acoes button { background: transparent; border: none; color: var(--text-muted); font-size: 17px; cursor: pointer; padding: 4px 6px; border-radius: 6px; }
   #conversas-header .acoes button:hover { background: var(--bg-alt); color: var(--text); }
-  .canal-badge { flex-shrink: 0; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--bg-alt); color: var(--text-muted); white-space: nowrap; }
+  #abas-numeros { display: flex; padding: 0 12px; gap: 4px; border-bottom: 1px solid var(--border); }
+  .aba-numero { position: relative; padding: 9px 14px 9px 12px; color: var(--text-muted); font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; }
+  .aba-numero.ativa { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .aba-numero.tem-novas::after { content: ""; position: absolute; top: 6px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 
   .nav-item { position: relative; }
   .nav-item.tem-novas::after { content: ""; position: absolute; top: 4px; right: 6px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--sidebar); }
@@ -68,12 +71,12 @@
   #busca-wrap { padding: 10px 12px; border-bottom: 1px solid var(--border); }
   #busca { width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-alt); font-size: 14px; }
   #busca:focus { outline: none; border-color: var(--accent); background: var(--card); }
-  #lista-conversas { overflow-y: auto; flex: 1; }
+  #lista-conversas { overflow-y: auto; flex: 1; padding: 6px 0; }
 
-  .conversa { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--bg-alt); cursor: pointer; }
+  .conversa { display: flex; align-items: center; gap: 12px; padding: 11px 14px; margin: 1px 8px; border-radius: 10px; cursor: pointer; }
   .conversa:hover { background: var(--bg-alt); }
   .conversa.ativa { background: var(--accent-soft); }
-  .avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--sidebar); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; flex-shrink: 0; }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; flex-shrink: 0; }
   .conversa-info { flex: 1; min-width: 0; }
   .conversa-linha1 { display: flex; align-items: baseline; gap: 6px; }
   .conversa-nome { font-weight: 600; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
@@ -118,8 +121,8 @@
   #vazio .icone { font-size: 64px; opacity: 0.3; }
 
   /* ── WhatsApp: abas de status (estilo Chatwoot) ──────────────── */
-  #abas-status { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); overflow-x: auto; }
-  .aba-status { background: transparent; border: none; padding: 6px 11px; border-radius: 20px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
+  #abas-status { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .aba-status { background: transparent; border: none; padding: 5px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
   .aba-status:hover { background: var(--bg-alt); }
   .aba-status.ativa { background: var(--accent-soft); color: var(--accent); }
 
@@ -344,6 +347,7 @@
           <button id="btn-massa" title="Enviar mensagem em massa">📢</button>
         </span>
       </div>
+      <div id="abas-numeros"></div>
       <div id="abas-status">
         <button class="aba-status ativa" data-status="todas" type="button">Todas</button>
         <button class="aba-status" data-status="novo" type="button">🔵 Novo</button>
@@ -623,7 +627,8 @@
 <script>
 let telefoneAtual = null;
 let conversasCache = [];
-let numeros = [];
+let numeros = []; // só WhatsApp (usado no envio em massa, que não existe pro Instagram)
+let numerosTodos = []; // numeros + a aba sintética "instagram" — usado nas abas da caixa de entrada
 let numeroAtivoId = null;
 
 // ─── Navegação entre views ─────────────────────────────────────────────────
@@ -643,16 +648,41 @@ document.querySelectorAll(".nav-item").forEach((btn) => {
 async function carregarNumeros() {
   const res = await fetch("/painel/api/numbers");
   numeros = await res.json();
+  // "instagram" é o business_number_id sintético fixo usado pelas DMs do Instagram
+  // (ver logInstagramInbound em server.js) — aparece como mais uma aba, igual um número.
+  numerosTodos = [...numeros, { id: "instagram", label: "Instagram" }];
+  if (!numeroAtivoId && numerosTodos.length) numeroAtivoId = numerosTodos[0].id;
   atualizarSelectMassa();
+  renderizarAbas();
 }
 
-// Rótulo exibido em cada linha da caixa de entrada unificada — canal + (no caso do
-// WhatsApp) qual dos números configurados, já que "instagram" é um id sintético fixo
-// (ver logInstagramInbound em server.js) e os outros ids vêm de PHONE_NUMBERS_JSON.
-function rotuloCanal(c) {
-  if (c.channel === "instagram") return "📸 Instagram";
-  const numero = numeros.find((n) => n.id === c.business_number_id);
-  return `💬 ${numero?.label || c.business_number_id}`;
+function renderizarAbas() {
+  const wrap = document.getElementById("abas-numeros");
+  wrap.innerHTML = "";
+  for (const n of numerosTodos) {
+    const div = document.createElement("div");
+    div.className = "aba-numero" + (n.id === numeroAtivoId ? " ativa" : "") + (naoLidosPorNumero.has(n.id) ? " tem-novas" : "");
+    div.textContent = rotuloNumero(n.id);
+    div.onclick = () => {
+      naoLidosPorNumero.delete(n.id);
+      atualizarBadgeNav();
+      if (numeroAtivoId === n.id) { renderizarAbas(); return; }
+      numeroAtivoId = n.id;
+      telefoneAtual = null;
+      document.getElementById("conversa-atual").style.display = "none";
+      document.getElementById("vazio").style.display = "flex";
+      renderizarAbas();
+      carregarConversas();
+    };
+    wrap.appendChild(div);
+  }
+}
+
+// Rótulo de um número/canal — usado nas abas, no cabeçalho da conversa e nas notificações.
+function rotuloNumero(businessNumberId) {
+  if (businessNumberId === "instagram") return "📸 Instagram";
+  const numero = numeros.find((n) => n.id === businessNumberId);
+  return `💬 ${numero?.label || businessNumberId}`;
 }
 
 function atualizarSelectMassa() {
@@ -703,12 +733,6 @@ function atualizarBadgeNav() {
   navWhats.classList.toggle("tem-novas", naoLidosPorNumero.size > 0);
 }
 
-// Rótulo do canal/número pra usar em notificações — reaproveita rotuloCanal(), mas com
-// uma "conversa" mínima só com os campos que ele precisa.
-function rotuloNumero(businessNumberId) {
-  return rotuloCanal({ business_number_id: businessNumberId, channel: businessNumberId === "instagram" ? "instagram" : "whatsapp" });
-}
-
 function atualizarBotaoNotif() {
   const btn = document.getElementById("btn-notif");
   if (typeof Notification === "undefined") { btn.style.display = "none"; return; }
@@ -723,29 +747,40 @@ document.getElementById("btn-notif").addEventListener("click", () => {
   Notification.requestPermission().then(atualizarBotaoNotif);
 });
 
-function notificarNovaMensagem(conversa) {
-  const businessNumberId = conversa.business_number_id;
-  const olhandoAgora = numeroAtivoId === businessNumberId && telefoneAtual === conversa.phone && document.hasFocus();
+function notificarNovaMensagem(numero, conversa) {
+  const olhandoAgora = numeroAtivoId === numero.id && telefoneAtual === conversa.phone && document.hasFocus();
   if (olhandoAgora) return;
 
-  naoLidosPorNumero.add(businessNumberId);
+  naoLidosPorNumero.add(numero.id);
+  renderizarAbas();
   atualizarBadgeNav();
   tocarSomNotificacao();
 
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
-  const notif = new Notification(`${rotuloNumero(businessNumberId)} · ${conversa.name || conversa.phone}`, {
+  const notif = new Notification(`${numero.label || numero.id} · ${conversa.name || conversa.phone}`, {
     body: previewTexto(conversa) || "Nova mensagem",
-    tag: `inbox-${businessNumberId}-${conversa.phone}`,
+    tag: `inbox-${numero.id}-${conversa.phone}`,
   });
   notif.onclick = () => {
     window.focus();
     document.querySelector('.nav-item[data-view="whatsapp"]').click();
-    naoLidosPorNumero.delete(businessNumberId);
-    carregarConversas().then(() => selecionarConversa(conversa.phone, businessNumberId));
+    naoLidosPorNumero.delete(numero.id);
+    if (numeroAtivoId !== numero.id) {
+      numeroAtivoId = numero.id;
+      telefoneAtual = null;
+      renderizarAbas();
+      carregarConversas().then(() => selecionarConversa(conversa.phone));
+    } else {
+      renderizarAbas();
+      selecionarConversa(conversa.phone);
+    }
     atualizarBadgeNav();
   };
 }
 
+// Um fetch só na caixa unificada cobre todas as abas de uma vez (mais barato que checar
+// número por número), mas o resultado alimenta o indicador "tem-novas" de CADA aba
+// (inclusive a que não está ativa no momento), igual funcionava antes.
 async function verificarNovasMensagens() {
   let lista;
   try {
@@ -755,12 +790,13 @@ async function verificarNovasMensagens() {
     return;
   }
   for (const c of lista) {
-    const chave = `${c.business_number_id}|${c.phone}`;
+    const numero = numerosTodos.find((n) => n.id === c.business_number_id) || { id: c.business_number_id, label: c.business_number_id };
+    const chave = `${numero.id}|${c.phone}`;
     const visto = ultimaMsgConhecida[chave];
     const ehNova = c.last_message_at && (!visto || c.last_message_at > visto);
     if (ehNova) {
       if (primeiraVerificacaoFeita && c.last_direction === "in") {
-        notificarNovaMensagem(c);
+        notificarNovaMensagem(numero, c);
       }
       ultimaMsgConhecida[chave] = c.last_message_at;
     }
@@ -792,8 +828,9 @@ function formatarHoraCurta(ts) {
 }
 
 async function carregarConversas() {
+  if (!numeroAtivoId) return;
   try {
-    const res = await fetch("/painel/api/inbox");
+    const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}`);
     if (!res.ok) throw new Error(`status ${res.status}`);
     conversasCache = await res.json();
   } catch (err) {
@@ -813,23 +850,14 @@ let telefonesEncontradosPorMensagem = null; // null = busca de texto não está 
 
 let buscaMsgTimeout = null;
 async function buscarPorMensagem(termo) {
-  if (!termo) {
+  if (!termo || !numeroAtivoId) {
     telefonesEncontradosPorMensagem = null;
     return;
   }
-  // Busca no texto das mensagens em todos os canais (cada número de WhatsApp + Instagram),
-  // já que a caixa de entrada agora mistura todos juntos.
-  const ids = [...numeros.map((n) => n.id), "instagram"];
   try {
-    const listas = await Promise.all(
-      ids.map((id) =>
-        fetch(`/painel/api/conversations/${encodeURIComponent(id)}/buscar?q=${encodeURIComponent(termo)}`)
-          .then((r) => r.json())
-          .then((resultados) => resultados.map((r) => `${id}|${r.phone}`))
-          .catch(() => [])
-      )
-    );
-    telefonesEncontradosPorMensagem = new Set(listas.flat());
+    const res = await fetch(`/painel/api/conversations/${encodeURIComponent(numeroAtivoId)}/buscar?q=${encodeURIComponent(termo)}`);
+    const resultados = await res.json();
+    telefonesEncontradosPorMensagem = new Set(resultados.map((r) => r.phone));
   } catch {
     telefonesEncontradosPorMensagem = null;
   }
@@ -844,7 +872,7 @@ function renderizarConversas() {
   const filtradas = porStatus.filter((c) => {
     if (!filtro) return true;
     if ((c.name || "").toLowerCase().includes(filtro) || c.phone.includes(filtro)) return true;
-    return telefonesEncontradosPorMensagem && telefonesEncontradosPorMensagem.has(`${c.business_number_id}|${c.phone}`);
+    return telefonesEncontradosPorMensagem && telefonesEncontradosPorMensagem.has(c.phone);
   });
   if (!filtradas.length) {
     lista.innerHTML = `<div class="lista-vazia" style="padding:16px;">${
@@ -854,7 +882,7 @@ function renderizarConversas() {
   }
   for (const c of filtradas) {
     const status = STATUS_INFO[c.status] || STATUS_INFO.novo;
-    const ativa = c.phone === telefoneAtual && c.business_number_id === numeroAtivoId;
+    const ativa = c.phone === telefoneAtual;
     const div = document.createElement("div");
     div.className = "conversa" + (ativa ? " ativa" : "");
     div.innerHTML = `
@@ -865,13 +893,12 @@ function renderizarConversas() {
       <div class="conversa-info">
         <div class="conversa-linha1">
           <span class="conversa-nome">${escapeHtml(c.name || c.phone)}</span>
-          <span class="canal-badge">${rotuloCanal(c)}</span>
           <span class="conversa-hora">${formatarHoraCurta(c.last_message_at)}</span>
         </div>
         <div class="conversa-preview">${escapeHtml(previewTexto(c))}</div>
       </div>
     `;
-    div.onclick = () => selecionarConversa(c.phone, c.business_number_id);
+    div.onclick = () => selecionarConversa(c.phone);
     lista.appendChild(div);
   }
 }
@@ -938,15 +965,14 @@ document.getElementById("info-nota-salvar").addEventListener("click", async () =
   setTimeout(() => (aviso.style.display = "none"), 2000);
 });
 
-function selecionarConversa(phone, businessNumberId) {
+function selecionarConversa(phone) {
   telefoneAtual = phone;
-  numeroAtivoId = businessNumberId;
-  const conversa = conversasCache.find((c) => c.phone === phone && c.business_number_id === businessNumberId);
+  const conversa = conversasCache.find((c) => c.phone === phone);
   document.getElementById("conversa-atual").style.display = "flex";
   document.getElementById("vazio").style.display = "none";
   document.getElementById("chat-avatar").textContent = iniciais(conversa?.name || phone);
   document.getElementById("chat-nome").textContent = conversa?.name || phone;
-  document.getElementById("chat-telefone").textContent = conversa ? rotuloCanal(conversa) : "";
+  document.getElementById("chat-telefone").textContent = conversa?.name ? phone : "";
   document.getElementById("view-whatsapp").classList.add("mostrando-conversa"); // no celular, troca lista pela conversa
   renderizarInfoContato(conversa, phone);
   renderizarConversas();

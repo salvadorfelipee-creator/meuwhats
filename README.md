@@ -995,7 +995,7 @@ Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
 | `POST /webhook`                                                 | Recebe mensagens/status                     |
 | `GET /painel`                                                   | Painel web (auth)                           |
 | `GET /painel/api/numbers`                                       | Lista números configurados (auth)           |
-| `GET /painel/api/inbox`                                          | Caixa de entrada unificada — conversas de todos os números + Instagram juntas (auth) |
+| `GET /painel/api/inbox`                                          | Conversas de todos os números + Instagram juntas — usada pelo polling de notificação/indicador "tem novas" de cada aba (auth) |
 | `GET /painel/api/conversations/:businessId`                     | Lista conversas de um número (auth)         |
 | `GET /painel/api/conversations/:businessId/:phone/messages`     | Mensagens de uma conversa (auth)            |
 | `POST /painel/api/conversations/:businessId/:phone/reply`       | Envia resposta de texto (auth)              |
@@ -1022,14 +1022,14 @@ Redesenhado em 26/06/2026 para um layout minimalista (paleta neutra/terracota, s
 dependências novas — continua HTML/CSS/JS puro, sem build step) com uma navegação lateral
 de ícones que troca entre três telas dentro da mesma página:
 
-- **💬 Conversas** — caixa de entrada única (11/08/2026): junta WhatsApp (todos os números
-  configurados) e DMs do Instagram na mesma lista, ordenada pela mensagem mais recente, com
-  uma etiqueta de canal em cada linha (`💬 {número}` ou `📸 Instagram`). Não existe mais aba
-  por número — clicar numa conversa já sabe por onde responder. Chat, status, nota e busca
-  funcionam igual para os dois canais; envio de imagem continua exclusivo do WhatsApp (a
-  API de DM do Instagram usada aqui só manda texto). Envio em massa continua em modal, mas
-  agora tem um seletor explícito de "Enviar pelo número" (só WhatsApp, broadcast usa
-  template — Instagram não entra nessa).
+- **💬 Conversas** — lista de conversas + chat, com uma aba por conta no topo: cada número de
+  WhatsApp configurado (cada um com seu próprio fluxo de atendimento automático — Felizcred e
+  Cota Certa são contas/fluxos diferentes) e agora também uma aba **Instagram** (12/08/2026),
+  já que as DMs passaram a ser gravadas de verdade (ver abaixo). Trocar de aba troca a lista e
+  quem recebe a resposta — chat, status, nota e busca funcionam igual nas duas. Envio de
+  imagem continua exclusivo do WhatsApp (a API de DM do Instagram usada aqui só manda texto).
+  Envio em massa continua em modal, com um seletor de "Enviar pelo número" (só WhatsApp,
+  broadcast usa template — Instagram não entra nessa).
 - **📸 Instagram** — perfil conectado, métricas do último post e comentários do último post,
   botão de resetar boas-vindas. As DMs saíram daqui (ver acima).
 - **📊 Ads Manager** — lista de campanhas (era um modal antes, agora é página própria),
