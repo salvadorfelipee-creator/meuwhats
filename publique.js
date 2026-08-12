@@ -2,6 +2,7 @@ const instagram = require("./instagram");
 const facebook = require("./facebook");
 const twitter = require("./twitter");
 const linkedin = require("./linkedin");
+const threads = require("./threads");
 
 // Variáveis de ambiente de credencial vêm sempre com trim() — copiar/colar token no painel
 // do Render facilmente carrega um espaço ou quebra de linha a mais no fim, e isso quebra o
@@ -43,6 +44,10 @@ const CONTAS = [
         env("LINKEDIN_ACCESS_TOKEN") && env("LINKEDIN_AUTHOR_URN")
           ? { token: env("LINKEDIN_ACCESS_TOKEN"), autorUrn: env("LINKEDIN_AUTHOR_URN") }
           : null,
+      threads:
+        env("THREADS_ACCESS_TOKEN") && env("THREADS_USER_ID")
+          ? { accessToken: env("THREADS_ACCESS_TOKEN"), userId: env("THREADS_USER_ID") }
+          : null,
     },
   },
   // Próxima conta entra aqui como um novo objeto igual ao de cima.
@@ -80,6 +85,7 @@ const ADAPTADORES = {
   facebook: (conteudo, credenciais) => facebook.publicar(conteudo, credenciais),
   twitter: (conteudo, credenciais) => twitter.publicar(conteudo, credenciais),
   linkedin: (conteudo, credenciais) => linkedin.publicar(conteudo, credenciais),
+  threads: (conteudo, credenciais) => threads.publicar(conteudo, credenciais),
 };
 
 // Publica o mesmo conteúdo em várias redes de uma vez (um clique). Cada rede publica

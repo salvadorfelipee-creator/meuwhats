@@ -279,6 +279,16 @@ Criar um App em linkedin.developer.com, pedir o produto "Share on LinkedIn" (lib
 (`urn:li:person:...` pra perfil pessoal, `urn:li:organization:...` pra Página da empresa —
 esse exige o produto "Community Management API" aprovado).
 
+### Threads
+
+Usa o mesmo App da Meta já existente (`1046810638003047`), mas precisa adicionar o produto
+**"Threads API"** a ele (é um caso de uso à parte, não vem junto com Instagram/Facebook).
+Depois: autorizar via `threads.net/oauth/authorize` (escopos `threads_basic` +
+`threads_content_publish`), trocar o `code` por token curto, trocar por longa duração
+(~60 dias, endpoint próprio do Threads, não é o mesmo `fb_exchange_token` do Facebook) e
+pegar o ID do usuário do Threads via `GET /me` (não é o mesmo ID do Instagram, mesmo sendo a
+mesma conta). Passo a passo completo em `CHAVES-LOCAL.md`.
+
 ## Status
 
 - **Instagram e Facebook**: ✅ ao vivo e testado (10/08/2026) — publicação real feita e
@@ -292,5 +302,8 @@ esse exige o produto "Community Management API" aprovado).
   verificação por e-mail via "Microsoft Vetting Services") — ver `CHAVES-LOCAL.md`.
 - **X/Twitter**: código escrito seguindo a documentação oficial, mas **ainda não testado
   contra API real** — a conta de desenvolvedor não existe ainda.
+- **Threads**: código escrito (`threads.js`) seguindo a documentação oficial da Threads API,
+  já plugado no seletor de redes do painel — mas **ainda não testado contra API real**, falta
+  adicionar o produto "Threads API" ao App da Meta e gerar o token (ver `CHAVES-LOCAL.md`).
 
 Pendências de conta/chave: ver `CHAVES-LOCAL.md`.
