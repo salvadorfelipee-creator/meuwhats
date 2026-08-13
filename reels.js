@@ -145,8 +145,18 @@ async function listarFilaComEstimativa() {
 
 // dataHoraString no formato do <input type="datetime-local"> ("2026-08-15T14:00") — vazio
 // ou null limpa o agendamento e o vídeo volta pro piloto automático.
+// `new Date(string).getTime()` interpreta a string no fuso do processo Node (UTC no Render),
+// não no de Brasília — por isso convertemos manualmente somando 3h (Brasília é sempre UTC-3,
+// sem horário de verão desde 2019) em vez de deixar o parser ambíguo decidir.
+function timestampDeDataHoraBrasilia(dataHoraString) {
+  const m = dataHoraString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) throw new Error("Data e hora inválidas.");
+  const [, ano, mes, dia, hora, min] = m.map(Number);
+  return Date.UTC(ano, mes - 1, dia, hora + 3, min);
+}
+
 async function definirData(id, dataHoraString) {
-  const timestamp = dataHoraString ? new Date(dataHoraString).getTime() : null;
+  const timestamp = dataHoraString ? timestampDeDataHoraBrasilia(dataHoraString) : null;
   await db.reelsDefinirData(id, timestamp);
 }
 

@@ -29,17 +29,26 @@ async function enviarImagens(imagens) {
 // dataHoraString no formato do <input type="datetime-local"> ("2026-08-20T09:30") — sempre
 // em horário local, nunca UTC (ver reels.js pra por que isso importa: toISOString() dá
 // timestamp errado).
+// `new Date(string).getTime()` interpreta a string no fuso do PROCESSO Node, não do usuário —
+// em produção (Render) o processo roda em UTC, então "12:00" virava 12:00 UTC (09:00 em
+// Brasília, 3h adiantado do que a pessoa escolheu no formulário). Brasília é sempre UTC-3 (sem
+// horário de verão desde 2019), então somamos 3h à hora informada antes de converter pra UTC —
+// isso funciona igual não importa o fuso do servidor.
 function timestampDeDataHora(dataHoraString) {
-  const ms = new Date(dataHoraString).getTime();
-  if (!dataHoraString || Number.isNaN(ms)) throw new Error("Data e hora inválidas.");
-  return ms;
+  const m = dataHoraString && dataHoraString.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) throw new Error("Data e hora inválidas.");
+  const [, ano, mes, dia, hora, min] = m.map(Number);
+  return Date.UTC(ano, mes - 1, dia, hora + 3, min);
 }
 
 // Cria um post agendado — cada um tem seu próprio dia+hora exato, definido pelo usuário (não
 // tem "piloto automático" aqui como nos Reels, é sempre uma escolha explícita).
 // `imagens` (opcional): array de { buffer, nomeArquivo, contentType } — 2+ imagens vira
 // carrossel na hora de publicar. Se vier preenchido, tem prioridade sobre imagemBuffer único.
-async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, imagemBuffer, imagemNomeArquivo, imagemContentType, imagens }) {
+// `imagensPorRede` (opcional): objeto { rede: { buffer, nomeArquivo, contentType } } — versão
+// da imagem reenquadrada manualmente no painel pra uma rede específica (ex. Stories 9:16), só
+// vale a pena junto com imagemBuffer (não faz sentido em carrossel).
+async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, imagemBuffer, imagemNomeArquivo, imagemContentType, imagens, imagensPorRede }) {
   if (!texto && !imagemBuffer && !(imagens && imagens.length)) throw new Error("Informe ao menos um texto ou uma imagem.");
   if (!redes || !redes.length) throw new Error("Marque ao menos uma rede.");
   const agendadoPara = timestampDeDataHora(dataHoraString);
@@ -52,7 +61,15 @@ async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, i
     imagemKey = await enviarImagem(imagemBuffer, imagemNomeArquivo || "imagem.jpg", imagemContentType);
   }
 
-  const id = await db.agendaCriar({ contaId: contaId || "felizcred", texto, link, imagemKey, imagemKeys, redes, agendadoPara });
+  let imagemPorRedeKeys = null;
+  if (imagensPorRede && Object.keys(imagensPorRede).length) {
+    imagemPorRedeKeys = {};
+    for (const [rede, img] of Object.entries(imagensPorRede)) {
+      imagemPorRedeKeys[rede] = await enviarImagem(img.buffer, img.nomeArquivo || "imagem.jpg", img.contentType);
+    }
+  }
+
+  const id = await db.agendaCriar({ contaId: contaId || "felizcred", texto, link, imagemKey, imagemKeys, imagemPorRedeKeys, redes, agendadoPara });
   return { id, agendadoPara };
 }
 
@@ -67,12 +84,19 @@ async function publicarAgendamento(item) {
       ? await Promise.all(imagemKeys.map((key) => r2.urlAssinada(key)))
       : undefined;
     const imagemUrl = !imagemUrls && item.imagem_key ? await r2.urlAssinada(item.imagem_key) : undefined;
+    const imagemPorRedeKeys = item.imagem_por_rede_keys ? JSON.parse(item.imagem_por_rede_keys) : null;
+    const imagemUrlPorRede = imagemPorRedeKeys
+      ? Object.fromEntries(
+          await Promise.all(Object.entries(imagemPorRedeKeys).map(async ([rede, key]) => [rede, await r2.urlAssinada(key)]))
+        )
+      : undefined;
     const redes = JSON.parse(item.redes);
     const resultado = await publique.publicarEmTodos({
       contaId: item.conta_id,
       texto: item.texto,
       imagemUrl,
       imagemUrls,
+      imagemUrlPorRede,
       link: item.link,
       redes,
     });
@@ -141,6 +165,9 @@ async function removerAgendamento(id) {
   if (item.imagem_keys) {
     for (const key of JSON.parse(item.imagem_keys)) await r2.apagarVideo(key).catch(() => {});
   }
+  if (item.imagem_por_rede_keys) {
+    for (const key of Object.values(JSON.parse(item.imagem_por_rede_keys))) await r2.apagarVideo(key).catch(() => {});
+  }
   await db.agendaRemover(id);
 }
 
@@ -158,6 +185,9 @@ async function limparAntigas() {
       if (item.imagem_key) await r2.apagarVideo(item.imagem_key);
       if (item.imagem_keys) {
         for (const key of JSON.parse(item.imagem_keys)) await r2.apagarVideo(key);
+      }
+      if (item.imagem_por_rede_keys) {
+        for (const key of Object.values(JSON.parse(item.imagem_por_rede_keys))) await r2.apagarVideo(key);
       }
       await db.agendaMarcarImagemApagada(item.id);
       apagadas++;
