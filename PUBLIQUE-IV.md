@@ -27,7 +27,7 @@ esses campos do Instagram continua sendo manual, direto no app.
 | Instagram | vira a legenda | **obrigatória** — sem imagem, a publicação falha com erro claro | ignorado (Instagram não aceita link em post de feed) |
 | Facebook | mensagem do post | se tiver, publica como foto (`/photos`); sem imagem, publica como texto/link (`/feed`) | usado só quando não há imagem |
 | X/Twitter | corpo do tweet (corta em 280 caracteres se passar, e avisa no resultado) | opcional, sobe como mídia do tweet | não tem campo próprio — se quiser, inclua no texto |
-| LinkedIn | `commentary` do post | **não sobe imagem própria** (exigiria o fluxo de registro de upload da LinkedIn — não implementado) | se tiver, LinkedIn gera a prévia/thumbnail automática do site |
+| LinkedIn | `commentary` do post | sobe (`content.media`, 1 imagem) ou várias (`content.multiImage`, 2–20 imagens) via Images API — ver seção Carrossel | usado só quando não há imagem (`content.article`, LinkedIn gera a prévia/thumbnail do site) |
 | Threads | vira o texto do post | opcional, sobe como mídia (`media_type: IMAGE`) | ignorado (Threads não tem campo de link próprio) |
 
 ## Arquitetura
@@ -267,10 +267,10 @@ numa rede que não suporta o formato pedido).
 **Suportam carrossel**: Instagram (`publicarCarrossel()` em `instagram.js` — até 10 imagens),
 Facebook (`publicarCarrossel()` em `facebook.js` — sobe cada foto `published:false` e cria o
 post via `attached_media`, sem limite fixo documentado), Threads (`publicarCarrossel()` em
-`threads.js` — até 20 imagens). **Não suportam**: Instagram Stories (formato de uma imagem só,
-sem swipe entre várias), X/Twitter (não implementado neste sistema) e LinkedIn (esse já não
-sobe imagem nenhuma, ver tabela acima) — nesses o adaptador lança erro em vez de publicar o
-post sem imagem.
+`threads.js` — até 20 imagens), LinkedIn (`publicar()` em `linkedin.js` detecta `imagemUrls` e
+usa `content.multiImage` — 2 a 20 imagens, ver abaixo). **Não suporta**: Instagram Stories
+(formato de uma imagem só, sem swipe entre várias) e X/Twitter (não implementado neste
+sistema) — nesses o adaptador lança erro em vez de publicar o post fora do formato pedido.
 
 **Gotcha do Threads**: diferente do Instagram, o Threads recusa o container "pai" (`media_type
 CAROUSEL`) se algum item filho ainda não tiver terminado de processar — dá erro "children
@@ -278,18 +278,40 @@ inválidos/inexistentes". `threads.js` espera cada filho ficar `FINISHED`
 (`aguardarContainerPronto`) antes de seguir pro próximo, um por um; o Instagram não precisa
 disso (aceita children ainda processando).
 
-**Como qualquer adaptador recebe as imagens**: mesmo padrão do resto do Publique IV — precisa
-de URLs públicas que a Meta consiga buscar. Pra publicar o carrossel de lucros 2026 não passou
-pelo painel (upload de várias imagens de uma vez ainda não tem UI própria) — foi um script
-único, direto no Node, que subiu as 10 imagens pro mesmo bucket R2 dos Reels/Agenda (prefixo
-`temp-publish/`, apagado do R2 logo depois de publicar) e chamou `publique.publicarEmTodos()`
-com `imagemUrls`. Se carrossel virar algo recorrente, vale construir upload múltiplo no
-painel reaproveitando esse mesmo prefixo R2 — não foi feito ainda porque não foi pedido.
+**LinkedIn ganhou upload de imagem de verdade** (13/08/2026) — antes não subia imagem nenhuma
+(exigiria o fluxo de registro de upload da Images API, que não existia aqui). Agora
+`linkedin.js` tem `subirImagem()`: registra o upload (`POST /rest/images?action=
+initializeUpload`, corpo `{ initializeUploadRequest: { owner: autorUrn } }`) pra ganhar uma
+`uploadUrl` temporária + o URN final (`urn:li:image:...`), baixa os bytes da `imagemUrl`
+recebida (mesmo padrão do resto do sistema — a imagem já está hospedada em algum lugar público,
+ex. R2) e manda esses bytes crus via `PUT` pra `uploadUrl`. Com 1 imagem vira
+`content.media: { id: urn }`; com 2+ (`imagemUrls`) vira `content.multiImage: { images: [...]
+}` — o equivalente do LinkedIn a um carrossel (não é swipe visual como Instagram/Threads, é
+uma grade/carrossel de miniaturas, mas é o formato nativo deles pra várias imagens no mesmo
+post).
 
-**Publicado ao vivo em 13/08/2026** (carrossel real "A distribuição de lucros mudou em
-2026", Lei nº 15.270/2025): Instagram e Facebook publicaram de primeira; Threads falhou uma
-vez com o gotcha acima, corrigido e publicado com sucesso na segunda tentativa. X/Twitter e
-LinkedIn ficaram de fora (sem credencial o primeiro, sem suporte a imagem o segundo).
+**Gotcha de versão descoberto publicando isso**: o comentário antigo em `linkedin.js` dizia
+que a `LinkedIn-Version` só aceitava o mês atual (verdade pro `/rest/posts`, testado
+10/08/2026) — mas testando o `/rest/images` em 13/08/2026, esse endpoint recusou o mês atual
+(`426 NONEXISTENT_VERSION`) e só aceitou de 1 a 3 meses atrás. Cada recurso da API do LinkedIn
+parece ativar a versão do mês corrente num momento diferente. Resolvido de vez (não só pra
+essa vez): `request()` em `linkedin.js` agora tenta o mês atual e recua mês a mês (até 3)
+automaticamente sempre que a resposta for `NONEXISTENT_VERSION`, pra não quebrar de novo
+assim que o calendário virar ou um recurso novo entrar.
+
+**Como qualquer adaptador recebe as imagens**: mesmo padrão do resto do Publique IV — precisa
+de URLs públicas (Instagram/Facebook/Threads buscam direto; LinkedIn baixa os bytes e
+reenvia). Pra publicar o carrossel de lucros 2026 não passou pelo painel (upload de várias
+imagens de uma vez ainda não tem UI própria) — foi um script único, direto no Node, que subiu
+as 10 imagens pro mesmo bucket R2 dos Reels/Agenda (prefixo `temp-publish/`, apagado do R2
+logo depois de publicar) e chamou `publique.publicarEmTodos()`/`linkedin.publicar()` com
+`imagemUrls`. Se carrossel virar algo recorrente, vale construir upload múltiplo no painel
+reaproveitando esse mesmo prefixo R2 — não foi feito ainda porque não foi pedido.
+
+**Publicado ao vivo em 13/08/2026** (carrossel real "A distribuição de lucros mudou em 2026",
+Lei nº 15.270/2025) em Instagram, Facebook, Threads e LinkedIn (perfil pessoal) — as quatro
+confirmadas com link real do post. Threads e LinkedIn precisaram de um ajuste em cima da hora
+(gotchas acima) antes de funcionar. X/Twitter ficou de fora (sem credencial ainda).
 
 ## Contas — como adicionar uma nova
 

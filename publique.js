@@ -76,10 +76,10 @@ function listarContas() {
 }
 
 // Cada adaptador recebe o mesmo conteúdo genérico { texto, imagemUrl, imagemUrls, link } e usa
-// só o que a rede aceita — ex.: Instagram exige imagem, LinkedIn ignora imagem e usa o link
-// pra gerar a prévia. `imagemUrls` (array, 2+ imagens) pede um carrossel — só Instagram,
-// Facebook e Threads sabem publicar isso; nas demais o adaptador recusa com um erro claro em
-// vez de postar algo fora do formato pedido. Ver PUBLIQUE-IV.md pra tabela completa.
+// só o que a rede aceita. `imagemUrls` (array, 2+ imagens) pede um carrossel — Instagram,
+// Facebook, Threads e LinkedIn sabem publicar isso; nas demais (Stories, X/Twitter) o
+// adaptador recusa com um erro claro em vez de postar algo fora do formato pedido. Ver
+// PUBLIQUE-IV.md pra tabela completa.
 const ADAPTADORES = {
   instagram: (conteudo, credenciais) => {
     if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
@@ -121,12 +121,7 @@ const ADAPTADORES = {
     }
     return twitter.publicar(conteudo, credenciais);
   },
-  linkedin: (conteudo, credenciais) => {
-    if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
-      throw new Error("LinkedIn não suporta imagem/carrossel neste sistema ainda (ver PUBLIQUE-IV.md).");
-    }
-    return linkedin.publicar(conteudo, credenciais);
-  },
+  linkedin: (conteudo, credenciais) => linkedin.publicar(conteudo, credenciais),
   threads: (conteudo, credenciais) => {
     if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
       return threads.publicarCarrossel({ texto: conteudo.texto, imagemUrls: conteudo.imagemUrls }, credenciais);
