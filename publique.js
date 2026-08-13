@@ -56,6 +56,41 @@ const CONTAS = [
           : null,
     },
   },
+  {
+    id: "cotacerta",
+    nome: "Cota Certa Seguros",
+    redes: {
+      instagram:
+        env("INSTAGRAM_COTACERTA_ACCESS_TOKEN") && env("INSTAGRAM_COTACERTA_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_COTACERTA_ACCESS_TOKEN"), accountId: env("INSTAGRAM_COTACERTA_ACCOUNT_ID") }
+          : null,
+      instagram_story:
+        env("INSTAGRAM_COTACERTA_ACCESS_TOKEN") && env("INSTAGRAM_COTACERTA_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_COTACERTA_ACCESS_TOKEN"), accountId: env("INSTAGRAM_COTACERTA_ACCOUNT_ID") }
+          : null,
+      facebook:
+        env("FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN") && env("FACEBOOK_COTACERTA_PAGE_ID")
+          ? { token: env("FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN"), paginaId: env("FACEBOOK_COTACERTA_PAGE_ID") }
+          : null,
+      twitter:
+        env("TWITTER_COTACERTA_API_KEY") && env("TWITTER_COTACERTA_API_SECRET") && env("TWITTER_COTACERTA_ACCESS_TOKEN") && env("TWITTER_COTACERTA_ACCESS_SECRET")
+          ? {
+              apiKey: env("TWITTER_COTACERTA_API_KEY"),
+              apiSecret: env("TWITTER_COTACERTA_API_SECRET"),
+              accessToken: env("TWITTER_COTACERTA_ACCESS_TOKEN"),
+              accessSecret: env("TWITTER_COTACERTA_ACCESS_SECRET"),
+            }
+          : null,
+      linkedin:
+        env("LINKEDIN_COTACERTA_ACCESS_TOKEN") && env("LINKEDIN_COTACERTA_AUTHOR_URN")
+          ? { token: env("LINKEDIN_COTACERTA_ACCESS_TOKEN"), autorUrn: env("LINKEDIN_COTACERTA_AUTHOR_URN") }
+          : null,
+      threads:
+        env("THREADS_COTACERTA_ACCESS_TOKEN") && env("THREADS_COTACERTA_USER_ID")
+          ? { accessToken: env("THREADS_COTACERTA_ACCESS_TOKEN"), userId: env("THREADS_COTACERTA_USER_ID") }
+          : null,
+    },
+  },
   // Próxima conta entra aqui como um novo objeto igual ao de cima.
 ];
 
