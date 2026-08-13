@@ -276,11 +276,13 @@
   .resultado-item a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
   .resultado-item a:hover { text-decoration: underline; }
 
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .cal-dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; padding-bottom: 4px; }
+  .cal-wrap { max-width: 360px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .cal-dow { text-align: center; font-size: 9.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; padding-bottom: 3px; }
   .cal-dia {
-    position: relative; min-height: 52px; border-radius: 8px; background: var(--bg);
-    border: 1px solid transparent; padding: 6px; cursor: default; font-size: 12.5px; color: var(--text-muted);
+    position: relative; aspect-ratio: 1 / 1; min-height: 0; border-radius: 6px; background: var(--bg);
+    border: 1px solid transparent; padding: 3px 4px; cursor: default; font-size: 10.5px; color: var(--text-muted);
+    display: flex; align-items: flex-start;
   }
   .cal-dia.cal-vazio { background: transparent; }
   .cal-dia.cal-com-post { cursor: pointer; color: var(--text); background: var(--accent-soft); }
@@ -289,11 +291,17 @@
   .cal-dia.cal-selecionado { background: var(--accent); color: #fff; }
   .cal-dia .cal-num { font-weight: 700; }
   .cal-dia .cal-badge {
-    position: absolute; top: 4px; right: 4px; background: var(--accent); color: #fff;
-    font-size: 10px; font-weight: 800; border-radius: 999px; min-width: 16px; height: 16px;
-    display: flex; align-items: center; justify-content: center; padding: 0 3px;
+    position: absolute; top: 2px; right: 2px; background: var(--accent); color: #fff;
+    font-size: 8.5px; font-weight: 800; border-radius: 999px; min-width: 13px; height: 13px;
+    display: flex; align-items: center; justify-content: center; padding: 0 2px;
   }
   .cal-dia.cal-selecionado .cal-badge { background: #fff; color: var(--accent); }
+  @media (max-width: 480px) {
+    .cal-wrap { max-width: 100%; }
+    .cal-grid { gap: 2px; }
+    .cal-dia { font-size: 9px; padding: 2px 3px; border-radius: 5px; }
+    .cal-dow { font-size: 8.5px; }
+  }
   .cal-nav-botao {
     border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 8px;
     width: 30px; height: 30px; cursor: pointer; font-size: 14px;
@@ -628,7 +636,7 @@
             <button type="button" id="agenda-mes-proximo" class="cal-nav-botao">›</button>
           </div>
         </h4>
-        <div id="agenda-calendario">Carregando...</div>
+        <div id="agenda-calendario" class="cal-wrap">Carregando...</div>
         <div id="agenda-dia-detalhe" style="margin-top:14px;"></div>
 
         <h4 style="margin:20px 0 8px;">Histórico recente</h4>
