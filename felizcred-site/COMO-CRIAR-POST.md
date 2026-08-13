@@ -26,6 +26,28 @@ passos manuais:
    (nunca `width` fixo em px para blocos grandes) e inclua pelo menos um
    `@media (max-width: 640px)` no final do `<style>` ajustando paddings do
    header/hero/CTA — copie o bloco de qualquer post existente como base.
+   **Cuidado com qual post você copia como base**: vários posts antigos
+   (ex: `bpc-loas-como-solicitar.html`, `aposentadoria-por-invalidez.html`)
+   nunca foram atualizados com as regras 3b/3c abaixo — copiar um desses sem
+   olhar prejudica o post novo. Prefira copiar de um post recente da série
+   Reforma Tributária (ex: `cbs-pessoa-fisica.html`) como referência de
+   template atual.
+
+   **3b. Foto real, não emoji sobre gradiente** — ver
+   [`README.md` → "Imagens reais nos posts"](./README.md#imagens-reais-nos-posts-imgblogwebp)
+   pro fluxo completo de sourcing. Resumo: toda foto usada vira dois lugares
+   — `background-image` no `.card-thumb.photo` do card em `blog/index.html`,
+   e `<img class="featured-img">` dentro de `.featured-img-wrap`, logo no
+   início do `<article class="article-body">` do post. Reveja
+   `img/blog/*.webp` antes de baixar uma nova — pode já existir uma que sirva
+   pro assunto.
+
+   **3c. Dados estruturados (JSON-LD)** — três blocos `<script
+   type="application/ld+json">` no `<head>`: `Article` (headline/description/
+   image/datePublished/author/publisher), `BreadcrumbList` (Início → Blog →
+   título do post) e, se o post tiver uma seção de perguntas frequentes,
+   `FAQPage` com as mesmas perguntas/respostas visíveis na página. Copie a
+   estrutura de qualquer post da série Reforma Tributária.
 
 4. **Adicionar o card na listagem** — abra `blog/index.html` e:
    - Adicione um `<a class="article-card" href="/blog/SLUG" data-cat="..."
