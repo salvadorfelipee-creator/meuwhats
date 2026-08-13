@@ -86,7 +86,12 @@ const INSTAGRAM_OPCOES_MENU = [
 const INSTAGRAM_DADOS_RECEBIDOS_MESSAGE =
   "Perfeito! ✅ Recebemos seus dados, é só aguardar que um atendente já vai continuar por aqui. 🙌";
 
-const REGEX_ACENTOS = new RegExp("[̀-ͯ]", "g");
+// Além dos acentos (faixa de combining diacritics), também tira variation selector (️/︎)
+// e o combining enclosing keycap (⃣) — sem isso, alguém que responde tocando no emoji
+// "1️⃣" que a GENTE MESMO manda no menu (em vez de digitar "1" no teclado) nunca casava com
+// a chave "1": o emoji de teclado é o dígito + esses dois caracteres invisíveis, que ficavam
+// intactos e faziam a comparação `t === chave` falhar sempre. Bug real, confirmado testando.
+const REGEX_ACENTOS = new RegExp("[̀-ͯ︎️⃣]", "g");
 
 function normalizarTexto(texto) {
   return (texto || "")
@@ -338,7 +343,8 @@ const TEXTO_MENU_PRINCIPAL =
   "1 - CONSIGNADO CLT\n" +
   "2 - SEGURO DE CARRO/MOTO\n" +
   "3 - EMPRÉSTIMO COM CARRO EM GARANTIA\n" +
-  "4 - FINANCIAR UM VEÍCULO\n\n" +
+  "4 - FINANCIAR UM VEÍCULO\n" +
+  "5 - SAQUE DO FGTS\n\n" +
   "ATENÇÃO: O saque do FGTS só pode ser simulado se não foi realizado neste ano. A Caixa alterou as regras.\n\n" +
   "✅ (47) 99705-9353\n" +
   "✅ (47) 99274-7368\n" +
@@ -350,6 +356,13 @@ const TEXTO_MENU_PRINCIPAL =
 // simulação de crédito de verdade fora desse horário — ver horarioComercialCotaCerta mais
 // abaixo, mesma janela usada pela Cota Certa, mesma equipe). Pra reativar a triagem de
 // gerente, troca essa função pelo conteúdo de menuInicialGerenteArquivado() (logo acima).
+// `foraDeHorario: true` avisa quem chama que essa NÃO foi a mensagem real do menu — é só o
+// aviso de horário. Sem essa distinção, quem manda mensagem fora do expediente era marcado no
+// passo "menu_inicial" do mesmo jeito de quem recebeu o menu de verdade, e uns minutos depois
+// levava um lembrete dizendo "responda com o número da opção que te mandei ali em cima" — só
+// que a opção nunca foi mandada, só o aviso de horário. Bug real, reportado pelo usuário
+// (13/08/2026): cliente mandou mensagem fora do horário, recebeu só o aviso, e mesmo assim
+// levou a cobrança "parou no meio do atendimento" mais tarde.
 function menuInicial() {
   if (!horarioComercialCotaCerta()) {
     return {
@@ -357,6 +370,7 @@ function menuInicial() {
         "Olá! 😊 Aqui é o Felipe, da Felizcred. No momento estamos fora do horário comercial " +
         "(atendemos de segunda a sexta das 9h às 18h, e aos sábados até o meio-dia).\n\n" +
         "Por favor, envie sua mensagem dentro do horário comercial pra reativar a conversa que a gente já te atende! 😊",
+      foraDeHorario: true,
     };
   }
   return { texto: TEXTO_MENU_PRINCIPAL };
@@ -371,6 +385,11 @@ const OPCOES_MENU_PRINCIPAL = [
   { id: "2", chaves: ["2", "seguro"] },
   { id: "3", chaves: ["3", "garantia"] },
   { id: "4", chaves: ["4", "financiar", "financiamento"] },
+  // Adicionado 13/08/2026: o menu já citava FGTS no aviso ("ATENÇÃO: o saque do FGTS...")
+  // mas ninguém tratava a palavra — quem digitasse "fgts" ficava sem resposta nenhuma
+  // (reportado pelo usuário). Mesmas chaves já usadas no menu do Instagram, pra manter os
+  // dois canais consistentes.
+  { id: "5", chaves: ["5", "fgts", "saque"] },
 ];
 
 function detectarOpcaoMenuPrincipal(texto) {
@@ -432,6 +451,16 @@ async function handlerMenuPrincipal(de, businessNumberId, corpo) {
         DOCUMENTOS_VEICULO
     );
     await db.setFluxoPasso(de, businessNumberId, "financiamento_dados");
+  } else if (escolha === "5") {
+    // Mesmo texto/fluxo já usado no Instagram (autorizar o BMS, depois mandar o CPF) —
+    // consistência entre os dois canais, ver INSTAGRAM_OPCOES_MENU.
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      "Para fazer a simulação do saque do FGTS, é necessário autorizar o banco BMS lá no aplicativo " +
+        "do FGTS. Depois de autorizar, é só me mandar o seu CPF que a gente já parte pro atendimento. 😊"
+    );
+    await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
   }
   // Não reconheceu a opção → fica no passo menu_inicial (mantém o lembrete sutil ativo)
 }
@@ -470,6 +499,7 @@ const LEMBRETE_MINUTOS = {
   clt_3mais: 15,
   carro_garantia_dados: 15,
   financiamento_dados: 15,
+  fgts_cpf: 15,
 };
 
 const LEMBRETE_TEXTOS = {
@@ -493,6 +523,9 @@ const LEMBRETE_TEXTOS = {
   financiamento_dados:
     "Olá! Só lembrando que pra eu simular o financiamento do seu veículo, preciso desses dados 😊\n" +
     "Foto do documento do veículo, endereço completo, profissão e renda, foto do seu documento e e-mail.",
+  fgts_cpf:
+    "Olá! Só lembrando que pra eu simular o saque do FGTS, preciso do seu CPF 😊 (depois de você já ter " +
+    "autorizado o banco BMS lá no aplicativo do FGTS).",
   padrao:
     "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da " +
     "mensagem acima 👆",
@@ -637,6 +670,17 @@ async function handlerCapturaDadosCarroGarantia(de, businessNumberId, corpo) {
 async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
   if (!REGEX_EMAIL.test(corpo || "")) {
     await db.setFluxoPasso(de, businessNumberId, "financiamento_dados");
+    return;
+  }
+  await confirmarDadosRecebidos(de, businessNumberId);
+}
+
+// Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
+// verdade na mensagem — qualquer outra coisa só reseta o relógio do lembrete, sem confirmar
+// nada errado (mesmo cuidado do handlerCapturaDadosClt, ver comentário lá em cima).
+async function handlerCapturaDadosFgts(de, businessNumberId, corpo) {
+  if (!REGEX_CPF.test(corpo || "")) {
+    await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
     return;
   }
   await confirmarDadosRecebidos(de, businessNumberId);
@@ -908,6 +952,7 @@ const FLUXO_FELIZCRED = {
     clt_3mais: handlerCapturaDadosClt,
     carro_garantia_dados: handlerCapturaDadosCarroGarantia,
     financiamento_dados: handlerCapturaDadosFinanciamento,
+    fgts_cpf: handlerCapturaDadosFgts,
   },
 };
 
@@ -985,7 +1030,9 @@ async function processarEntry(entry) {
             try {
               const menu = fluxo.menuInicial();
               await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista);
-              await db.setFluxoPasso(de, businessNumberId, "menu_inicial");
+              // Fora do horário: só o aviso foi mandado, não o menu de verdade — não marca
+              // "menu_inicial" (senão o lembrete cobra uma opção que nunca foi oferecida).
+              await db.setFluxoPasso(de, businessNumberId, menu.foraDeHorario ? null : "menu_inicial");
               mensagemJaTratada = true;
             } catch (err) {
               console.error("Erro ao reabrir menu inicial:", err.message);
@@ -1085,7 +1132,9 @@ async function processarEntry(entry) {
             if (podeEnviar) {
               const menu = fluxo.menuInicial();
               await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista);
-              await db.setFluxoPasso(de, businessNumberId, "menu_inicial");
+              // Mesma correção do reabrir-por-"menu" acima: fora do horário não conta como
+              // "está no passo do menu", senão o lembrete cobra uma opção nunca oferecida.
+              await db.setFluxoPasso(de, businessNumberId, menu.foraDeHorario ? null : "menu_inicial");
             }
           } catch (err) {
             console.error("Erro ao enviar menu inicial:", err.message);

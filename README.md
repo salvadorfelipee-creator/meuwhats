@@ -281,16 +281,32 @@ assinada antes de pedir dados (mínimo aceito nos exemplos reais: 3 meses), e é
 menu real que ele já usa manualmente foi copiado pro código.
 
 - **Primeira mensagem** (`TEXTO_MENU_PRINCIPAL`, texto puro — a pessoa responde digitando
-  "1"-"4" ou uma palavra, não clicando em botão, igual acontece de verdade): "Olá, me chamo
+  "1"-"5" ou uma palavra, não clicando em botão, igual acontece de verdade): "Olá, me chamo
   Felipe: escolha uma das opções... 1 - CONSIGNADO CLT / 2 - SEGURO DE CARRO/MOTO /
-  3 - EMPRÉSTIMO COM CARRO EM GARANTIA / 4 - FINANCIAR UM VEÍCULO" + aviso do FGTS + telefones
-  + site. Reconhecimento em `detectarOpcaoMenuPrincipal`/`handlerMenuPrincipal`: número exato
-  ou palavra-chave — mas **exige a mensagem inteira igual à palavra-chave** (`t === chave`,
-  não `.includes()`), tanto aqui quanto em `detectarOpcaoMenuInstagram`: mandar só "fgts"
-  aciona, mandar uma frase qualquer que contenha "fgts" no meio não aciona mais (mudou
-  12/08/2026 depois do usuário ver a palavra disparando dentro de frases sem intenção clara).
-  Não reconhecer não responde nada automático (fica pro atendimento manual, e o lembrete
-  sutil do passo `menu_inicial` continua tentando trazer a pessoa de volta).
+  3 - EMPRÉSTIMO COM CARRO EM GARANTIA / 4 - FINANCIAR UM VEÍCULO / 5 - SAQUE DO FGTS" + aviso
+  do FGTS + telefones + site. Reconhecimento em
+  `detectarOpcaoMenuPrincipal`/`handlerMenuPrincipal`: número exato ou palavra-chave — mas
+  **exige a mensagem inteira igual à palavra-chave** (`t === chave`, não `.includes()`), tanto
+  aqui quanto em `detectarOpcaoMenuInstagram`: mandar só "fgts" aciona, mandar uma frase
+  qualquer que contenha "fgts" no meio não aciona mais (mudou 12/08/2026 depois do usuário ver
+  a palavra disparando dentro de frases sem intenção clara). Não reconhecer não responde nada
+  automático (fica pro atendimento manual, e o lembrete sutil do passo `menu_inicial` continua
+  tentando trazer a pessoa de volta).
+  - ⚠️ **Bug corrigido 13/08/2026 — opção 5/FGTS não existia**: o aviso "ATENÇÃO: o saque do
+    FGTS só pode ser simulado..." já citava FGTS desde sempre, mas nenhuma opção do menu
+    tratava a palavra — quem digitasse "fgts" ficava sem resposta nenhuma (reportado pelo
+    usuário testando ao vivo). Agora tem opção `5` própria, mesmo texto/fluxo já usado no
+    Instagram (autorizar o banco BMS no app do FGTS, depois mandar o CPF — passo `fgts_cpf`,
+    `handlerCapturaDadosFgts`, mesmo padrão paciente do CLT: só confirma achando um CPF de
+    verdade, resto só reseta o lembrete).
+  - ⚠️ **Bug corrigido 13/08/2026 — emoji de teclado não casava com o número**: o menu do
+    Instagram manda os números como emoji "1️⃣ 2️⃣ 3️⃣..." (dígito + variation selector +
+    combining enclosing keycap, 3 caracteres). Quem tocasse nesse emoji em vez de digitar "1"
+    no teclado normal nunca tinha resposta — `normalizarTexto` só tirava acentos (faixa
+    U+0300-036F), não esses dois caracteres invisíveis extras, então a comparação `t === "1"`
+    sempre falhava pra quem usasse o emoji. `REGEX_ACENTOS` agora também remove
+    variation selector (U+FE0E/U+FE0F) e combining enclosing keycap (U+20E3) — corrige nos
+    dois canais (WhatsApp e Instagram usam a mesma `normalizarTexto`).
   - **Opção 1 (CLT)** → "Para simular o consignado CLT, precisa ter no mínimo 3 meses de
     carteira assinada..." com botões `3 MESES OU MAIS` / `MENOS DE 3 MESES` (passo
     `clt_pergunta_tempo`, esses dois continuam sendo botão de verdade, não texto).
@@ -329,12 +345,22 @@ confirmação de dados recebidos (`confirmarDadosRecebidos`, reaproveitada pelos
 também ganha esse aviso (`avisoForaHorarioCotaCerta()`) quando cai fora do horário, pra não
 prometer resposta rápida à toa.
 
+⚠️ **Bug corrigido 13/08/2026 — lembrete cobrando uma opção que nunca foi mostrada**: fora do
+horário, `menuInicial()` manda só o aviso "estamos fora do horário", não o menu numérico —
+mas o código marcava o passo como `menu_inicial` do mesmo jeito de quem recebeu o menu de
+verdade, então minutos depois o lembrete sutil mandava "responda com o número da opção que te
+mandei ali em cima" pra alguém que nunca recebeu opção nenhuma. Reportado pelo usuário
+testando com um cliente real (Mario). `menuInicial()` agora devolve `foraDeHorario: true`
+quando cai nesse caso, e os dois lugares que chamam `menuInicial()` (mensagem nova e palavra
+"menu") só marcam o passo `menu_inicial` quando **não** é esse caso — fora do horário o passo
+fica `null`, sem lembrete nenhum.
+
 **Lembretes ("gancho") são sutis e só disparam pra quem parou no meio de uma resposta
 automática** — se o Felipe já respondeu manualmente pelo painel, `setFluxoPasso(...null)`
 zera o passo e cancela qualquer lembrete pendente daquela conversa (mesmo mecanismo de
-sempre, ver "Lembretes e agenda" acima). Passos novos: `menu_inicial` (15 min, "responda com
+sempre, ver "Lembretes e agenda" acima). Passos: `menu_inicial` (15 min, "responda com
 o número da opção"), `clt_pergunta_tempo` (15 min), `clt_3mais` (15 min), `carro_garantia_dados`
-(15 min), `financiamento_dados` (15 min).
+(15 min), `financiamento_dados` (15 min), `fgts_cpf` (15 min).
 
 **O que fica de fora de propósito** (evidenciado nas conversas analisadas, mas não
 automatizável com o que existe hoje): a simulação de crédito de verdade é feita pelo Felipe
