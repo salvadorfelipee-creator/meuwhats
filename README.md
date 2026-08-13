@@ -15,7 +15,7 @@ só compartilham o histórico do Git:
 |---|---|---|---|
 | **Painel de WhatsApp/Instagram/Telegram** (este README) | raiz (`server.js`, `db.js`, `painel/`...) | **Render** (deploy automático a cada push) | `meuwhats.onrender.com` |
 | **Site institucional FelizCred** | `felizcred-site/` | **Vercel**, projeto `meuwhats`, Root Directory = `felizcred-site` | `www.felizcred.com.br` |
-| **Cota Certa Seguros** | `cotacerta-seguros/` | **Vercel**, projeto separado `otacerta-seguros`, Root Directory = `cotacerta-seguros` | `cotacertaseguros.com.br` |
+| **Cota Certa Seguros** | `cotacerta-seguros/` | **Vercel**, projeto separado `cotacerta-seguros`, Root Directory = `cotacerta-seguros` | `cotacertaseguros.com.br` |
 
 Detalhes de cada site estático ficam em
 [`felizcred-site/README.md`](./felizcred-site/README.md) e
@@ -36,6 +36,41 @@ importantes pra não misturar:
   absoluto.
 - Editar algo do painel de WhatsApp (este README, `server.js`, `db.js`) nunca
   afeta os sites, e vice-versa.
+
+### 🚨 Se o site felizcred.com.br parecer desatualizado ou com posts "sumidos"
+
+**NÃO é bug de código.** Antes de mexer em qualquer arquivo, confira o DNS —
+foi exatamente isso que aconteceu em 13/08/2026: o domínio voltou a resolver
+pra hospedagem antiga da Hostinger (servindo uma cópia congelada de 18/07,
+com só 32 posts) em vez do Vercel, mesmo com o código/commits todos corretos
+e publicados.
+
+**Como confirmar rápido:** `nslookup felizcred.com.br` — se o IP não for
+`216.198.79.1` (ou não resolver pro Vercel), é DNS, não código.
+
+**Os registros corretos no Zone Editor da Hostinger** (painel da Hostinger →
+domínio `felizcred.com.br` → DNS/Nameservers):
+
+| Tipo | Nome | Valor |
+|---|---|---|
+| A | `@` | `216.198.79.1` |
+| CNAME | `www` | `cname.vercel-dns.com` |
+
+Todos os outros registros daquela tela (MX, os CNAME de `hostingermail-*`,
+`brevo*._domainkey`, `autodiscover`, `autoconfig`, o TXT `_dmarc`/SPF/
+`brevo-code`, o A de `ftp`) são de **e-mail e verificação**, não mexem no
+site — nunca precisam mudar.
+
+⚠️ **Nunca clicar em "Redefinir registros DNS"** no Zone Editor da Hostinger
+— esse botão apaga os dois registros customizados acima e volta tudo pro
+padrão de hospedagem deles (`ALIAS @` e `CNAME www` apontando pra
+`*.cdn.hstgr.net`), causando exatamente esse sumiço. É a causa mais provável
+do que aconteceu em 13/08.
+
+Depois de corrigir, confirme no Vercel em **Project → Settings → Domains**:
+`felizcred.com.br` e `www.felizcred.com.br` devem aparecer com selo verde
+"Valid Configuration" (um selo laranja "DNS Change Recommended" é só
+sugestão opcional, não erro — o site funciona normalmente assim).
 
 ---
 
