@@ -168,10 +168,13 @@ const ADAPTADORES = {
 // Publica o mesmo conteúdo em várias redes de uma vez (um clique). Cada rede publica
 // independente das outras — se uma falhar (token vencido, rede sem credencial, rede sem
 // suporte a carrossel etc.) as demais continuam, e o motivo de cada falha vai no resultado.
-async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, imagemUrls, link, redes }) {
+// `imagemUrlPorRede` (objeto { rede: url }) é um ajuste manual feito no painel (enquadrar/
+// reposicionar a foto pra não cortar errado numa rede específica, ex. Stories 9:16) — quando
+// existe pra uma rede, essa URL vence a `imagemUrl` genérica só pra ela; as outras redes
+// continuam usando a imagem padrão normalmente.
+async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, imagemUrls, imagemUrlPorRede, link, redes }) {
   const conta = contaPorId(contaId);
   const alvo = redes && redes.length ? redes : Object.keys(conta.redes);
-  const conteudo = { texto, imagemUrl, imagemUrls, link };
   const resultados = {};
 
   for (const rede of alvo) {
@@ -184,6 +187,7 @@ async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, imagem
       resultados[rede] = { ok: false, erro: "Sem credenciais configuradas para esta rede." };
       continue;
     }
+    const conteudo = { texto, imagemUrl: imagemUrlPorRede?.[rede] || imagemUrl, imagemUrls, link };
     try {
       const resultado = await ADAPTADORES[rede](conteudo, credenciais);
       resultados[rede] = { ok: true, ...resultado };

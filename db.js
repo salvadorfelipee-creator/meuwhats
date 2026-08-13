@@ -205,6 +205,12 @@ const ready = (async () => {
   if (!colunasAgendados.includes("imagem_keys")) {
     await client.execute(`ALTER TABLE posts_agendados ADD COLUMN imagem_keys TEXT`);
   }
+  // imagem_por_rede_keys (JSON objeto { rede: key }) — versão da imagem ajustada manualmente
+  // (reenquadrada/reposicionada no painel) pra uma rede específica, ex. Stories 9:16. Quando
+  // existe pra uma rede, vence a imagem padrão só naquela rede na hora de publicar.
+  if (!colunasAgendados.includes("imagem_por_rede_keys")) {
+    await client.execute(`ALTER TABLE posts_agendados ADD COLUMN imagem_por_rede_keys TEXT`);
+  }
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -681,17 +687,18 @@ async function reelsConfigSet(chave, valor) {
   });
 }
 
-async function agendaCriar({ contaId, texto, link, imagemKey, imagemKeys, redes, agendadoPara }) {
+async function agendaCriar({ contaId, texto, link, imagemKey, imagemKeys, imagemPorRedeKeys, redes, agendadoPara }) {
   await ready;
   const result = await client.execute({
-    sql: `INSERT INTO posts_agendados (conta_id, texto, link, imagem_key, imagem_keys, redes, agendado_para, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO posts_agendados (conta_id, texto, link, imagem_key, imagem_keys, imagem_por_rede_keys, redes, agendado_para, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       contaId,
       texto || null,
       link || null,
       imagemKey || null,
       imagemKeys && imagemKeys.length ? JSON.stringify(imagemKeys) : null,
+      imagemPorRedeKeys && Object.keys(imagemPorRedeKeys).length ? JSON.stringify(imagemPorRedeKeys) : null,
       JSON.stringify(redes),
       agendadoPara,
       Date.now(),
@@ -762,8 +769,10 @@ async function agendaReenfileirar(id) {
 async function agendaPostadosParaLimpar(idadeMinimaMs) {
   await ready;
   const result = await client.execute({
-    sql: `SELECT id, imagem_key, imagem_keys FROM posts_agendados
-          WHERE status = 'posted' AND (imagem_key IS NOT NULL OR imagem_keys IS NOT NULL) AND posted_at <= ?`,
+    sql: `SELECT id, imagem_key, imagem_keys, imagem_por_rede_keys FROM posts_agendados
+          WHERE status = 'posted'
+            AND (imagem_key IS NOT NULL OR imagem_keys IS NOT NULL OR imagem_por_rede_keys IS NOT NULL)
+            AND posted_at <= ?`,
     args: [Date.now() - idadeMinimaMs],
   });
   return result.rows;
@@ -772,7 +781,7 @@ async function agendaPostadosParaLimpar(idadeMinimaMs) {
 async function agendaMarcarImagemApagada(id) {
   await ready;
   await client.execute({
-    sql: `UPDATE posts_agendados SET imagem_key = NULL, imagem_keys = NULL WHERE id = ?`,
+    sql: `UPDATE posts_agendados SET imagem_key = NULL, imagem_keys = NULL, imagem_por_rede_keys = NULL WHERE id = ?`,
     args: [id],
   });
 }

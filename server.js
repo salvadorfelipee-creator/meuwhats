@@ -1850,6 +1850,19 @@ const server = http.createServer(async (req, res) => {
           return send(res, 400, { error: err.message });
         }
       }
+      // imagensBase64PorRede ({ rede: base64 }) — versão reenquadrada manualmente no painel
+      // pra uma rede específica (ex. Stories 9:16), vence a imagem padrão só naquela rede.
+      if (body.imagensBase64PorRede && typeof body.imagensBase64PorRede === "object") {
+        try {
+          body.imagemUrlPorRede = {};
+          for (const [rede, b64] of Object.entries(body.imagensBase64PorRede)) {
+            const filename = salvarImagemPublicar(b64);
+            body.imagemUrlPorRede[rede] = `https://${req.headers.host}/publicar-media/${filename}`;
+          }
+        } catch (err) {
+          return send(res, 400, { error: err.message });
+        }
+      }
       if (!body.texto && !body.imagemUrl && !(body.imagemUrls && body.imagemUrls.length)) {
         return send(res, 400, { error: "Informe ao menos um texto ou uma imagem" });
       }
@@ -1902,6 +1915,15 @@ const server = http.createServer(async (req, res) => {
         const imagens = Array.isArray(body.imagensBase64) && body.imagensBase64.length
           ? body.imagensBase64.map((b64) => decodificarImagemBase64(b64))
           : undefined;
+        // imagensBase64PorRede ({ rede: base64 }) — mesma ideia do /painel/api/publicar,
+        // versão reenquadrada manualmente pra uma rede específica.
+        let imagensPorRede;
+        if (body.imagensBase64PorRede && typeof body.imagensBase64PorRede === "object") {
+          imagensPorRede = {};
+          for (const [rede, b64] of Object.entries(body.imagensBase64PorRede)) {
+            imagensPorRede[rede] = decodificarImagemBase64(b64);
+          }
+        }
         const criado = await agenda.criarAgendamento({
           contaId: body.contaId,
           texto: body.texto,
@@ -1912,6 +1934,7 @@ const server = http.createServer(async (req, res) => {
           imagemNomeArquivo: imagem.nomeArquivo,
           imagemContentType: imagem.contentType,
           imagens,
+          imagensPorRede,
         });
         return send(res, 200, criado);
       } catch (err) {
