@@ -1831,7 +1831,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && path_ === "/painel/api/publicar") {
       if (!requireAuth(req, res)) return;
       const body = await parseBody(req);
-      if (body.imagemBase64) {
+      // imagensBase64 (array, 2+) = carrossel — tem prioridade sobre imagemBase64 único
+      // (mesmo padrão já usado em /painel/api/agenda).
+      if (Array.isArray(body.imagensBase64) && body.imagensBase64.length) {
+        try {
+          body.imagemUrls = body.imagensBase64.map((b64) => {
+            const filename = salvarImagemPublicar(b64);
+            return `https://${req.headers.host}/publicar-media/${filename}`;
+          });
+        } catch (err) {
+          return send(res, 400, { error: err.message });
+        }
+      } else if (body.imagemBase64) {
         try {
           const filename = salvarImagemPublicar(body.imagemBase64);
           body.imagemUrl = `https://${req.headers.host}/publicar-media/${filename}`;
@@ -1839,7 +1850,7 @@ const server = http.createServer(async (req, res) => {
           return send(res, 400, { error: err.message });
         }
       }
-      if (!body.texto && !body.imagemUrl) {
+      if (!body.texto && !body.imagemUrl && !(body.imagemUrls && body.imagemUrls.length)) {
         return send(res, 400, { error: "Informe ao menos um texto ou uma imagem" });
       }
       try {

@@ -227,6 +227,20 @@
   .upload-remover:hover { background: rgba(0,0,0,0.8); }
   .aviso-instagram { font-size: 12px; color: #c0392b; margin-top: 6px; display: none; }
 
+  .upload-thumbs-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .upload-thumb { position: relative; width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background: var(--bg); }
+  .upload-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .upload-thumb .upload-thumb-num {
+    position: absolute; bottom: 2px; left: 3px; background: rgba(0,0,0,0.6); color: #fff;
+    font-size: 10px; font-weight: 700; border-radius: 4px; padding: 0 4px;
+  }
+  .upload-thumb .upload-thumb-remover {
+    position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%;
+    border: none; background: rgba(0,0,0,0.65); color: #fff; font-size: 10px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .upload-thumb .upload-thumb-remover:hover { background: rgba(0,0,0,0.85); }
+
   .rede-chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .rede-chip {
     display: flex; align-items: center; gap: 7px; padding: 8px 14px 8px 8px; border-radius: 999px;
@@ -512,15 +526,17 @@
       <div class="publicar-grid">
         <div class="card publicar-card">
           <div class="upload-zone" id="pub-upload-zone">
-            <input type="file" id="pub-imagem-input" accept="image/*" hidden />
+            <input type="file" id="pub-imagem-input" accept="image/*" multiple hidden />
             <div class="upload-zone-vazio" id="pub-upload-vazio">
               <div class="upload-icone">🖼️</div>
-              <div class="upload-titulo">Arraste uma imagem aqui ou clique pra escolher</div>
-              <div class="upload-sub">JPG, PNG ou WEBP — obrigatória pro Instagram</div>
+              <div class="upload-titulo">Arraste uma ou mais imagens aqui ou clique pra escolher</div>
+              <div class="upload-sub">JPG, PNG ou WEBP — 2+ imagens vira carrossel (Instagram/Facebook/Threads)</div>
             </div>
             <img id="pub-upload-preview" style="display:none;" />
             <button type="button" id="pub-upload-remover" class="upload-remover" style="display:none;" title="Remover imagem">✕</button>
           </div>
+          <div class="upload-thumbs-row" id="pub-upload-thumbs" style="display:none;"></div>
+          <button type="button" id="pub-upload-adicionar" class="btn-secundario" style="display:none; margin-top:8px;">+ Adicionar mais imagens</button>
 
           <label>Legenda</label>
           <textarea id="pub-texto" placeholder="Escreva o texto da publicação..." maxlength="2200"></textarea>
@@ -563,9 +579,10 @@
                 <div class="preview-subtitulo">Agora</div>
               </div>
             </div>
-            <div class="preview-imagem-wrap">
+            <div class="preview-imagem-wrap" style="position:relative;">
               <img id="preview-imagem" />
               <div class="preview-imagem-vazia" id="preview-imagem-vazia">Sua imagem aparece aqui</div>
+              <div id="preview-carrossel-badge" style="display:none; position:absolute; top:8px; right:8px; background:rgba(0,0,0,0.65); color:#fff; font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px;"></div>
             </div>
             <div class="preview-texto vazio" id="preview-texto">Escreva sua legenda ao lado...</div>
           </div>
@@ -1551,7 +1568,10 @@ document.getElementById("tg-atualizar").addEventListener("click", carregarContat
 
 // ─── Publicar (Publique IV) ───────────────────────────────────────────────────
 let contasPublicar = [];
-let pubImagemBase64 = null;
+// Array em vez de imagem única — 1 imagem publica normal, 2+ vira carrossel (Instagram/
+// Facebook/Threads/LinkedIn). Instagram Stories e X/Twitter não aceitam carrossel — o
+// servidor recusa com um erro claro se tentar (ver publique.js).
+let pubImagens = [];
 const REDES_INFO = {
   instagram: { label: "Instagram", sigla: "IG" },
   instagram_story: { label: "Instagram Stories", sigla: "IG●" },
@@ -1581,7 +1601,9 @@ function atualizarPreviaCortes() {
   const imgEl = document.getElementById("pub-upload-preview");
   const redes = redesMarcadas().filter((r) => RATIO_REDES[r]);
 
-  if (!pubImagemBase64 || !redes.length || !imgEl.naturalWidth) {
+  // Só faz sentido com exatamente 1 imagem — em carrossel (2+) cada rede mostra as imagens
+  // como vieram, sem cortar pra caber num formato só, então o aviso de corte não se aplica.
+  if (pubImagens.length !== 1 || !redes.length || !imgEl.naturalWidth) {
     wrap.style.display = "none";
     div.innerHTML = "";
     return;
@@ -1611,7 +1633,7 @@ function atualizarPreviaCortes() {
       const info = REDES_INFO[rede] || { label: rede };
       return `<div class="crop-preview-item">
         <div class="crop-preview-frame" style="aspect-ratio:${imgEl.naturalWidth}/${imgEl.naturalHeight};">
-          <img src="${pubImagemBase64}" />
+          <img src="${pubImagens[0]}" />
           ${faixas}
         </div>
         <div class="crop-preview-label">${escapeHtml(info.label)}${cortouAlgo ? " ⚠️" : " ✅"}</div>
@@ -1634,7 +1656,7 @@ function redesMarcadas() {
 
 function atualizarAvisoInstagram() {
   const marcadoIg = document.querySelector('.rede-chip[data-rede="instagram"].marcada, .rede-chip[data-rede="instagram_story"].marcada');
-  document.getElementById("pub-aviso-instagram").style.display = marcadoIg && !pubImagemBase64 ? "block" : "none";
+  document.getElementById("pub-aviso-instagram").style.display = marcadoIg && !pubImagens.length ? "block" : "none";
 }
 
 function renderizarRedesPublicar() {
@@ -1689,21 +1711,69 @@ function redimensionarImagem(file, maxLado = 1600, qualidade = 0.86) {
   });
 }
 
-async function processarImagemSelecionada(file) {
-  if (!file || !file.type.startsWith("image/")) return;
-  try {
-    pubImagemBase64 = await redimensionarImagem(file);
-    document.getElementById("pub-upload-vazio").style.display = "none";
-    const preview = document.getElementById("pub-upload-preview");
+// Decide o que mostrar na zona de upload conforme quantas imagens estão selecionadas:
+// 0 = prompt vazio; 1 = prévia grande de sempre (com preview de corte); 2+ = vira carrossel,
+// mostra uma fileira de miniaturas (cada uma removível) e some com a prévia grande.
+function renderizarUploadZona() {
+  const zona = document.getElementById("pub-upload-zone");
+  const vazio = document.getElementById("pub-upload-vazio");
+  const preview = document.getElementById("pub-upload-preview");
+  const removerBtn = document.getElementById("pub-upload-remover");
+  const thumbsRow = document.getElementById("pub-upload-thumbs");
+  const addBtn = document.getElementById("pub-upload-adicionar");
+
+  if (pubImagens.length === 0) {
+    zona.style.display = "";
+    vazio.style.display = "block";
+    preview.style.display = "none";
+    removerBtn.style.display = "none";
+    thumbsRow.style.display = "none";
+    thumbsRow.innerHTML = "";
+    addBtn.style.display = "none";
+  } else if (pubImagens.length === 1) {
+    zona.style.display = "";
+    vazio.style.display = "none";
     preview.onload = () => atualizarPreviaCortes(); // naturalWidth só fica disponível depois de carregar
-    preview.src = pubImagemBase64;
+    preview.src = pubImagens[0];
     preview.style.display = "block";
-    document.getElementById("pub-upload-remover").style.display = "flex";
-  } catch (err) {
-    alert(err.message);
+    removerBtn.style.display = "flex";
+    thumbsRow.style.display = "none";
+    thumbsRow.innerHTML = "";
+    addBtn.style.display = "none";
+  } else {
+    zona.style.display = "none"; // some com a caixa de drag&drop, sobra só a fileira + botão
+    thumbsRow.style.display = "flex";
+    thumbsRow.innerHTML = pubImagens
+      .map(
+        (src, i) => `<div class="upload-thumb">
+          <img src="${src}" />
+          <span class="upload-thumb-num">${i + 1}</span>
+          <button type="button" class="upload-thumb-remover" onclick="removerImagemCarrossel(${i})" title="Remover">✕</button>
+        </div>`
+      )
+      .join("");
+    addBtn.style.display = "inline-block";
   }
   atualizarAvisoInstagram();
   atualizarPreview();
+}
+
+function removerImagemCarrossel(indice) {
+  pubImagens.splice(indice, 1);
+  renderizarUploadZona();
+}
+
+async function processarImagensSelecionadas(files) {
+  const validos = Array.from(files || []).filter((f) => f && f.type.startsWith("image/"));
+  if (!validos.length) return;
+  try {
+    for (const file of validos) {
+      pubImagens.push(await redimensionarImagem(file));
+    }
+    renderizarUploadZona();
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 const pubUploadZone = document.getElementById("pub-upload-zone");
@@ -1711,24 +1781,23 @@ const pubUploadInput = document.getElementById("pub-imagem-input");
 pubUploadZone.addEventListener("click", (e) => {
   if (e.target.id !== "pub-upload-remover") pubUploadInput.click();
 });
-pubUploadInput.addEventListener("change", () => processarImagemSelecionada(pubUploadInput.files[0]));
+pubUploadInput.addEventListener("change", () => {
+  processarImagensSelecionadas(pubUploadInput.files);
+  pubUploadInput.value = ""; // permite escolher o mesmo arquivo de novo depois de remover
+});
 pubUploadZone.addEventListener("dragover", (e) => { e.preventDefault(); pubUploadZone.classList.add("arrastando"); });
 pubUploadZone.addEventListener("dragleave", () => pubUploadZone.classList.remove("arrastando"));
 pubUploadZone.addEventListener("drop", (e) => {
   e.preventDefault();
   pubUploadZone.classList.remove("arrastando");
-  processarImagemSelecionada(e.dataTransfer.files[0]);
+  processarImagensSelecionadas(e.dataTransfer.files);
 });
 document.getElementById("pub-upload-remover").addEventListener("click", (e) => {
   e.stopPropagation();
-  pubImagemBase64 = null;
-  pubUploadInput.value = "";
-  document.getElementById("pub-upload-vazio").style.display = "block";
-  document.getElementById("pub-upload-preview").style.display = "none";
-  document.getElementById("pub-upload-remover").style.display = "none";
-  atualizarAvisoInstagram();
-  atualizarPreview();
+  pubImagens = [];
+  renderizarUploadZona();
 });
+document.getElementById("pub-upload-adicionar").addEventListener("click", () => pubUploadInput.click());
 
 // ─ Pré-visualização ao vivo ─
 function atualizarPreview() {
@@ -1739,13 +1808,20 @@ function atualizarPreview() {
 
   const img = document.getElementById("preview-imagem");
   const vazio = document.getElementById("preview-imagem-vazia");
-  if (pubImagemBase64) {
-    img.src = pubImagemBase64;
+  const badge = document.getElementById("preview-carrossel-badge");
+  if (pubImagens.length) {
+    img.src = pubImagens[0];
     img.style.display = "block";
     vazio.style.display = "none";
   } else {
     img.style.display = "none";
     vazio.style.display = "block";
+  }
+  if (pubImagens.length > 1) {
+    badge.textContent = `🖼️ Carrossel — ${pubImagens.length} imagens`;
+    badge.style.display = "block";
+  } else {
+    badge.style.display = "none";
   }
 
   const contaId = document.getElementById("pub-conta").value;
@@ -1763,6 +1839,14 @@ document.getElementById("pub-texto").addEventListener("input", () => {
   atualizarPreview();
 });
 
+// 1 imagem manda "imagemBase64" (formato de sempre); 2+ manda "imagensBase64" (vira
+// carrossel no servidor — ver publique.js/agenda.js). Usado tanto no publicar quanto no agendar.
+function payloadImagens() {
+  if (pubImagens.length > 1) return { imagensBase64: pubImagens };
+  if (pubImagens.length === 1) return { imagemBase64: pubImagens[0] };
+  return {};
+}
+
 document.getElementById("pub-publicar").addEventListener("click", async () => {
   const contaId = document.getElementById("pub-conta").value;
   const texto = document.getElementById("pub-texto").value.trim();
@@ -1771,7 +1855,7 @@ document.getElementById("pub-publicar").addEventListener("click", async () => {
   const resDiv = document.getElementById("pub-resultado");
   const botao = document.getElementById("pub-publicar");
 
-  if (!texto && !pubImagemBase64) {
+  if (!texto && !pubImagens.length) {
     resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Preencha ao menos o texto ou a imagem.</span></div>`;
     return;
   }
@@ -1787,7 +1871,7 @@ document.getElementById("pub-publicar").addEventListener("click", async () => {
     const res = await fetch("/painel/api/publicar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contaId, texto, link, redes, ...(pubImagemBase64 ? { imagemBase64: pubImagemBase64 } : {}) }),
+      body: JSON.stringify({ contaId, texto, link, redes, ...payloadImagens() }),
     });
     const data = await res.json();
     if (data.error) {
@@ -1824,7 +1908,7 @@ document.getElementById("pub-agendar").addEventListener("click", async () => {
   const resDiv = document.getElementById("pub-resultado");
   const botao = document.getElementById("pub-agendar");
 
-  if (!texto && !pubImagemBase64) {
+  if (!texto && !pubImagens.length) {
     resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Preencha ao menos o texto ou a imagem.</span></div>`;
     return;
   }
@@ -1844,7 +1928,7 @@ document.getElementById("pub-agendar").addEventListener("click", async () => {
     const res = await fetch("/painel/api/agenda", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contaId, texto, link, redes, data, ...(pubImagemBase64 ? { imagemBase64: pubImagemBase64 } : {}) }),
+      body: JSON.stringify({ contaId, texto, link, redes, data, ...payloadImagens() }),
     });
     const respData = await res.json();
     if (respData.error) {
