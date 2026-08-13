@@ -27,6 +27,12 @@ const CONTAS = [
         env("INSTAGRAM_ACCESS_TOKEN") && env("INSTAGRAM_ACCOUNT_ID")
           ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID") }
           : null,
+      // Mesma credencial do Instagram acima — é a mesma conta, só um tipo de publicação
+      // diferente (Stories em vez de feed). Fica marcável/desmarcável separado no painel.
+      instagram_story:
+        env("INSTAGRAM_ACCESS_TOKEN") && env("INSTAGRAM_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID") }
+          : null,
       facebook:
         env("FACEBOOK_PAGE_ACCESS_TOKEN") && env("FACEBOOK_PAGE_ID")
           ? { token: env("FACEBOOK_PAGE_ACCESS_TOKEN"), paginaId: env("FACEBOOK_PAGE_ID") }
@@ -69,11 +75,21 @@ function listarContas() {
   }));
 }
 
-// Cada adaptador recebe o mesmo conteúdo genérico { texto, imagemUrl, link } e usa só o que
-// a rede aceita — ex.: Instagram exige imagem, LinkedIn ignora imagem e usa o link pra gerar
-// a prévia. Ver PUBLIQUE-IV.md pra tabela completa de compatibilidade.
+// Cada adaptador recebe o mesmo conteúdo genérico { texto, imagemUrl, imagemUrls, link } e usa
+// só o que a rede aceita — ex.: Instagram exige imagem, LinkedIn ignora imagem e usa o link
+// pra gerar a prévia. `imagemUrls` (array, 2+ imagens) pede um carrossel — só Instagram,
+// Facebook e Threads sabem publicar isso; nas demais o adaptador recusa com um erro claro em
+// vez de postar algo fora do formato pedido. Ver PUBLIQUE-IV.md pra tabela completa.
 const ADAPTADORES = {
   instagram: (conteudo, credenciais) => {
+    if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
+      return instagram.publicarCarrossel({
+        imagemUrls: conteudo.imagemUrls,
+        legenda: conteudo.texto,
+        accessToken: credenciais.accessToken,
+        accountId: credenciais.accountId,
+      });
+    }
     if (!conteudo.imagemUrl) throw new Error("Instagram exige uma imagem.");
     return instagram.publicarImagem({
       imagemUrl: conteudo.imagemUrl,
@@ -82,19 +98,50 @@ const ADAPTADORES = {
       accountId: credenciais.accountId,
     });
   },
-  facebook: (conteudo, credenciais) => facebook.publicar(conteudo, credenciais),
-  twitter: (conteudo, credenciais) => twitter.publicar(conteudo, credenciais),
-  linkedin: (conteudo, credenciais) => linkedin.publicar(conteudo, credenciais),
-  threads: (conteudo, credenciais) => threads.publicar(conteudo, credenciais),
+  instagram_story: (conteudo, credenciais) => {
+    if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
+      throw new Error("Instagram Stories não suporta carrossel (formato de várias imagens deslizáveis).");
+    }
+    if (!conteudo.imagemUrl) throw new Error("Story exige uma imagem.");
+    return instagram.publicarStory({
+      imagemUrl: conteudo.imagemUrl,
+      accessToken: credenciais.accessToken,
+      accountId: credenciais.accountId,
+    });
+  },
+  facebook: (conteudo, credenciais) => {
+    if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
+      return facebook.publicarCarrossel({ texto: conteudo.texto, imagemUrls: conteudo.imagemUrls }, credenciais);
+    }
+    return facebook.publicar(conteudo, credenciais);
+  },
+  twitter: (conteudo, credenciais) => {
+    if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
+      throw new Error("X/Twitter não suporta carrossel neste sistema ainda.");
+    }
+    return twitter.publicar(conteudo, credenciais);
+  },
+  linkedin: (conteudo, credenciais) => {
+    if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
+      throw new Error("LinkedIn não suporta imagem/carrossel neste sistema ainda (ver PUBLIQUE-IV.md).");
+    }
+    return linkedin.publicar(conteudo, credenciais);
+  },
+  threads: (conteudo, credenciais) => {
+    if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
+      return threads.publicarCarrossel({ texto: conteudo.texto, imagemUrls: conteudo.imagemUrls }, credenciais);
+    }
+    return threads.publicar(conteudo, credenciais);
+  },
 };
 
 // Publica o mesmo conteúdo em várias redes de uma vez (um clique). Cada rede publica
-// independente das outras — se uma falhar (token vencido, rede sem credencial etc.) as
-// demais continuam, e o motivo de cada falha vai no resultado.
-async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, link, redes }) {
+// independente das outras — se uma falhar (token vencido, rede sem credencial, rede sem
+// suporte a carrossel etc.) as demais continuam, e o motivo de cada falha vai no resultado.
+async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, imagemUrls, link, redes }) {
   const conta = contaPorId(contaId);
   const alvo = redes && redes.length ? redes : Object.keys(conta.redes);
-  const conteudo = { texto, imagemUrl, link };
+  const conteudo = { texto, imagemUrl, imagemUrls, link };
   const resultados = {};
 
   for (const rede of alvo) {

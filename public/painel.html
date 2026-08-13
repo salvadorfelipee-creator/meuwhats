@@ -240,6 +240,7 @@
   .rede-chip.desabilitada { opacity: 0.45; cursor: not-allowed; }
   .rede-chip.marcada { border-color: transparent; color: var(--text); background: var(--accent-soft); }
   .rede-icone.rede-instagram { background: linear-gradient(45deg,#f9ce34,#ee2a7b 45%,#6228d7); }
+  .rede-icone.rede-instagram_story { background: linear-gradient(45deg,#f9ce34,#ee2a7b 45%,#6228d7); font-size: 8.5px; }
   .rede-icone.rede-facebook { background: #1877F2; }
   .rede-icone.rede-twitter { background: #0F1419; }
   .rede-icone.rede-linkedin { background: #0A66C2; }
@@ -284,6 +285,13 @@
     width: 30px; height: 30px; cursor: pointer; font-size: 14px;
   }
   .cal-nav-botao:hover { background: var(--bg); }
+
+  .crop-preview-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .crop-preview-item { width: 74px; }
+  .crop-preview-frame { position: relative; overflow: hidden; border-radius: 6px; background: #000; }
+  .crop-preview-frame img { display: block; width: 100%; height: 100%; }
+  .crop-preview-cut { position: absolute; background: rgba(220, 53, 69, 0.6); pointer-events: none; }
+  .crop-preview-label { font-size: 10.5px; text-align: center; margin-top: 5px; color: var(--text-muted); }
 
   .reels-stats { display: flex; gap: 10px; flex-wrap: wrap; }
   .reels-stat { flex: 1; min-width: 110px; background: var(--bg); border-radius: 10px; padding: 12px 14px; text-align: center; }
@@ -524,6 +532,16 @@
           <label>Publicar em</label>
           <div class="rede-chips" id="pub-redes"></div>
           <div class="aviso-instagram" id="pub-aviso-instagram">O Instagram está marcado mas não tem imagem — ele vai falhar sem uma foto.</div>
+
+          <div id="pub-crop-preview-wrap" style="display:none;">
+            <label>Como a imagem fica em cada rede</label>
+            <div style="font-size:11.5px; color:var(--text-muted); margin:-4px 0 8px;">
+              Cada rede corta a imagem num formato diferente — a faixa vermelha mostra o que
+              fica <strong>fora</strong> e não aparece nessa rede. Aproximado (proporção
+              recomendada de cada rede), não é o corte exato de cada uma.
+            </div>
+            <div class="crop-preview-row" id="pub-crop-preview"></div>
+          </div>
 
           <label>Agendar para (opcional — deixe em branco pra publicar agora)</label>
           <input type="datetime-local" id="pub-data" />
@@ -1536,11 +1554,71 @@ let contasPublicar = [];
 let pubImagemBase64 = null;
 const REDES_INFO = {
   instagram: { label: "Instagram", sigla: "IG" },
+  instagram_story: { label: "Instagram Stories", sigla: "IG●" },
   facebook: { label: "Facebook", sigla: "FB" },
   twitter: { label: "X/Twitter", sigla: "X" },
   linkedin: { label: "LinkedIn", sigla: "in" },
   threads: { label: "Threads", sigla: "@" },
 };
+
+// Proporção (largura/altura) recomendada de cada rede pro preview de corte — aproximado, não
+// é o algoritmo de corte real de cada plataforma (isso a gente não controla), só uma
+// referência pra avisar quando uma foto claramente vai perder conteúdo numa rede específica.
+const RATIO_REDES = {
+  instagram: 4 / 5, // feed vertical, formato mais seguro recomendado pela própria Meta
+  instagram_story: 9 / 16,
+  threads: 4 / 5,
+  facebook: 1, // posts de foto no feed do FB cortam perto de 1:1
+  twitter: 16 / 9,
+  linkedin: 1.91,
+};
+
+// Mostra, por rede marcada, o que ficaria FORA do corte (faixa vermelha) se a imagem atual
+// fosse publicada nela — só um aviso visual, não muda a imagem enviada de verdade.
+function atualizarPreviaCortes() {
+  const wrap = document.getElementById("pub-crop-preview-wrap");
+  const div = document.getElementById("pub-crop-preview");
+  const imgEl = document.getElementById("pub-upload-preview");
+  const redes = redesMarcadas().filter((r) => RATIO_REDES[r]);
+
+  if (!pubImagemBase64 || !redes.length || !imgEl.naturalWidth) {
+    wrap.style.display = "none";
+    div.innerHTML = "";
+    return;
+  }
+  wrap.style.display = "block";
+
+  const imgRatio = imgEl.naturalWidth / imgEl.naturalHeight;
+  div.innerHTML = redes
+    .map((rede) => {
+      const alvo = RATIO_REDES[rede];
+      let corteLateralPct = 0;
+      let corteVerticalPct = 0;
+      if (imgRatio > alvo) {
+        corteLateralPct = (1 - alvo / imgRatio) * 50; // % de cada lado (esquerda E direita)
+      } else if (imgRatio < alvo) {
+        corteVerticalPct = (1 - imgRatio / alvo) * 50; // % de cima E de baixo
+      }
+      const cortouAlgo = corteLateralPct > 1 || corteVerticalPct > 1;
+      const faixas =
+        corteLateralPct > 1
+          ? `<div class="crop-preview-cut" style="top:0;bottom:0;left:0;width:${corteLateralPct}%;"></div>
+             <div class="crop-preview-cut" style="top:0;bottom:0;right:0;width:${corteLateralPct}%;"></div>`
+          : corteVerticalPct > 1
+          ? `<div class="crop-preview-cut" style="left:0;right:0;top:0;height:${corteVerticalPct}%;"></div>
+             <div class="crop-preview-cut" style="left:0;right:0;bottom:0;height:${corteVerticalPct}%;"></div>`
+          : "";
+      const info = REDES_INFO[rede] || { label: rede };
+      return `<div class="crop-preview-item">
+        <div class="crop-preview-frame" style="aspect-ratio:${imgEl.naturalWidth}/${imgEl.naturalHeight};">
+          <img src="${pubImagemBase64}" />
+          ${faixas}
+        </div>
+        <div class="crop-preview-label">${escapeHtml(info.label)}${cortouAlgo ? " ⚠️" : " ✅"}</div>
+      </div>`;
+    })
+    .join("");
+}
 
 async function carregarContasPublicar() {
   const res = await fetch("/painel/api/publicar/contas");
@@ -1555,7 +1633,7 @@ function redesMarcadas() {
 }
 
 function atualizarAvisoInstagram() {
-  const marcadoIg = document.querySelector('.rede-chip[data-rede="instagram"].marcada');
+  const marcadoIg = document.querySelector('.rede-chip[data-rede="instagram"].marcada, .rede-chip[data-rede="instagram_story"].marcada');
   document.getElementById("pub-aviso-instagram").style.display = marcadoIg && !pubImagemBase64 ? "block" : "none";
 }
 
@@ -1575,6 +1653,7 @@ function renderizarRedesPublicar() {
     chip.addEventListener("click", () => {
       chip.classList.toggle("marcada");
       atualizarAvisoInstagram();
+      atualizarPreviaCortes();
     });
   });
   atualizarAvisoInstagram();
@@ -1616,6 +1695,7 @@ async function processarImagemSelecionada(file) {
     pubImagemBase64 = await redimensionarImagem(file);
     document.getElementById("pub-upload-vazio").style.display = "none";
     const preview = document.getElementById("pub-upload-preview");
+    preview.onload = () => atualizarPreviaCortes(); // naturalWidth só fica disponível depois de carregar
     preview.src = pubImagemBase64;
     preview.style.display = "block";
     document.getElementById("pub-upload-remover").style.display = "flex";
@@ -1671,6 +1751,8 @@ function atualizarPreview() {
   const contaId = document.getElementById("pub-conta").value;
   const conta = contasPublicar.find((c) => c.id === contaId);
   document.getElementById("preview-nome").textContent = conta ? conta.nome.toLowerCase().replace(/\s+/g, "") : "felizcred";
+
+  atualizarPreviaCortes();
 }
 
 document.getElementById("pub-texto").addEventListener("input", () => {

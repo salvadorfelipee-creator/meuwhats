@@ -104,6 +104,67 @@ async function publicar({ texto, imagemUrl }, credenciais) {
   return { id: publicado.id, link, truncado };
 }
 
+// Publica um carrossel (2 a 20 imagens deslizáveis) — mesmo padrão do Instagram: cada imagem
+// primeiro vira um item filho (is_carousel_item), depois um container "pai" media_type
+// CAROUSEL referencia os filhos pelos IDs (children, separado por vírgula) antes de publicar.
+async function publicarCarrossel({ texto, imagemUrls }, credenciais) {
+  const { accessToken, userId } = credenciais;
+  if (!imagemUrls || imagemUrls.length < 2) throw new Error("Carrossel exige ao menos 2 imagens.");
+  if (imagemUrls.length > 20) throw new Error("Carrossel do Threads aceita no máximo 20 imagens.");
+
+  let textoFinal = texto || "";
+  const truncado = textoFinal.length > 500;
+  if (truncado) textoFinal = textoFinal.slice(0, 497) + "...";
+
+  const filhoIds = [];
+  for (const imagemUrl of imagemUrls) {
+    const { status, json: filho } = await graphRequest(
+      "POST",
+      `/${GRAPH_VERSION}/${userId}/threads`,
+      { media_type: "IMAGE", image_url: imagemUrl, is_carousel_item: true },
+      accessToken
+    );
+    if (status >= 400) throw new Error(`Falha ao criar item do carrossel no Threads: ${JSON.stringify(filho)}`);
+    // Diferente do Instagram (que aceita children ainda em processamento), o Threads recusa o
+    // container pai com "children inválidos/inexistentes" se o item filho não tiver terminado
+    // de processar antes — precisa esperar FINISHED aqui, um por um, antes de seguir.
+    await aguardarContainerPronto(accessToken, filho.id);
+    filhoIds.push(filho.id);
+  }
+
+  const { status, json: container } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${userId}/threads`,
+    { media_type: "CAROUSEL", children: filhoIds.join(","), text: textoFinal },
+    accessToken
+  );
+  if (status >= 400) throw new Error(`Falha ao criar carrossel no Threads: ${JSON.stringify(container)}`);
+
+  await aguardarContainerPronto(accessToken, container.id);
+
+  const { status: s2, json: publicado } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${userId}/threads_publish`,
+    { creation_id: container.id },
+    accessToken
+  );
+  if (s2 >= 400) throw new Error(`Falha ao publicar carrossel no Threads: ${JSON.stringify(publicado)}`);
+
+  let link = null;
+  try {
+    const { status: s3, json: dados } = await graphRequest(
+      "GET",
+      `/${GRAPH_VERSION}/${publicado.id}?fields=permalink`,
+      null,
+      accessToken
+    );
+    if (s3 < 400) link = dados.permalink;
+  } catch {
+    // publicação já existe mesmo se essa busca falhar — só não teremos o link pro painel
+  }
+  return { id: publicado.id, link, truncado };
+}
+
 // Confirma que o token funciona e devolve o ID do usuário do Threads (precisa pra montar as
 // credenciais em publique.js — ver CHAVES-LOCAL.md pra como gerar o token).
 async function getPerfil(accessToken) {
@@ -112,4 +173,4 @@ async function getPerfil(accessToken) {
   return json;
 }
 
-module.exports = { publicar, getPerfil };
+module.exports = { publicar, publicarCarrossel, getPerfil };

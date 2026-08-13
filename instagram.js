@@ -214,6 +214,61 @@ async function publicarImagem({ imagemUrl, legenda, accessToken, accountId }) {
   return { id: publicado.id, link };
 }
 
+// Publica um carrossel (2 a 10 imagens deslizáveis) no feed — usado pelo Publique IV quando
+// o conteúdo tem `imagemUrls` (array) em vez de uma `imagemUrl` só. Cada imagem primeiro vira
+// um item filho (is_carousel_item), depois um container "pai" media_type CAROUSEL referencia
+// os filhos pelos IDs (children, string separada por vírgula) — só então publica.
+async function publicarCarrossel({ imagemUrls, legenda, accessToken, accountId }) {
+  if (!imagemUrls || imagemUrls.length < 2) throw new Error("Carrossel exige ao menos 2 imagens.");
+  if (imagemUrls.length > 10) throw new Error("Carrossel do Instagram aceita no máximo 10 imagens.");
+  const token = accessToken || ACCESS_TOKEN;
+  const conta = accountId || ACCOUNT_ID;
+
+  const filhoIds = [];
+  for (const imagemUrl of imagemUrls) {
+    const { status, json: filho } = await graphRequest(
+      "POST",
+      `/${GRAPH_VERSION}/${conta}/media`,
+      { image_url: imagemUrl, is_carousel_item: true },
+      token
+    );
+    if (status >= 400) throw new Error(`Falha ao criar item do carrossel no Instagram: ${JSON.stringify(filho)}`);
+    filhoIds.push(filho.id);
+  }
+
+  const { status, json: container } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${conta}/media`,
+    { media_type: "CAROUSEL", children: filhoIds.join(","), caption: legenda || "" },
+    token
+  );
+  if (status >= 400) throw new Error(`Falha ao criar carrossel no Instagram: ${JSON.stringify(container)}`);
+
+  await aguardarContainerPronto(token, container.id);
+
+  const { status: s2, json: publicado } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${conta}/media_publish`,
+    { creation_id: container.id },
+    token
+  );
+  if (s2 >= 400) throw new Error(`Falha ao publicar carrossel no Instagram: ${JSON.stringify(publicado)}`);
+
+  let link = null;
+  try {
+    const { status: s3, json: dados } = await graphRequest(
+      "GET",
+      `/${GRAPH_VERSION}/${publicado.id}?fields=permalink`,
+      null,
+      token
+    );
+    if (s3 < 400) link = dados.permalink;
+  } catch {
+    // publicação já existe mesmo se essa busca falhar — só não teremos o link pro painel
+  }
+  return { id: publicado.id, link };
+}
+
 // Publica um Reels (vídeo) no feed — usado pela fila de agendamento em massa (ver
 // PUBLIQUE-IV.md, seção Reels). Igual à publicação de imagem, mas com media_type REELS
 // e um tempo de espera bem maior no polling: processar vídeo demora bem mais que imagem.
@@ -253,6 +308,34 @@ async function publicarReels({ videoUrl, legenda, accessToken, accountId }) {
   return { id: publicado.id, link };
 }
 
+// Publica um Story (imagem, some em 24h) — usado pela Agenda de publicações quando o usuário
+// marca "Instagram Stories" em vez de (ou além de) "Instagram" (feed). Diferente do feed, a
+// API do Instagram NÃO aceita legenda em Story (não existe texto sobreposto via API) — o
+// campo é ignorado de propósito, mesmo que o post tenha texto preenchido.
+async function publicarStory({ imagemUrl, accessToken, accountId }) {
+  const token = accessToken || ACCESS_TOKEN;
+  const conta = accountId || ACCOUNT_ID;
+  const { status, json: container } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${conta}/media`,
+    { media_type: "STORIES", image_url: imagemUrl },
+    token
+  );
+  if (status >= 400) throw new Error(`Falha ao criar Story no Instagram: ${JSON.stringify(container)}`);
+
+  await aguardarContainerPronto(token, container.id);
+
+  const { status: s2, json: publicado } = await graphRequest(
+    "POST",
+    `/${GRAPH_VERSION}/${conta}/media_publish`,
+    { creation_id: container.id },
+    token
+  );
+  if (s2 >= 400) throw new Error(`Falha ao publicar Story no Instagram: ${JSON.stringify(publicado)}`);
+
+  return { id: publicado.id, link: null }; // Stories não têm permalink público via API
+}
+
 module.exports = {
   ACCOUNT_ID,
   sendDM,
@@ -265,5 +348,7 @@ module.exports = {
   getMensagensConversa,
   diagnostico,
   publicarImagem,
+  publicarCarrossel,
   publicarReels,
+  publicarStory,
 };

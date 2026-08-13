@@ -69,6 +69,31 @@ async function publicar({ texto, imagemUrl, link }, { token, paginaId }) {
   return { id: json.id, link: await buscarLink(token, json.id) };
 }
 
+// Publica um post de várias fotos na Página (o "carrossel" do Facebook) — usado pelo
+// Publique IV quando o conteúdo tem `imagemUrls` (array) em vez de uma `imagemUrl` só. Sobe
+// cada foto sem publicar (published:false, só reserva o ID) e depois cria o post no /feed
+// referenciando todas de uma vez via attached_media.
+async function publicarCarrossel({ texto, imagemUrls }, { token, paginaId }) {
+  if (!imagemUrls || imagemUrls.length < 2) throw new Error("Carrossel exige ao menos 2 imagens.");
+
+  const mediaIds = [];
+  for (const imagemUrl of imagemUrls) {
+    const { status, json } = await graphRequest(token, "POST", `/${GRAPH_VERSION}/${paginaId}/photos`, {
+      url: imagemUrl,
+      published: false,
+    });
+    if (status >= 400) throw new Error(`Falha ao subir foto do carrossel no Facebook: ${JSON.stringify(json)}`);
+    mediaIds.push(json.id);
+  }
+
+  const { status, json } = await graphRequest(token, "POST", `/${GRAPH_VERSION}/${paginaId}/feed`, {
+    message: texto || "",
+    attached_media: mediaIds.map((id) => ({ media_fbid: id })),
+  });
+  if (status >= 400) throw new Error(`Falha ao publicar carrossel no Facebook: ${JSON.stringify(json)}`);
+  return { id: json.id, link: await buscarLink(token, json.id) };
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -163,4 +188,4 @@ async function atualizarSobre(texto, { token, paginaId }) {
   return json;
 }
 
-module.exports = { publicar, publicarReels, atualizarCapa, atualizarFotoPerfil, atualizarSobre };
+module.exports = { publicar, publicarCarrossel, publicarReels, atualizarCapa, atualizarFotoPerfil, atualizarSobre };

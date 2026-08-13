@@ -256,6 +256,41 @@ navegação entre meses, seleção de dia, histórico com erros reais) — pegou
 real (histórico usava a função crua do banco em vez do wrapper que parseia `redes` pra
 array).
 
+## Carrossel (várias imagens deslizáveis)
+
+Adicionado 13/08/2026, pra publicar o carrossel "distribuição de lucros 2026" (10 imagens
+prontas em `felizcred-site/logo/reels/`). `publicarEmTodos()` aceita `imagemUrls` (array, 2+
+imagens) além do `imagemUrl` único de sempre — quando vem `imagemUrls`, cada adaptador decide
+se sabe publicar carrossel ou recusa com um erro claro (não faz sentido postar só o texto
+numa rede que não suporta o formato pedido).
+
+**Suportam carrossel**: Instagram (`publicarCarrossel()` em `instagram.js` — até 10 imagens),
+Facebook (`publicarCarrossel()` em `facebook.js` — sobe cada foto `published:false` e cria o
+post via `attached_media`, sem limite fixo documentado), Threads (`publicarCarrossel()` em
+`threads.js` — até 20 imagens). **Não suportam**: Instagram Stories (formato de uma imagem só,
+sem swipe entre várias), X/Twitter (não implementado neste sistema) e LinkedIn (esse já não
+sobe imagem nenhuma, ver tabela acima) — nesses o adaptador lança erro em vez de publicar o
+post sem imagem.
+
+**Gotcha do Threads**: diferente do Instagram, o Threads recusa o container "pai" (`media_type
+CAROUSEL`) se algum item filho ainda não tiver terminado de processar — dá erro "children
+inválidos/inexistentes". `threads.js` espera cada filho ficar `FINISHED`
+(`aguardarContainerPronto`) antes de seguir pro próximo, um por um; o Instagram não precisa
+disso (aceita children ainda processando).
+
+**Como qualquer adaptador recebe as imagens**: mesmo padrão do resto do Publique IV — precisa
+de URLs públicas que a Meta consiga buscar. Pra publicar o carrossel de lucros 2026 não passou
+pelo painel (upload de várias imagens de uma vez ainda não tem UI própria) — foi um script
+único, direto no Node, que subiu as 10 imagens pro mesmo bucket R2 dos Reels/Agenda (prefixo
+`temp-publish/`, apagado do R2 logo depois de publicar) e chamou `publique.publicarEmTodos()`
+com `imagemUrls`. Se carrossel virar algo recorrente, vale construir upload múltiplo no
+painel reaproveitando esse mesmo prefixo R2 — não foi feito ainda porque não foi pedido.
+
+**Publicado ao vivo em 13/08/2026** (carrossel real "A distribuição de lucros mudou em
+2026", Lei nº 15.270/2025): Instagram e Facebook publicaram de primeira; Threads falhou uma
+vez com o gotcha acima, corrigido e publicado com sucesso na segunda tentativa. X/Twitter e
+LinkedIn ficaram de fora (sem credencial o primeiro, sem suporte a imagem o segundo).
+
 ## Contas — como adicionar uma nova
 
 Todo o roteamento de "qual credencial usar" mora num único lugar: o array `CONTAS` no topo
