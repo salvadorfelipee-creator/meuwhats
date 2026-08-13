@@ -168,7 +168,18 @@
   }
 
   /* ── Modal envio em massa ─────────────────────────────────── */
-  #modal-massa, #modal-respostas-prontas { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 10; }
+  #modal-massa, #modal-respostas-prontas, #modal-ajustar-imagem { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); align-items: center; justify-content: center; z-index: 10; }
+  .ajustar-frame {
+    position: relative; overflow: hidden; background: #000; border-radius: 6px;
+    touch-action: none; cursor: grab; user-select: none;
+  }
+  .ajustar-frame:active { cursor: grabbing; }
+  .ajustar-frame img { position: absolute; top: 0; left: 0; max-width: none; pointer-events: none; }
+  .crop-preview-item { cursor: pointer; }
+  .crop-preview-item .crop-preview-ajustado-selo {
+    position: absolute; top: 3px; left: 3px; background: rgba(30,142,62,0.85); color: #fff;
+    font-size: 9px; font-weight: 800; border-radius: 4px; padding: 1px 4px;
+  }
   .modal-conteudo { background: var(--card); border-radius: 12px; padding: 20px 24px; width: 480px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
   .modal-conteudo h3 { margin: 0 0 14px; }
   .modal-conteudo label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
@@ -253,6 +264,15 @@
   }
   .rede-chip.desabilitada { opacity: 0.45; cursor: not-allowed; }
   .rede-chip.marcada { border-color: transparent; color: var(--text); background: var(--accent-soft); }
+
+  .data-chip {
+    display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); font-size: 12.5px; font-weight: 600;
+  }
+  .data-chip button {
+    border: none; background: rgba(0,0,0,0.12); color: inherit; width: 18px; height: 18px;
+    border-radius: 50%; cursor: pointer; font-size: 10px; line-height: 1; display:flex; align-items:center; justify-content:center;
+  }
   .rede-icone.rede-instagram { background: linear-gradient(45deg,#f9ce34,#ee2a7b 45%,#6228d7); }
   .rede-icone.rede-instagram_story { background: linear-gradient(45deg,#f9ce34,#ee2a7b 45%,#6228d7); font-size: 8.5px; }
   .rede-icone.rede-facebook { background: #1877F2; }
@@ -277,6 +297,8 @@
   .resultado-item a:hover { text-decoration: underline; }
 
   .cal-wrap { max-width: 360px; }
+  .cal-mes-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .cal-mes-nav #agenda-mes-label { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: var(--text); }
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
   .cal-dow { text-align: center; font-size: 9.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; padding-bottom: 3px; }
   .cal-dia {
@@ -568,7 +590,22 @@
           </div>
 
           <label>Agendar para (opcional — deixe em branco pra publicar agora)</label>
-          <input type="datetime-local" id="pub-data" />
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="datetime-local" id="pub-data" style="flex:1;" />
+            <button type="button" id="pub-data-adicionar" class="btn-secundario" title="Adicionar essa data à lista abaixo, pra repetir o mesmo post em vários dias">+ Adicionar à lista</button>
+          </div>
+
+          <div id="pub-datas-repetir-wrap" style="margin-top:8px;">
+            <button type="button" id="pub-datas-repetir-toggle" class="btn-secundario" style="font-size:12px;">🔁 Repetir em vários dias...</button>
+            <div id="pub-datas-repetir-form" style="display:none; margin-top:8px; padding:10px; background:var(--bg); border-radius:8px; font-size:12.5px;">
+              A partir da data acima, repetir a cada
+              <input type="number" id="pub-datas-repetir-intervalo" value="2" min="1" style="width:50px; display:inline-block;" /> dia(s),
+              <input type="number" id="pub-datas-repetir-qtd" value="5" min="2" max="60" style="width:50px; display:inline-block;" /> vez(es).
+              <button type="button" id="pub-datas-repetir-gerar" class="btn-secundario" style="margin-left:6px;">Gerar datas</button>
+            </div>
+          </div>
+
+          <div id="pub-datas-lista" class="rede-chips" style="margin-top:8px;"></div>
 
           <div style="display:flex; gap:10px; margin-top:8px;">
             <button id="pub-publicar" class="btn-publicar" type="button" style="margin-top:0;">Publicar agora</button>
@@ -628,15 +665,15 @@
           nas redes marcadas, na hora certa — pode agendar quantos quiser, sem limite.
         </div>
 
-        <h4 style="margin:14px 0 8px; display:flex; align-items:center; justify-content:space-between;">
-          <span>Fila (pendentes)</span>
-          <div style="display:flex; align-items:center; gap:10px; font-weight:400;">
+        <h4 style="margin:14px 0 8px;">Fila (pendentes)</h4>
+        <div class="cal-wrap">
+          <div class="cal-mes-nav">
             <button type="button" id="agenda-mes-anterior" class="cal-nav-botao">‹</button>
-            <span id="agenda-mes-label" style="min-width:130px; text-align:center; font-size:13px; color:var(--text-muted);"></span>
+            <span id="agenda-mes-label"></span>
             <button type="button" id="agenda-mes-proximo" class="cal-nav-botao">›</button>
           </div>
-        </h4>
-        <div id="agenda-calendario" class="cal-wrap">Carregando...</div>
+          <div id="agenda-calendario">Carregando...</div>
+        </div>
         <div id="agenda-dia-detalhe" style="margin-top:14px;"></div>
 
         <h4 style="margin:20px 0 8px;">Histórico recente</h4>
@@ -725,6 +762,28 @@
     <div class="modal-botoes">
       <button id="rp-fechar" type="button">Fechar</button>
       <button id="rp-adicionar" type="button">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-ajustar-imagem">
+  <div class="modal-conteudo" style="width:380px;">
+    <h3 id="ajustar-titulo">Ajustar imagem</h3>
+    <div style="font-size:12px; color:var(--text-muted); margin-top:-8px; margin-bottom:10px;">
+      Arraste a imagem pra posicionar o que quer mostrar dentro do quadro — igual no app do
+      celular. Use o zoom pra aproximar.
+    </div>
+    <div style="display:flex; justify-content:center;">
+      <div class="ajustar-frame" id="ajustar-frame">
+        <img id="ajustar-img" draggable="false" />
+      </div>
+    </div>
+    <label>Zoom</label>
+    <input type="range" id="ajustar-zoom" min="100" max="300" value="100" style="width:100%;" />
+    <div class="modal-botoes">
+      <button id="ajustar-remover" type="button" style="background:transparent; color:#c0392b; box-shadow:inset 0 0 0 1px #c0392b;">Remover ajuste</button>
+      <button id="ajustar-cancelar" type="button">Cancelar</button>
+      <button id="ajustar-salvar" type="button">Salvar ajuste</button>
     </div>
   </div>
 </div>
@@ -1580,6 +1639,10 @@ let contasPublicar = [];
 // Facebook/Threads/LinkedIn). Instagram Stories e X/Twitter não aceitam carrossel — o
 // servidor recusa com um erro claro se tentar (ver publique.js).
 let pubImagens = [];
+// { rede: dataURL } — versão reenquadrada manualmente (arrastar/zoom) pra uma rede
+// específica, quando o corte automático não serve (ex. Stories 9:16 cortando o texto do
+// criativo). Só se aplica com exatamente 1 imagem (não em carrossel).
+let pubAjustesPorRede = {};
 const REDES_INFO = {
   instagram: { label: "Instagram", sigla: "IG" },
   instagram_story: { label: "Instagram Stories", sigla: "IG●" },
@@ -1621,6 +1684,19 @@ function atualizarPreviaCortes() {
   const imgRatio = imgEl.naturalWidth / imgEl.naturalHeight;
   div.innerHTML = redes
     .map((rede) => {
+      const info = REDES_INFO[rede] || { label: rede };
+      // Ajustado manualmente (arrastou/deu zoom) — mostra a imagem já pronta, sem faixa
+      // vermelha, com um selo verde. Clicar de novo abre o editor pra refazer.
+      if (pubAjustesPorRede[rede]) {
+        return `<div class="crop-preview-item" onclick="abrirAjusteImagem('${rede}')">
+          <div class="crop-preview-frame" style="aspect-ratio:${RATIO_REDES[rede]};">
+            <img src="${pubAjustesPorRede[rede]}" style="width:100%;height:100%;object-fit:cover;" />
+            <span class="crop-preview-ajustado-selo">✏️ ajustado</span>
+          </div>
+          <div class="crop-preview-label">${escapeHtml(info.label)} ✅</div>
+        </div>`;
+      }
+
       const alvo = RATIO_REDES[rede];
       let corteLateralPct = 0;
       let corteVerticalPct = 0;
@@ -1638,8 +1714,7 @@ function atualizarPreviaCortes() {
           ? `<div class="crop-preview-cut" style="left:0;right:0;top:0;height:${corteVerticalPct}%;"></div>
              <div class="crop-preview-cut" style="left:0;right:0;bottom:0;height:${corteVerticalPct}%;"></div>`
           : "";
-      const info = REDES_INFO[rede] || { label: rede };
-      return `<div class="crop-preview-item">
+      return `<div class="crop-preview-item" onclick="abrirAjusteImagem('${rede}')" title="Clique pra ajustar/reposicionar">
         <div class="crop-preview-frame" style="aspect-ratio:${imgEl.naturalWidth}/${imgEl.naturalHeight};">
           <img src="${pubImagens[0]}" />
           ${faixas}
@@ -1649,6 +1724,126 @@ function atualizarPreviaCortes() {
     })
     .join("");
 }
+
+// ─ Editor de ajuste de imagem (arrastar + zoom) por rede ─
+let ajusteAtual = null; // { rede, frameW, frameH, naturalW, naturalH, baseScale, scale, offsetX, offsetY }
+let ajusteArrastando = null;
+
+function abrirAjusteImagem(rede) {
+  if (pubImagens.length !== 1) return; // só faz sentido com 1 imagem (não em carrossel)
+  const alvo = RATIO_REDES[rede];
+  if (!alvo) return;
+
+  const frame = document.getElementById("ajustar-frame");
+  const ladoMax = 280;
+  const frameW = alvo >= 1 ? ladoMax : Math.round(ladoMax * alvo);
+  const frameH = alvo >= 1 ? Math.round(ladoMax / alvo) : ladoMax;
+  frame.style.width = frameW + "px";
+  frame.style.height = frameH + "px";
+
+  const imgEl = document.getElementById("ajustar-img");
+  imgEl.onload = () => {
+    const naturalW = imgEl.naturalWidth;
+    const naturalH = imgEl.naturalHeight;
+    const baseScale = Math.max(frameW / naturalW, frameH / naturalH);
+    ajusteAtual = {
+      rede, frameW, frameH, naturalW, naturalH, baseScale, scale: baseScale,
+      offsetX: (frameW - naturalW * baseScale) / 2,
+      offsetY: (frameH - naturalH * baseScale) / 2,
+    };
+    document.getElementById("ajustar-zoom").value = 100;
+    renderizarAjusteImg();
+  };
+  imgEl.src = pubImagens[0]; // sempre parte da imagem original, não de um ajuste salvo antes
+
+  const info = REDES_INFO[rede] || { label: rede };
+  document.getElementById("ajustar-titulo").textContent = `Ajustar imagem — ${info.label}`;
+  document.getElementById("ajustar-remover").style.display = pubAjustesPorRede[rede] ? "inline-block" : "none";
+  document.getElementById("modal-ajustar-imagem").style.display = "flex";
+}
+
+function fecharAjusteImagem() {
+  document.getElementById("modal-ajustar-imagem").style.display = "none";
+  ajusteAtual = null;
+  ajusteArrastando = null;
+}
+
+function renderizarAjusteImg() {
+  const a = ajusteAtual;
+  if (!a) return;
+  const img = document.getElementById("ajustar-img");
+  img.style.width = a.naturalW * a.scale + "px";
+  img.style.height = a.naturalH * a.scale + "px";
+  img.style.transform = `translate(${a.offsetX}px, ${a.offsetY}px)`;
+}
+
+function ajusteClamparOffset() {
+  const a = ajusteAtual;
+  const minX = a.frameW - a.naturalW * a.scale;
+  const minY = a.frameH - a.naturalH * a.scale;
+  a.offsetX = Math.min(0, Math.max(minX, a.offsetX));
+  a.offsetY = Math.min(0, Math.max(minY, a.offsetY));
+}
+
+const ajustarFrameEl = document.getElementById("ajustar-frame");
+ajustarFrameEl.addEventListener("pointerdown", (e) => {
+  if (!ajusteAtual) return;
+  ajusteArrastando = { x: e.clientX, y: e.clientY, offsetX: ajusteAtual.offsetX, offsetY: ajusteAtual.offsetY };
+  ajustarFrameEl.setPointerCapture(e.pointerId);
+});
+ajustarFrameEl.addEventListener("pointermove", (e) => {
+  if (!ajusteArrastando || !ajusteAtual) return;
+  ajusteAtual.offsetX = ajusteArrastando.offsetX + (e.clientX - ajusteArrastando.x);
+  ajusteAtual.offsetY = ajusteArrastando.offsetY + (e.clientY - ajusteArrastando.y);
+  ajusteClamparOffset();
+  renderizarAjusteImg();
+});
+ajustarFrameEl.addEventListener("pointerup", () => { ajusteArrastando = null; });
+ajustarFrameEl.addEventListener("pointercancel", () => { ajusteArrastando = null; });
+
+document.getElementById("ajustar-zoom").addEventListener("input", (e) => {
+  const a = ajusteAtual;
+  if (!a) return;
+  const escalaAnterior = a.scale;
+  a.scale = a.baseScale * (Number(e.target.value) / 100);
+  // mantém o centro do quadro fixo ao mudar o zoom, em vez de sempre puxar pro canto
+  const cx = a.frameW / 2;
+  const cy = a.frameH / 2;
+  const relX = (cx - a.offsetX) / escalaAnterior;
+  const relY = (cy - a.offsetY) / escalaAnterior;
+  a.offsetX = cx - relX * a.scale;
+  a.offsetY = cy - relY * a.scale;
+  ajusteClamparOffset();
+  renderizarAjusteImg();
+});
+
+document.getElementById("ajustar-cancelar").addEventListener("click", fecharAjusteImagem);
+
+document.getElementById("ajustar-remover").addEventListener("click", () => {
+  if (ajusteAtual) delete pubAjustesPorRede[ajusteAtual.rede];
+  fecharAjusteImagem();
+  atualizarPreviaCortes();
+});
+
+document.getElementById("ajustar-salvar").addEventListener("click", () => {
+  const a = ajusteAtual;
+  if (!a) return;
+  const escalaSaida = 1080 / Math.max(a.frameW, a.frameH);
+  const outputW = Math.round(a.frameW * escalaSaida);
+  const outputH = Math.round(a.frameH * escalaSaida);
+  const canvas = document.createElement("canvas");
+  canvas.width = outputW;
+  canvas.height = outputH;
+  const ctx = canvas.getContext("2d");
+  const sx = -a.offsetX / a.scale;
+  const sy = -a.offsetY / a.scale;
+  const sw = a.frameW / a.scale;
+  const sh = a.frameH / a.scale;
+  ctx.drawImage(document.getElementById("ajustar-img"), sx, sy, sw, sh, 0, 0, outputW, outputH);
+  pubAjustesPorRede[a.rede] = canvas.toDataURL("image/jpeg", 0.9);
+  fecharAjusteImagem();
+  atualizarPreviaCortes();
+});
 
 async function carregarContasPublicar() {
   const res = await fetch("/painel/api/publicar/contas");
@@ -1730,6 +1925,8 @@ function renderizarUploadZona() {
   const thumbsRow = document.getElementById("pub-upload-thumbs");
   const addBtn = document.getElementById("pub-upload-adicionar");
 
+  if (pubImagens.length !== 1) pubAjustesPorRede = {}; // só fazem sentido com exatamente 1 imagem
+
   if (pubImagens.length === 0) {
     zona.style.display = "";
     vazio.style.display = "block";
@@ -1803,6 +2000,7 @@ pubUploadZone.addEventListener("drop", (e) => {
 document.getElementById("pub-upload-remover").addEventListener("click", (e) => {
   e.stopPropagation();
   pubImagens = [];
+  pubAjustesPorRede = {}; // ajustes eram específicos dessa imagem, não fazem sentido pra outra
   renderizarUploadZona();
 });
 document.getElementById("pub-upload-adicionar").addEventListener("click", () => pubUploadInput.click());
@@ -1847,11 +2045,16 @@ document.getElementById("pub-texto").addEventListener("input", () => {
   atualizarPreview();
 });
 
-// 1 imagem manda "imagemBase64" (formato de sempre); 2+ manda "imagensBase64" (vira
-// carrossel no servidor — ver publique.js/agenda.js). Usado tanto no publicar quanto no agendar.
+// 1 imagem manda "imagemBase64" (formato de sempre, + "imagensBase64PorRede" se tiver algum
+// ajuste manual salvo); 2+ manda "imagensBase64" (vira carrossel no servidor — ver
+// publique.js/agenda.js). Usado tanto no publicar quanto no agendar.
 function payloadImagens() {
   if (pubImagens.length > 1) return { imagensBase64: pubImagens };
-  if (pubImagens.length === 1) return { imagemBase64: pubImagens[0] };
+  if (pubImagens.length === 1) {
+    const payload = { imagemBase64: pubImagens[0] };
+    if (Object.keys(pubAjustesPorRede).length) payload.imagensBase64PorRede = pubAjustesPorRede;
+    return payload;
+  }
   return {};
 }
 
@@ -1904,15 +2107,76 @@ document.getElementById("pub-publicar").addEventListener("click", async () => {
   }
 });
 
+// ─ Agendar o MESMO post em vários dias de uma vez (sem re-selecionar a imagem cada vez) ─
+// Lista de datas montada à parte do campo "Agendar para": ou vai adicionando uma a uma
+// ("+ Adicionar à lista"), ou usa "Repetir em vários dias" pra gerar várias de uma vez a
+// partir de um intervalo (ex. a cada 2 dias, 10 vezes). Se a lista estiver vazia, o botão
+// "Agendar" usa só o valor do campo (comportamento de sempre, sem mudança).
+let pubDatasExtras = [];
+
+function formatarDataHoraDeInput(valor) {
+  const [dataParte, horaParte] = valor.split("T");
+  const [, mes, dia] = dataParte.split("-");
+  return `${dia}/${mes} ${horaParte}`;
+}
+
+function renderizarDatasExtras() {
+  const div = document.getElementById("pub-datas-lista");
+  div.innerHTML = pubDatasExtras
+    .map((d, i) => `<div class="data-chip">📅 ${formatarDataHoraDeInput(d)}<button type="button" onclick="removerDataExtra(${i})">✕</button></div>`)
+    .join("");
+  document.getElementById("pub-agendar").textContent = pubDatasExtras.length > 1 ? `📅 Agendar (${pubDatasExtras.length})` : "📅 Agendar";
+}
+
+function removerDataExtra(indice) {
+  pubDatasExtras.splice(indice, 1);
+  renderizarDatasExtras();
+}
+
+document.getElementById("pub-data-adicionar").addEventListener("click", () => {
+  const valor = document.getElementById("pub-data").value;
+  if (!valor) return alert('Escolha o dia e a hora no campo "Agendar para" primeiro.');
+  if (!pubDatasExtras.includes(valor)) pubDatasExtras.push(valor);
+  pubDatasExtras.sort();
+  document.getElementById("pub-data").value = "";
+  renderizarDatasExtras();
+});
+
+document.getElementById("pub-datas-repetir-toggle").addEventListener("click", () => {
+  const form = document.getElementById("pub-datas-repetir-form");
+  form.style.display = form.style.display === "none" ? "block" : "none";
+});
+
+document.getElementById("pub-datas-repetir-gerar").addEventListener("click", () => {
+  const base = document.getElementById("pub-data").value;
+  if (!base) return alert('Preencha o dia e a hora inicial no campo "Agendar para" primeiro.');
+  const [dataParte, horaParte] = base.split("T");
+  const [ano, mes, dia] = dataParte.split("-").map(Number);
+  const intervaloDias = Math.max(1, Number(document.getElementById("pub-datas-repetir-intervalo").value) || 1);
+  const qtd = Math.max(2, Math.min(60, Number(document.getElementById("pub-datas-repetir-qtd").value) || 2));
+  const p = (n) => String(n).padStart(2, "0");
+  for (let i = 0; i < qtd; i++) {
+    const d = new Date(ano, mes - 1, dia + i * intervaloDias);
+    const valor = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${horaParte}`;
+    if (!pubDatasExtras.includes(valor)) pubDatasExtras.push(valor);
+  }
+  pubDatasExtras.sort();
+  document.getElementById("pub-data").value = "";
+  document.getElementById("pub-datas-repetir-form").style.display = "none";
+  renderizarDatasExtras();
+});
+
 // Mesmo formulário do "Publicar agora" acima, mas manda pra fila da agenda em vez de
-// publicar na hora — usa o campo "Agendar para". Depois de agendar, limpa o formulário (texto
-// + imagem) pra já deixar pronto pro próximo post, já que a ideia é criar vários seguidos.
+// publicar na hora — usa o campo "Agendar para" (ou a lista de datas, se tiver alguma).
+// Depois de agendar, limpa o formulário (texto + imagem + datas) pra já deixar pronto pro
+// próximo post, já que a ideia é criar vários seguidos.
 document.getElementById("pub-agendar").addEventListener("click", async () => {
   const contaId = document.getElementById("pub-conta").value;
   const texto = document.getElementById("pub-texto").value.trim();
   const link = document.getElementById("pub-link").value.trim();
   const redes = redesMarcadas();
-  const data = document.getElementById("pub-data").value;
+  const dataCampo = document.getElementById("pub-data").value;
+  const datas = pubDatasExtras.length ? pubDatasExtras.slice() : dataCampo ? [dataCampo] : [];
   const resDiv = document.getElementById("pub-resultado");
   const botao = document.getElementById("pub-agendar");
 
@@ -1924,38 +2188,52 @@ document.getElementById("pub-agendar").addEventListener("click", async () => {
     resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Marque ao menos uma rede.</span></div>`;
     return;
   }
-  if (!data) {
-    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Escolha o dia e a hora em "Agendar para" (ou use "Publicar agora" pra sair na hora).</span></div>`;
+  if (!datas.length) {
+    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">Escolha o dia e a hora em "Agendar para" (ou adicione datas à lista) — ou use "Publicar agora" pra sair na hora.</span></div>`;
     return;
   }
 
   botao.disabled = true;
-  botao.textContent = "Agendando...";
   resDiv.innerHTML = "";
-  try {
-    const res = await fetch("/painel/api/agenda", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contaId, texto, link, redes, data, ...payloadImagens() }),
-    });
-    const respData = await res.json();
-    if (respData.error) {
-      resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(respData.error)}</span></div>`;
-      return;
+  const payloadBase = { contaId, texto, link, redes, ...payloadImagens() };
+  const resultadosDatas = [];
+  for (let i = 0; i < datas.length; i++) {
+    botao.textContent = datas.length > 1 ? `Agendando ${i + 1}/${datas.length}...` : "Agendando...";
+    try {
+      const res = await fetch("/painel/api/agenda", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payloadBase, data: datas[i] }),
+      });
+      const respData = await res.json();
+      resultadosDatas.push(
+        respData.error ? { ok: false, data: datas[i], erro: respData.error } : { ok: true, agendadoPara: respData.agendadoPara }
+      );
+    } catch (err) {
+      resultadosDatas.push({ ok: false, data: datas[i], erro: err.message });
     }
-    resDiv.innerHTML = `<div class="resultado-item ok"><span class="status">Agendado pra ${formatarDataHora(respData.agendadoPara)} ✅ — já apareceu na Agenda de publicações, abaixo.</span></div>`;
+  }
+
+  resDiv.innerHTML = resultadosDatas
+    .map((r) =>
+      r.ok
+        ? `<div class="resultado-item ok"><span class="status">Agendado pra ${formatarDataHora(r.agendadoPara)} ✅</span></div>`
+        : `<div class="resultado-item erro"><span class="status">${formatarDataHoraDeInput(r.data)}: ${escapeHtml(r.erro)}</span></div>`
+    )
+    .join("");
+
+  if (resultadosDatas.some((r) => r.ok)) {
     // Limpa o formulário pra já deixar pronto pro próximo post (mantém conta e redes marcadas).
     document.getElementById("pub-texto").value = "";
     document.getElementById("pub-link").value = "";
     document.getElementById("pub-data").value = "";
     document.getElementById("pub-upload-remover").click();
+    pubDatasExtras = [];
+    renderizarDatasExtras();
     carregarAgenda();
-  } catch (err) {
-    resDiv.innerHTML = `<div class="resultado-item erro"><span class="status">${escapeHtml(err.message)}</span></div>`;
-  } finally {
-    botao.disabled = false;
-    botao.textContent = "📅 Agendar";
   }
+  botao.disabled = false;
+  if (!pubDatasExtras.length) botao.textContent = "📅 Agendar";
 });
 
 document.getElementById("perfil-fb-salvar").addEventListener("click", async () => {
