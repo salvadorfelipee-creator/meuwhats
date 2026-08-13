@@ -38,9 +38,13 @@ passos manuais:
    pro fluxo completo de sourcing. Resumo: toda foto usada vira dois lugares
    — `background-image` no `.card-thumb.photo` do card em `blog/index.html`,
    e `<img class="featured-img">` dentro de `.featured-img-wrap`, logo no
-   início do `<article class="article-body">` do post. Reveja
-   `img/blog/*.webp` antes de baixar uma nova — pode já existir uma que sirva
-   pro assunto.
+   início do `<article class="article-body">` do post. **Cada assunto tem
+   sua própria foto** — só reaproveitar uma foto existente se o post novo for
+   literalmente o par PF/PJ do mesmo assunto (ex: CBS pessoa física/jurídica
+   com a mesma `moeda-real.webp`). Pra qualquer assunto diferente, sempre
+   buscar uma foto nova no Pixabay, mesmo que o tema pareça parecido (ex:
+   "dinheiro" não é motivo pra reusar a mesma foto entre posts sobre
+   assuntos financeiros diferentes).
 
    **3c. Dados estruturados (JSON-LD)** — três blocos `<script
    type="application/ld+json">` no `<head>`: `Article` (headline/description/

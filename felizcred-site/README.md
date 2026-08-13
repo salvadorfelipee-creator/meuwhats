@@ -154,13 +154,17 @@ ter uma foto real. Fluxo usado (repita pra cada post novo):
    `<article class="article-body">` de cada post (banner full-width, 280px
    de altura, `object-fit:cover`).
 
-Uma mesma foto pode ser reaproveitada entre o par PF/PJ do mesmo assunto
-(ex: `moeda-real.webp` nos dois posts de CBS) — o que diferencia
-visualmente é o título e a cor da badge, não precisa foto exclusiva por
-página. Fotos já disponíveis: `congresso-nacional.webp` (Reforma Tributária/
-hub), `moeda-real.webp` (CBS), `mercado-prateleira.webp` (IBS),
+Uma mesma foto pode ser reaproveitada **só entre o par PF/PJ do mesmo
+assunto** (ex: `moeda-real.webp` nos dois posts de CBS, que são a mesma
+notícia em duas versões) — o que diferencia visualmente é o título e a cor
+da badge. **Não reaproveitar entre assuntos diferentes** só porque o tema
+parece similar (ex: dois posts sobre dinheiro/imposto não-relacionados não
+devem usar a mesma foto) — buscar sempre uma foto nova e específica pro
+assunto nesse caso. Fotos já disponíveis: `congresso-nacional.webp` (Reforma
+Tributária/hub), `moeda-real.webp` (CBS), `mercado-prateleira.webp` (IBS),
 `poluicao-industrial.webp` (Imposto Seletivo), `pagamento-cartao.webp`
-(Split Payment) — reveja se alguma já serve antes de baixar uma nova.
+(Split Payment), `moedas-reais.webp` (Abono Salarial — moedas e notas
+pequenas, composição diferente de `moeda-real.webp`).
 
 ## Rastreamento por IA (`robots.txt` + `llms.txt`)
 
