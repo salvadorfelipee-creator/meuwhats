@@ -17,6 +17,15 @@ async function enviarImagem(buffer, nomeArquivo, contentType) {
   return key;
 }
 
+// Carrossel — mesma ideia, várias imagens do mesmo post agendado, uma key por imagem.
+async function enviarImagens(imagens) {
+  const keys = [];
+  for (const img of imagens) {
+    keys.push(await enviarImagem(img.buffer, img.nomeArquivo || "imagem.jpg", img.contentType));
+  }
+  return keys;
+}
+
 // dataHoraString no formato do <input type="datetime-local"> ("2026-08-20T09:30") — sempre
 // em horário local, nunca UTC (ver reels.js pra por que isso importa: toISOString() dá
 // timestamp errado).
@@ -28,15 +37,22 @@ function timestampDeDataHora(dataHoraString) {
 
 // Cria um post agendado — cada um tem seu próprio dia+hora exato, definido pelo usuário (não
 // tem "piloto automático" aqui como nos Reels, é sempre uma escolha explícita).
-async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, imagemBuffer, imagemNomeArquivo, imagemContentType }) {
-  if (!texto && !imagemBuffer) throw new Error("Informe ao menos um texto ou uma imagem.");
+// `imagens` (opcional): array de { buffer, nomeArquivo, contentType } — 2+ imagens vira
+// carrossel na hora de publicar. Se vier preenchido, tem prioridade sobre imagemBuffer único.
+async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, imagemBuffer, imagemNomeArquivo, imagemContentType, imagens }) {
+  if (!texto && !imagemBuffer && !(imagens && imagens.length)) throw new Error("Informe ao menos um texto ou uma imagem.");
   if (!redes || !redes.length) throw new Error("Marque ao menos uma rede.");
   const agendadoPara = timestampDeDataHora(dataHoraString);
 
   let imagemKey = null;
-  if (imagemBuffer) imagemKey = await enviarImagem(imagemBuffer, imagemNomeArquivo || "imagem.jpg", imagemContentType);
+  let imagemKeys = null;
+  if (imagens && imagens.length) {
+    imagemKeys = await enviarImagens(imagens);
+  } else if (imagemBuffer) {
+    imagemKey = await enviarImagem(imagemBuffer, imagemNomeArquivo || "imagem.jpg", imagemContentType);
+  }
 
-  const id = await db.agendaCriar({ contaId: contaId || "felizcred", texto, link, imagemKey, redes, agendadoPara });
+  const id = await db.agendaCriar({ contaId: contaId || "felizcred", texto, link, imagemKey, imagemKeys, redes, agendadoPara });
   return { id, agendadoPara };
 }
 
@@ -46,12 +62,17 @@ async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, i
 // evita o link expirar antes da hora marcada chegar).
 async function publicarAgendamento(item) {
   try {
-    const imagemUrl = item.imagem_key ? await r2.urlAssinada(item.imagem_key) : undefined;
+    const imagemKeys = item.imagem_keys ? JSON.parse(item.imagem_keys) : null;
+    const imagemUrls = imagemKeys && imagemKeys.length
+      ? await Promise.all(imagemKeys.map((key) => r2.urlAssinada(key)))
+      : undefined;
+    const imagemUrl = !imagemUrls && item.imagem_key ? await r2.urlAssinada(item.imagem_key) : undefined;
     const redes = JSON.parse(item.redes);
     const resultado = await publique.publicarEmTodos({
       contaId: item.conta_id,
       texto: item.texto,
       imagemUrl,
+      imagemUrls,
       link: item.link,
       redes,
     });
@@ -91,8 +112,12 @@ async function publicarAgoraEspecifico(id) {
 // imagem (gerar uma URL assinada é só uma assinatura criptográfica, não custa uma chamada de
 // rede — de sobra pra fazer isso pra cada item da lista).
 async function enriquecerItem(item) {
-  const imagemUrl = item.imagem_key ? await r2.urlAssinada(item.imagem_key, 3600) : null;
-  return { ...item, redes: JSON.parse(item.redes), imagemUrl };
+  const imagemKeys = item.imagem_keys ? JSON.parse(item.imagem_keys) : null;
+  const imagemUrls = imagemKeys && imagemKeys.length
+    ? await Promise.all(imagemKeys.map((key) => r2.urlAssinada(key, 3600)))
+    : null;
+  const imagemUrl = imagemUrls ? imagemUrls[0] : (item.imagem_key ? await r2.urlAssinada(item.imagem_key, 3600) : null);
+  return { ...item, redes: JSON.parse(item.redes), imagemUrl, imagemUrls };
 }
 
 async function listarFila() {
@@ -113,6 +138,9 @@ async function removerAgendamento(id) {
   const item = await db.agendaBuscarPorId(id);
   if (!item) throw new Error("Post não encontrado na agenda.");
   if (item.imagem_key) await r2.apagarVideo(item.imagem_key).catch(() => {});
+  if (item.imagem_keys) {
+    for (const key of JSON.parse(item.imagem_keys)) await r2.apagarVideo(key).catch(() => {});
+  }
   await db.agendaRemover(id);
 }
 
@@ -127,7 +155,10 @@ async function limparAntigas() {
   let apagadas = 0;
   for (const item of itens) {
     try {
-      await r2.apagarVideo(item.imagem_key);
+      if (item.imagem_key) await r2.apagarVideo(item.imagem_key);
+      if (item.imagem_keys) {
+        for (const key of JSON.parse(item.imagem_keys)) await r2.apagarVideo(key);
+      }
       await db.agendaMarcarImagemApagada(item.id);
       apagadas++;
     } catch (err) {

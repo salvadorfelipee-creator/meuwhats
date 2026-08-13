@@ -1887,6 +1887,10 @@ const server = http.createServer(async (req, res) => {
       try {
         let imagem = {};
         if (body.imagemBase64) imagem = decodificarImagemBase64(body.imagemBase64);
+        // imagensBase64 (array, 2+) = carrossel — tem prioridade sobre imagemBase64 único.
+        const imagens = Array.isArray(body.imagensBase64) && body.imagensBase64.length
+          ? body.imagensBase64.map((b64) => decodificarImagemBase64(b64))
+          : undefined;
         const criado = await agenda.criarAgendamento({
           contaId: body.contaId,
           texto: body.texto,
@@ -1896,6 +1900,7 @@ const server = http.createServer(async (req, res) => {
           imagemBuffer: imagem.buffer,
           imagemNomeArquivo: imagem.nomeArquivo,
           imagemContentType: imagem.contentType,
+          imagens,
         });
         return send(res, 200, criado);
       } catch (err) {
