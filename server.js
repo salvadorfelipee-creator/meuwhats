@@ -1777,6 +1777,26 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { resultados });
     }
 
+    // POST /painel/api/registrar-numero/:businessId — registro único de um número novo na
+    // Cloud API (depois de já verificado por SMS/ligação no Business Manager). Ação
+    // administrativa de uma vez só por número, não faz parte do fluxo normal do painel — sem
+    // botão na interface de propósito, chama direto via requisição autenticada.
+    const matchRegistrarNumero = path_.match(/^\/painel\/api\/registrar-numero\/([^/]+)$/);
+    if (req.method === "POST" && matchRegistrarNumero) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchRegistrarNumero[1]);
+      const body = await parseBody(req);
+      if (!body.pin || String(body.pin).length !== 6) {
+        return send(res, 400, { error: "Informe um PIN de 6 dígitos" });
+      }
+      try {
+        const result = await wa.registerNumber(businessId, body.pin);
+        return send(res, 200, { ok: true, result });
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+
     // POST /painel/api/instagram/importar-historico — importa as DMs que já existiam antes
     // da gravação automática via webhook começar (ver instagramImportarHistorico acima).
     // Idempotente — pode clicar de novo sem duplicar.

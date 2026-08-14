@@ -146,6 +146,26 @@ async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, c
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+// Registro único de um número novo na Cloud API — necessário depois de verificar o número
+// por SMS/ligação no Business Manager (aquele passo confirma que o número é seu; este aqui
+// ativa ele de fato pra mandar/receber mensagem pela API). `pin` é o PIN de verificação em
+// duas etapas que você escolhe agora e vai precisar de novo se registrar esse número em outro
+// lugar no futuro — guarde ele. Ação de uma vez só por número, não faz parte do fluxo normal
+// de mensagens.
+async function registerNumber(phoneNumberId, pin) {
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${phoneNumberId}/register`,
+    {
+      body: { messaging_product: "whatsapp", pin: String(pin) },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao registrar número: ${JSON.stringify(json)}`);
+  return json;
+}
+
 // Marca uma mensagem recebida como lida (dois tiques azuis pro cliente) — não falha o
 // processamento do webhook se der erro, só não fica marcado como lido pro cliente.
 async function markAsRead(fromPhoneNumberId, messageId) {
@@ -203,4 +223,13 @@ async function downloadMedia(mediaId) {
   return { buffer, mimeType: info.mime_type };
 }
 
-module.exports = { sendText, sendImage, sendButtons, sendList, sendTemplate, downloadMedia, markAsRead };
+module.exports = {
+  sendText,
+  sendImage,
+  sendButtons,
+  sendList,
+  sendTemplate,
+  registerNumber,
+  downloadMedia,
+  markAsRead,
+};
