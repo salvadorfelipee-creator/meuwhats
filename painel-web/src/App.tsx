@@ -1,6 +1,7 @@
 import * as React from "react"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
 import { ChannelProvider } from "@/lib/channel-context"
+import { UnreadProvider } from "@/lib/unread-context"
 import { SidebarProvider, SidebarInset } from "@/components/blocks/sidebar"
 import { AppSidebar, type Screen } from "@/components/app-sidebar"
 import { LoginPage } from "@/pages/login"
@@ -28,7 +29,9 @@ function Gate() {
   if (!authenticated) return <LoginPage />
   return (
     <ChannelProvider>
-      <Shell />
+      <UnreadProvider>
+        <Shell />
+      </UnreadProvider>
     </ChannelProvider>
   )
 }
