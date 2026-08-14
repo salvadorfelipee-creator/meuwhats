@@ -37,6 +37,17 @@ Guia completo sobre a Reforma Tributária brasileira do consumo (EC 132/2023, LC
 - [Split Payment para pessoa física](https://www.felizcred.com.br/blog/split-payment-pessoa-fisica): como funciona a divisão automática do imposto no pagamento eletrônico
 - [Split Payment para empresa (PJ)](https://www.felizcred.com.br/blog/split-payment-pessoa-juridica): simulador do impacto no fluxo de caixa
 
+## Crédito para negativados e alertas de golpe
+
+- [Negativado pode fazer consignado CLT?](https://www.felizcred.com.br/blog/negativado-emprestimo-consignado-clt): por que o desconto em folha dispensa análise de score
+- [FGTS pra negativado: sem consulta ao SPC/Serasa](https://www.felizcred.com.br/blog/fgts-negativado-sem-consulta-spc-serasa): como funciona a antecipação do saque-aniversário
+- [Golpe do empréstimo "aprovação garantida"](https://www.felizcred.com.br/blog/golpe-emprestimo-aprovacao-garantida-negativado): sinais de fraude e como identificar oferta legítima
+
+## Benefícios do trabalhador
+
+- [Seguro-Desemprego 2026](https://www.felizcred.com.br/blog/seguro-desemprego-2026-duvidas-comuns): quantas parcelas, quando cai e prazo de saque
+- [Auxílio-doença negado ou atrasado](https://www.felizcred.com.br/blog/auxilio-doenca-negado-atrasado-o-que-fazer): prazos do INSS e como recorrer
+
 ## Conteúdo educativo
 
 - [Blog](https://www.felizcred.com.br/blog/): artigos sobre direitos trabalhistas, FGTS, INSS, consignado e seguros
