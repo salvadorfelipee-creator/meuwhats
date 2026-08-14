@@ -5,6 +5,12 @@ const client = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+// Item travado em 'processing' por mais tempo que isso é considerado órfão (servidor caiu ou
+// foi redeployado no meio da publicação) e pode ser reclamado de novo pelo agendador — senão
+// ficaria pendurado pra sempre sem nunca sair nem aparecer como erro pra dar "Tentar de novo".
+// Usado tanto pelo agendaProximoDevido (posts) quanto pelo reelsProximoAgendadoDevido (vídeos).
+const PROCESSING_ORFAO_MS = 10 * 60 * 1000;
+
 function defaultBusinessNumberId() {
   if (process.env.PHONE_NUMBERS_JSON) {
     const list = JSON.parse(process.env.PHONE_NUMBERS_JSON);
@@ -174,6 +180,11 @@ const ready = (async () => {
     // publica na ordem normal da fila (piloto automático, N por dia).
     await client.execute(`ALTER TABLE reels_queue ADD COLUMN agendado_para INTEGER`);
   }
+  if (!infoReelsQueue.rows.some((r) => r.name === "claimed_at")) {
+    // Mesma trava anti-duplicata do posts_agendados (ver ali) — evita publicar o mesmo vídeo
+    // duas vezes se dois ticks do setInterval se sobrepuserem.
+    await client.execute(`ALTER TABLE reels_queue ADD COLUMN claimed_at INTEGER`);
+  }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS reels_config (
     chave TEXT PRIMARY KEY,
@@ -210,6 +221,13 @@ const ready = (async () => {
   // existe pra uma rede, vence a imagem padrão só naquela rede na hora de publicar.
   if (!colunasAgendados.includes("imagem_por_rede_keys")) {
     await client.execute(`ALTER TABLE posts_agendados ADD COLUMN imagem_por_rede_keys TEXT`);
+  }
+  // claimed_at — marca quando o agendador "reservou" o post pra publicar (status vira
+  // 'processing'). Sem isso, dois ticks do setInterval (a cada 60s) podiam pegar o MESMO post
+  // ainda 'pending' se a publicação anterior (upload de carrossel + várias redes) demorasse
+  // mais que 60s — resultado: post duplicado no Instagram. Ver agendaProximoDevido.
+  if (!colunasAgendados.includes("claimed_at")) {
+    await client.execute(`ALTER TABLE posts_agendados ADD COLUMN claimed_at INTEGER`);
   }
 })();
 
@@ -562,15 +580,30 @@ async function reelsProximosPendentes(quantidade) {
 
 // Vídeo com horário exato marcado cuja hora já chegou — checado a cada minuto pelo
 // agendador, furando a fila automática pra sair no horário certo (não só "algum dia depois
-// dessa data" — é o horário mesmo, com ~1min de margem).
+// dessa data" — é o horário mesmo, com ~1min de margem). Reserva o vídeo (status vira
+// 'processing') com a mesma trava anti-duplicata do agendaProximoDevido (ver ali) — sem isso,
+// se a publicação de um vídeo demorasse mais que o intervalo de 60s do agendador, o próximo
+// tick pegava o MESMO vídeo ainda 'pending' e postava de novo.
 async function reelsProximoAgendadoDevido() {
   await ready;
+  const agora = Date.now();
   const result = await client.execute({
-    sql: `SELECT * FROM reels_queue WHERE status = 'pending' AND agendado_para IS NOT NULL AND agendado_para <= ?
+    sql: `SELECT * FROM reels_queue
+          WHERE (status = 'pending' AND agendado_para IS NOT NULL AND agendado_para <= ?)
+             OR (status = 'processing' AND agendado_para IS NOT NULL AND claimed_at <= ?)
           ORDER BY agendado_para ASC LIMIT 1`,
-    args: [Date.now()],
+    args: [agora, agora - PROCESSING_ORFAO_MS],
   });
-  return result.rows[0] || null;
+  const item = result.rows[0];
+  if (!item) return null;
+
+  const claim = await client.execute({
+    sql: `UPDATE reels_queue SET status = 'processing', claimed_at = ? WHERE id = ? AND status = ?`,
+    args: [agora, item.id, item.status],
+  });
+  if (claim.rowsAffected === 0) return null; // outro tick já reservou esse vídeo primeiro
+
+  return item;
 }
 
 // Fila inteira de pendentes (não só os elegíveis agora) — pra mostrar no painel com data
@@ -708,15 +741,33 @@ async function agendaCriar({ contaId, texto, link, imagemKey, imagemKeys, imagem
 }
 
 // Próximo post cuja hora já chegou — checado a cada minuto pelo agendador (mesmo
-// mecanismo do reelsProximoAgendadoDevido, ver server.js).
+// mecanismo do reelsProximoAgendadoDevido, ver server.js). Reserva o post (status vira
+// 'processing') numa segunda query condicionada a `status ainda igual ao que a gente leu` —
+// isso garante que, mesmo se dois ticks do setInterval se sobrepuserem (publicação anterior
+// demorou mais que os 60s do intervalo), só um dos dois consegue reservar o mesmo post; o
+// outro recebe rowsAffected = 0 e desiste. Sem essa trava o mesmo post saía duplicado nas
+// redes (viu isso acontecer no Instagram em 2026-08-14).
 async function agendaProximoDevido() {
   await ready;
+  const agora = Date.now();
   const result = await client.execute({
-    sql: `SELECT * FROM posts_agendados WHERE status = 'pending' AND agendado_para <= ?
+    sql: `SELECT * FROM posts_agendados
+          WHERE (status = 'pending' AND agendado_para <= ?)
+             OR (status = 'processing' AND claimed_at <= ?)
           ORDER BY agendado_para ASC LIMIT 1`,
-    args: [Date.now()],
+    args: [agora, agora - PROCESSING_ORFAO_MS],
   });
-  return result.rows[0] || null;
+  const item = result.rows[0];
+  if (!item) return null;
+
+  const claim = await client.execute({
+    sql: `UPDATE posts_agendados SET status = 'processing', claimed_at = ?
+          WHERE id = ? AND status = ?`,
+    args: [agora, item.id, item.status],
+  });
+  if (claim.rowsAffected === 0) return null; // outro tick já reservou esse post primeiro
+
+  return item;
 }
 
 // Fila inteira de pendentes, mais próximos primeiro — pra mostrar no painel como um
