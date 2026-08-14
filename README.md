@@ -236,6 +236,33 @@ No Gerenciador do WhatsApp (business.facebook.com → Contas do WhatsApp → esc
 ⚠️ Cada número de WhatsApp Business tem um **limite diário de mensagens iniciadas** (cresce
 conforme a "qualidade"/uso do número — começa em 250/dia). Evite listas gigantes de uma vez só.
 
+### 3. Botões do template abrindo um fluxo automático próprio
+
+Cada template pode ter até 3 botões de resposta rápida. Quando a pessoa clica, a Meta manda
+o texto do botão pro webhook — o servidor casa esse texto (sem acento/maiúscula) no mapa
+`RESPOSTAS_BOTAO` (`server.js`) e manda a resposta automática correspondente. Opcionalmente,
+a entrada pode ter um `passo`, que marca a conversa nesse passo do fluxo pra a próxima
+mensagem de texto da pessoa cair num `capturaTexto` dedicado — em vez de ficar solta sem
+automação, ou pior, colidir com o fluxo do menu principal.
+
+**Importante**: cada template novo precisa de textos de botão **diferentes** dos já usados
+por outros templates. Se dois templates reusassem "QUERO SABER MAIS", não daria pra saber
+qual campanha originou o clique — as duas cairiam na mesma resposta.
+
+Exemplo já implementado — template `parcela_clt_disponivel` (campanha com o valor da parcela
+em `{{1}}`, sem nome, pra listas de leads com parcela já calculada em outra instituição):
+
+- **Categoria**: Marketing
+- **Corpo**: `Você tem uma parcela de consignado CLT disponível de R$ {{1}}. Fale com a gente para saber mais!`
+- **Botões**: `QUERO SIMULAR` (leva pro passo `parcela_clt_dados`, que pede nome/CPF/telefone/
+  e-mail/data de nascimento e confirma assim que reconhece um CPF na resposta) e
+  `NÃO TENHO INTERESSE` (só agradece, sem marcar passo — fluxo termina ali)
+- **Contatos no painel**: `telefone,valor da parcela` — ex. `5511999999999,180,77` (o parsing
+  do painel só quebra na primeira vírgula, então valor com vírgula decimal funciona direto)
+
+Esse template ainda precisa ser criado manualmente no Gerenciador do WhatsApp (passo 1 acima)
+e aprovado pela Meta antes do primeiro envio — o código já está pronto esperando por ele.
+
 ---
 
 ## Atendimento automático com botões (WhatsApp)

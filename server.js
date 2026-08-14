@@ -268,12 +268,31 @@ function normalizar(s) {
     .trim();
 }
 
-// Respostas automáticas para os botões de resposta rápida do template aviso_taxa_clt
+// Respostas automáticas para os botões de resposta rápida dos templates de campanha.
+// `passo` (opcional) marca a conversa nesse passo do fluxo pra a próxima mensagem de texto
+// da pessoa cair num capturaTexto dedicado (ver FLUXO_FELIZCRED.capturaTexto), em vez de
+// ficar solta sem automação. Chaves de templates diferentes usam textos de botão diferentes
+// de propósito — se dois templates reusassem "QUERO SABER MAIS", não daria pra saber qual
+// campanha originou o clique, e as duas cairiam na mesma resposta/fluxo aqui.
 const RESPOSTAS_BOTAO = {
-  "quero saber mais":
-    "Para simular o consignado CLT precisamos de alguns dados para gerar a autorização, após enviar é só aguardar que um atendente irá vir te atender. Enquanto aguarda, visite nosso site www.felizcred.com.br",
-  "nao quero receber mais":
-    "Não iremos mais enviar mensagem e fique à vontade para nos chamar quando precisar!",
+  // Template aviso_taxa_clt
+  "quero saber mais": {
+    texto:
+      "Para simular o consignado CLT precisamos de alguns dados para gerar a autorização, após enviar é só aguardar que um atendente irá vir te atender. Enquanto aguarda, visite nosso site www.felizcred.com.br",
+  },
+  "nao quero receber mais": {
+    texto: "Não iremos mais enviar mensagem e fique à vontade para nos chamar quando precisar!",
+  },
+  // Template parcela_clt_disponivel (campanha com o valor da parcela em {{1}})
+  "quero simular": {
+    texto:
+      "Show! 😊 Pra simular sua parcela de consignado CLT, preciso de mais 5 coisinhas, pode mandar tudo numa mensagem só:\n" +
+      "• Nome completo\n• CPF\n• Telefone\n• E-mail\n• Data de nascimento",
+    passo: "parcela_clt_dados",
+  },
+  "nao tenho interesse": {
+    texto: "Sem problemas! Fique à vontade para nos chamar quando precisar 😊",
+  },
 };
 
 async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes, lista) {
@@ -500,6 +519,7 @@ const LEMBRETE_MINUTOS = {
   carro_garantia_dados: 15,
   financiamento_dados: 15,
   fgts_cpf: 15,
+  parcela_clt_dados: 15,
 };
 
 const LEMBRETE_TEXTOS = {
@@ -526,6 +546,9 @@ const LEMBRETE_TEXTOS = {
   fgts_cpf:
     "Olá! Só lembrando que pra eu simular o saque do FGTS, preciso do seu CPF 😊 (depois de você já ter " +
     "autorizado o banco BMS lá no aplicativo do FGTS).",
+  parcela_clt_dados:
+    "Olá! Só lembrando que pra eu simular sua parcela de consignado CLT, preciso desses dados 😊\n" +
+    "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
   padrao:
     "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da " +
     "mensagem acima 👆",
@@ -650,6 +673,19 @@ async function confirmarDadosRecebidos(de, businessNumberId) {
 async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
   if (!REGEX_CPF.test(corpo || "")) {
     await db.setFluxoPasso(de, businessNumberId, "clt_3mais"); // reafirma o passo, reseta o lembrete
+    return;
+  }
+  await confirmarDadosRecebidos(de, businessNumberId);
+}
+
+// Mesmo padrão do handlerCapturaDadosClt acima, mas passo próprio (parcela_clt_dados) pra
+// quem respondeu à campanha do template parcela_clt_disponivel — não reaproveita "clt_3mais"
+// de propósito, senão essa conversa ficaria indistinguível de quem entrou pelo menu normal
+// (mesmo passo, mesmo lembrete), o que ia contra o pedido de manter a campanha fora do fluxo
+// já cadastrado do menu principal.
+async function handlerCapturaDadosParcelaClt(de, businessNumberId, corpo) {
+  if (!REGEX_CPF.test(corpo || "")) {
+    await db.setFluxoPasso(de, businessNumberId, "parcela_clt_dados");
     return;
   }
   await confirmarDadosRecebidos(de, businessNumberId);
@@ -953,6 +989,7 @@ const FLUXO_FELIZCRED = {
     carro_garantia_dados: handlerCapturaDadosCarroGarantia,
     financiamento_dados: handlerCapturaDadosFinanciamento,
     fgts_cpf: handlerCapturaDadosFgts,
+    parcela_clt_dados: handlerCapturaDadosParcelaClt,
   },
 };
 
@@ -1074,7 +1111,8 @@ async function processarEntry(entry) {
           const resposta = RESPOSTAS_BOTAO[normalizar(textoBotao)];
           if (resposta) {
             try {
-              await enviarRespostaAutomatica(businessNumberId, de, resposta);
+              await enviarRespostaAutomatica(businessNumberId, de, resposta.texto);
+              await db.setFluxoPasso(de, businessNumberId, resposta.passo || null);
             } catch (err) {
               console.error("Erro ao enviar resposta automática:", err.message);
             }

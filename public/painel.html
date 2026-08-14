@@ -738,10 +738,10 @@
     <input id="massa-template" value="aviso_taxa_clt" />
     <label>Idioma</label>
     <input id="massa-idioma" value="pt_BR" />
-    <label>Texto do template — use {{1}} onde fica o nome (só para guardar no histórico, não é enviado)</label>
+    <label>Texto do template — use {{1}} onde fica a variável (nome, valor, etc — só para guardar no histórico, não é enviado)</label>
     <textarea id="massa-preview">Olá {{1}}! Temos uma novidade para você: a taxa para CLT mudou para 3,98%. Fale com a gente para saber mais.</textarea>
-    <label>Contatos — um por linha: telefone,nome (nome é opcional)</label>
-    <textarea id="massa-contatos" placeholder="5511999999999,João&#10;5511888888888"></textarea>
+    <label>Contatos — um por linha: telefone,variável (o que vier depois da 1ª vírgula vira {{1}}: nome, valor da parcela etc — opcional)</label>
+    <textarea id="massa-contatos" placeholder="5511999999999,João&#10;5511888888888,180,77"></textarea>
     <div class="modal-botoes">
       <button id="massa-cancelar" type="button">Cancelar</button>
       <button id="massa-enviar" type="button">Enviar</button>
@@ -1402,7 +1402,11 @@ document.getElementById("massa-enviar").addEventListener("click", async () => {
   const bodyPreview = document.getElementById("massa-preview").value;
   const linhas = document.getElementById("massa-contatos").value.split("\n").map((l) => l.trim()).filter(Boolean);
   const contacts = linhas.map((l) => {
-    const [phone, name] = l.split(",").map((s) => (s || "").trim());
+    // Só quebra na PRIMEIRA vírgula — a segunda coluna vira {{1}} inteiro, aceitando valores
+    // com vírgula decimal (ex: "180,77" de uma parcela) sem cortar o resto fora.
+    const idxVirgula = l.indexOf(",");
+    const phone = (idxVirgula === -1 ? l : l.slice(0, idxVirgula)).trim();
+    const name = (idxVirgula === -1 ? "" : l.slice(idxVirgula + 1)).trim();
     return { phone, name };
   });
 
