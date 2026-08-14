@@ -8,7 +8,7 @@ import { LoginPage } from "@/pages/login"
 import { ChatsPage } from "@/pages/chats"
 import { AgendaPage } from "@/pages/agenda"
 import { PublicarPage } from "@/pages/publicar"
-import { PlaceholderPage } from "@/pages/placeholder"
+import { ReelsPage } from "@/pages/reels"
 
 function Shell() {
   const [screen, setScreen] = React.useState<Screen>("chats")
@@ -20,7 +20,7 @@ function Shell() {
         {screen === "chats" && <ChatsPage />}
         {screen === "agenda" && <AgendaPage />}
         {screen === "publicar" && <PublicarPage />}
-        {screen === "reels" && <PlaceholderPage title="Reels" />}
+        {screen === "reels" && <ReelsPage />}
       </SidebarInset>
     </SidebarProvider>
   )

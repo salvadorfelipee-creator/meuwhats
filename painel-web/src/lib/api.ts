@@ -76,6 +76,37 @@ export type CriarAgendamentoPayload = {
   imagensBase64?: string[]
 }
 
+export type ReelsStatus = "pending" | "processing" | "posted" | "error"
+
+export type ReelsItem = {
+  id: number
+  drive_file_id: string
+  nome_arquivo: string
+  posicao: number
+  legenda: string | null
+  agendado_para: number | null
+  status: ReelsStatus
+  resultado: string | null
+  tentativas: number
+  created_at: number
+  posted_at: number | null
+  data_prevista?: number
+  exato?: boolean
+}
+
+export type ReelsResumo = { pending: number; posted: number; error: number; total: number }
+
+export type ReelsEspaco = { usados: number; limite: number; percentual: number; bloqueado: boolean }
+
+export type ReelsStatusResponse = {
+  resumo: ReelsResumo
+  recentes: ReelsItem[]
+  pausado: boolean
+  postsPorDia: number
+  legendaPadrao: string
+  espaco: ReelsEspaco | null
+}
+
 function getCredentials(): string | null {
   return localStorage.getItem(AUTH_KEY)
 }
@@ -242,6 +273,76 @@ export const api = {
     request<{ ok: true }>(`/painel/api/agenda/${id}/reenfileirar`, { method: "POST" }),
 
   agendaRemover: (id: number) => request<{ ok: true }>(`/painel/api/agenda/${id}`, { method: "DELETE" }),
+
+  // ── Reels em massa ─────────────────────────────────────────────────────────
+  reelsStatus: () => request<ReelsStatusResponse>("/painel/api/reels/status"),
+
+  reelsFila: () => request<ReelsItem[]>("/painel/api/reels/fila"),
+
+  reelsPostsPorDia: (quantidade: number) =>
+    request<{ ok: true; quantidade: number }>("/painel/api/reels/posts-por-dia", {
+      method: "POST",
+      body: JSON.stringify({ quantidade }),
+    }),
+
+  reelsLegendaPadrao: (legenda: string) =>
+    request<{ ok: true }>("/painel/api/reels/legenda-padrao", {
+      method: "POST",
+      body: JSON.stringify({ legenda }),
+    }),
+
+  reelsPausar: (pausado: boolean) =>
+    request<{ ok: true }>("/painel/api/reels/pausar", {
+      method: "POST",
+      body: JSON.stringify({ pausado }),
+    }),
+
+  reelsSincronizar: () => request<{ encontrados: number; adicionados: number }>("/painel/api/reels/sincronizar", { method: "POST" }),
+
+  reelsPublicarProximo: () => request<{ vazio?: true; ok?: boolean }>("/painel/api/reels/publicar-agora", { method: "POST" }),
+
+  reelsPublicarItem: (id: number) => request<{ ok: boolean }>(`/painel/api/reels/${id}/publicar-agora`, { method: "POST" }),
+
+  reelsDefinirData: (id: number, data: string | null) =>
+    request<{ ok: true }>(`/painel/api/reels/${id}/data`, {
+      method: "POST",
+      body: JSON.stringify({ data }),
+    }),
+
+  reelsReenfileirar: (id: number) => request<{ ok: true }>(`/painel/api/reels/${id}/reenfileirar`, { method: "POST" }),
+
+  reelsRemover: (id: number) => request<{ ok: true }>(`/painel/api/reels/${id}`, { method: "DELETE" }),
+
+  // Upload de vídeo é multipart/form-data, não JSON — passa longe do helper `request` de
+  // propósito. Os campos de texto (legenda/data) precisam ser anexados ANTES do arquivo no
+  // FormData, senão o servidor (busboy) pode perdê-los — ver comentário em server.js.
+  async reelsUpload(file: File, legenda: string, data: string, onProgress?: (pct: number) => void): Promise<{ ok: true; nome: string }> {
+    const creds = getCredentials()
+    const form = new FormData()
+    form.append("legenda", legenda)
+    form.append("data", data)
+    form.append("video", file)
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open("POST", "/painel/api/reels/upload")
+      if (creds) xhr.setRequestHeader("Authorization", `Basic ${creds}`)
+      xhr.upload.onprogress = (e) => {
+        if (onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
+      }
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText)
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data)
+          else reject(new ApiError(xhr.status, data.error || `Erro ${xhr.status}`))
+        } catch {
+          reject(new ApiError(xhr.status, "Resposta inválida do servidor"))
+        }
+      }
+      xhr.onerror = () => reject(new ApiError(0, "Falha de rede no upload"))
+      xhr.send(form)
+    })
+  },
 }
 
 export { ApiError }

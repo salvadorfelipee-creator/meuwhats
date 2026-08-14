@@ -1203,8 +1203,10 @@ mesmo de sempre, só o front-end do `/painel` foi reescrito.
 - **`GET /painel-antigo`**: o painel HTML antigo (`public/painel.html`) continua no ar como
   plano B, com o mesmo Basic Auth de sempre, enquanto o painel novo é validado em produção.
   Remover essa rota (e o arquivo) quando não precisar mais dele.
-- **Ainda faltam portar pro layout novo**: Agenda, Publique IV e Reels planner — por enquanto
-  aparecem como telas "em construção" no menu lateral (ícones já estão lá, sem função ainda).
+- **As 4 abas já estão portadas**: Conversas, Agenda (calendário + fila + histórico),
+  Publicar (publicação direta multi-rede) e Reels em massa (upload, fila com estimativa,
+  piloto automático, espaço usado no R2) — todas ligadas às mesmas rotas que já existiam,
+  backend sem mudança nenhuma.
 
 ---
 
