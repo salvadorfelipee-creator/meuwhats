@@ -9,11 +9,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { CardDescription, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -174,9 +169,9 @@ export function ChatsPage() {
   }
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-screen">
+    <div className="flex h-screen w-full overflow-hidden">
       {/* Lista de conversas */}
-      <ResizablePanel defaultSize={28} minSize={22} className="flex-grow">
+      <div className="w-[340px] shrink-0">
         <div className="flex flex-col h-screen border-r">
           <div className="h-14 px-3 flex items-center justify-between border-b shrink-0">
             <div>
@@ -240,12 +235,10 @@ export function ChatsPage() {
             ))}
           </ScrollArea>
         </div>
-      </ResizablePanel>
-
-      <ResizableHandle />
+      </div>
 
       {/* Janela de conversa */}
-      <ResizablePanel defaultSize={72} minSize={40}>
+      <div className="flex-1 min-w-0 border-l">
         {!conversaAtual ? (
           <div className="flex flex-col h-screen items-center justify-center text-muted-foreground gap-2">
             <MessagesSquare className="h-8 w-8" />
@@ -366,7 +359,7 @@ export function ChatsPage() {
             </div>
           </div>
         )}
-      </ResizablePanel>
+      </div>
 
       {/* Detalhes do contato */}
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
@@ -386,7 +379,7 @@ export function ChatsPage() {
       </Sheet>
 
       <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} businessId={current.id} />
-    </ResizablePanelGroup>
+    </div>
   )
 }
 

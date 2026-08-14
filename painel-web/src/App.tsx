@@ -12,7 +12,7 @@ function Shell() {
   const [screen, setScreen] = React.useState<Screen>("chats")
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <AppSidebar screen={screen} onScreenChange={setScreen} />
       <SidebarInset>
         {screen === "chats" && <ChatsPage />}
