@@ -6,6 +6,8 @@ import { SidebarProvider, SidebarInset } from "@/components/blocks/sidebar"
 import { AppSidebar, type Screen } from "@/components/app-sidebar"
 import { LoginPage } from "@/pages/login"
 import { ChatsPage } from "@/pages/chats"
+import { AgendaPage } from "@/pages/agenda"
+import { PublicarPage } from "@/pages/publicar"
 import { PlaceholderPage } from "@/pages/placeholder"
 
 function Shell() {
@@ -16,8 +18,8 @@ function Shell() {
       <AppSidebar screen={screen} onScreenChange={setScreen} />
       <SidebarInset>
         {screen === "chats" && <ChatsPage />}
-        {screen === "agenda" && <PlaceholderPage title="Agenda" />}
-        {screen === "publicar" && <PlaceholderPage title="Publicar" />}
+        {screen === "agenda" && <AgendaPage />}
+        {screen === "publicar" && <PublicarPage />}
         {screen === "reels" && <PlaceholderPage title="Reels" />}
       </SidebarInset>
     </SidebarProvider>

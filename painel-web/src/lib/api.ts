@@ -39,6 +39,43 @@ export type RespostaPronta = { id: number; atalho: string; texto: string }
 export type BroadcastContact = { phone: string; name?: string }
 export type BroadcastResult = { phone: string; ok: boolean; error?: string }
 
+export type Rede = "instagram" | "instagram_story" | "facebook" | "twitter" | "linkedin" | "threads"
+
+export type ContaPublicar = { id: string; nome: string; redesDisponiveis: Rede[] }
+
+export type AgendaStatus = "pending" | "processing" | "posted" | "error"
+
+export type AgendaItem = {
+  id: number
+  conta_id: string
+  texto: string | null
+  link: string | null
+  redes: Rede[]
+  agendado_para: number
+  status: AgendaStatus
+  imagemUrl: string | null
+  imagemUrls: string[] | null
+  resultado: string | null
+  tentativas: number
+  created_at: number
+  posted_at: number | null
+}
+
+export type AgendaResumo = { pending: number; posted: number; error: number; total: number }
+
+export type PublicarResultado = Record<string, { ok: boolean; erro?: string }>
+
+// dataHoraLocal no formato de <input type="datetime-local"> — "2026-08-20T09:30"
+export type CriarAgendamentoPayload = {
+  contaId: string
+  texto?: string
+  link?: string
+  redes: Rede[]
+  data: string
+  imagemBase64?: string
+  imagensBase64?: string[]
+}
+
 function getCredentials(): string | null {
   return localStorage.getItem(AUTH_KEY)
 }
@@ -164,6 +201,47 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+
+  // ── Publique IV (publicação direta + agenda) ──────────────────────────────
+  contasPublicar: () => request<ContaPublicar[]>("/painel/api/publicar/contas"),
+
+  publicarAgora: (payload: {
+    contaId: string
+    texto?: string
+    link?: string
+    redes: Rede[]
+    imagemBase64?: string
+    imagensBase64?: string[]
+  }) =>
+    request<{ resultados: PublicarResultado }>("/painel/api/publicar", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  agendaFila: () => request<AgendaItem[]>("/painel/api/agenda/fila"),
+
+  agendaLista: () =>
+    request<{ resumo: AgendaResumo; recentes: AgendaItem[] }>("/painel/api/agenda/lista"),
+
+  agendaCriar: (payload: CriarAgendamentoPayload) =>
+    request<{ id: number; agendadoPara: number }>("/painel/api/agenda", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  agendaPublicarAgora: (id: number) =>
+    request<{ ok: true }>(`/painel/api/agenda/${id}/publicar-agora`, { method: "POST" }),
+
+  agendaReagendar: (id: number, data: string) =>
+    request<{ ok: true }>(`/painel/api/agenda/${id}/data`, {
+      method: "POST",
+      body: JSON.stringify({ data }),
+    }),
+
+  agendaReenfileirar: (id: number) =>
+    request<{ ok: true }>(`/painel/api/agenda/${id}/reenfileirar`, { method: "POST" }),
+
+  agendaRemover: (id: number) => request<{ ok: true }>(`/painel/api/agenda/${id}`, { method: "DELETE" }),
 }
 
 export { ApiError }
