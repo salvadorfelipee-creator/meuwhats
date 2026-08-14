@@ -1166,10 +1166,45 @@ no painel a **qualidade** das 19 conversas (quantas clicaram TRABALHO/TRABALHEI 
 
 ```bash
 npm install
+npm run build   # builda o painel novo (painel-web/, React) — gera painel-web/dist
 VERIFY_TOKEN=meu_token_secreto ACCESS_TOKEN=xxx PHONE_NUMBER_ID=xxx PAINEL_USER=eu PAINEL_PASS=minhasenha node server.js
 ```
 
-Acesse `http://localhost:3000/painel` (vai pedir usuário/senha).
+Acesse `http://localhost:3000/painel`. Diferente de antes, essa tela **não** pede o prompt
+nativo do navegador — abre uma tela de login própria (mesmo usuário/senha de sempre,
+`PAINEL_USER`/`PAINEL_PASS`), porque a autenticação agora acontece por chamada de API, não
+mais na página HTML em si.
+
+### Painel novo (`painel-web/`) — React + Tailwind + shadcn/ui
+
+A partir de 2026-08-14, o painel deixou de ser HTML/CSS/JS puro (decisão de reformular o
+visual pra um layout tipo WhatsApp Web, inspirado num template do 21st.dev) e passou a ser
+uma SPA em `painel-web/` (Vite + React + TypeScript + Tailwind v4 + shadcn/ui), buildada e
+servida como estático pelo próprio `server.js` (rotas `GET /painel`, `GET /painel/assets/*`
+— ver `server.js`). O backend (`server.js`, `db.js`, `whatsapp.js` etc.) **não mudou**: é o
+mesmo de sempre, só o front-end do `/painel` foi reescrito.
+
+- **Onde mexer**: `painel-web/src/pages/chats.tsx` é a tela principal (conversas). Layout
+  (barra lateral de ícones + seletor de canal WhatsApp/Instagram) fica em
+  `painel-web/src/components/app-sidebar.tsx`. Cliente de API (Basic Auth) em
+  `painel-web/src/lib/api.ts`.
+- **Rodar em modo desenvolvimento** (hot reload, aponta pro backend local na porta 3000):
+  ```bash
+  cd painel-web
+  npm install
+  npm run dev
+  ```
+  Abre em `http://localhost:5173/painel/` (o `base: "/painel/"` do `vite.config.ts` é de
+  propósito, pra bater com o path real em produção).
+- **Deploy no Render**: o *Build Command* precisa incluir o build do painel novo. Configurar
+  em Render → Environment → Build Command: `npm install && npm run build` (o `npm run build`
+  da raiz já builda o `painel-web` — ver `package.json`). Sem isso, o deploy sobe o backend
+  mas `painel-web/dist/` não existe e `/painel` quebra.
+- **`GET /painel-antigo`**: o painel HTML antigo (`public/painel.html`) continua no ar como
+  plano B, com o mesmo Basic Auth de sempre, enquanto o painel novo é validado em produção.
+  Remover essa rota (e o arquivo) quando não precisar mais dele.
+- **Ainda faltam portar pro layout novo**: Agenda, Publique IV e Reels planner — por enquanto
+  aparecem como telas "em construção" no menu lateral (ícones já estão lá, sem função ainda).
 
 ---
 

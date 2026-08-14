@@ -1567,8 +1567,48 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, html, { "Content-Type": "text/html; charset=utf-8" });
     }
 
-    // GET /painel — página do painel
+    // GET /painel — painel novo (React), build gerado em painel-web/dist pelo `npm run build`
+    // (ver package.json raiz). Sem auth aqui de propósito: é só o shell estático da SPA, a
+    // autenticação de verdade acontece por chamada em cada /painel/api/* (ver requireAuth
+    // abaixo) — diferente do painel.html antigo, que exigia Basic Auth só pra carregar o HTML
+    // e por isso abria o prompt nativo feio do navegador antes da tela de login própria.
     if (req.method === "GET" && path_ === "/painel") {
+      const html = fs.readFileSync(path.join(__dirname, "painel-web", "dist", "index.html"));
+      return send(res, 200, html, { "Content-Type": "text/html; charset=utf-8" });
+    }
+
+    // GET /painel/assets/:arquivo — JS/CSS gerados pelo build do Vite (hash no nome, cache
+    // longo é seguro). Sem auth — são só assets estáticos, sem dado nenhum de cliente.
+    const matchPainelAsset = path_.match(/^\/painel\/assets\/([^/]+)$/);
+    if (req.method === "GET" && matchPainelAsset) {
+      const arquivo = decodeURIComponent(matchPainelAsset[1]);
+      const assetPath = path.join(__dirname, "painel-web", "dist", "assets", arquivo);
+      if (!fs.existsSync(assetPath)) return send(res, 404, "Not found");
+      const ext = path.extname(arquivo);
+      const tipo =
+        ext === ".js"
+          ? "application/javascript; charset=utf-8"
+          : ext === ".css"
+          ? "text/css; charset=utf-8"
+          : "application/octet-stream";
+      return send(res, 200, fs.readFileSync(assetPath), {
+        "Content-Type": tipo,
+        "Cache-Control": "public, max-age=31536000, immutable",
+      });
+    }
+
+    // GET /painel/favicon.svg e /painel/icons.svg — arquivos estáticos da pasta public/ do
+    // painel-web copiados pro build (ver painel-web/public/).
+    const matchPainelPublico = path_.match(/^\/painel\/(favicon\.svg|icons\.svg)$/);
+    if (req.method === "GET" && matchPainelPublico) {
+      const arquivoPath = path.join(__dirname, "painel-web", "dist", matchPainelPublico[1]);
+      if (!fs.existsSync(arquivoPath)) return send(res, 404, "Not found");
+      return send(res, 200, fs.readFileSync(arquivoPath), { "Content-Type": "image/svg+xml" });
+    }
+
+    // GET /painel-antigo — painel vanilla anterior, mantido como plano B enquanto o novo
+    // (React) é validado em produção. Remover quando não for mais necessário.
+    if (req.method === "GET" && path_ === "/painel-antigo") {
       if (!requireAuth(req, res)) return;
       const html = fs.readFileSync(path.join(__dirname, "public", "painel.html"));
       return send(res, 200, html, { "Content-Type": "text/html; charset=utf-8" });

@@ -1,4 +1,5 @@
 node_modules/
+painel-web/dist/
 .env
 CHAVES-LOCAL.md
 data.db

@@ -1,0 +1,44 @@
+import * as React from "react"
+import { AuthProvider, useAuth } from "@/lib/auth-context"
+import { ChannelProvider } from "@/lib/channel-context"
+import { SidebarProvider, SidebarInset } from "@/components/blocks/sidebar"
+import { AppSidebar, type Screen } from "@/components/app-sidebar"
+import { LoginPage } from "@/pages/login"
+import { ChatsPage } from "@/pages/chats"
+import { PlaceholderPage } from "@/pages/placeholder"
+
+function Shell() {
+  const [screen, setScreen] = React.useState<Screen>("chats")
+
+  return (
+    <SidebarProvider>
+      <AppSidebar screen={screen} onScreenChange={setScreen} />
+      <SidebarInset>
+        {screen === "chats" && <ChatsPage />}
+        {screen === "agenda" && <PlaceholderPage title="Agenda" />}
+        {screen === "publicar" && <PlaceholderPage title="Publicar" />}
+        {screen === "reels" && <PlaceholderPage title="Reels" />}
+      </SidebarInset>
+    </SidebarProvider>
+  )
+}
+
+function Gate() {
+  const { authenticated } = useAuth()
+  if (!authenticated) return <LoginPage />
+  return (
+    <ChannelProvider>
+      <Shell />
+    </ChannelProvider>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <Gate />
+    </AuthProvider>
+  )
+}
+
+export default App

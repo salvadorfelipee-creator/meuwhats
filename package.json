@@ -4,7 +4,8 @@
   "description": "Webhook + painel simples para a API oficial do WhatsApp (Meta)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "npm install --prefix painel-web && npm run build --prefix painel-web"
   },
   "engines": {
     "node": ">=18"
