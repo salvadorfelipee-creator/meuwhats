@@ -249,16 +249,16 @@ automação, ou pior, colidir com o fluxo do menu principal.
 por outros templates. Se dois templates reusassem "QUERO SABER MAIS", não daria pra saber
 qual campanha originou o clique — as duas cairiam na mesma resposta.
 
-Exemplo já implementado — template `parcela_clt_disponivel` (campanha com o valor da parcela
-em `{{1}}`, sem nome, pra listas de leads com parcela já calculada em outra instituição):
+Exemplo já implementado — template `oferta_consignado_clt` (campanha genérica, **sem
+variável nenhuma** — mesma mensagem curta pra toda a lista, categoria Marketing, a mais
+barata pra essa conta):
 
 - **Categoria**: Marketing
-- **Corpo**: `Você tem uma parcela de consignado CLT disponível de R$ {{1}}. Fale com a gente para saber mais!`
-- **Botões**: `QUERO SIMULAR` (leva pro passo `parcela_clt_dados`, que pede nome/CPF/telefone/
+- **Corpo**: `Olá! 👋 Você pode ter uma condição especial de consignado CLT disponível. Quer saber mais?`
+- **Botões**: `QUERO SIMULAR` (leva pro passo `campanha_clt_dados`, que pede nome/CPF/telefone/
   e-mail/data de nascimento e confirma assim que reconhece um CPF na resposta) e
   `NÃO TENHO INTERESSE` (só agradece, sem marcar passo — fluxo termina ali)
-- **Contatos no painel**: `telefone,valor da parcela` — ex. `5511999999999,180,77` (o parsing
-  do painel só quebra na primeira vírgula, então valor com vírgula decimal funciona direto)
+- **Contatos no painel**: só `telefone` por linha (sem variável, não precisa de segunda coluna)
 
 Esse template ainda precisa ser criado manualmente no Gerenciador do WhatsApp (passo 1 acima)
 e aprovado pela Meta antes do primeiro envio — o código já está pronto esperando por ele.
