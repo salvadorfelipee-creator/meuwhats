@@ -30,15 +30,17 @@ import {
   AtSign as InstagramIcon,
   Phone,
   LogOut,
+  Filter,
 } from "lucide-react"
 
-export type Screen = "chats" | "agenda" | "publicar" | "reels"
+export type Screen = "chats" | "agenda" | "publicar" | "reels" | "funil"
 
 const NAV_ITEMS: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
   { id: "chats", title: "Conversas", icon: MessageCircle },
   { id: "agenda", title: "Agenda", icon: CalendarDays },
   { id: "publicar", title: "Publicar", icon: Send },
   { id: "reels", title: "Reels", icon: Clapperboard },
+  { id: "funil", title: "Funil", icon: Filter },
 ]
 
 // Bolinha vermelha "tem mensagem nova" — usada tanto ao lado do nome do canal (dropdown

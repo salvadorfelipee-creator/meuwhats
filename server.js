@@ -320,6 +320,14 @@ async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes, 
   });
 }
 
+// Registra um evento do funil de qualificação pro painel (aba Funil) — nunca deixa o erro
+// derrubar o fluxo de atendimento de verdade, só loga (mesmo espírito do markAsRead).
+function logFunil(businessNumberId, phone, etapa) {
+  db.funilRegistrarEvento(phone, businessNumberId, etapa).catch((err) =>
+    console.error("Falha ao registrar evento de funil:", err.message)
+  );
+}
+
 // ─── FLUXO DE MENSAGENS AUTOMÁTICAS COM BOTÕES ───────────────────────────────
 // Menu inicial enviado quando um contato manda mensagem e a conversa está
 // inativa há mais de 24h (ou é a primeira mensagem dele). Cada botão leva ao
@@ -440,6 +448,7 @@ const DOCUMENTOS_VEICULO =
 async function handlerMenuPrincipal(de, businessNumberId, corpo) {
   const escolha = detectarOpcaoMenuPrincipal(corpo);
   if (escolha === "1") {
+    logFunil(businessNumberId, de, "clt_menu_escolhido");
     await enviarRespostaAutomatica(
       businessNumberId,
       de,
@@ -506,8 +515,16 @@ function PRODUTO_CONFIRMACAO(produto) {
 }
 
 // ─── LEMBRETES PARA QUEM PARA NO MEIO DO FLUXO ──────────────────────────────
-// Minutos de silêncio até mandar UM lembrete, por passo. Quem clicou
-// NUNCA TRABALHEI (gerente_nunca) fica de fora de propósito — decisão do usuário.
+// Minutos de silêncio até mandar lembrete, por passo — um número manda só 1 toque (padrão
+// de sempre); um array manda vários, cada um contado a partir de fluxo_passo_at (não é
+// incremental do lembrete anterior, pra não acumular atraso). Qualquer mensagem nova da
+// pessoa reresta o relógio E o contador de toques (ver db.setFluxoPasso/handlers de
+// captura) — só quem fica em silêncio de verdade recebe o próximo toque.
+// Quem clicou NUNCA TRABALHEI (gerente_nunca) fica de fora de propósito — decisão do usuário.
+//
+// clt_3mais e campanha_clt_dados usam 2 toques de propósito (15min + 4h): é o passo que
+// mais perde lead (pedir 5 dados de uma vez assusta) e é onde a campanha paga por lead — os
+// outros passos continuam com 1 toque só, sem mudar comportamento deles.
 const LEMBRETE_MINUTOS = {
   menu_inicial: 15,
   fluxo_gerente: 15,
@@ -516,11 +533,11 @@ const LEMBRETE_MINUTOS = {
   gerente_mais2: 15,
   gerente_autorizo: 20,
   clt_pergunta_tempo: 15,
-  clt_3mais: 15,
+  clt_3mais: [15, 240],
   carro_garantia_dados: 15,
   financiamento_dados: 15,
   fgts_cpf: 15,
-  campanha_clt_dados: 15,
+  campanha_clt_dados: [15, 240],
 };
 
 const LEMBRETE_TEXTOS = {
@@ -535,9 +552,16 @@ const LEMBRETE_TEXTOS = {
   clt_pergunta_tempo:
     "Olá! Ainda por aí? 😊 Pra eu simular o consignado CLT, só preciso saber se você tem 3 meses ou " +
     "mais de carteira assinada no seu trabalho atual.",
-  clt_3mais:
+  // 2 toques: o primeiro só lembra (mesmo texto de sempre); o segundo, 4h depois, muda de
+  // abordagem — em vez de repetir o pedido, reduz o atrito (5 campos de uma vez assusta,
+  // deixa claro que dá pra mandar aos poucos). Nunca insiste 2x com o mesmo texto —
+  // atendimento repetitivo é o padrão "agressivo" que queremos evitar.
+  clt_3mais: [
     "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
-    "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
+      "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
+    "Sem compromisso nenhum, é só pra simular 😊 Se preferir, pode começar só com nome e CPF que eu já " +
+      "adianto — o resto (telefone, e-mail, data de nascimento) você me manda depois, sem pressa.",
+  ],
   carro_garantia_dados:
     "Olá! Só lembrando que pra eu simular seu empréstimo com carro em garantia, preciso desses dados 😊\n" +
     "Foto do documento do veículo, endereço completo, profissão e renda, foto do seu documento e e-mail.",
@@ -547,9 +571,12 @@ const LEMBRETE_TEXTOS = {
   fgts_cpf:
     "Olá! Só lembrando que pra eu simular o saque do FGTS, preciso do seu CPF 😊 (depois de você já ter " +
     "autorizado o banco BMS lá no aplicativo do FGTS).",
-  campanha_clt_dados:
+  campanha_clt_dados: [
     "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
-    "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
+      "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
+    "Sem compromisso nenhum, é só pra simular 😊 Se preferir, pode começar só com nome e CPF que eu já " +
+      "adianto — o resto (telefone, e-mail, data de nascimento) você me manda depois, sem pressa.",
+  ],
   padrao:
     "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da " +
     "mensagem acima 👆",
@@ -676,6 +703,7 @@ async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "clt_3mais"); // reafirma o passo, reseta o lembrete
     return;
   }
+  logFunil(businessNumberId, de, "clt_dados_completos");
   await confirmarDadosRecebidos(de, businessNumberId);
 }
 
@@ -689,6 +717,7 @@ async function handlerCapturaDadosCampanhaClt(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "campanha_clt_dados");
     return;
   }
+  logFunil(businessNumberId, de, "campanha_dados_completos");
   await confirmarDadosRecebidos(de, businessNumberId);
 }
 
@@ -1112,6 +1141,7 @@ async function processarEntry(entry) {
           const resposta = RESPOSTAS_BOTAO[normalizar(textoBotao)];
           if (resposta) {
             try {
+              if (resposta.passo === "campanha_clt_dados") logFunil(businessNumberId, de, "campanha_clique");
               await enviarRespostaAutomatica(businessNumberId, de, resposta.texto);
               await db.setFluxoPasso(de, businessNumberId, resposta.passo || null);
             } catch (err) {
@@ -1125,6 +1155,7 @@ async function processarEntry(entry) {
           const passo = fluxo.fluxoBotoes[reply.id];
           if (passo) {
             try {
+              if (reply.id === "clt_3mais") logFunil(businessNumberId, de, "clt_qualificado");
               const textoPasso = typeof passo.texto === "function" ? passo.texto() : passo.texto;
               await enviarRespostaAutomatica(businessNumberId, de, textoPasso, passo.botoes, passo.lista);
               // Marca (ou limpa) o passo em que a conversa fica aguardando resposta
@@ -1750,6 +1781,26 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await db.buscarMensagens(decodeURIComponent(matchBuscarMsg[1]), termo));
     }
 
+    // GET /painel/api/funil?dias=7 — resumo do funil de qualificação do CLT (menu → 3+ meses
+    // → dados completos, e o mesmo pra quem entrou pela campanha de WhatsApp), contagem de
+    // pessoas ÚNICAS por etapa dentro da janela pedida (padrão 7 dias).
+    if (req.method === "GET" && path_ === "/painel/api/funil") {
+      if (!requireAuth(req, res)) return;
+      const dias = Math.max(Number(url.searchParams.get("dias")) || 7, 1);
+      const desde = Date.now() - dias * 24 * 60 * 60 * 1000;
+      const resumo = await db.funilResumo(desde);
+      return send(res, 200, {
+        dias,
+        etapas: {
+          clt_menu_escolhido: resumo.clt_menu_escolhido || 0,
+          clt_qualificado: resumo.clt_qualificado || 0,
+          clt_dados_completos: resumo.clt_dados_completos || 0,
+          campanha_clique: resumo.campanha_clique || 0,
+          campanha_dados_completos: resumo.campanha_dados_completos || 0,
+        },
+      });
+    }
+
     // GET/POST /painel/api/respostas-prontas — respostas rápidas reutilizáveis
     if (req.method === "GET" && path_ === "/painel/api/respostas-prontas") {
       if (!requireAuth(req, res)) return;
@@ -2359,13 +2410,23 @@ setInterval(async () => {
     const agora = Date.now();
     for (const p of pendentes) {
       const fluxoDoContato = getFluxo(p.business_number_id);
-      const minutos = fluxoDoContato.lembreteMinutos[p.fluxo_passo];
-      if (!minutos || agora - Number(p.fluxo_passo_at) < minutos * 60 * 1000) continue;
-      if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id))) continue;
+      const config = fluxoDoContato.lembreteMinutos[p.fluxo_passo];
+      // Cada passo pode ter 1 lembrete (número, comportamento de sempre) ou vários (array de
+      // minutos, contados sempre a partir de fluxo_passo_at — não incremental do lembrete
+      // anterior, pra não acumular atraso). `fluxo_lembrete` é o índice de quantos toques
+      // esse contato já recebeu; passou do tamanho do array = já mandou tudo, ignora.
+      const minutosArray = Array.isArray(config) ? config : config ? [config] : [];
+      const indice = Number(p.fluxo_lembrete) || 0;
+      if (indice >= minutosArray.length) continue;
+      const minutos = minutosArray[indice];
+      if (agora - Number(p.fluxo_passo_at) < minutos * 60 * 1000) continue;
+      if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id, indice))) continue;
       try {
-        const texto = fluxoDoContato.lembreteTextos[p.fluxo_passo] || fluxoDoContato.lembreteTextos.padrao;
+        const textosConfig = fluxoDoContato.lembreteTextos[p.fluxo_passo];
+        const textosArray = Array.isArray(textosConfig) ? textosConfig : [textosConfig || fluxoDoContato.lembreteTextos.padrao];
+        const texto = textosArray[indice] || textosArray[textosArray.length - 1];
         await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
-        console.log(`⏰ Lembrete de fluxo parado enviado para ${p.phone} (passo ${p.fluxo_passo})`);
+        console.log(`⏰ Lembrete de fluxo parado enviado para ${p.phone} (passo ${p.fluxo_passo}, toque ${indice + 1}/${minutosArray.length})`);
       } catch (err) {
         console.error("Erro ao enviar lembrete de fluxo:", err.message);
       }

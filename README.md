@@ -1203,10 +1203,30 @@ mesmo de sempre, só o front-end do `/painel` foi reescrito.
 - **`GET /painel-antigo`**: o painel HTML antigo (`public/painel.html`) continua no ar como
   plano B, com o mesmo Basic Auth de sempre, enquanto o painel novo é validado em produção.
   Remover essa rota (e o arquivo) quando não precisar mais dele.
-- **As 4 abas já estão portadas**: Conversas, Agenda (calendário + fila + histórico),
-  Publicar (publicação direta multi-rede) e Reels em massa (upload, fila com estimativa,
-  piloto automático, espaço usado no R2) — todas ligadas às mesmas rotas que já existiam,
-  backend sem mudança nenhuma.
+- **As 5 abas já estão portadas**: Conversas, Agenda (calendário + fila + histórico),
+  Publicar (publicação direta multi-rede), Reels em massa (upload, fila com estimativa,
+  piloto automático, espaço usado no R2) e Funil (ver abaixo) — todas ligadas às mesmas
+  rotas que já existiam, backend sem mudança nenhuma (exceto o Funil, que é rota nova).
+
+### Funil de qualificação (aba "Funil") e lembrete em 2 toques
+
+Adicionado em 2026-08-15. Duas peças:
+
+1. **Rastreio de funil** — cada transição-chave do funil de CLT (escolheu CLT no menu →
+   confirmou 3+ meses → completou os dados; e a mesma sequência pra quem entra pela campanha
+   de WhatsApp) grava 1 linha em `funil_eventos` (`db.funilRegistrarEvento`, chamado via
+   `logFunil()` nos pontos exatos em `server.js` — não é dedução por texto de mensagem, é
+   evento explícito). A aba Funil (`GET /painel/api/funil?dias=7|30`) mostra a contagem de
+   pessoas únicas por etapa e a taxa de conversão entre elas.
+2. **Lembrete em 2 toques** (só nos passos `clt_3mais` e `campanha_clt_dados`, que são onde
+   mais se perde lead — pedir 5 dados de uma vez assusta) — `LEMBRETE_MINUTOS`/`LEMBRETE_TEXTOS`
+   agora aceitam um **array** por passo em vez de só um valor: primeiro toque em 15min (mesmo
+   texto de sempre), segundo em 4h com um ângulo diferente (reduz o atrito — "pode mandar só
+   nome e CPF primeiro" — em vez de repetir o mesmo pedido, que é o padrão que soa insistente).
+   Todos os outros passos continuam com 1 toque só, sem mudança de comportamento. `fluxo_lembrete`
+   no banco virou contador (0, 1, 2...) em vez de flag — qualquer mensagem nova da pessoa
+   zera o contador (mesmo mecanismo de sempre), só quem fica em silêncio de verdade avança
+   pro próximo toque.
 
 ---
 

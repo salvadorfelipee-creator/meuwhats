@@ -107,6 +107,17 @@ export type ReelsStatusResponse = {
   espaco: ReelsEspaco | null
 }
 
+export type FunilResponse = {
+  dias: number
+  etapas: {
+    clt_menu_escolhido: number
+    clt_qualificado: number
+    clt_dados_completos: number
+    campanha_clique: number
+    campanha_dados_completos: number
+  }
+}
+
 function getCredentials(): string | null {
   return localStorage.getItem(AUTH_KEY)
 }
@@ -343,6 +354,9 @@ export const api = {
       xhr.send(form)
     })
   },
+
+  // ── Funil de qualificação ──────────────────────────────────────────────────
+  funilResumo: (dias = 7) => request<FunilResponse>(`/painel/api/funil?dias=${dias}`),
 }
 
 export { ApiError }

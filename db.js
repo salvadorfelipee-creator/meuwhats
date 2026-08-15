@@ -229,6 +229,18 @@ const ready = (async () => {
   if (!colunasAgendados.includes("claimed_at")) {
     await client.execute(`ALTER TABLE posts_agendados ADD COLUMN claimed_at INTEGER`);
   }
+
+  // Eventos do funil de qualificação (CLT por enquanto) — 1 linha por contato+etapa, pra dar
+  // pra contar "quantos passaram por aqui essa semana" sem depender do estado ATUAL da
+  // conversa (que só guarda o passo de agora, não o histórico). Ver logFunil em server.js.
+  await client.execute(`CREATE TABLE IF NOT EXISTS funil_eventos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    business_number_id TEXT NOT NULL,
+    etapa TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_funil_eventos_etapa ON funil_eventos(etapa, created_at)`);
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -284,22 +296,28 @@ async function setFluxoPasso(phone, businessNumberId, passo) {
   });
 }
 
+// `fluxo_lembrete` é um CONTADOR (0, 1, 2...), não mais um flag booleano — permite mais de
+// um toque de lembrete por passo (ver LEMBRETE_MINUTOS em server.js, que agora aceita um
+// array de minutos por passo em vez de só um número). Sem filtro de contador aqui: quem já
+// recebeu todos os toques configurados pro passo dele é descartado no lado do JS
+// (server.js), que é quem sabe quantos toques cada passo tem.
 async function listarFluxosAguardando() {
   await ready;
   const result = await client.execute(
-    `SELECT phone, business_number_id, fluxo_passo, fluxo_passo_at FROM conversations
-     WHERE fluxo_passo IS NOT NULL AND fluxo_lembrete = 0`
+    `SELECT phone, business_number_id, fluxo_passo, fluxo_passo_at, fluxo_lembrete FROM conversations
+     WHERE fluxo_passo IS NOT NULL`
   );
   return result.rows;
 }
 
-// Atômico: só o primeiro chamador consegue marcar (evita lembrete duplicado)
-async function tentarMarcarLembreteEnviado(phone, businessNumberId) {
+// Atômico: incrementa de `esperado` pra `esperado + 1` — só quem lê o contador exatamente
+// nesse valor consegue (evita dois ticks do setInterval mandarem o mesmo toque duas vezes).
+async function tentarMarcarLembreteEnviado(phone, businessNumberId, esperado) {
   await ready;
   const result = await client.execute({
-    sql: `UPDATE conversations SET fluxo_lembrete = 1
-          WHERE phone = ? AND business_number_id = ? AND fluxo_lembrete = 0 AND fluxo_passo IS NOT NULL`,
-    args: [phone, businessNumberId],
+    sql: `UPDATE conversations SET fluxo_lembrete = ?
+          WHERE phone = ? AND business_number_id = ? AND fluxo_lembrete = ? AND fluxo_passo IS NOT NULL`,
+    args: [esperado + 1, phone, businessNumberId, esperado],
   });
   return result.rowsAffected > 0;
 }
@@ -860,6 +878,33 @@ async function agendaListarRecentes(limit = 30) {
   return result.rows;
 }
 
+// Registra 1 evento do funil (ver logFunil em server.js, chamado nos pontos exatos de
+// transição — ex. escolheu CLT no menu, confirmou 3+ meses, completou os dados). Não é
+// "1 por contato": se a mesma pessoa passar pela etapa de novo (ex. reabriu o funil), conta
+// de novo — é intencional, mede eventos, não estado.
+async function funilRegistrarEvento(phone, businessNumberId, etapa) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO funil_eventos (phone, business_number_id, etapa, created_at) VALUES (?, ?, ?, ?)`,
+    args: [phone, businessNumberId, etapa, Date.now()],
+  });
+}
+
+// Contagem de eventos ÚNICOS por telefone (uma pessoa que bateu na mesma etapa 2x não conta
+// 2x aqui — é isso que faz sentido pra ler como funil de conversão), por etapa, dentro da
+// janela de tempo pedida.
+async function funilResumo(desdeMs) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT etapa, COUNT(DISTINCT phone || '|' || business_number_id) AS total
+          FROM funil_eventos WHERE created_at >= ? GROUP BY etapa`,
+    args: [desdeMs],
+  });
+  const resumo = {};
+  for (const row of result.rows) resumo[row.etapa] = row.total;
+  return resumo;
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -918,4 +963,6 @@ module.exports = {
   agendaMarcarImagemApagada,
   agendaResumo,
   agendaListarRecentes,
+  funilRegistrarEvento,
+  funilResumo,
 };
