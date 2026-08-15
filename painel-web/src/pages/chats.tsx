@@ -1,5 +1,6 @@
 import * as React from "react"
 import { useChannel } from "@/lib/channel-context"
+import { useUnread } from "@/lib/unread-context"
 import { api, type Conversation, type Message, type RespostaPronta } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -37,6 +38,8 @@ import {
   MessagesSquare,
   Radio,
   Smile,
+  Bell,
+  BellOff,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -64,6 +67,7 @@ function formatTime(ts: number | null) {
 
 export function ChatsPage() {
   const { current } = useChannel()
+  const { notifPermission, requestNotifPermission } = useUnread()
   const [conversations, setConversations] = React.useState<Conversation[]>([])
   const [selected, setSelected] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -178,9 +182,26 @@ export function ChatsPage() {
               <p className="font-semibold text-sm">Conversas</p>
               <p className="text-xs text-muted-foreground">{current.label}</p>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setBroadcastOpen(true)} title="Envio em massa">
-              <Radio className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center">
+              {notifPermission !== "unsupported" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={requestNotifPermission}
+                  disabled={notifPermission === "granted"}
+                  title={notifPermission === "granted" ? "Notificações ativadas" : "Ativar notificações de novas mensagens"}
+                >
+                  {notifPermission === "granted" ? (
+                    <Bell className="h-4 w-4 text-primary" />
+                  ) : (
+                    <BellOff className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
+              <Button variant="ghost" size="icon" onClick={() => setBroadcastOpen(true)} title="Envio em massa">
+                <Radio className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="relative px-3 py-3 shrink-0">
@@ -289,7 +310,12 @@ export function ChatsPage() {
                     }`}
                   >
                     {m.type === "image" && m.media_path && (
-                      <img src={m.media_path} alt="" className="rounded mb-1 max-w-full" />
+                      <img
+                        src={m.media_path}
+                        alt=""
+                        className="rounded mb-1 max-w-[280px] max-h-[360px] w-auto h-auto object-contain cursor-pointer"
+                        onClick={() => window.open(m.media_path!, "_blank")}
+                      />
                     )}
                     {m.body}
                     <div className="text-[10px] opacity-70 mt-1 text-right">
