@@ -45,13 +45,17 @@ com card de link pro artigo do blog cotacertaseguros.com.br/blog).
   (`debug_token`: tipo PAGE, não vence, com `pages_manage_posts`). Falta só o
   usuário colocar `FACEBOOK_COTACERTA_PAGE_ID` e `FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN`
   no Render (valores em `CHAVES-LOCAL.md`).
-- [ ] Instagram (feed + Story) — `@cotacertaseguros` (`17841437674153172`) confirmado
-  conectado ao mesmo Portfólio, mas o token de usuário atual não tem a permissão
-  `instagram_content_publish` (só lê, não publica). Falta o usuário gerar um
-  token novo com essa permissão extra (passo a passo em `CHAVES-LOCAL.md`,
-  seção "Cota Certa Seguros — conexão Meta"); assim que existir, Stories
-  acende junto (já codificado em `publique.js`, sem precisar mexer em nada).
-- [ ] Twitter/LinkedIn/Threads do Cota Certa: ainda não configurados
+- [x] Instagram (feed + Story) — token definitivo (Usuário do Sistema `bot-webhook`,
+  "Nunca expira") gerado e testado ao vivo (`debug_token`: `SYSTEM_USER`,
+  `expires_at: 0`, com `instagram_content_publish`). Precisou de um pequeno
+  ajuste em `instagram.js`/`publique.js` (parâmetro `host`, já commitado) já
+  que esse token fala com `graph.facebook.com`, não `graph.instagram.com`
+  como o fluxo da Felizcred. Falta só o usuário colocar
+  `INSTAGRAM_COTACERTA_ACCESS_TOKEN`/`INSTAGRAM_COTACERTA_ACCOUNT_ID` no
+  Render (valores em `CHAVES-LOCAL.md`); Stories acende junto, mesma credencial.
+- [ ] Threads do Cota Certa: ainda não configurado (mesmo limite de 60 dias que a
+  Felizcred, sem alternativa definitiva — Threads não tem Usuário do Sistema)
+- [ ] Twitter/LinkedIn do Cota Certa: ainda não configurados
 
 ## Como foi feito (pra repetir depois)
 
