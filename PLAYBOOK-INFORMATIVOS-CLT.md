@@ -44,9 +44,9 @@ salarial).
 
 ## Status
 
-- [ ] Playbook aprovado pelo usuário
-- [ ] 20 imagens geradas (skill `carrossel-formato-tuiter`, modo `story`)
-- [ ] 20 publicações agendadas via `/painel/api/agenda` (`redes: ["instagram_story"]`)
+- [x] Playbook aprovado pelo usuário
+- [x] 20 imagens geradas (skill `carrossel-formato-tuiter`, modo `story`)
+- [x] 20 publicações agendadas via `/painel/api/agenda` (`redes: ["instagram_story"]`) — IDs 48-67 na fila
 
 ## Como foi feito (pra repetir depois)
 
