@@ -186,6 +186,26 @@ async function markAsRead(fromPhoneNumberId, messageId) {
   return json;
 }
 
+// Checa se o App está inscrito nos webhooks dessa conta do WhatsApp (WABA) — sem essa
+// inscrição, a Meta nunca avisa o servidor de mensagens novas (o número existe e manda
+// mensagem normal, mas o /webhook daqui nunca é chamado, então o bot nunca "vê" nada chegar).
+// Diferente do registro de número (POST .../register) — número novo pode estar registrado
+// certinho e mesmo assim não ter essa inscrição, porque ela é por WABA, feita geralmente uma
+// vez pelo fluxo padrão de onboarding, que números criados "no meio do caminho" podem pular.
+async function checarInscricaoWebhook(wabaId) {
+  const { status, buffer } = await graphRequest("GET", "graph.facebook.com", `/${GRAPH_VERSION}/${wabaId}/subscribed_apps`);
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao checar inscrição de webhook: ${JSON.stringify(json)}`);
+  return json; // { data: [{ whatsapp_business_api_data: { id, name, ... } }] }
+}
+
+async function inscreverWebhook(wabaId) {
+  const { status, buffer } = await graphRequest("POST", "graph.facebook.com", `/${GRAPH_VERSION}/${wabaId}/subscribed_apps`);
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao inscrever webhook: ${JSON.stringify(json)}`);
+  return json; // { success: true }
+}
+
 async function getMediaInfo(mediaId) {
   const { status, buffer } = await graphRequest(
     "GET",
@@ -230,6 +250,8 @@ module.exports = {
   sendList,
   sendTemplate,
   registerNumber,
+  checarInscricaoWebhook,
+  inscreverWebhook,
   downloadMedia,
   markAsRead,
 };

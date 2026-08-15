@@ -1917,6 +1917,31 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // GET/POST /painel/api/webhook-inscricao/:wabaId — checa (GET) ou corrige (POST) a
+    // inscrição de webhook de uma conta do WhatsApp (WABA, não o número). Sem essa inscrição
+    // a Meta nunca chama nosso /webhook, então o bot nunca reage a mensagem nenhuma nesse
+    // número, mesmo com tudo mais certo (número registrado, template aprovado etc.). Mesma
+    // filosofia do registrar-numero: ação administrativa, sem botão na interface.
+    const matchWebhookInscricao = path_.match(/^\/painel\/api\/webhook-inscricao\/([^/]+)$/);
+    if (req.method === "GET" && matchWebhookInscricao) {
+      if (!requireAuth(req, res)) return;
+      try {
+        const result = await wa.checarInscricaoWebhook(decodeURIComponent(matchWebhookInscricao[1]));
+        return send(res, 200, result);
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+    if (req.method === "POST" && matchWebhookInscricao) {
+      if (!requireAuth(req, res)) return;
+      try {
+        const result = await wa.inscreverWebhook(decodeURIComponent(matchWebhookInscricao[1]));
+        return send(res, 200, result);
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+
     // POST /painel/api/instagram/importar-historico — importa as DMs que já existiam antes
     // da gravação automática via webhook começar (ver instagramImportarHistorico acima).
     // Idempotente — pode clicar de novo sem duplicar.
