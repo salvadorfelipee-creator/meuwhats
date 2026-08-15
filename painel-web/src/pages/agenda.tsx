@@ -199,8 +199,14 @@ export function AgendaPage() {
 
         <div className="px-4 pb-4">
           <p className="text-xs font-medium text-muted-foreground mb-2">Histórico recente</p>
-          <ScrollArea className="max-h-[420px]">
-            <div className="flex flex-col gap-2 pr-2">
+          <ScrollArea
+            className="max-h-[420px]"
+            style={{
+              maskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black calc(100% - 28px), transparent 100%)",
+            }}
+          >
+            <div className="flex flex-col gap-2 pr-2 pb-6">
               {recentes.map((item) => (
                 <PostCard
                   key={item.id}
