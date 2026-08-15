@@ -553,14 +553,16 @@ const LEMBRETE_TEXTOS = {
     "Olá! Ainda por aí? 😊 Pra eu simular o consignado CLT, só preciso saber se você tem 3 meses ou " +
     "mais de carteira assinada no seu trabalho atual.",
   // 2 toques: o primeiro só lembra (mesmo texto de sempre); o segundo, 4h depois, muda de
-  // abordagem — em vez de repetir o pedido, reduz o atrito (5 campos de uma vez assusta,
-  // deixa claro que dá pra mandar aos poucos). Nunca insiste 2x com o mesmo texto —
-  // atendimento repetitivo é o padrão "agressivo" que queremos evitar.
+  // abordagem — em vez de repetir o pedido de dados (não pede CPF de novo, fica pesado),
+  // oferece um caminho mais fácil: falar com um atendente humano. Qualquer resposta a esse
+  // 2º toque (não só "sim") é tratada como aceite e encaminha pro atendimento — ver
+  // handlerCapturaDadosClt, que checa fluxo_lembrete >= 2. Nunca insiste 2x com o mesmo
+  // texto — atendimento repetitivo é o padrão "agressivo" que queremos evitar.
   clt_3mais: [
     "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
       "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
-    "Sem compromisso nenhum, é só pra simular 😊 Se preferir, pode começar só com nome e CPF que eu já " +
-      "adianto — o resto (telefone, e-mail, data de nascimento) você me manda depois, sem pressa.",
+    "Sem compromisso nenhum 😊 Você deseja falar com um atendente humano pra simular? É só responder " +
+      "aqui que eu já te encaminho.",
   ],
   carro_garantia_dados:
     "Olá! Só lembrando que pra eu simular seu empréstimo com carro em garantia, preciso desses dados 😊\n" +
@@ -574,8 +576,8 @@ const LEMBRETE_TEXTOS = {
   campanha_clt_dados: [
     "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
       "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
-    "Sem compromisso nenhum, é só pra simular 😊 Se preferir, pode começar só com nome e CPF que eu já " +
-      "adianto — o resto (telefone, e-mail, data de nascimento) você me manda depois, sem pressa.",
+    "Sem compromisso nenhum 😊 Você deseja falar com um atendente humano pra simular? É só responder " +
+      "aqui que eu já te encaminho.",
   ],
   padrao:
     "Olá! Vi que você parou no meio do atendimento. Para continuar, é só tocar em uma das opções da " +
@@ -688,6 +690,20 @@ async function confirmarDadosRecebidos(de, businessNumberId) {
   await db.setFluxoPasso(de, businessNumberId, null);
 }
 
+// Resposta de quem respondeu ao 2º toque do lembrete ("deseja falar com atendente humano pra
+// simular?") sem mandar os dados — a pergunta já é sim/não, então qualquer resposta conta
+// como aceite e encaminha, sem checar CPF. Ver handlerCapturaDadosClt/CampanhaClt.
+async function confirmarEncaminhamentoHumano(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Perfeito! 😊 Já vou te colocar com um atendente — em breve eu, Felipe, te chamo por aqui pra fazer " +
+      "sua simulação. 🙌" +
+      avisoForaHorarioCotaCerta()
+  );
+  await db.setFluxoPasso(de, businessNumberId, null);
+}
+
 // Depois que a pessoa manda os dados pedidos em clt_3mais — confirma e libera pro
 // atendimento humano (Felipe assume dali pra frente, com os dados já visíveis no
 // histórico da conversa no painel).
@@ -699,12 +715,19 @@ async function confirmarDadosRecebidos(de, businessNumberId) {
 // reseta o relógio do lembrete (fica quieto, sem incomodar) — só cobra de volta depois de um
 // tempo sem novidade (LEMBRETE_TEXTOS.clt_3mais), nunca na hora.
 async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
-  if (!REGEX_CPF.test(corpo || "")) {
-    await db.setFluxoPasso(de, businessNumberId, "clt_3mais"); // reafirma o passo, reseta o lembrete
+  if (REGEX_CPF.test(corpo || "")) {
+    logFunil(businessNumberId, de, "clt_dados_completos");
+    await confirmarDadosRecebidos(de, businessNumberId);
     return;
   }
-  logFunil(businessNumberId, de, "clt_dados_completos");
-  await confirmarDadosRecebidos(de, businessNumberId);
+  // Já mandamos os 2 toques (o 2º pergunta se quer falar com atendente humano) — qualquer
+  // resposta aqui, mesmo sem CPF, conta como aceite e encaminha pro atendimento.
+  const conversa = await db.getConversation(de, businessNumberId);
+  if (Number(conversa?.fluxo_lembrete) >= 2) {
+    await confirmarEncaminhamentoHumano(de, businessNumberId);
+    return;
+  }
+  await db.setFluxoPasso(de, businessNumberId, "clt_3mais"); // reafirma o passo, reseta o lembrete
 }
 
 // Mesmo padrão do handlerCapturaDadosClt acima, mas passo próprio (campanha_clt_dados) pra
@@ -713,12 +736,17 @@ async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
 // (mesmo passo, mesmo lembrete), o que ia contra o pedido de manter a campanha fora do fluxo
 // já cadastrado do menu principal.
 async function handlerCapturaDadosCampanhaClt(de, businessNumberId, corpo) {
-  if (!REGEX_CPF.test(corpo || "")) {
-    await db.setFluxoPasso(de, businessNumberId, "campanha_clt_dados");
+  if (REGEX_CPF.test(corpo || "")) {
+    logFunil(businessNumberId, de, "campanha_dados_completos");
+    await confirmarDadosRecebidos(de, businessNumberId);
     return;
   }
-  logFunil(businessNumberId, de, "campanha_dados_completos");
-  await confirmarDadosRecebidos(de, businessNumberId);
+  const conversa = await db.getConversation(de, businessNumberId);
+  if (Number(conversa?.fluxo_lembrete) >= 2) {
+    await confirmarEncaminhamentoHumano(de, businessNumberId);
+    return;
+  }
+  await db.setFluxoPasso(de, businessNumberId, "campanha_clt_dados");
 }
 
 // Mesmo padrão do CLT, mas pros funis de carro em garantia e financiamento — sinal de
