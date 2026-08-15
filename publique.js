@@ -91,6 +91,41 @@ const CONTAS = [
           : null,
     },
   },
+  {
+    id: "ciahot",
+    nome: "Ciahot",
+    redes: {
+      instagram:
+        env("INSTAGRAM_CIAHOT_ACCESS_TOKEN") && env("INSTAGRAM_CIAHOT_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_CIAHOT_ACCESS_TOKEN"), accountId: env("INSTAGRAM_CIAHOT_ACCOUNT_ID") }
+          : null,
+      instagram_story:
+        env("INSTAGRAM_CIAHOT_ACCESS_TOKEN") && env("INSTAGRAM_CIAHOT_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_CIAHOT_ACCESS_TOKEN"), accountId: env("INSTAGRAM_CIAHOT_ACCOUNT_ID") }
+          : null,
+      facebook:
+        env("FACEBOOK_CIAHOT_PAGE_ACCESS_TOKEN") && env("FACEBOOK_CIAHOT_PAGE_ID")
+          ? { token: env("FACEBOOK_CIAHOT_PAGE_ACCESS_TOKEN"), paginaId: env("FACEBOOK_CIAHOT_PAGE_ID") }
+          : null,
+      twitter:
+        env("TWITTER_CIAHOT_API_KEY") && env("TWITTER_CIAHOT_API_SECRET") && env("TWITTER_CIAHOT_ACCESS_TOKEN") && env("TWITTER_CIAHOT_ACCESS_SECRET")
+          ? {
+              apiKey: env("TWITTER_CIAHOT_API_KEY"),
+              apiSecret: env("TWITTER_CIAHOT_API_SECRET"),
+              accessToken: env("TWITTER_CIAHOT_ACCESS_TOKEN"),
+              accessSecret: env("TWITTER_CIAHOT_ACCESS_SECRET"),
+            }
+          : null,
+      linkedin:
+        env("LINKEDIN_CIAHOT_ACCESS_TOKEN") && env("LINKEDIN_CIAHOT_AUTHOR_URN")
+          ? { token: env("LINKEDIN_CIAHOT_ACCESS_TOKEN"), autorUrn: env("LINKEDIN_CIAHOT_AUTHOR_URN") }
+          : null,
+      threads:
+        env("THREADS_CIAHOT_ACCESS_TOKEN") && env("THREADS_CIAHOT_USER_ID")
+          ? { accessToken: env("THREADS_CIAHOT_ACCESS_TOKEN"), userId: env("THREADS_CIAHOT_USER_ID") }
+          : null,
+    },
+  },
   // Próxima conta entra aqui como um novo objeto igual ao de cima.
 ];
 
