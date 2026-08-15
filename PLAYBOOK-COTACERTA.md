@@ -40,21 +40,26 @@ com card de link pro artigo do blog cotacertaseguros.com.br/blog).
 - [x] Conteúdo aprovado pelo usuário
 - [x] 40 imagens geradas (8 carrosséis × 5 slides, skill `carrossel-formato-tuiter`, modo `feed`)
 - [x] 8 carrosséis agendados via `/painel/api/agenda` (`redes: ["instagram"]`, `contaId: "cotacerta"`) — IDs 100-107 na fila, cadência dia-sim-dia-não completa
-- [x] Facebook da Página "Cota certa seguros" (`105193575892026`) confirmado dentro do mesmo
-  Portfólio Empresarial da Felizcred — token de Página real gerado e testado
-  (`debug_token`: tipo PAGE, não vence, com `pages_manage_posts`). Falta só o
-  usuário colocar `FACEBOOK_COTACERTA_PAGE_ID` e `FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN`
-  no Render (valores em `CHAVES-LOCAL.md`).
+- [x] Facebook da Página "Cota certa seguros" (`105193575892026`) — token de Página real
+  gerado e testado (`debug_token`: tipo PAGE, não vence, com `pages_manage_posts`).
+  `FACEBOOK_COTACERTA_PAGE_ID`/`FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN` já colados
+  no Render pelo usuário — confirmado ao vivo via `/painel/api/publicar/contas`
+  que a rede "facebook" já aparece disponível pra conta Cota Certa.
 - [x] Instagram (feed + Story) — token definitivo (Usuário do Sistema `bot-webhook`,
   "Nunca expira") gerado e testado ao vivo (`debug_token`: `SYSTEM_USER`,
   `expires_at: 0`, com `instagram_content_publish`). Precisou de um pequeno
   ajuste em `instagram.js`/`publique.js` (parâmetro `host`, já commitado) já
   que esse token fala com `graph.facebook.com`, não `graph.instagram.com`
-  como o fluxo da Felizcred. Falta só o usuário colocar
-  `INSTAGRAM_COTACERTA_ACCESS_TOKEN`/`INSTAGRAM_COTACERTA_ACCOUNT_ID` no
-  Render (valores em `CHAVES-LOCAL.md`); Stories acende junto, mesma credencial.
-- [ ] Threads do Cota Certa: ainda não configurado (mesmo limite de 60 dias que a
-  Felizcred, sem alternativa definitiva — Threads não tem Usuário do Sistema)
+  como o fluxo da Felizcred. `INSTAGRAM_COTACERTA_ACCESS_TOKEN`/
+  `INSTAGRAM_COTACERTA_ACCOUNT_ID` já colados no Render — confirmado ao vivo
+  que "instagram" e "instagram_story" já aparecem disponíveis pra conta.
+- [x] Threads — token gerado via "Gerador de token do usuário" (mesmo App/caso
+  de uso do Threads da Felizcred), confirmado ao vivo via
+  `graph.threads.net/v1.0/me` — conta `@cotacertaseguros`, ID
+  `28344506855153852`. Vence em ~60 dias (Threads não tem Usuário do Sistema,
+  sem alternativa definitiva). Falta o usuário colocar
+  `THREADS_COTACERTA_ACCESS_TOKEN`/`THREADS_COTACERTA_USER_ID` no Render
+  (valores em `CHAVES-LOCAL.md`).
 - [ ] Twitter/LinkedIn do Cota Certa: ainda não configurados
 
 ## Como foi feito (pra repetir depois)
