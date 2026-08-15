@@ -60,13 +60,17 @@ const CONTAS = [
     id: "cotacerta",
     nome: "Cota Certa Seguros",
     redes: {
+      // host: "graph.facebook.com" (em vez do padrão graph.instagram.com) porque essa conta
+      // usa um token de Usuário do Sistema (Business Manager, "Nunca expira") em vez do fluxo
+      // "Login do Instagram" que a Felizcred usa — token de Usuário do Sistema só fala com a
+      // Graph API clássica do Facebook, não com o host específico do Login do Instagram.
       instagram:
         env("INSTAGRAM_COTACERTA_ACCESS_TOKEN") && env("INSTAGRAM_COTACERTA_ACCOUNT_ID")
-          ? { accessToken: env("INSTAGRAM_COTACERTA_ACCESS_TOKEN"), accountId: env("INSTAGRAM_COTACERTA_ACCOUNT_ID") }
+          ? { accessToken: env("INSTAGRAM_COTACERTA_ACCESS_TOKEN"), accountId: env("INSTAGRAM_COTACERTA_ACCOUNT_ID"), host: "graph.facebook.com" }
           : null,
       instagram_story:
         env("INSTAGRAM_COTACERTA_ACCESS_TOKEN") && env("INSTAGRAM_COTACERTA_ACCOUNT_ID")
-          ? { accessToken: env("INSTAGRAM_COTACERTA_ACCESS_TOKEN"), accountId: env("INSTAGRAM_COTACERTA_ACCOUNT_ID") }
+          ? { accessToken: env("INSTAGRAM_COTACERTA_ACCESS_TOKEN"), accountId: env("INSTAGRAM_COTACERTA_ACCOUNT_ID"), host: "graph.facebook.com" }
           : null,
       facebook:
         env("FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN") && env("FACEBOOK_COTACERTA_PAGE_ID")
@@ -158,6 +162,7 @@ const ADAPTADORES = {
         legenda: conteudo.texto,
         accessToken: credenciais.accessToken,
         accountId: credenciais.accountId,
+        host: credenciais.host,
       });
     }
     if (!conteudo.imagemUrl) throw new Error("Instagram exige uma imagem.");
@@ -166,6 +171,7 @@ const ADAPTADORES = {
       legenda: conteudo.texto,
       accessToken: credenciais.accessToken,
       accountId: credenciais.accountId,
+      host: credenciais.host,
     });
   },
   instagram_story: (conteudo, credenciais) => {
@@ -177,6 +183,7 @@ const ADAPTADORES = {
       imagemUrl: conteudo.imagemUrl,
       accessToken: credenciais.accessToken,
       accountId: credenciais.accountId,
+      host: credenciais.host,
     });
   },
   facebook: (conteudo, credenciais) => {

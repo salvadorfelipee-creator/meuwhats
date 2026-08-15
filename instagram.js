@@ -4,13 +4,13 @@ const GRAPH_VERSION = "v21.0";
 const ACCESS_TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const ACCOUNT_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 
-function graphRequest(method, requestPath, body, tokenOverride) {
+function graphRequest(method, requestPath, body, tokenOverride, hostOverride) {
   return new Promise((resolve, reject) => {
     const payload = body ? JSON.stringify(body) : null;
     const req = https.request(
       {
         method,
-        hostname: "graph.instagram.com",
+        hostname: hostOverride || "graph.instagram.com",
         path: requestPath,
         headers: {
           Authorization: `Bearer ${tokenOverride || ACCESS_TOKEN}`,
@@ -157,13 +157,14 @@ function sleep(ms) {
 // O Instagram baixa/processa a imagem em segundo plano depois de criar o container —
 // publicar direto na sequência falha com "media is not ready for publishing" se a Meta
 // ainda não terminou. Espera até o status virar FINISHED (ou desiste em ~30s).
-async function aguardarContainerPronto(token, containerId, tentativas = 15, intervaloMs = 2000) {
+async function aguardarContainerPronto(token, containerId, host, tentativas = 15, intervaloMs = 2000) {
   for (let i = 0; i < tentativas; i++) {
     const { status, json } = await graphRequest(
       "GET",
       `/${GRAPH_VERSION}/${containerId}?fields=status_code`,
       null,
-      token
+      token,
+      host
     );
     if (status >= 400) throw new Error(`Falha ao checar status da publicação: ${JSON.stringify(json)}`);
     if (json.status_code === "FINISHED") return;
@@ -178,24 +179,26 @@ async function aguardarContainerPronto(token, containerId, tentativas = 15, inte
 // Publica uma imagem no feed (usado pelo Publique IV — ver PUBLIQUE-IV.md).
 // accessToken/accountId são opcionais: se não vierem, cai no token/conta padrão (Felizcred,
 // via env). Passar os dois explicitamente é o jeito de publicar em outra conta de Instagram.
-async function publicarImagem({ imagemUrl, legenda, accessToken, accountId }) {
+async function publicarImagem({ imagemUrl, legenda, accessToken, accountId, host }) {
   const token = accessToken || ACCESS_TOKEN;
   const conta = accountId || ACCOUNT_ID;
   const { status, json: container } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media`,
     { image_url: imagemUrl, caption: legenda || "" },
-    token
+    token,
+    host
   );
   if (status >= 400) throw new Error(`Falha ao criar publicação no Instagram: ${JSON.stringify(container)}`);
 
-  await aguardarContainerPronto(token, container.id);
+  await aguardarContainerPronto(token, container.id, host);
 
   const { status: s2, json: publicado } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media_publish`,
     { creation_id: container.id },
-    token
+    token,
+    host
   );
   if (s2 >= 400) throw new Error(`Falha ao publicar no Instagram: ${JSON.stringify(publicado)}`);
 
@@ -205,7 +208,8 @@ async function publicarImagem({ imagemUrl, legenda, accessToken, accountId }) {
       "GET",
       `/${GRAPH_VERSION}/${publicado.id}?fields=permalink`,
       null,
-      token
+      token,
+      host
     );
     if (s3 < 400) link = dados.permalink;
   } catch {
@@ -218,7 +222,7 @@ async function publicarImagem({ imagemUrl, legenda, accessToken, accountId }) {
 // o conteúdo tem `imagemUrls` (array) em vez de uma `imagemUrl` só. Cada imagem primeiro vira
 // um item filho (is_carousel_item), depois um container "pai" media_type CAROUSEL referencia
 // os filhos pelos IDs (children, string separada por vírgula) — só então publica.
-async function publicarCarrossel({ imagemUrls, legenda, accessToken, accountId }) {
+async function publicarCarrossel({ imagemUrls, legenda, accessToken, accountId, host }) {
   if (!imagemUrls || imagemUrls.length < 2) throw new Error("Carrossel exige ao menos 2 imagens.");
   if (imagemUrls.length > 10) throw new Error("Carrossel do Instagram aceita no máximo 10 imagens.");
   const token = accessToken || ACCESS_TOKEN;
@@ -230,7 +234,8 @@ async function publicarCarrossel({ imagemUrls, legenda, accessToken, accountId }
       "POST",
       `/${GRAPH_VERSION}/${conta}/media`,
       { image_url: imagemUrl, is_carousel_item: true },
-      token
+      token,
+      host
     );
     if (status >= 400) throw new Error(`Falha ao criar item do carrossel no Instagram: ${JSON.stringify(filho)}`);
     filhoIds.push(filho.id);
@@ -240,17 +245,19 @@ async function publicarCarrossel({ imagemUrls, legenda, accessToken, accountId }
     "POST",
     `/${GRAPH_VERSION}/${conta}/media`,
     { media_type: "CAROUSEL", children: filhoIds.join(","), caption: legenda || "" },
-    token
+    token,
+    host
   );
   if (status >= 400) throw new Error(`Falha ao criar carrossel no Instagram: ${JSON.stringify(container)}`);
 
-  await aguardarContainerPronto(token, container.id);
+  await aguardarContainerPronto(token, container.id, host);
 
   const { status: s2, json: publicado } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media_publish`,
     { creation_id: container.id },
-    token
+    token,
+    host
   );
   if (s2 >= 400) throw new Error(`Falha ao publicar carrossel no Instagram: ${JSON.stringify(publicado)}`);
 
@@ -260,7 +267,8 @@ async function publicarCarrossel({ imagemUrls, legenda, accessToken, accountId }
       "GET",
       `/${GRAPH_VERSION}/${publicado.id}?fields=permalink`,
       null,
-      token
+      token,
+      host
     );
     if (s3 < 400) link = dados.permalink;
   } catch {
@@ -272,24 +280,26 @@ async function publicarCarrossel({ imagemUrls, legenda, accessToken, accountId }
 // Publica um Reels (vídeo) no feed — usado pela fila de agendamento em massa (ver
 // PUBLIQUE-IV.md, seção Reels). Igual à publicação de imagem, mas com media_type REELS
 // e um tempo de espera bem maior no polling: processar vídeo demora bem mais que imagem.
-async function publicarReels({ videoUrl, legenda, accessToken, accountId }) {
+async function publicarReels({ videoUrl, legenda, accessToken, accountId, host }) {
   const token = accessToken || ACCESS_TOKEN;
   const conta = accountId || ACCOUNT_ID;
   const { status, json: container } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media`,
     { media_type: "REELS", video_url: videoUrl, caption: legenda || "", share_to_feed: true },
-    token
+    token,
+    host
   );
   if (status >= 400) throw new Error(`Falha ao criar publicação de Reels no Instagram: ${JSON.stringify(container)}`);
 
-  await aguardarContainerPronto(token, container.id, 40, 5000); // até ~3min de processamento
+  await aguardarContainerPronto(token, container.id, host, 40, 5000); // até ~3min de processamento
 
   const { status: s2, json: publicado } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media_publish`,
     { creation_id: container.id },
-    token
+    token,
+    host
   );
   if (s2 >= 400) throw new Error(`Falha ao publicar Reels no Instagram: ${JSON.stringify(publicado)}`);
 
@@ -299,7 +309,8 @@ async function publicarReels({ videoUrl, legenda, accessToken, accountId }) {
       "GET",
       `/${GRAPH_VERSION}/${publicado.id}?fields=permalink`,
       null,
-      token
+      token,
+      host
     );
     if (s3 < 400) link = dados.permalink;
   } catch {
@@ -312,24 +323,26 @@ async function publicarReels({ videoUrl, legenda, accessToken, accountId }) {
 // marca "Instagram Stories" em vez de (ou além de) "Instagram" (feed). Diferente do feed, a
 // API do Instagram NÃO aceita legenda em Story (não existe texto sobreposto via API) — o
 // campo é ignorado de propósito, mesmo que o post tenha texto preenchido.
-async function publicarStory({ imagemUrl, accessToken, accountId }) {
+async function publicarStory({ imagemUrl, accessToken, accountId, host }) {
   const token = accessToken || ACCESS_TOKEN;
   const conta = accountId || ACCOUNT_ID;
   const { status, json: container } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media`,
     { media_type: "STORIES", image_url: imagemUrl },
-    token
+    token,
+    host
   );
   if (status >= 400) throw new Error(`Falha ao criar Story no Instagram: ${JSON.stringify(container)}`);
 
-  await aguardarContainerPronto(token, container.id);
+  await aguardarContainerPronto(token, container.id, host);
 
   const { status: s2, json: publicado } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media_publish`,
     { creation_id: container.id },
-    token
+    token,
+    host
   );
   if (s2 >= 400) throw new Error(`Falha ao publicar Story no Instagram: ${JSON.stringify(publicado)}`);
 
