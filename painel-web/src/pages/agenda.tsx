@@ -1,5 +1,5 @@
 import * as React from "react"
-import { api, type AgendaItem, type AgendaResumo, type ContaPublicar, type Rede } from "@/lib/api"
+import { api, type AgendaItem, type ContaPublicar, type Rede } from "@/lib/api"
 import { fileToBase64 } from "@/lib/file-to-base64"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,7 +50,8 @@ function formatDateTime(ts: number) {
 export function AgendaPage() {
   const [fila, setFila] = React.useState<AgendaItem[]>([])
   const [recentes, setRecentes] = React.useState<AgendaItem[]>([])
-  const [resumo, setResumo] = React.useState<AgendaResumo | null>(null)
+  const [contas, setContas] = React.useState<ContaPublicar[]>([])
+  const [contaFiltro, setContaFiltro] = React.useState("felizcred")
   const [mesAtual, setMesAtual] = React.useState(() => {
     const d = new Date()
     return new Date(d.getFullYear(), d.getMonth(), 1)
@@ -61,26 +62,35 @@ export function AgendaPage() {
   const carregar = React.useCallback(() => {
     api.agendaFila().then(setFila).catch(() => {})
     api.agendaLista().then((r) => {
-      setResumo(r.resumo)
       setRecentes(r.recentes)
     }).catch(() => {})
   }, [])
 
   React.useEffect(() => {
     carregar()
+    api.contasPublicar().then(setContas).catch(() => {})
     const id = setInterval(carregar, 15000)
     return () => clearInterval(id)
   }, [carregar])
 
+  const filaDaConta = React.useMemo(
+    () => fila.filter((item) => item.conta_id === contaFiltro),
+    [fila, contaFiltro],
+  )
+  const recentesDaConta = React.useMemo(
+    () => recentes.filter((item) => item.conta_id === contaFiltro),
+    [recentes, contaFiltro],
+  )
+
   const itensPorDia = React.useMemo(() => {
     const map = new Map<string, AgendaItem[]>()
-    for (const item of fila) {
+    for (const item of filaDaConta) {
       const chave = chaveDia(item.agendado_para)
       if (!map.has(chave)) map.set(chave, [])
       map.get(chave)!.push(item)
     }
     return map
-  }, [fila])
+  }, [filaDaConta])
 
   const diasDoMes = React.useMemo(() => {
     const ano = mesAtual.getFullYear()
@@ -94,8 +104,14 @@ export function AgendaPage() {
   }, [mesAtual])
 
   const itensDoDiaSelecionado = diaSelecionado
-    ? recentes.filter((i) => chaveDia(i.agendado_para) === diaSelecionado)
+    ? recentesDaConta.filter((i) => chaveDia(i.agendado_para) === diaSelecionado)
     : []
+
+  const resumoFiltrado = React.useMemo(() => {
+    const posted = recentesDaConta.filter((i) => i.status === "posted").length
+    const error = recentesDaConta.filter((i) => i.status === "error").length
+    return { pending: filaDaConta.length, posted, error, total: filaDaConta.length + posted + error }
+  }, [filaDaConta, recentesDaConta])
 
   async function acaoPublicarAgora(id: number) {
     if (!confirm("Publicar esse post agora, fora da hora marcada?")) return
@@ -124,16 +140,34 @@ export function AgendaPage() {
         <div className="h-14 px-4 flex items-center justify-between border-b shrink-0">
           <div>
             <p className="font-semibold text-sm">Agenda</p>
-            {resumo && (
-              <p className="text-xs text-muted-foreground">
-                {resumo.pending} pendente(s) · {resumo.posted} publicado(s) · {resumo.error} com erro
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {resumoFiltrado.pending} pendente(s) · {resumoFiltrado.posted} publicado(s) · {resumoFiltrado.error} com erro
+            </p>
           </div>
           <Button size="sm" onClick={() => setCriarOpen(true)}>
             <Plus className="h-4 w-4 mr-1" /> Novo post
           </Button>
         </div>
+
+        {contas.length > 1 && (
+          <div className="px-4 pt-3">
+            <label className="text-xs font-medium text-muted-foreground mb-1 block">Conta</label>
+            <select
+              className="flex h-9 w-full max-w-xs rounded-md border border-input bg-background px-3 py-1 text-sm"
+              value={contaFiltro}
+              onChange={(e) => {
+                setContaFiltro(e.target.value)
+                setDiaSelecionado(null)
+              }}
+            >
+              {contas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="p-4 max-w-xl">
           <div className="flex items-center justify-between mb-2">
@@ -207,7 +241,7 @@ export function AgendaPage() {
             }}
           >
             <div className="flex flex-col gap-2 pr-2 pb-6">
-              {recentes.map((item) => (
+              {recentesDaConta.map((item) => (
                 <PostCard
                   key={item.id}
                   item={item}
@@ -216,7 +250,7 @@ export function AgendaPage() {
                   onReenfileirar={() => acaoReenfileirar(item.id)}
                 />
               ))}
-              {recentes.length === 0 && (
+              {recentesDaConta.length === 0 && (
                 <p className="text-sm text-muted-foreground">Nenhum post ainda.</p>
               )}
             </div>
@@ -224,7 +258,7 @@ export function AgendaPage() {
         </div>
       </div>
 
-      <CriarPostDialog open={criarOpen} onOpenChange={setCriarOpen} onCriado={carregar} />
+      <CriarPostDialog open={criarOpen} onOpenChange={setCriarOpen} onCriado={carregar} contaPadrao={contaFiltro} />
     </div>
   )
 }
@@ -282,10 +316,12 @@ function CriarPostDialog({
   open,
   onOpenChange,
   onCriado,
+  contaPadrao,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCriado: () => void
+  contaPadrao?: string
 }) {
   const [contas, setContas] = React.useState<ContaPublicar[]>([])
   const [contaId, setContaId] = React.useState("")
@@ -301,10 +337,10 @@ function CriarPostDialog({
     if (!open) return
     api.contasPublicar().then((lista) => {
       setContas(lista)
-      if (lista.length && !contaId) setContaId(lista[0].id)
+      setContaId(contaPadrao && lista.some((c) => c.id === contaPadrao) ? contaPadrao : lista[0]?.id || "")
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, contaPadrao])
 
   const conta = contas.find((c) => c.id === contaId)
 
