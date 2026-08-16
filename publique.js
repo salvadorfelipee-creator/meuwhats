@@ -190,9 +190,10 @@ const ADAPTADORES = {
     if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
       throw new Error("Instagram Stories não suporta carrossel (formato de várias imagens deslizáveis).");
     }
-    if (!conteudo.imagemUrl) throw new Error("Story exige uma imagem.");
+    if (!conteudo.imagemUrl && !conteudo.videoUrl) throw new Error("Story exige uma imagem ou um vídeo.");
     return instagram.publicarStory({
       imagemUrl: conteudo.imagemUrl,
+      videoUrl: conteudo.videoUrl,
       accessToken: credenciais.accessToken,
       accountId: credenciais.accountId,
       host: credenciais.host,

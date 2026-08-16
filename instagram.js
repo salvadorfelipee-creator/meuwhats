@@ -319,23 +319,31 @@ async function publicarReels({ videoUrl, legenda, accessToken, accountId, host }
   return { id: publicado.id, link };
 }
 
-// Publica um Story (imagem, some em 24h) — usado pela Agenda de publicações quando o usuário
-// marca "Instagram Stories" em vez de (ou além de) "Instagram" (feed). Diferente do feed, a
-// API do Instagram NÃO aceita legenda em Story (não existe texto sobreposto via API) — o
-// campo é ignorado de propósito, mesmo que o post tenha texto preenchido.
-async function publicarStory({ imagemUrl, accessToken, accountId, host }) {
+// Publica um Story (imagem ou vídeo, some em 24h) — usado pela Agenda de publicações quando o
+// usuário marca "Instagram Stories" em vez de (ou além de) "Instagram" (feed). Diferente do
+// feed, a API do Instagram NÃO aceita legenda em Story (não existe texto sobreposto via API) —
+// o campo é ignorado de propósito, mesmo que o post tenha texto preenchido.
+// Vídeo em Story usa o mesmo mecanismo do Reels (media_type: "STORIES" + video_url, container
+// processado de forma assíncrona) — só a espera é mais longa que a de imagem, que fica pronta
+// quase na hora.
+async function publicarStory({ imagemUrl, videoUrl, accessToken, accountId, host }) {
   const token = accessToken || ACCESS_TOKEN;
   const conta = accountId || ACCOUNT_ID;
+  const params = videoUrl ? { media_type: "STORIES", video_url: videoUrl } : { media_type: "STORIES", image_url: imagemUrl };
   const { status, json: container } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media`,
-    { media_type: "STORIES", image_url: imagemUrl },
+    params,
     token,
     host
   );
   if (status >= 400) throw new Error(`Falha ao criar Story no Instagram: ${JSON.stringify(container)}`);
 
-  await aguardarContainerPronto(token, container.id, host);
+  if (videoUrl) {
+    await aguardarContainerPronto(token, container.id, host, 40, 5000); // até ~3min de processamento
+  } else {
+    await aguardarContainerPronto(token, container.id, host);
+  }
 
   const { status: s2, json: publicado } = await graphRequest(
     "POST",
