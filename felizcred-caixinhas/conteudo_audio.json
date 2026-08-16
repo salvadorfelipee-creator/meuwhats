@@ -1,0 +1,50 @@
+[
+  {
+    "pergunta": "Hora extra tem que pagar quanto a mais?",
+    "resposta": "No mínimo 50% a mais sobre o valor da hora normal. Em domingos e feriados trabalhados, o adicional sobe pra 100%."
+  },
+  {
+    "pergunta": "O pai também tem direito a licença quando o filho nasce?",
+    "resposta": "Sim, 5 dias de licença-paternidade — ou 20 dias em empresas que participam do programa Empresa Cidadã."
+  },
+  {
+    "pergunta": "Fui demitido sem justa causa — tenho direito à multa de 40% do FGTS?",
+    "resposta": "Tem sim. Você recebe o saldo total do FGTS mais 40% de multa, paga pelo empregador sobre todo o valor acumulado durante o contrato — não sai do seu saldo."
+  },
+  {
+    "pergunta": "Quem pede demissão tem direito a sacar o FGTS?",
+    "resposta": "Não. No pedido de demissão voluntária, o trabalhador não tem direito a sacar o saldo do FGTS nem à multa de 40% — isso só vale em situações como demissão sem justa causa."
+  },
+  {
+    "pergunta": "O que é rescisão indireta?",
+    "resposta": "É quando o empregador descumpre a lei — atrasa o salário por mais de 30 dias, por exemplo — e o trabalhador pede pra sair recebendo os mesmos direitos de uma demissão sem justa causa. Precisa ser reconhecida pela Justiça do Trabalho."
+  },
+  {
+    "pergunta": "INSS negou meu auxílio-doença — o que eu faço?",
+    "resposta": "Você pode entrar com recurso administrativo pelo Meu INSS, dentro do prazo indicado na decisão, reforçando a documentação médica. Se o recurso também for negado, dá pra recorrer à via judicial."
+  },
+  {
+    "pergunta": "Sofri um acidente e fiquei com sequela, mas ainda trabalho — tenho direito a algo do INSS?",
+    "resposta": "Tem sim, o auxílio-acidente — um benefício pago junto com o salário pra quem ficou com sequela permanente que reduz a capacidade de trabalho, mesmo continuando a trabalhar."
+  },
+  {
+    "pergunta": "Negativado consegue fazer empréstimo consignado CLT?",
+    "resposta": "Consegue, na maioria dos casos. Como a parcela é descontada direto da folha antes do salário cair na conta, o banco depende muito menos do seu histórico no SPC/Serasa do que num empréstimo comum."
+  },
+  {
+    "pergunta": "Já saí do emprego — ainda posso sacar o abono salarial?",
+    "resposta": "Pode sim. O que importa é ter cumprido os requisitos no ano-base — estar empregado, desempregado ou autônomo hoje não muda o seu direito."
+  },
+  {
+    "pergunta": "É verdade que existe empréstimo com \"aprovação garantida\" mesmo pra negativado?",
+    "resposta": "Desconfie. Nenhuma instituição séria aprova 100% dos pedidos sem nenhuma análise — essa promessa é um dos principais sinais de golpe."
+  },
+  {
+    "pergunta": "Existe seguro pra quando fico impossibilitado de trabalhar por semanas?",
+    "resposta": "Existe, o seguro renda protegida — também chamado de seguro DIT. Ele paga uma renda diária ou mensal enquanto você está afastado por acidente ou doença, depois de um período de carência."
+  },
+  {
+    "pergunta": "Gestante pode ser demitida durante a gravidez?",
+    "resposta": "Em regra, não. A gestante tem estabilidade provisória desde a confirmação da gravidez até 5 meses depois do parto, e não pode ser demitida sem justa causa nesse período."
+  }
+]

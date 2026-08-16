@@ -13,3 +13,9 @@ media/
 # inflariam o histórico do Git com binários grandes sem necessidade.
 felizcred-site/logo/
 sitefelizcred/
+
+# Vídeos de fundo (Klickpin/Pinterest) e a saída gerada (overlay/áudio/vídeo
+# por item, ~90MB) da série de caixinhas da Felizcred — já publicados via R2/
+# agenda, não precisam ficar versionados. Conteúdo/scripts continuam no Git.
+felizcred-caixinhas/saida/
+felizcred-caixinhas/*.mp4
