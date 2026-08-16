@@ -230,6 +230,14 @@ function decodificarImagemBase64(dataUrl) {
   return { buffer: Buffer.from(match[2], "base64"), contentType: match[1], nomeArquivo: `imagem.${ext}` };
 }
 
+// Igual a decodificarImagemBase64, mas pra vídeo (Reels agendado pela agenda multi-rede).
+function decodificarVideoBase64(dataUrl) {
+  const match = /^data:(video\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || "");
+  if (!match) throw new Error("Formato de vídeo inválido");
+  const ext = match[1] === "video/quicktime" ? "mov" : "mp4";
+  return { buffer: Buffer.from(match[2], "base64"), contentType: match[1], nomeArquivo: `video.${ext}` };
+}
+
 function send(res, status, body, headers = {}) {
   if (Buffer.isBuffer(body)) {
     res.writeHead(status, headers);
@@ -2127,6 +2135,8 @@ const server = http.createServer(async (req, res) => {
             imagensPorRede[rede] = decodificarImagemBase64(b64);
           }
         }
+        let video = {};
+        if (body.videoBase64) video = decodificarVideoBase64(body.videoBase64);
         const criado = await agenda.criarAgendamento({
           contaId: body.contaId,
           texto: body.texto,
@@ -2138,6 +2148,9 @@ const server = http.createServer(async (req, res) => {
           imagemContentType: imagem.contentType,
           imagens,
           imagensPorRede,
+          videoBuffer: video.buffer,
+          videoNomeArquivo: video.nomeArquivo,
+          videoContentType: video.contentType,
         });
         return send(res, 200, criado);
       } catch (err) {

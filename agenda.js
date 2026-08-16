@@ -48,10 +48,18 @@ function timestampDeDataHora(dataHoraString) {
 // `imagensPorRede` (opcional): objeto { rede: { buffer, nomeArquivo, contentType } } — versão
 // da imagem reenquadrada manualmente no painel pra uma rede específica (ex. Stories 9:16), só
 // vale a pena junto com imagemBuffer (não faz sentido em carrossel).
-async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, imagemBuffer, imagemNomeArquivo, imagemContentType, imagens, imagensPorRede }) {
-  if (!texto && !imagemBuffer && !(imagens && imagens.length)) throw new Error("Informe ao menos um texto ou uma imagem.");
+// `videoBuffer` (opcional): vídeo pra publicar como Reels — vira `redes: ["instagram_reels"]`.
+// Reaproveita o mesmo helper de upload das imagens (r2.enviarVideo já é genérico pra qualquer
+// binário, só o nome é histórico).
+async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, imagemBuffer, imagemNomeArquivo, imagemContentType, imagens, imagensPorRede, videoBuffer, videoNomeArquivo, videoContentType }) {
+  if (!texto && !imagemBuffer && !(imagens && imagens.length) && !videoBuffer) throw new Error("Informe ao menos um texto, uma imagem ou um vídeo.");
   if (!redes || !redes.length) throw new Error("Marque ao menos uma rede.");
   const agendadoPara = timestampDeDataHora(dataHoraString);
+
+  let videoKey = null;
+  if (videoBuffer) {
+    videoKey = await enviarImagem(videoBuffer, videoNomeArquivo || "video.mp4", videoContentType);
+  }
 
   let imagemKey = null;
   let imagemKeys = null;
@@ -69,7 +77,7 @@ async function criarAgendamento({ contaId, texto, link, redes, dataHoraString, i
     }
   }
 
-  const id = await db.agendaCriar({ contaId: contaId || "felizcred", texto, link, imagemKey, imagemKeys, imagemPorRedeKeys, redes, agendadoPara });
+  const id = await db.agendaCriar({ contaId: contaId || "felizcred", texto, link, imagemKey, imagemKeys, imagemPorRedeKeys, videoKey, redes, agendadoPara });
   return { id, agendadoPara };
 }
 
@@ -90,6 +98,7 @@ async function publicarAgendamento(item) {
           await Promise.all(Object.entries(imagemPorRedeKeys).map(async ([rede, key]) => [rede, await r2.urlAssinada(key)]))
         )
       : undefined;
+    const videoUrl = item.video_key ? await r2.urlAssinada(item.video_key) : undefined;
     const redes = JSON.parse(item.redes);
     const resultado = await publique.publicarEmTodos({
       contaId: item.conta_id,
@@ -97,6 +106,7 @@ async function publicarAgendamento(item) {
       imagemUrl,
       imagemUrls,
       imagemUrlPorRede,
+      videoUrl,
       link: item.link,
       redes,
     });
@@ -141,7 +151,8 @@ async function enriquecerItem(item) {
     ? await Promise.all(imagemKeys.map((key) => r2.urlAssinada(key, 3600)))
     : null;
   const imagemUrl = imagemUrls ? imagemUrls[0] : (item.imagem_key ? await r2.urlAssinada(item.imagem_key, 3600) : null);
-  return { ...item, redes: JSON.parse(item.redes), imagemUrl, imagemUrls };
+  const videoUrl = item.video_key ? await r2.urlAssinada(item.video_key, 3600) : null;
+  return { ...item, redes: JSON.parse(item.redes), imagemUrl, imagemUrls, videoUrl };
 }
 
 async function listarFila() {
@@ -168,6 +179,7 @@ async function removerAgendamento(id) {
   if (item.imagem_por_rede_keys) {
     for (const key of Object.values(JSON.parse(item.imagem_por_rede_keys))) await r2.apagarVideo(key).catch(() => {});
   }
+  if (item.video_key) await r2.apagarVideo(item.video_key).catch(() => {});
   await db.agendaRemover(id);
 }
 
@@ -189,6 +201,7 @@ async function limparAntigas() {
       if (item.imagem_por_rede_keys) {
         for (const key of Object.values(JSON.parse(item.imagem_por_rede_keys))) await r2.apagarVideo(key);
       }
+      if (item.video_key) await r2.apagarVideo(item.video_key);
       await db.agendaMarcarImagemApagada(item.id);
       apagadas++;
     } catch (err) {

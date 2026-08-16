@@ -33,6 +33,10 @@ const CONTAS = [
         env("INSTAGRAM_ACCESS_TOKEN") && env("INSTAGRAM_ACCOUNT_ID")
           ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID") }
           : null,
+      instagram_reels:
+        env("INSTAGRAM_ACCESS_TOKEN") && env("INSTAGRAM_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID") }
+          : null,
       facebook:
         env("FACEBOOK_PAGE_ACCESS_TOKEN") && env("FACEBOOK_PAGE_ID")
           ? { token: env("FACEBOOK_PAGE_ACCESS_TOKEN"), paginaId: env("FACEBOOK_PAGE_ID") }
@@ -72,6 +76,10 @@ const CONTAS = [
         env("INSTAGRAM_COTACERTA_ACCESS_TOKEN") && env("INSTAGRAM_COTACERTA_ACCOUNT_ID")
           ? { accessToken: env("INSTAGRAM_COTACERTA_ACCESS_TOKEN"), accountId: env("INSTAGRAM_COTACERTA_ACCOUNT_ID"), host: "graph.facebook.com" }
           : null,
+      instagram_reels:
+        env("INSTAGRAM_COTACERTA_ACCESS_TOKEN") && env("INSTAGRAM_COTACERTA_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_COTACERTA_ACCESS_TOKEN"), accountId: env("INSTAGRAM_COTACERTA_ACCOUNT_ID"), host: "graph.facebook.com" }
+          : null,
       facebook:
         env("FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN") && env("FACEBOOK_COTACERTA_PAGE_ID")
           ? { token: env("FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN"), paginaId: env("FACEBOOK_COTACERTA_PAGE_ID") }
@@ -104,6 +112,10 @@ const CONTAS = [
           ? { accessToken: env("INSTAGRAM_CIAHOT_ACCESS_TOKEN"), accountId: env("INSTAGRAM_CIAHOT_ACCOUNT_ID") }
           : null,
       instagram_story:
+        env("INSTAGRAM_CIAHOT_ACCESS_TOKEN") && env("INSTAGRAM_CIAHOT_ACCOUNT_ID")
+          ? { accessToken: env("INSTAGRAM_CIAHOT_ACCESS_TOKEN"), accountId: env("INSTAGRAM_CIAHOT_ACCOUNT_ID") }
+          : null,
+      instagram_reels:
         env("INSTAGRAM_CIAHOT_ACCESS_TOKEN") && env("INSTAGRAM_CIAHOT_ACCOUNT_ID")
           ? { accessToken: env("INSTAGRAM_CIAHOT_ACCESS_TOKEN"), accountId: env("INSTAGRAM_CIAHOT_ACCOUNT_ID") }
           : null,
@@ -192,6 +204,18 @@ const ADAPTADORES = {
     }
     return facebook.publicar(conteudo, credenciais);
   },
+  // Reels — mesma credencial do Instagram (reaproveita accessToken/accountId/host), só muda
+  // o tipo de mídia (vídeo em vez de imagem). Ver criarAgendamento em agenda.js (videoBuffer).
+  instagram_reels: (conteudo, credenciais) => {
+    if (!conteudo.videoUrl) throw new Error("Reels exige um vídeo.");
+    return instagram.publicarReels({
+      videoUrl: conteudo.videoUrl,
+      legenda: conteudo.texto,
+      accessToken: credenciais.accessToken,
+      accountId: credenciais.accountId,
+      host: credenciais.host,
+    });
+  },
   twitter: (conteudo, credenciais) => {
     if (conteudo.imagemUrls && conteudo.imagemUrls.length) {
       throw new Error("X/Twitter não suporta carrossel neste sistema ainda.");
@@ -214,7 +238,7 @@ const ADAPTADORES = {
 // reposicionar a foto pra não cortar errado numa rede específica, ex. Stories 9:16) — quando
 // existe pra uma rede, essa URL vence a `imagemUrl` genérica só pra ela; as outras redes
 // continuam usando a imagem padrão normalmente.
-async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, imagemUrls, imagemUrlPorRede, link, redes }) {
+async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, imagemUrls, imagemUrlPorRede, videoUrl, link, redes }) {
   const conta = contaPorId(contaId);
   const alvo = redes && redes.length ? redes : Object.keys(conta.redes);
   const resultados = {};
@@ -229,7 +253,7 @@ async function publicarEmTodos({ contaId = "felizcred", texto, imagemUrl, imagem
       resultados[rede] = { ok: false, erro: "Sem credenciais configuradas para esta rede." };
       continue;
     }
-    const conteudo = { texto, imagemUrl: imagemUrlPorRede?.[rede] || imagemUrl, imagemUrls, link };
+    const conteudo = { texto, imagemUrl: imagemUrlPorRede?.[rede] || imagemUrl, imagemUrls, videoUrl, link };
     try {
       const resultado = await ADAPTADORES[rede](conteudo, credenciais);
       resultados[rede] = { ok: true, ...resultado };

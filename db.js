@@ -229,6 +229,11 @@ const ready = (async () => {
   if (!colunasAgendados.includes("claimed_at")) {
     await client.execute(`ALTER TABLE posts_agendados ADD COLUMN claimed_at INTEGER`);
   }
+  // video_key — post agendado do tipo Reels (vídeo), mesmo bucket/prefixo "posts/" das
+  // imagens. Convive com imagem_key/imagem_keys no mesmo item (cada post só usa um dos três).
+  if (!colunasAgendados.includes("video_key")) {
+    await client.execute(`ALTER TABLE posts_agendados ADD COLUMN video_key TEXT`);
+  }
 
   // Eventos do funil de qualificação (CLT por enquanto) — 1 linha por contato+etapa, pra dar
   // pra contar "quantos passaram por aqui essa semana" sem depender do estado ATUAL da
@@ -738,11 +743,11 @@ async function reelsConfigSet(chave, valor) {
   });
 }
 
-async function agendaCriar({ contaId, texto, link, imagemKey, imagemKeys, imagemPorRedeKeys, redes, agendadoPara }) {
+async function agendaCriar({ contaId, texto, link, imagemKey, imagemKeys, imagemPorRedeKeys, videoKey, redes, agendadoPara }) {
   await ready;
   const result = await client.execute({
-    sql: `INSERT INTO posts_agendados (conta_id, texto, link, imagem_key, imagem_keys, imagem_por_rede_keys, redes, agendado_para, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO posts_agendados (conta_id, texto, link, imagem_key, imagem_keys, imagem_por_rede_keys, video_key, redes, agendado_para, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       contaId,
       texto || null,
@@ -750,6 +755,7 @@ async function agendaCriar({ contaId, texto, link, imagemKey, imagemKeys, imagem
       imagemKey || null,
       imagemKeys && imagemKeys.length ? JSON.stringify(imagemKeys) : null,
       imagemPorRedeKeys && Object.keys(imagemPorRedeKeys).length ? JSON.stringify(imagemPorRedeKeys) : null,
+      videoKey || null,
       JSON.stringify(redes),
       agendadoPara,
       Date.now(),
