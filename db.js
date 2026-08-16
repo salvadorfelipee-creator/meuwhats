@@ -327,6 +327,21 @@ async function tentarMarcarLembreteEnviado(phone, businessNumberId, esperado) {
   return result.rowsAffected > 0;
 }
 
+// Atômico (compare-and-swap): só avança fluxo_passo se ele estiver EXATAMENTE no valor
+// esperado. Usado pelo link de rastreio do clique no site (Ciahot) — a mesma URL pode ser
+// acessada mais de uma vez (clique duplo, scanner de segurança de algum app) sem que isso
+// dispare a mensagem de 5 minutos mais de uma vez: só quem encontra o passo ainda em
+// `deEsperado` consegue avançar.
+async function tentarAvancarFluxoPasso(phone, businessNumberId, deEsperado, paraNovo) {
+  await ready;
+  const result = await client.execute({
+    sql: `UPDATE conversations SET fluxo_passo = ?, fluxo_passo_at = ?, fluxo_lembrete = 0
+          WHERE phone = ? AND business_number_id = ? AND fluxo_passo = ?`,
+    args: [paraNovo, Date.now(), phone, businessNumberId, deEsperado],
+  });
+  return result.rowsAffected > 0;
+}
+
 // Conversas com fluxo em aberto há quase 24h (janela do WhatsApp pra mensagem
 // livre) que ainda não receberam o aviso de "continua aí?" — manda-se UM só,
 // entre 20h e 24h de silêncio, pra tentar reabrir a janela antes que feche.
@@ -916,6 +931,7 @@ module.exports = {
   getConversation,
   tentarMarcarMenuEnviado,
   setFluxoPasso,
+  tentarAvancarFluxoPasso,
   listarFluxosAguardando,
   tentarMarcarLembreteEnviado,
   listarJanelasParaManter,

@@ -475,21 +475,33 @@ diferente da Felizcred/Cota Certa, `phone_number_id` `1264737673394463`, confirm
 2. Quando a pessoa responde qualquer coisa, o fluxo espera **15 segundos** e manda "Espero
    que esteja bem! Meu nome é Felipe."
 3. Em seguida manda a oferta (anúncio grátis no site) com um botão de link — **"Visitar
-   site"** (`cta_url`, abre `www.ciahot.com.br`) — e, em mensagem separada, um botão de
-   resposta rápida **"Falar com atendimento"**. A API do WhatsApp não deixa misturar botão
-   de link com botão de resposta na mesma mensagem interativa, por isso são duas mensagens.
+   site"** (`cta_url`) — e, em mensagem separada, um botão de resposta rápida **"Falar com
+   atendimento"**. A API do WhatsApp não deixa misturar botão de link com botão de resposta
+   na mesma mensagem interativa, por isso são duas mensagens.
 4. Clique em "Falar com atendimento" → responde "Aguarde, em breve irei te responder." e
-   encerra a automação (humano assume pelo painel). Cliques no botão de link **não geram
-   webhook** (a Meta não avisa clique em `cta_url`), então não tem como saber se a pessoa
-   visitou o site.
+   encerra a automação (humano assume pelo painel).
 5. Se ninguém tocar em nenhum botão em **17 minutos**, manda um lembrete único: "O site
    CIAHOT pode gerar mais contatos pra você...".
+6. Clique em "Visitar site" **é rastreado**: o botão não aponta direto pra
+   `www.ciahot.com.br`, aponta pra `GET /ciahot/site?to=<telefone>` do próprio servidor, que
+   registra o clique e redireciona (302) pro site de verdade — só assim dá pra saber que a
+   pessoa clicou, já que a Meta **não avisa clique em botão `cta_url`** via webhook (só avisa
+   clique em botão de resposta rápida). 5 minutos depois do clique, manda a oferta com selo
+   **VIP** ("Fazer anúncio" / "No momento não").
+7. "Fazer anúncio" → manda o link do formulário (`ciahot.com.br/anunciar/`, outro botão de
+   link) +, em mensagem separada, botão "Anúncio concluído!". Ao concluir, confirma e pede
+   pra salvar o contato + e-mail de suporte (`contato@ciahot.com.br`). "No momento não" só
+   confirma e encerra.
 
 Implementado com `FLUXO_CIAHOT.aoIniciar` (função assíncrona) no lugar de `menuInicial` —
 `dispararInicioFluxo` (usado tanto na reabertura por "menu" quanto no disparo automático por
 inatividade) chama `aoIniciar` quando ele existe, em vez do menu síncrono padrão. Botão de
 link novo: `wa.sendCtaUrl` em `whatsapp.js`, e `enviarRespostaAutomatica` ganhou um 6º
-parâmetro opcional `cta: { buttonText, url }`.
+parâmetro opcional `cta: { buttonText, url }`. Entradas de `fluxoBotoes` também podem ser uma
+função (em vez do formato declarativo `{texto, botoes, lista}`) quando o passo precisa mandar
+mais de uma mensagem ou lógica própria — ver `handlerCiahotAnuncioSim` e
+`db.tentarAvancarFluxoPasso` (compare-and-swap, evita duplicar o disparo dos 5min se o link
+de rastreio for acessado mais de uma vez).
 
 ### Aviso de horário comercial (31/07/2026)
 

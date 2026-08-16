@@ -815,6 +815,10 @@ const REGEX_SITE_CALLBACK = /^Ol[áa]!\s*Quero receber uma liga[çc][ãa]o/i;
 // cutuca 1x se ninguém tocar em nada em 17 minutos.
 const CIAHOT_NUMBER_ID = "1264737673394463";
 const CIAHOT_SITE_URL = "https://www.ciahot.com.br";
+const CIAHOT_ANUNCIAR_URL = "https://ciahot.com.br/anunciar/";
+// Base pública do próprio servidor — usada pra montar o link de rastreio de clique
+// (ver CIAHOT_SITE_URL_RASTREADA). Reaproveita a mesma env var do auto-ping.
+const CIAHOT_PUBLIC_URL = process.env.PUBLIC_URL || "https://meuwhats.onrender.com";
 
 const CIAHOT_TEXTO_BOAS_VINDAS = "Espero que esteja bem! 😊 Meu nome é Felipe.";
 
@@ -825,6 +829,25 @@ const CIAHOT_TEXTO_OFERTA =
 
 const CIAHOT_TEXTO_ATENDIMENTO = "Prefere falar direto com a gente? 👇";
 
+const CIAHOT_TEXTO_VIP =
+  "Você pode fazer seu anúncio gratuito, sem custo! 🎉 E ainda pode ganhar o selo *VIP* na campanha " +
+  "que está ativa agora. Faça seu anúncio que ele já é liberado pela nossa equipe!";
+
+const CIAHOT_TEXTO_ANUNCIO_ACESSO = "Ótimo! 🙌 Vamos iniciar, é rápido e fácil — é só acessar:";
+const CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_PERGUNTA = "Quando terminar de preencher, toca aqui:";
+const CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA =
+  "Ótimo! Agora é só aguardar a liberação, vamos te avisar por aqui. 📌 Já salva esse contato e " +
+  "também nosso e-mail de suporte: contato@ciahot.com.br";
+const CIAHOT_TEXTO_ANUNCIO_AGORA_NAO = "Sem problemas! 😊 Vamos ficar à disposição, pode nos chamar se tiver alguma dúvida.";
+
+// Link do botão "Visitar site": passa pelo próprio servidor antes de chegar no site de
+// verdade — é a única forma de saber que a pessoa clicou, já que a Meta não avisa clique em
+// botão cta_url via webhook (só avisa clique em botão de resposta rápida). Ver rota
+// GET /ciahot/site em processarRequisicao.
+function linkRastreadoSiteCiahot(phone) {
+  return `${CIAHOT_PUBLIC_URL}/ciahot/site?to=${encodeURIComponent(phone)}`;
+}
+
 // Dispara depois que a pessoa responde o template de campanha (ver dispararInicioFluxo).
 // Espera 15s (tempo de "digitando..." natural) antes da primeira mensagem, manda a
 // sequência de aquecimento + oferta, e só então marca o passo que liga o lembrete de 17min.
@@ -834,7 +857,7 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
       await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_BOAS_VINDAS);
       await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, null, null, {
         buttonText: "Visitar site",
-        url: CIAHOT_SITE_URL,
+        url: linkRastreadoSiteCiahot(de),
       });
       await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ATENDIMENTO, [
         { id: "ciahot_atendimento", title: "Falar com atendimento" },
@@ -846,10 +869,47 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
   }, 15000);
 }
 
+// Chamado pela rota GET /ciahot/site (ver processarRequisicao) quando a pessoa toca no botão
+// "Visitar site". Só avança se a conversa ainda estiver exatamente esperando esse clique
+// (evita duplicar caso a URL seja acessada mais de uma vez); 5 minutos depois manda a oferta
+// de anúncio com selo VIP.
+async function tratarCliqueSiteCiahot(phone) {
+  const avancou = await db.tentarAvancarFluxoPasso(phone, CIAHOT_NUMBER_ID, "ciahot_oferta", "ciahot_pos_clique");
+  if (!avancou) return;
+  setTimeout(async () => {
+    try {
+      await enviarRespostaAutomatica(CIAHOT_NUMBER_ID, phone, CIAHOT_TEXTO_VIP, [
+        { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
+        { id: "ciahot_anuncio_nao", title: "No momento não" },
+      ]);
+      await db.setFluxoPasso(phone, CIAHOT_NUMBER_ID, "ciahot_vip_oferta");
+    } catch (err) {
+      console.error("Erro ao enviar oferta VIP do Ciahot:", err.message);
+    }
+  }, 5 * 60 * 1000);
+}
+
+// Clique em "Fazer anúncio" (oferta VIP) — como a API não deixa misturar botão de link com
+// botão de resposta na mesma mensagem, são duas mensagens: uma com o link do formulário,
+// outra perguntando se já concluiu.
+async function handlerCiahotAnuncioSim(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ANUNCIO_ACESSO, null, null, {
+    buttonText: "Fazer anúncio",
+    url: CIAHOT_ANUNCIAR_URL,
+  });
+  await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_PERGUNTA, [
+    { id: "ciahot_anuncio_concluido", title: "Anúncio concluído!" },
+  ]);
+  await db.setFluxoPasso(de, businessNumberId, "ciahot_aguardando_conclusao");
+}
+
 const FLUXO_BOTOES_CIAHOT = {
   ciahot_atendimento: {
     texto: "Perfeito! 👍 Aguarde, em breve irei te responder.",
   },
+  ciahot_anuncio_sim: handlerCiahotAnuncioSim,
+  ciahot_anuncio_nao: { texto: CIAHOT_TEXTO_ANUNCIO_AGORA_NAO },
+  ciahot_anuncio_concluido: { texto: CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA },
 };
 
 const LEMBRETE_MINUTOS_CIAHOT = {
@@ -1277,10 +1337,17 @@ async function processarEntry(entry) {
           if (passo) {
             try {
               if (reply.id === "clt_3mais") logFunil(businessNumberId, de, "clt_qualificado");
-              const textoPasso = typeof passo.texto === "function" ? passo.texto() : passo.texto;
-              await enviarRespostaAutomatica(businessNumberId, de, textoPasso, passo.botoes, passo.lista);
-              // Marca (ou limpa) o passo em que a conversa fica aguardando resposta
-              await db.setFluxoPasso(de, businessNumberId, fluxo.lembreteMinutos[reply.id] ? reply.id : null);
+              if (typeof passo === "function") {
+                // Passo "handler": função própria cuida de tudo (inclui casos que precisam
+                // mandar mais de uma mensagem, ex.: link + botão de resposta separados —
+                // ver handlerCiahotAnuncioSim), inclusive marcar o fluxo_passo.
+                await passo(de, businessNumberId);
+              } else {
+                const textoPasso = typeof passo.texto === "function" ? passo.texto() : passo.texto;
+                await enviarRespostaAutomatica(businessNumberId, de, textoPasso, passo.botoes, passo.lista);
+                // Marca (ou limpa) o passo em que a conversa fica aguardando resposta
+                await db.setFluxoPasso(de, businessNumberId, fluxo.lembreteMinutos[reply.id] ? reply.id : null);
+              }
             } catch (err) {
               console.error("Erro ao enviar passo do fluxo de botões:", err.message);
             }
@@ -1609,6 +1676,18 @@ const server = http.createServer(async (req, res) => {
     // GET /ping — usado pelo auto-ping (e por monitores externos) pra manter o Render acordado
     if (req.method === "GET" && path_ === "/ping") {
       return send(res, 200, { ok: true });
+    }
+
+    // GET /ciahot/site?to=<telefone> — link de rastreio do botão "Visitar site" da campanha
+    // Ciahot. Registra o clique (dispara a oferta VIP 5min depois — ver
+    // tratarCliqueSiteCiahot) e redireciona pro site de verdade. Pública, sem auth: quem
+    // acessa é o navegador do lead, não o painel.
+    if (req.method === "GET" && path_ === "/ciahot/site") {
+      const to = url.searchParams.get("to");
+      if (to) {
+        tratarCliqueSiteCiahot(to).catch((err) => console.error("Erro ao tratar clique do site Ciahot:", err.message));
+      }
+      return send(res, 302, "", { Location: CIAHOT_SITE_URL });
     }
 
     // GET /webhook — verificação do Meta
