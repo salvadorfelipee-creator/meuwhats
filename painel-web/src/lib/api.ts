@@ -55,6 +55,7 @@ export type AgendaItem = {
   status: AgendaStatus
   imagemUrl: string | null
   imagemUrls: string[] | null
+  videoUrl: string | null
   resultado: string | null
   tentativas: number
   created_at: number

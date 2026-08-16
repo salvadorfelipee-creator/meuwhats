@@ -289,6 +289,9 @@ function PostCard({
       {item.imagemUrl && (
         <img src={item.imagemUrl} alt="" className="h-14 w-14 rounded object-cover shrink-0" />
       )}
+      {!item.imagemUrl && item.videoUrl && (
+        <video src={item.videoUrl} muted controls className="h-14 w-14 rounded object-cover shrink-0" />
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap mb-1">
           <Badge variant={STATUS_VARIANT[item.status]}>{STATUS_LABEL[item.status]}</Badge>
