@@ -821,7 +821,9 @@ const CIAHOT_TEXTO_BOAS_VINDAS = "Espero que esteja bem! 😊 Meu nome é Felipe
 
 const CIAHOT_TEXTO_OFERTA =
   "Aqui é do escritório do site CIAHOT, um site de anúncios aqui na região do Vale. 📣\n\n" +
-  "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes!";
+  "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes! " +
+  "Te convido a visitar nosso site pra ver como será seu anúncio — se desejar fazer, em 1 min você vê " +
+  "e faz seu anúncio *premium*!";
 
 const CIAHOT_TEXTO_ATENDIMENTO = "Prefere falar direto com a gente? 👇";
 
@@ -866,24 +868,25 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
 // botão de link com botão de resposta); o link de verdade vem agora, numa mensagem própria
 // (aí sim como botão de link cta_url). Como isso é um clique de botão normal, a Meta AVISA
 // via webhook — dá pra saber que a pessoa clicou sem precisar de link de rastreio próprio.
-// 5 minutos depois, manda a oferta de anúncio com selo VIP.
+// Só marca o passo "ciahot_pos_clique" aqui — quem manda a oferta VIP 2min depois é o
+// verificador de fluxos parados (lembreteHandlers.ciahot_pos_clique, mais abaixo), não um
+// setTimeout em memória: assim sobrevive a um redeploy/reinício no meio da espera.
 async function handlerCiahotVisitarSite(de, businessNumberId) {
   await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_LINK_SITE, null, null, {
     buttonText: "Visitar site",
     url: CIAHOT_SITE_URL,
   });
   await db.setFluxoPasso(de, businessNumberId, "ciahot_pos_clique");
-  setTimeout(async () => {
-    try {
-      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_VIP, [
-        { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
-        { id: "ciahot_anuncio_nao", title: "No momento não" },
-      ]);
-      await db.setFluxoPasso(de, businessNumberId, "ciahot_vip_oferta");
-    } catch (err) {
-      console.error("Erro ao enviar oferta VIP do Ciahot:", err.message);
-    }
-  }, 5 * 60 * 1000);
+}
+
+// Handler do lembrete "ciahot_pos_clique" (ver lembreteHandlers/LEMBRETE_MINUTOS_CIAHOT) —
+// manda botões, por isso não dá pra usar o lembreteTextos genérico (só texto puro).
+async function handlerLembreteCiahotVip(phone, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, phone, CIAHOT_TEXTO_VIP, [
+    { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
+    { id: "ciahot_anuncio_nao", title: "No momento não" },
+  ]);
+  await db.setFluxoPasso(phone, businessNumberId, "ciahot_vip_oferta");
 }
 
 // Clique em "Fazer anúncio" (oferta VIP) — como a API não deixa misturar botão de link com
@@ -913,6 +916,11 @@ const FLUXO_BOTOES_CIAHOT = {
 
 const LEMBRETE_MINUTOS_CIAHOT = {
   ciahot_oferta: 17,
+  ciahot_pos_clique: 2,
+};
+
+const LEMBRETE_HANDLERS_CIAHOT = {
+  ciahot_pos_clique: handlerLembreteCiahotVip,
 };
 
 const LEMBRETE_TEXTOS_CIAHOT = {
@@ -1204,6 +1212,7 @@ const FLUXO_CIAHOT = {
   fluxoBotoes: FLUXO_BOTOES_CIAHOT,
   lembreteMinutos: LEMBRETE_MINUTOS_CIAHOT,
   lembreteTextos: LEMBRETE_TEXTOS_CIAHOT,
+  lembreteHandlers: LEMBRETE_HANDLERS_CIAHOT,
   capturaTexto: {},
 };
 
@@ -2635,10 +2644,17 @@ setInterval(async () => {
       if (agora - Number(p.fluxo_passo_at) < minutos * 60 * 1000) continue;
       if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id, indice))) continue;
       try {
-        const textosConfig = fluxoDoContato.lembreteTextos[p.fluxo_passo];
-        const textosArray = Array.isArray(textosConfig) ? textosConfig : [textosConfig || fluxoDoContato.lembreteTextos.padrao];
-        const texto = textosArray[indice] || textosArray[textosArray.length - 1];
-        await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
+        // Passo com handler próprio (ex.: manda botões, não só texto — ver
+        // handlerLembreteCiahotVip) cuida de tudo sozinho, inclusive setFluxoPasso.
+        const handler = fluxoDoContato.lembreteHandlers?.[p.fluxo_passo];
+        if (handler) {
+          await handler(p.phone, p.business_number_id);
+        } else {
+          const textosConfig = fluxoDoContato.lembreteTextos[p.fluxo_passo];
+          const textosArray = Array.isArray(textosConfig) ? textosConfig : [textosConfig || fluxoDoContato.lembreteTextos.padrao];
+          const texto = textosArray[indice] || textosArray[textosArray.length - 1];
+          await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
+        }
         console.log(`⏰ Lembrete de fluxo parado enviado para ${p.phone} (passo ${p.fluxo_passo}, toque ${indice + 1}/${minutosArray.length})`);
       } catch (err) {
         console.error("Erro ao enviar lembrete de fluxo:", err.message);

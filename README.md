@@ -481,8 +481,10 @@ diferente da Felizcred/Cota Certa, `phone_number_id` `1264737673394463`, confirm
    link com botão de resposta) **e** o clique gera webhook normal, então dá pra saber que a
    pessoa clicou sem precisar de link de rastreio próprio.
 4. Clique em **"Visitar site"** → manda o link de verdade numa mensagem própria (aí sim como
-   botão de link `cta_url`, sozinho). 5 minutos depois, manda a oferta com selo **VIP**
-   ("Fazer anúncio" / "No momento não").
+   botão de link `cta_url`, sozinho). **2 minutos** depois, manda a oferta com selo **VIP**
+   ("Fazer anúncio" / "No momento não") — via o mesmo verificador de fluxos parados que manda
+   o lembrete de 17min (não um `setTimeout` solto: sobrevive a redeploy/reinício no meio da
+   espera, que é como o `setTimeout` original falhou silenciosamente num teste).
 5. Clique em **"No momento não"** (na oferta inicial) → confirma e encerra a automação.
 6. Clique em **"Falar com atendimento"** → responde "Aguarde, em breve irei te responder." e
    encerra a automação (humano assume pelo painel).
@@ -500,6 +502,9 @@ link novo: `wa.sendCtaUrl` em `whatsapp.js`, e `enviarRespostaAutomatica` ganhou
 parâmetro opcional `cta: { buttonText, url }`. Entradas de `fluxoBotoes` também podem ser uma
 função (em vez do formato declarativo `{texto, botoes, lista}`) quando o passo precisa mandar
 mais de uma mensagem ou lógica própria — ver `handlerCiahotVisitarSite`/`handlerCiahotAnuncioSim`.
+O verificador de fluxos parados também ganhou esse mesmo suporte a handler-função
+(`lembreteHandlers`, ao lado de `lembreteMinutos`/`lembreteTextos`) pra lembretes que
+precisam mandar botões, não só texto — ver `handlerLembreteCiahotVip`.
 
 ### Aviso de horário comercial (31/07/2026)
 
