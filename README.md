@@ -474,24 +474,24 @@ diferente da Felizcred/Cota Certa, `phone_number_id` `1264737673394463`, confirm
    número/lista de leads.
 2. Quando a pessoa responde qualquer coisa, o fluxo espera **15 segundos** e manda "Espero
    que esteja bem! Meu nome é Felipe."
-3. Em seguida manda a oferta (anúncio grátis no site) com um botão de link — **"Visitar
-   site"** (`cta_url`) — e, em mensagem separada, um botão de resposta rápida **"Falar com
-   atendimento"**. A API do WhatsApp não deixa misturar botão de link com botão de resposta
-   na mesma mensagem interativa, por isso são duas mensagens.
-4. Clique em "Falar com atendimento" → responde "Aguarde, em breve irei te responder." e
+3. Em seguida manda a oferta (anúncio grátis no site) com **dois botões de resposta rápida**
+   — "Visitar site" e "No momento não" — e, em mensagem separada, um terceiro botão "Falar
+   com atendimento". "Visitar site" é botão de resposta (não link direto) de propósito: assim
+   ele cabe ao lado de "No momento não" na mesma mensagem (a API não deixa misturar botão de
+   link com botão de resposta) **e** o clique gera webhook normal, então dá pra saber que a
+   pessoa clicou sem precisar de link de rastreio próprio.
+4. Clique em **"Visitar site"** → manda o link de verdade numa mensagem própria (aí sim como
+   botão de link `cta_url`, sozinho). 5 minutos depois, manda a oferta com selo **VIP**
+   ("Fazer anúncio" / "No momento não").
+5. Clique em **"No momento não"** (na oferta inicial) → confirma e encerra a automação.
+6. Clique em **"Falar com atendimento"** → responde "Aguarde, em breve irei te responder." e
    encerra a automação (humano assume pelo painel).
-5. Se ninguém tocar em nenhum botão em **17 minutos**, manda um lembrete único: "O site
+7. Se ninguém tocar em nenhum botão em **17 minutos**, manda um lembrete único: "O site
    CIAHOT pode gerar mais contatos pra você...".
-6. Clique em "Visitar site" **é rastreado**: o botão não aponta direto pra
-   `www.ciahot.com.br`, aponta pra `GET /ciahot/site?to=<telefone>` do próprio servidor, que
-   registra o clique e redireciona (302) pro site de verdade — só assim dá pra saber que a
-   pessoa clicou, já que a Meta **não avisa clique em botão `cta_url`** via webhook (só avisa
-   clique em botão de resposta rápida). 5 minutos depois do clique, manda a oferta com selo
-   **VIP** ("Fazer anúncio" / "No momento não").
-7. "Fazer anúncio" → manda o link do formulário (`ciahot.com.br/anunciar/`, outro botão de
-   link) +, em mensagem separada, botão "Anúncio concluído!". Ao concluir, confirma e pede
-   pra salvar o contato + e-mail de suporte (`contato@ciahot.com.br`). "No momento não" só
-   confirma e encerra.
+8. Na oferta VIP, "Fazer anúncio" → manda o link do formulário (`ciahot.com.br/anunciar/`,
+   botão de link) +, em mensagem separada, botão "Anúncio concluído!". Ao concluir, confirma
+   e pede pra salvar o contato + e-mail de suporte (`contato@ciahot.com.br`). "No momento não"
+   só confirma e encerra.
 
 Implementado com `FLUXO_CIAHOT.aoIniciar` (função assíncrona) no lugar de `menuInicial` —
 `dispararInicioFluxo` (usado tanto na reabertura por "menu" quanto no disparo automático por
@@ -499,9 +499,7 @@ inatividade) chama `aoIniciar` quando ele existe, em vez do menu síncrono padr�
 link novo: `wa.sendCtaUrl` em `whatsapp.js`, e `enviarRespostaAutomatica` ganhou um 6º
 parâmetro opcional `cta: { buttonText, url }`. Entradas de `fluxoBotoes` também podem ser uma
 função (em vez do formato declarativo `{texto, botoes, lista}`) quando o passo precisa mandar
-mais de uma mensagem ou lógica própria — ver `handlerCiahotAnuncioSim` e
-`db.tentarAvancarFluxoPasso` (compare-and-swap, evita duplicar o disparo dos 5min se o link
-de rastreio for acessado mais de uma vez).
+mais de uma mensagem ou lógica própria — ver `handlerCiahotVisitarSite`/`handlerCiahotAnuncioSim`.
 
 ### Aviso de horário comercial (31/07/2026)
 

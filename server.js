@@ -816,18 +816,18 @@ const REGEX_SITE_CALLBACK = /^Ol[áa]!\s*Quero receber uma liga[çc][ãa]o/i;
 const CIAHOT_NUMBER_ID = "1264737673394463";
 const CIAHOT_SITE_URL = "https://www.ciahot.com.br";
 const CIAHOT_ANUNCIAR_URL = "https://ciahot.com.br/anunciar/";
-// Base pública do próprio servidor — usada pra montar o link de rastreio de clique
-// (ver CIAHOT_SITE_URL_RASTREADA). Reaproveita a mesma env var do auto-ping.
-const CIAHOT_PUBLIC_URL = process.env.PUBLIC_URL || "https://meuwhats.onrender.com";
 
 const CIAHOT_TEXTO_BOAS_VINDAS = "Espero que esteja bem! 😊 Meu nome é Felipe.";
 
 const CIAHOT_TEXTO_OFERTA =
   "Aqui é do escritório do site CIAHOT, um site de anúncios aqui na região do Vale. 📣\n\n" +
-  "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes! " +
-  "Dá uma olhada no nosso site:";
+  "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes!";
 
 const CIAHOT_TEXTO_ATENDIMENTO = "Prefere falar direto com a gente? 👇";
+
+const CIAHOT_TEXTO_LINK_SITE = "Aqui está: 👇";
+
+const CIAHOT_TEXTO_SITE_AGORA_NAO = "Sem problemas! 😊 Fico à disposição, é só me chamar quando quiser.";
 
 const CIAHOT_TEXTO_VIP =
   "Você pode fazer seu anúncio gratuito, sem custo! 🎉 E ainda pode ganhar o selo *VIP* na campanha " +
@@ -840,14 +840,6 @@ const CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA =
   "também nosso e-mail de suporte: contato@ciahot.com.br";
 const CIAHOT_TEXTO_ANUNCIO_AGORA_NAO = "Sem problemas! 😊 Vamos ficar à disposição, pode nos chamar se tiver alguma dúvida.";
 
-// Link do botão "Visitar site": passa pelo próprio servidor antes de chegar no site de
-// verdade — é a única forma de saber que a pessoa clicou, já que a Meta não avisa clique em
-// botão cta_url via webhook (só avisa clique em botão de resposta rápida). Ver rota
-// GET /ciahot/site em processarRequisicao.
-function linkRastreadoSiteCiahot(phone) {
-  return `${CIAHOT_PUBLIC_URL}/ciahot/site?to=${encodeURIComponent(phone)}`;
-}
-
 // Dispara depois que a pessoa responde o template de campanha (ver dispararInicioFluxo).
 // Espera 15s (tempo de "digitando..." natural) antes da primeira mensagem, manda a
 // sequência de aquecimento + oferta, e só então marca o passo que liga o lembrete de 17min.
@@ -855,10 +847,10 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
   setTimeout(async () => {
     try {
       await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_BOAS_VINDAS);
-      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, null, null, {
-        buttonText: "Visitar site",
-        url: linkRastreadoSiteCiahot(de),
-      });
+      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, [
+        { id: "ciahot_visitar_site", title: "Visitar site" },
+        { id: "ciahot_site_agora_nao", title: "No momento não" },
+      ]);
       await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ATENDIMENTO, [
         { id: "ciahot_atendimento", title: "Falar com atendimento" },
       ]);
@@ -869,20 +861,25 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
   }, 15000);
 }
 
-// Chamado pela rota GET /ciahot/site (ver processarRequisicao) quando a pessoa toca no botão
-// "Visitar site". Só avança se a conversa ainda estiver exatamente esperando esse clique
-// (evita duplicar caso a URL seja acessada mais de uma vez); 5 minutos depois manda a oferta
-// de anúncio com selo VIP.
-async function tratarCliqueSiteCiahot(phone) {
-  const avancou = await db.tentarAvancarFluxoPasso(phone, CIAHOT_NUMBER_ID, "ciahot_oferta", "ciahot_pos_clique");
-  if (!avancou) return;
+// Clique em "Visitar site" — "Visitar site" é botão de RESPOSTA (não link direto) só pra
+// poder ficar lado a lado com "No momento não" na mesma mensagem (a API não deixa misturar
+// botão de link com botão de resposta); o link de verdade vem agora, numa mensagem própria
+// (aí sim como botão de link cta_url). Como isso é um clique de botão normal, a Meta AVISA
+// via webhook — dá pra saber que a pessoa clicou sem precisar de link de rastreio próprio.
+// 5 minutos depois, manda a oferta de anúncio com selo VIP.
+async function handlerCiahotVisitarSite(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_LINK_SITE, null, null, {
+    buttonText: "Visitar site",
+    url: CIAHOT_SITE_URL,
+  });
+  await db.setFluxoPasso(de, businessNumberId, "ciahot_pos_clique");
   setTimeout(async () => {
     try {
-      await enviarRespostaAutomatica(CIAHOT_NUMBER_ID, phone, CIAHOT_TEXTO_VIP, [
+      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_VIP, [
         { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
         { id: "ciahot_anuncio_nao", title: "No momento não" },
       ]);
-      await db.setFluxoPasso(phone, CIAHOT_NUMBER_ID, "ciahot_vip_oferta");
+      await db.setFluxoPasso(de, businessNumberId, "ciahot_vip_oferta");
     } catch (err) {
       console.error("Erro ao enviar oferta VIP do Ciahot:", err.message);
     }
@@ -907,6 +904,8 @@ const FLUXO_BOTOES_CIAHOT = {
   ciahot_atendimento: {
     texto: "Perfeito! 👍 Aguarde, em breve irei te responder.",
   },
+  ciahot_visitar_site: handlerCiahotVisitarSite,
+  ciahot_site_agora_nao: { texto: CIAHOT_TEXTO_SITE_AGORA_NAO },
   ciahot_anuncio_sim: handlerCiahotAnuncioSim,
   ciahot_anuncio_nao: { texto: CIAHOT_TEXTO_ANUNCIO_AGORA_NAO },
   ciahot_anuncio_concluido: { texto: CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA },
@@ -1676,18 +1675,6 @@ const server = http.createServer(async (req, res) => {
     // GET /ping — usado pelo auto-ping (e por monitores externos) pra manter o Render acordado
     if (req.method === "GET" && path_ === "/ping") {
       return send(res, 200, { ok: true });
-    }
-
-    // GET /ciahot/site?to=<telefone> — link de rastreio do botão "Visitar site" da campanha
-    // Ciahot. Registra o clique (dispara a oferta VIP 5min depois — ver
-    // tratarCliqueSiteCiahot) e redireciona pro site de verdade. Pública, sem auth: quem
-    // acessa é o navegador do lead, não o painel.
-    if (req.method === "GET" && path_ === "/ciahot/site") {
-      const to = url.searchParams.get("to");
-      if (to) {
-        tratarCliqueSiteCiahot(to).catch((err) => console.error("Erro ao tratar clique do site Ciahot:", err.message));
-      }
-      return send(res, 302, "", { Location: CIAHOT_SITE_URL });
     }
 
     // GET /webhook — verificação do Meta
