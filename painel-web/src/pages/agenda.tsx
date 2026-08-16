@@ -103,9 +103,19 @@ export function AgendaPage() {
     return celulas
   }, [mesAtual])
 
-  const itensDoDiaSelecionado = diaSelecionado
-    ? recentesDaConta.filter((i) => chaveDia(i.agendado_para) === diaSelecionado)
-    : []
+  // "recentes" vem de /agenda/lista, que aplica um LIMIT global (todas as contas somadas)
+  // — com muitos posts na fila, os pendentes de uma conta específica podem ficar de fora
+  // desse recorte mesmo estando corretamente agendados. filaDaConta já é a lista completa
+  // (sem limite) de pendentes só dessa conta, então é a fonte confiável pros pendentes;
+  // "recentes" só complementa com publicados/com erro daquele dia (que não estão na fila).
+  const itensDoDiaSelecionado = React.useMemo(() => {
+    if (!diaSelecionado) return []
+    const pendentes = filaDaConta.filter((i) => chaveDia(i.agendado_para) === diaSelecionado)
+    const outros = recentesDaConta.filter(
+      (i) => i.status !== "pending" && chaveDia(i.agendado_para) === diaSelecionado,
+    )
+    return [...pendentes, ...outros]
+  }, [diaSelecionado, filaDaConta, recentesDaConta])
 
   const resumoFiltrado = React.useMemo(() => {
     const posted = recentesDaConta.filter((i) => i.status === "posted").length
