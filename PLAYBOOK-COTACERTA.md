@@ -26,20 +26,24 @@ com card de link pro artigo do blog cotacertaseguros.com.br/blog).
 
 | # | Data | Horário | Tema | Artigo (arquivo em cotacerta-seguros/blog/) | ID agenda |
 |---|------|---------|------|------|------|
-| 1 | 17/08 | 15h | Seguro pra motorista de app (Uber/99): o que a plataforma cobre e o que não cobre | seguro-motorista-app-uber-99.html | 100 |
-| 2 | 19/08 | 15h | Seguro pra carro financiado: a dívida some se o carro for roubado? | seguro-carro-financiado-obrigatorio.html | 104 |
-| 3 | 21/08 | 15h | Seguro de moto pra motoboy/entregador: vale a pena? | seguro-moto-motoboy-entregador.html | 101 |
-| 4 | 23/08 | 15h | Classe de bônus: quando você perde (e quando não) | classe-bonus-seguro-quando-perde.html | 105 |
-| 5 | 25/08 | 15h | Seguro de vida vale a pena pra quem não tem filho? | seguro-de-vida-vale-a-pena.html | 102 |
-| 6 | 27/08 | 15h | Seguro de invalidez permanente: e se sua renda passar do teto do INSS? | seguro-invalidez-permanente.html | 106 |
-| 7 | 29/08 | 15h | Seguro Renda Protegida (DIT) pra autônomo/MEI/motorista de app | seguro-renda-protegida-o-que-e.html | 103 |
-| 8 | 31/08 | 15h | Seguro auto pra quem roda por aplicativo: como declarar certo | porto-seguro-auto.html | 107 |
+| 1 | 17/08 | 15h | Seguro pra motorista de app (Uber/99): o que a plataforma cobre e o que não cobre | seguro-motorista-app-uber-99.html | 108 |
+| 2 | 19/08 | 15h | Seguro pra carro financiado: a dívida some se o carro for roubado? | seguro-carro-financiado-obrigatorio.html | 109 |
+| 3 | 21/08 | 15h | Seguro de moto pra motoboy/entregador: vale a pena? | seguro-moto-motoboy-entregador.html | 110 |
+| 4 | 23/08 | 15h | Classe de bônus: quando você perde (e quando não) | classe-bonus-seguro-quando-perde.html | 111 |
+| 5 | 25/08 | 15h | Seguro de vida vale a pena pra quem não tem filho? | seguro-de-vida-vale-a-pena.html | 112 |
+| 6 | 27/08 | 15h | Seguro de invalidez permanente: e se sua renda passar do teto do INSS? | seguro-invalidez-permanente.html | 113 |
+| 7 | 29/08 | 15h | Seguro Renda Protegida (DIT) pra autônomo/MEI/motorista de app | seguro-renda-protegida-o-que-e.html | 114 |
+| 8 | 31/08 | 15h | Seguro auto pra quem roda por aplicativo: como declarar certo | porto-seguro-auto.html | 115 |
 
 ## Status
 
 - [x] Conteúdo aprovado pelo usuário
 - [x] 40 imagens geradas (8 carrosséis × 5 slides, skill `carrossel-formato-tuiter`, modo `feed`)
-- [x] 8 carrosséis agendados via `/painel/api/agenda` (`redes: ["instagram"]`, `contaId: "cotacerta"`) — IDs 100-107 na fila, cadência dia-sim-dia-não completa
+- [x] 8 carrosséis agendados via `/painel/api/agenda` (`redes: ["instagram", "facebook", "threads"]`,
+  `contaId: "cotacerta"`) — IDs 108-115 na fila, cadência dia-sim-dia-não completa. Recriados
+  16/08 pra incluir Facebook e Threads assim que essas redes ficaram disponíveis (IDs
+  100-107 antigos, só Instagram, foram apagados). Twitter fica de fora desses (Publique IV
+  não suporta carrossel nessa rede ainda); LinkedIn fica de fora por decisão do usuário.
 - [x] Facebook da Página "Cota certa seguros" (`105193575892026`) — token de Página real
   gerado e testado (`debug_token`: tipo PAGE, não vence, com `pages_manage_posts`).
   `FACEBOOK_COTACERTA_PAGE_ID`/`FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN` já colados
