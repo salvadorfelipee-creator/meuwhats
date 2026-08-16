@@ -60,7 +60,12 @@ com card de link pro artigo do blog cotacertaseguros.com.br/blog).
   sem alternativa definitiva). Falta o usuário colocar
   `THREADS_COTACERTA_ACCESS_TOKEN`/`THREADS_COTACERTA_USER_ID` no Render
   (valores em `CHAVES-LOCAL.md`).
-- [ ] Twitter/LinkedIn do Cota Certa: ainda não configurados
+- [x] X/Twitter — app próprio criado no console de desenvolvedor X (conta
+  `cotacertaseguros`), OAuth 1.0a configurado, chaves geradas (valores em
+  `CHAVES-LOCAL.md`). Falta o usuário colocar `TWITTER_COTACERTA_API_KEY`/
+  `TWITTER_COTACERTA_API_SECRET`/`TWITTER_COTACERTA_ACCESS_TOKEN`/
+  `TWITTER_COTACERTA_ACCESS_SECRET` no Render.
+- [ ] LinkedIn do Cota Certa: ainda não configurado
 
 ## Como foi feito (pra repetir depois)
 
