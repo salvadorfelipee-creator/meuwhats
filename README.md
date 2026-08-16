@@ -463,6 +463,34 @@ O fluxo da Cota Certa (`FLUXO_COTACERTA`) tem duas entradas:
 **e também** o `WA_NUM`/links `wa.me` em todo `cotacerta-seguros/` (home, `/cotar`,
 blog) — são duas coisas independentes que precisam apontar pro mesmo número.
 
+### Fluxo por número — Ciahot (16/08/2026)
+
+Número do negócio **Ciahot** (site de anúncios classificados na região do Vale — negócio
+diferente da Felizcred/Cota Certa, `phone_number_id` `1264737673394463`, confirmar em
+`/painel/api/numbers` se o número mudar). Diferente dos outros fluxos, **não é um menu** —
+é uma sequência linear disparada por campanha de Marketing:
+
+1. Broadcast do painel manda o template aprovado (ex.: `bom_dia`, "Olá, boa tarde!") pro
+   número/lista de leads.
+2. Quando a pessoa responde qualquer coisa, o fluxo espera **15 segundos** e manda "Espero
+   que esteja bem! Meu nome é Felipe."
+3. Em seguida manda a oferta (anúncio grátis no site) com um botão de link — **"Visitar
+   site"** (`cta_url`, abre `www.ciahot.com.br`) — e, em mensagem separada, um botão de
+   resposta rápida **"Falar com atendimento"**. A API do WhatsApp não deixa misturar botão
+   de link com botão de resposta na mesma mensagem interativa, por isso são duas mensagens.
+4. Clique em "Falar com atendimento" → responde "Aguarde, em breve irei te responder." e
+   encerra a automação (humano assume pelo painel). Cliques no botão de link **não geram
+   webhook** (a Meta não avisa clique em `cta_url`), então não tem como saber se a pessoa
+   visitou o site.
+5. Se ninguém tocar em nenhum botão em **17 minutos**, manda um lembrete único: "O site
+   CIAHOT pode gerar mais contatos pra você...".
+
+Implementado com `FLUXO_CIAHOT.aoIniciar` (função assíncrona) no lugar de `menuInicial` —
+`dispararInicioFluxo` (usado tanto na reabertura por "menu" quanto no disparo automático por
+inatividade) chama `aoIniciar` quando ele existe, em vez do menu síncrono padrão. Botão de
+link novo: `wa.sendCtaUrl` em `whatsapp.js`, e `enviarRespostaAutomatica` ganhou um 6º
+parâmetro opcional `cta: { buttonText, url }`.
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa

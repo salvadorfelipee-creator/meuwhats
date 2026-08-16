@@ -123,6 +123,32 @@ async function sendList(fromPhoneNumberId, to, bodyText, buttonLabel, rows) {
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+// Botão único que abre um link externo (ex.: site). Diferente de sendButtons (respostas
+// rápidas), a API não deixa misturar um botão de link com botões de resposta na mesma
+// mensagem — por isso esse tipo sempre vem sozinho, em mensagem separada.
+async function sendCtaUrl(fromPhoneNumberId, to, bodyText, buttonText, url) {
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "cta_url",
+          body: { text: bodyText },
+          action: { name: "cta_url", parameters: { display_text: buttonText, url } },
+        },
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao enviar botão de link: ${JSON.stringify(json)}`);
+  return json;
+}
+
 async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, components) {
   const { status, buffer } = await graphRequest(
     "POST",
@@ -248,6 +274,7 @@ module.exports = {
   sendImage,
   sendButtons,
   sendList,
+  sendCtaUrl,
   sendTemplate,
   registerNumber,
   checarInscricaoWebhook,

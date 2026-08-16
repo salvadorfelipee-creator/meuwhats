@@ -304,17 +304,23 @@ const RESPOSTAS_BOTAO = {
   },
 };
 
-async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes, lista) {
-  const result = lista
+async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes, lista, cta) {
+  const result = cta
+    ? await wa.sendCtaUrl(businessNumberId, phone, texto, cta.buttonText, cta.url)
+    : lista
     ? await wa.sendList(businessNumberId, phone, texto, lista.botao, lista.opcoes)
     : botoes
     ? await wa.sendButtons(businessNumberId, phone, texto, botoes)
     : await wa.sendText(businessNumberId, phone, texto);
   const waId = result.messages?.[0]?.id || null;
   const now = Date.now();
-  // No histórico do painel, botões/opções aparecem listados abaixo do texto
+  // No histórico do painel, botões/opções (ou o link do cta) aparecem listados abaixo do texto
   const opcoes = lista ? lista.opcoes : botoes;
-  const bodySalvo = opcoes ? `${texto}\n\n${opcoes.map((b) => `🔘 ${b.title}`).join("\n")}` : texto;
+  const bodySalvo = cta
+    ? `${texto}\n\n🔗 ${cta.buttonText}: ${cta.url}`
+    : opcoes
+    ? `${texto}\n\n${opcoes.map((b) => `🔘 ${b.title}`).join("\n")}`
+    : texto;
   await db.upsertConversation(phone, businessNumberId, null, now);
   await db.insertMessage({
     phone,
@@ -800,6 +806,63 @@ const COTACERTA_NUMBER_ID = "518007084723311";
 const REGEX_SITE_COTACAO = /^Ol[áa]!\s*Quero cotar/i;
 const REGEX_SITE_CALLBACK = /^Ol[áa]!\s*Quero receber uma liga[çc][ãa]o/i;
 
+// ─── FLUXO CIAHOT (número "Ciahot") ──────────────────────────────────────────
+// Negócio diferente da Felizcred: CIAHOT é um site de anúncios classificados na região do
+// Vale. O disparo é sempre por campanha de Marketing (template aprovado, mandado pelo
+// broadcast do painel) — o fluxo abaixo só cuida do que acontece DEPOIS que a pessoa
+// responde esse template. Não é um menu (não tem opções pra escolher), é uma sequência
+// linear: aquece, oferece o anúncio grátis com link pro site + botão de atendimento, e
+// cutuca 1x se ninguém tocar em nada em 17 minutos.
+const CIAHOT_NUMBER_ID = "1264737673394463";
+const CIAHOT_SITE_URL = "https://www.ciahot.com.br";
+
+const CIAHOT_TEXTO_BOAS_VINDAS = "Espero que esteja bem! 😊 Meu nome é Felipe.";
+
+const CIAHOT_TEXTO_OFERTA =
+  "Aqui é do escritório do site CIAHOT, um site de anúncios aqui na região do Vale. 📣\n\n" +
+  "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes! " +
+  "Dá uma olhada no nosso site:";
+
+const CIAHOT_TEXTO_ATENDIMENTO = "Prefere falar direto com a gente? 👇";
+
+// Dispara depois que a pessoa responde o template de campanha (ver dispararInicioFluxo).
+// Espera 15s (tempo de "digitando..." natural) antes da primeira mensagem, manda a
+// sequência de aquecimento + oferta, e só então marca o passo que liga o lembrete de 17min.
+async function iniciarFluxoCiahot(de, businessNumberId) {
+  setTimeout(async () => {
+    try {
+      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_BOAS_VINDAS);
+      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, null, null, {
+        buttonText: "Visitar site",
+        url: CIAHOT_SITE_URL,
+      });
+      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ATENDIMENTO, [
+        { id: "ciahot_atendimento", title: "Falar com atendimento" },
+      ]);
+      await db.setFluxoPasso(de, businessNumberId, "ciahot_oferta");
+    } catch (err) {
+      console.error("Erro ao iniciar fluxo Ciahot:", err.message);
+    }
+  }, 15000);
+}
+
+const FLUXO_BOTOES_CIAHOT = {
+  ciahot_atendimento: {
+    texto: "Perfeito! 👍 Aguarde, em breve irei te responder.",
+  },
+};
+
+const LEMBRETE_MINUTOS_CIAHOT = {
+  ciahot_oferta: 17,
+};
+
+const LEMBRETE_TEXTOS_CIAHOT = {
+  padrao:
+    "O site CIAHOT pode gerar mais contatos para você! 🚀 Não deixe de conferir e fazer seu anúncio " +
+    `de forma gratuita: ${CIAHOT_SITE_URL}`,
+  manter_janela: () => `Ainda por aí? 😊 Não deixe de conferir o site CIAHOT e fazer seu anúncio gratuito: ${CIAHOT_SITE_URL}`,
+};
+
 // ─── HORÁRIO COMERCIAL (Cota Certa) ──────────────────────────────────────────
 // Assumido seg-sex 9h-18h, sábado 9h-12h, domingo fechado (não confirmado com o
 // usuário — ajustar aqui se o horário real da equipe for diferente).
@@ -1075,12 +1138,38 @@ const FLUXO_COTACERTA = {
   },
 };
 
+const FLUXO_CIAHOT = {
+  // Sem menuInicial — fluxo linear disparado por campanha, usa aoIniciar no lugar
+  // (ver dispararInicioFluxo).
+  aoIniciar: iniciarFluxoCiahot,
+  fluxoBotoes: FLUXO_BOTOES_CIAHOT,
+  lembreteMinutos: LEMBRETE_MINUTOS_CIAHOT,
+  lembreteTextos: LEMBRETE_TEXTOS_CIAHOT,
+  capturaTexto: {},
+};
+
 const FLUXOS_POR_NUMERO = {
   [COTACERTA_NUMBER_ID]: FLUXO_COTACERTA,
+  [CIAHOT_NUMBER_ID]: FLUXO_CIAHOT,
 };
 
 function getFluxo(businessNumberId) {
   return FLUXOS_POR_NUMERO[businessNumberId] || FLUXO_FELIZCRED;
+}
+
+// Ponto de entrada padrão de um fluxo: por padrão manda o menu inicial na hora (função
+// síncrona `menuInicial`, todos os fluxos baseados em menu). Fluxos lineares disparados por
+// campanha (ex.: Ciahot) definem `aoIniciar` no lugar — um handler assíncrono que cuida de
+// tudo, inclusive marcar o fluxo_passo. Reaproveitado tanto na reabertura por "menu" quanto
+// no disparo automático por inatividade, pra não duplicar a lógica dos dois lugares.
+async function dispararInicioFluxo(fluxo, de, businessNumberId) {
+  if (fluxo.aoIniciar) {
+    await fluxo.aoIniciar(de, businessNumberId);
+    return;
+  }
+  const menu = fluxo.menuInicial();
+  await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista);
+  await db.setFluxoPasso(de, businessNumberId, menu.foraDeHorario ? null : "menu_inicial");
 }
 
 // ─── PROCESSAR MENSAGENS RECEBIDAS ───────────────────────────────────────────
@@ -1131,11 +1220,7 @@ async function processarEntry(entry) {
           // não importa em que passo a conversa está.
           if (normalizarTexto(corpo) === "menu") {
             try {
-              const menu = fluxo.menuInicial();
-              await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista);
-              // Fora do horário: só o aviso foi mandado, não o menu de verdade — não marca
-              // "menu_inicial" (senão o lembrete cobra uma opção que nunca foi oferecida).
-              await db.setFluxoPasso(de, businessNumberId, menu.foraDeHorario ? null : "menu_inicial");
+              await dispararInicioFluxo(fluxo, de, businessNumberId);
               mensagemJaTratada = true;
             } catch (err) {
               console.error("Erro ao reabrir menu inicial:", err.message);
@@ -1236,11 +1321,7 @@ async function processarEntry(entry) {
               HORAS_INATIVIDADE_MENU * 60 * 60 * 1000
             );
             if (podeEnviar) {
-              const menu = fluxo.menuInicial();
-              await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista);
-              // Mesma correção do reabrir-por-"menu" acima: fora do horário não conta como
-              // "está no passo do menu", senão o lembrete cobra uma opção nunca oferecida.
-              await db.setFluxoPasso(de, businessNumberId, menu.foraDeHorario ? null : "menu_inicial");
+              await dispararInicioFluxo(fluxo, de, businessNumberId);
             }
           } catch (err) {
             console.error("Erro ao enviar menu inicial:", err.message);
