@@ -332,8 +332,15 @@ export function ChatsPage() {
                       />
                     )}
                     {m.body}
+                    {m.status === "failed" && (
+                      <div className="text-[11px] mt-1 text-red-200 flex items-start gap-1">
+                        <span>⚠️</span>
+                        <span>Não entregue{m.error_message ? `: ${m.error_message}` : ""}</span>
+                      </div>
+                    )}
                     <div className="text-[10px] opacity-70 mt-1 text-right">
                       {formatTime(m.created_at)}
+                      {m.direction === "out" && m.status && ` · ${m.status}`}
                     </div>
                   </div>
                 ))}

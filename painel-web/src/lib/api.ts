@@ -30,6 +30,7 @@ export type Message = {
   media_path: string | null
   media_mime: string | null
   status: string | null
+  error_message: string | null
   wa_message_id: string | null
   created_at: number
 }
