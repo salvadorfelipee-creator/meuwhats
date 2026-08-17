@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useChannel } from "@/lib/channel-context"
+import { useChannel, type Channel } from "@/lib/channel-context"
 import { useUnread } from "@/lib/unread-context"
 import {
   api,
@@ -47,6 +47,9 @@ import {
   Smile,
   Bell,
   BellOff,
+  ChevronDown,
+  Phone,
+  AtSign as InstagramIcon,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -73,8 +76,8 @@ function formatTime(ts: number | null) {
 }
 
 export function ChatsPage() {
-  const { current } = useChannel()
-  const { notifPermission, requestNotifPermission } = useUnread()
+  const { channels, current, setCurrent } = useChannel()
+  const { notifPermission, requestNotifPermission, unreadChannels, markSeen } = useUnread()
   const [conversations, setConversations] = React.useState<Conversation[]>([])
   const [selected, setSelected] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -94,6 +97,11 @@ export function ChatsPage() {
     if (!current) return
     api.conversations(current.id).then(setConversations).catch(() => {})
   }, [current])
+
+  function selecionarCanal(c: Channel) {
+    setCurrent(c)
+    markSeen(c.id)
+  }
 
   const carregarMensagens = React.useCallback(() => {
     if (!current || !selected) return
@@ -185,10 +193,38 @@ export function ChatsPage() {
       <div className="w-[340px] shrink-0">
         <div className="flex flex-col h-screen border-r">
           <div className="h-14 px-3 flex items-center justify-between border-b shrink-0">
-            <div>
-              <p className="font-semibold text-sm">Conversas</p>
-              <p className="text-xs text-muted-foreground">{current.label}</p>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="text-left rounded-md px-1 -mx-1 py-0.5 hover:bg-accent flex items-center gap-1">
+                  <div>
+                    <p className="font-semibold text-sm">Conversas</p>
+                    <p className="text-xs text-muted-foreground">{current.label}</p>
+                  </div>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuLabel>WhatsApp</DropdownMenuLabel>
+                {channels
+                  .filter((c) => c.kind === "whatsapp")
+                  .map((c) => (
+                    <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
+                      <Phone className="h-4 w-4" /> <span className="flex-1">{c.label}</span>
+                      {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
+                    </DropdownMenuItem>
+                  ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Instagram</DropdownMenuLabel>
+                {channels
+                  .filter((c) => c.kind === "instagram")
+                  .map((c) => (
+                    <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
+                      <InstagramIcon className="h-4 w-4" /> <span className="flex-1">{c.label}</span>
+                      {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="flex items-center">
               {notifPermission !== "unsupported" && (
                 <Button
