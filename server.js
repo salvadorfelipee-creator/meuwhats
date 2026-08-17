@@ -1937,13 +1937,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await db.listConversations(businessId));
     }
 
-    // GET /painel/api/conversations/:businessId/:phone/messages — mensagens de uma conversa
+    // GET /painel/api/conversations/:businessId/:phone/messages — mensagens de uma conversa.
+    // Só isso conta como "leu" (ver marcarConversaLida) — abrir a conversa no painel, nunca
+    // uma resposta automática do fluxo, que é exatamente o bug que motivou essa separação
+    // (mensagem do cliente "sumia" da checagem de não-lida assim que o bot respondia sozinho).
     const matchMessages = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/messages$/);
     if (req.method === "GET" && matchMessages) {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchMessages[1]);
       const phone = decodeURIComponent(matchMessages[2]);
-      return send(res, 200, await db.listMessages(phone, businessId));
+      const mensagens = await db.listMessages(phone, businessId);
+      await db.marcarConversaLida(phone, businessId);
+      return send(res, 200, mensagens);
     }
 
     // POST /painel/api/conversations/:businessId/:phone/reply — responder uma conversa.

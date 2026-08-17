@@ -18,6 +18,9 @@ export type Conversation = {
   last_body?: string | null
   last_direction?: "in" | "out" | null
   channel?: "whatsapp" | "instagram"
+  last_inbound_at?: number | null
+  last_read_at?: number | null
+  nao_lida?: boolean | number
 }
 
 export type Message = {

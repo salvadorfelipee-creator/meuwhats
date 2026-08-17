@@ -116,6 +116,15 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "nota")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN nota TEXT`);
   }
+  // last_inbound_at (só mensagem DO CLIENTE, atualizado em insertMessage) vs last_read_at (só
+  // quando um humano abre a conversa no painel, ver marcarConversaLida). "Não lida" é
+  // last_inbound_at > last_read_at — nunca "a última mensagem é de entrada", porque isso
+  // quebra assim que o fluxo automático responde sozinho logo em seguida (o bot manda uma
+  // mensagem de saída e a mensagem do cliente que ninguém viu de verdade "some" da checagem).
+  if (!infoConversations.rows.some((r) => r.name === "last_inbound_at")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN last_inbound_at INTEGER`);
+    await client.execute(`ALTER TABLE conversations ADD COLUMN last_read_at INTEGER`);
+  }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -459,7 +468,26 @@ async function insertMessage(msg) {
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, created_at],
   });
+  if (direction === "in") {
+    // Marca a hora da mensagem DO CLIENTE, separado de last_message_at (que conta qualquer
+    // direção) — é contra isso que comparamos last_read_at pra saber se ficou não lida.
+    await client.execute({
+      sql: `UPDATE conversations SET last_inbound_at = MAX(COALESCE(last_inbound_at, 0), ?)
+            WHERE phone = ? AND business_number_id = ?`,
+      args: [created_at, phone, business_number_id],
+    });
+  }
   return result.lastInsertRowid;
+}
+
+// Chamado quando um humano abre a conversa no painel (GET .../messages) — é a ÚNICA coisa
+// que conta como "li", nunca uma resposta automática do fluxo.
+async function marcarConversaLida(phone, businessNumberId) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET last_read_at = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [Date.now(), phone, businessNumberId],
+  });
 }
 
 async function updateStatusByWaId(waMessageId, status, errorMessage = null) {
@@ -477,7 +505,8 @@ async function listConversations(businessNumberId) {
       SELECT c.*,
         (SELECT type FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_type,
         (SELECT body FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_body,
-        (SELECT direction FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_direction
+        (SELECT direction FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_direction,
+        (c.last_inbound_at IS NOT NULL AND (c.last_read_at IS NULL OR c.last_inbound_at > c.last_read_at)) AS nao_lida
       FROM conversations c
       WHERE c.business_number_id = ?
       ORDER BY c.last_message_at DESC
@@ -1010,6 +1039,7 @@ module.exports = {
   listarJanelasParaManter,
   tentarMarcarJanelaLembreteEnviado,
   insertMessage,
+  marcarConversaLida,
   mensagemExistePorId,
   updateStatusByWaId,
   listConversations,

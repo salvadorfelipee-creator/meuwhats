@@ -77,7 +77,6 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
   const channelsRef = React.useRef(channels)
   channelsRef.current = channels
 
-  const lastSeenRef = React.useRef<Map<string, number>>(new Map())
   const firstCheckRef = React.useRef(false)
 
   const requestNotifPermission = React.useCallback(() => {
@@ -101,49 +100,50 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       }
       if (cancelled) return
 
-      let mudou = false
-      let tocouSom = false
-      const next = new Set(unreadConversationsRef.current)
+      // Verdade vem do servidor agora (nao_lida = last_inbound_at > last_read_at, ver
+      // db.js/listConversations) — não mais "a última mensagem é de entrada", que sumia
+      // assim que o fluxo automático respondia sozinho logo depois do cliente.
+      const next = new Set<string>()
+      const recemNaoLidas: typeof lista = []
       for (const c of lista) {
+        if (!c.nao_lida) continue
         const chId = c.channel === "instagram" ? "instagram" : c.business_number_id
         const chave = chaveConversa(chId, c.phone)
-        const visto = lastSeenRef.current.get(chave)
-        const ehNova = c.last_message_at && (!visto || c.last_message_at > visto)
-        if (ehNova) {
-          lastSeenRef.current.set(chave, c.last_message_at!)
-          const olhandoAgora =
-            activeRef.current.channelId === chId && activeRef.current.phone === c.phone && document.hasFocus()
-          if (firstCheckRef.current && c.last_direction === "in" && !olhandoAgora) {
-            if (!next.has(chave)) {
-              next.add(chave)
-              mudou = true
-            }
-            if (!tocouSom) {
-              tocarSomNotificacao()
-              tocouSom = true
-            }
-            if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-              const canal = channelsRef.current.find((ch) => ch.id === chId)
-              const notif = new Notification(`${canal?.label || chId} · ${c.name || c.phone}`, {
-                body: c.last_body || "Nova mensagem",
-                tag: `inbox-${chave}`,
-              })
-              notif.onclick = () => {
-                window.focus()
-                if (canal) setCurrent(canal)
-                setUnreadConversations((prev) => {
-                  if (!prev.has(chave)) return prev
-                  const n = new Set(prev)
-                  n.delete(chave)
-                  return n
-                })
-              }
-            }
+        next.add(chave)
+        if (firstCheckRef.current && !unreadConversationsRef.current.has(chave)) recemNaoLidas.push(c)
+      }
+      firstCheckRef.current = true
+
+      let tocouSom = false
+      for (const c of recemNaoLidas) {
+        const chId = c.channel === "instagram" ? "instagram" : c.business_number_id
+        const chave = chaveConversa(chId, c.phone)
+        // Segunda trava contra a janela de corrida entre os polls: se a conversa está aberta
+        // com a aba em foco AGORA, o próximo poll de mensagens já vai marcar como lida no
+        // servidor (ver GET .../messages) — não precisa alertar por algo que a pessoa já viu.
+        const olhandoAgora = activeRef.current.channelId === chId && activeRef.current.phone === c.phone && document.hasFocus()
+        if (olhandoAgora) continue
+        if (!tocouSom) {
+          tocarSomNotificacao()
+          tocouSom = true
+        }
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          const canal = channelsRef.current.find((ch) => ch.id === chId)
+          const notif = new Notification(`${canal?.label || chId} · ${c.name || c.phone}`, {
+            body: c.last_body || "Nova mensagem",
+            tag: `inbox-${chave}`,
+          })
+          notif.onclick = () => {
+            window.focus()
+            if (canal) setCurrent(canal)
           }
         }
       }
-      firstCheckRef.current = true
-      if (mudou) setUnreadConversations(next)
+
+      setUnreadConversations((prev) => {
+        if (prev.size === next.size && [...prev].every((k) => next.has(k))) return prev
+        return next
+      })
     }
 
     tick()
