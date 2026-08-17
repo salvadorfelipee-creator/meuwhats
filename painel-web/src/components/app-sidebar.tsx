@@ -66,12 +66,11 @@ export function AppSidebar({
 }) {
   const { toggleSidebar } = useSidebar()
   const { channels, current, setCurrent } = useChannel()
-  const { unreadChannels, hasAnyUnread, markSeen } = useUnread()
+  const { unreadChannels, hasAnyUnread } = useUnread()
   const { logout } = useAuth()
 
   function selecionarCanal(c: Channel) {
     setCurrent(c)
-    markSeen(c.id)
   }
 
   return (

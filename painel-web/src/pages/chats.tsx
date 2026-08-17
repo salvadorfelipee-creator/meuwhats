@@ -77,7 +77,8 @@ function formatTime(ts: number | null) {
 
 export function ChatsPage() {
   const { channels, current, setCurrent } = useChannel()
-  const { notifPermission, requestNotifPermission, unreadChannels, markSeen } = useUnread()
+  const { notifPermission, requestNotifPermission, unreadChannels, unreadConversations, markConversationSeen, setActiveConversation } =
+    useUnread()
   const [conversations, setConversations] = React.useState<Conversation[]>([])
   const [selected, setSelected] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -100,8 +101,16 @@ export function ChatsPage() {
 
   function selecionarCanal(c: Channel) {
     setCurrent(c)
-    markSeen(c.id)
   }
+
+  // Reporta ao UnreadProvider qual conversa está de fato aberta agora (canal + contato) —
+  // só ela deixa de tocar som/notificar quando chega mensagem nova (ver unread-context.tsx).
+  // Trocar de canal sozinho NÃO limpa o pulsar das conversas — só abrir cada uma limpa,
+  // senão o próprio bug que motivou essa mudança (mensagem nova sumindo sem avisar) voltaria.
+  React.useEffect(() => {
+    setActiveConversation(current?.id ?? null, selected)
+    return () => setActiveConversation(null, null)
+  }, [current, selected, setActiveConversation])
 
   const carregarMensagens = React.useCallback(() => {
     if (!current || !selected) return
@@ -270,12 +279,19 @@ export function ChatsPage() {
                 Nenhuma conversa ainda.
               </p>
             )}
-            {listaFiltrada.map((c) => (
+            {listaFiltrada.map((c) => {
+              const naoLida = current ? unreadConversations.has(`${current.id}|${c.phone}`) : false
+              return (
               <button
                 key={c.phone}
-                onClick={() => setSelected(c.phone)}
-                className={`px-3 w-full py-2.5 hover:bg-secondary cursor-pointer text-left border-b border-border/50 ${
-                  selected === c.phone ? "bg-secondary" : ""
+                onClick={() => {
+                  setSelected(c.phone)
+                  if (current) markConversationSeen(current.id, c.phone)
+                }}
+                className={`px-3 w-full py-2.5 hover:bg-secondary cursor-pointer text-left border-b border-border/50 border-l-4 ${
+                  naoLida
+                    ? "animate-pulse bg-red-50 dark:bg-red-950/40 border-l-red-500"
+                    : `border-l-transparent ${selected === c.phone ? "bg-secondary" : ""}`
                 }`}
               >
                 <div className="flex flex-row gap-3 items-start">
@@ -303,7 +319,8 @@ export function ChatsPage() {
                   </div>
                 </div>
               </button>
-            ))}
+              )
+            })}
           </ScrollArea>
         </div>
       </div>
