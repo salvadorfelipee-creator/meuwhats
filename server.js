@@ -819,10 +819,11 @@ const CIAHOT_ANUNCIAR_URL = "https://ciahot.com.br/anunciar/";
 
 const CIAHOT_TEXTO_BOAS_VINDAS =
   "Espero que esteja bem! 😊 Meu nome é Felipe, aqui é do escritório do site CIAHOT — um site de " +
-  "anúncios aqui na região do Vale. 📣";
+  "anúncios da região do Vale. 📣";
 
 const CIAHOT_TEXTO_OBJETIVO =
-  "Nosso objetivo é criar anúncios premium e gerar mais atendimentos, e facilitar a gestão do seu anúncio.";
+  "Nosso objetivo é criar anúncios premium e gerar mais atendimentos para você, e facilitar a gestão " +
+  "do seu anúncio.";
 
 const CIAHOT_TEXTO_OFERTA =
   "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes! " +
