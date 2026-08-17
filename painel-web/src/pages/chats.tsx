@@ -490,6 +490,8 @@ function BroadcastDialog({
   const [templatesErro, setTemplatesErro] = React.useState<string | null>(null)
   const [templateNome, setTemplateNome] = React.useState("")
   const [contatos, setContatos] = React.useState("")
+  const [intervaloMin, setIntervaloMin] = React.useState("0")
+  const [intervaloSeg, setIntervaloSeg] = React.useState("0")
   const [enviando, setEnviando] = React.useState(false)
   const [resumo, setResumo] = React.useState<string | null>(null)
   const [falhas, setFalhas] = React.useState<BroadcastResult[]>([])
@@ -528,17 +530,27 @@ function BroadcastDialog({
       setFalhas([])
       return
     }
+    const intervalSeconds = (Number(intervaloMin) || 0) * 60 + (Number(intervaloSeg) || 0)
     setEnviando(true)
     setResumo(null)
     setFalhas([])
     try {
-      const { resultados } = await api.broadcast(contaId, {
+      const { resultados, agendados } = await api.broadcast(contaId, {
         template: templateNome,
         language: templateSelecionado?.language || "pt_BR",
         contacts,
+        intervalSeconds: intervalSeconds > 0 ? intervalSeconds : undefined,
       })
       const ok = resultados.filter((r) => r.ok).length
-      setResumo(`${ok} enviada(s) com sucesso. ${resultados.length - ok} falharam.`)
+      const partes = [`${ok} enviada(s) agora.`]
+      if (resultados.length - ok > 0) partes.push(`${resultados.length - ok} falharam.`)
+      if (agendados) {
+        const min = Math.floor(intervalSeconds / 60)
+        const seg = intervalSeconds % 60
+        const intervaloTexto = seg ? `${min}min${seg}s` : `${min}min`
+        partes.push(`${agendados} agendada(s), uma a cada ${intervaloTexto}.`)
+      }
+      setResumo(partes.join(" "))
       setFalhas(resultados.filter((r) => !r.ok))
     } catch (err) {
       setResumo(err instanceof Error ? err.message : "Erro ao enviar")
@@ -604,6 +616,33 @@ function BroadcastDialog({
               rows={6}
               placeholder={"5511999999999,João\n5511888888888"}
             />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">
+              Intervalo entre mensagens (deixe 0 pra mandar tudo de uma vez)
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                value={intervaloMin}
+                onChange={(e) => setIntervaloMin(e.target.value)}
+                className="w-20"
+              />
+              <span className="text-sm text-muted-foreground">min</span>
+              <Input
+                type="number"
+                min={0}
+                max={59}
+                value={intervaloSeg}
+                onChange={(e) => setIntervaloSeg(e.target.value)}
+                className="w-20"
+              />
+              <span className="text-sm text-muted-foreground">seg</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              O 1º contato sai na hora; os demais ficam agendados nesse intervalo, mesmo se você fechar o painel.
+            </p>
           </div>
           {resumo && <p className="text-sm">{resumo}</p>}
           {falhas.length > 0 && (

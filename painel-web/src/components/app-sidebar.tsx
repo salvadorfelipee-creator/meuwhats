@@ -108,7 +108,7 @@ export function AppSidebar({
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton tooltip="Trocar canal">
+                <SidebarMenuButton tooltip="Trocar canal" className="text-destructive hover:text-destructive font-medium">
                   <span className="relative inline-flex">
                     {current?.kind === "instagram" ? <InstagramIcon /> : <Phone />}
                     {hasAnyUnread && (

@@ -243,12 +243,16 @@ export const api = {
       language?: string
       contacts: BroadcastContact[]
       bodyPreview?: string
+      intervalSeconds?: number
     },
   ) =>
-    request<{ resultados: BroadcastResult[] }>(`/painel/api/broadcast/${encodeURIComponent(businessId)}`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+    request<{ resultados: BroadcastResult[]; agendados?: number; intervalSeconds?: number }>(
+      `/painel/api/broadcast/${encodeURIComponent(businessId)}`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
 
   // ── Publique IV (publicação direta + agenda) ──────────────────────────────
   contasPublicar: () => request<ContaPublicar[]>("/painel/api/publicar/contas"),

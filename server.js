@@ -158,6 +158,36 @@ async function resolverWabaDoNumero(businessNumberId) {
   return cacheWabaPorNumero[businessNumberId] || null;
 }
 
+// Envia 1 mensagem de template de broadcast e grava na conversa — usado tanto pelo envio
+// imediato (POST /painel/api/broadcast) quanto pelo agendador de envios intercalados (ver
+// setInterval do broadcast_agendado, mais abaixo). Retorna { ok, error }, nunca lança.
+async function enviarUmBroadcast(businessId, { phone, name, template, language, bodyPreview }) {
+  const telefoneLimpo = (phone || "").replace(/\D/g, "");
+  const nome = (name || "").trim();
+  if (!telefoneLimpo) return { ok: false, error: "telefone inválido" };
+  try {
+    const components = nome ? [{ type: "body", parameters: [{ type: "text", text: nome }] }] : undefined;
+    const result = await wa.sendTemplate(businessId, telefoneLimpo, template, language || "pt_BR", components);
+    const waId = result.messages?.[0]?.id || null;
+    const now = Date.now();
+    const texto = bodyPreview ? bodyPreview.replace(/\{\{1\}\}/g, nome || "Cliente") : `[template] ${template}`;
+    await db.upsertConversation(telefoneLimpo, businessId, nome || null, now);
+    await db.insertMessage({
+      phone: telefoneLimpo,
+      business_number_id: businessId,
+      direction: "out",
+      type: "template",
+      body: texto,
+      wa_message_id: waId,
+      status: "sent",
+      created_at: now,
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 const MEDIA_DIR = path.join(__dirname, "media");
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
@@ -2068,53 +2098,51 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // POST /painel/api/broadcast/:businessId — envio em massa via template
+    // POST /painel/api/broadcast/:businessId — envio em massa via template. `intervalSeconds`
+    // (opcional): se > 0, só o 1º contato sai na hora — os demais caem na fila
+    // broadcast_agendado, espaçados por esse intervalo, e são processados pelo setInterval do
+    // agendador (mais abaixo). Sem isso a requisição teria que ficar aberta por horas pra um
+    // intervalo de "a cada 35min", o que não sobrevive a timeout de proxy nem a fechar o painel.
     const matchBroadcast = path_.match(/^\/painel\/api\/broadcast\/([^/]+)$/);
     if (req.method === "POST" && matchBroadcast) {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchBroadcast[1]);
       const body = await parseBody(req);
-      const { template, language, contacts, bodyPreview } = body;
+      const { template, language, contacts, bodyPreview, intervalSeconds } = body;
       if (!template || !Array.isArray(contacts) || !contacts.length) {
         return send(res, 400, { error: "Informe o template e ao menos um contato" });
       }
+      const intervalo = Math.max(Number(intervalSeconds) || 0, 0);
 
-      const resultados = [];
-      for (const contato of contacts) {
-        const phone = (contato.phone || "").replace(/\D/g, "");
-        const nome = (contato.name || "").trim();
-        if (!phone) {
-          resultados.push({ phone: contato.phone || "", ok: false, error: "telefone inválido" });
-          continue;
-        }
-        try {
-          const components = nome
-            ? [{ type: "body", parameters: [{ type: "text", text: nome }] }]
-            : undefined;
-          const result = await wa.sendTemplate(businessId, phone, template, language || "pt_BR", components);
-          const waId = result.messages?.[0]?.id || null;
-          const now = Date.now();
-          const texto = bodyPreview
-            ? bodyPreview.replace(/\{\{1\}\}/g, nome || "Cliente")
-            : `[template] ${template}`;
-          await db.upsertConversation(phone, businessId, nome || null, now);
-          await db.insertMessage({
-            phone,
-            business_number_id: businessId,
-            direction: "out",
-            type: "template",
-            body: texto,
-            wa_message_id: waId,
-            status: "sent",
-            created_at: now,
+      if (!intervalo) {
+        const resultados = [];
+        for (const contato of contacts) {
+          resultados.push({
+            phone: contato.phone || "",
+            ...(await enviarUmBroadcast(businessId, { ...contato, template, language, bodyPreview })),
           });
-          resultados.push({ phone, ok: true });
-        } catch (err) {
-          resultados.push({ phone, ok: false, error: err.message });
+          await new Promise((r) => setTimeout(r, 350));
         }
-        await new Promise((r) => setTimeout(r, 350));
+        return send(res, 200, { resultados });
       }
-      return send(res, 200, { resultados });
+
+      // Com intervalo: o 1º sai já (mesma experiência de sempre — confirma na hora que
+      // funcionou), o resto agenda.
+      const [primeiro, ...resto] = contacts;
+      const resultados = [
+        { phone: primeiro.phone || "", ...(await enviarUmBroadcast(businessId, { ...primeiro, template, language, bodyPreview })) },
+      ];
+      const agora = Date.now();
+      const itensAgendados = resto.map((contato, i) => ({
+        phone: (contato.phone || "").replace(/\D/g, ""),
+        name: contato.name || null,
+        template,
+        language: language || "pt_BR",
+        bodyPreview: bodyPreview || null,
+        agendadoPara: agora + (i + 1) * intervalo * 1000,
+      }));
+      const agendados = itensAgendados.length ? await db.broadcastAgendarLote(businessId, itensAgendados) : 0;
+      return send(res, 200, { resultados, agendados, intervalSeconds: intervalo });
     }
 
     // POST /painel/api/registrar-numero/:businessId — registro único de um número novo na
@@ -2790,6 +2818,30 @@ setInterval(async () => {
     console.error("Erro no agendador de posts (agenda):", err.message);
   }
 }, 60 * 1000);
+
+// Broadcast com intervalo entre mensagens (ver POST /painel/api/broadcast) — checa a cada
+// 20s (mais fino que os outros agendadores porque aqui o intervalo escolhido pelo usuário
+// pode ser curto) e processa TODOS os itens já devidos no tick, não só 1, pra recuperar
+// atraso rápido se o servidor ficou fora do ar.
+setInterval(async () => {
+  try {
+    for (let i = 0; i < 20; i++) {
+      const item = await db.broadcastProximoDevido();
+      if (!item) break;
+      const resultado = await enviarUmBroadcast(item.business_id, {
+        phone: item.phone,
+        name: item.name,
+        template: item.template,
+        language: item.language,
+        bodyPreview: item.body_preview,
+      });
+      if (resultado.ok) await db.broadcastMarcarEnviado(item.id);
+      else await db.broadcastMarcarErro(item.id, resultado.error || "erro desconhecido");
+    }
+  } catch (err) {
+    console.error("Erro no agendador de broadcast intercalado:", err.message);
+  }
+}, 20 * 1000);
 
 setInterval(async () => {
   try {

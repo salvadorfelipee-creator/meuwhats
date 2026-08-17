@@ -246,6 +246,27 @@ const ready = (async () => {
     created_at INTEGER NOT NULL
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_funil_eventos_etapa ON funil_eventos(etapa, created_at)`);
+
+  // Fila de envio em massa com intervalo entre mensagens (ex.: "manda uma a cada 35min") — o
+  // 1º contato do broadcast sai na hora (rota original), os demais caem aqui com seu próprio
+  // agendado_para e são processados pelo agendador (ver broadcastProximoDevido em server.js).
+  // Mesma trava anti-duplicata (status 'processing' + claimed_at) do posts_agendados/reels_queue.
+  await client.execute(`CREATE TABLE IF NOT EXISTS broadcast_agendado (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    name TEXT,
+    template TEXT NOT NULL,
+    language TEXT NOT NULL,
+    body_preview TEXT,
+    agendado_para INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    erro TEXT,
+    claimed_at INTEGER,
+    sent_at INTEGER,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_broadcast_agendado_status ON broadcast_agendado(status, agendado_para)`);
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
@@ -911,6 +932,74 @@ async function funilResumo(desdeMs) {
   return resumo;
 }
 
+// Agenda os contatos 2+ de um broadcast com intervalo — cada item já vem com seu
+// agendado_para calculado pelo chamador (server.js: agora + i * intervaloSegundos).
+async function broadcastAgendarLote(businessId, itens) {
+  await ready;
+  const agora = Date.now();
+  for (const item of itens) {
+    await client.execute({
+      sql: `INSERT INTO broadcast_agendado
+              (business_id, phone, name, template, language, body_preview, agendado_para, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [businessId, item.phone, item.name || null, item.template, item.language, item.bodyPreview || null, item.agendadoPara, agora],
+    });
+  }
+  return itens.length;
+}
+
+// Mesma trava anti-duplicata de agendaProximoDevido/reelsProximoAgendadoDevido: marca
+// 'processing' com claimed_at antes de enviar, pra dois ticks do setInterval não mandarem a
+// mesma mensagem duas vezes se o envio anterior demorar mais que o intervalo do agendador.
+async function broadcastProximoDevido() {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `SELECT * FROM broadcast_agendado
+          WHERE (status = 'pending' AND agendado_para <= ?)
+             OR (status = 'processing' AND claimed_at <= ?)
+          ORDER BY agendado_para ASC LIMIT 1`,
+    args: [agora, agora - PROCESSING_ORFAO_MS],
+  });
+  const item = result.rows[0];
+  if (!item) return null;
+
+  const claim = await client.execute({
+    sql: `UPDATE broadcast_agendado SET status = 'processing', claimed_at = ? WHERE id = ? AND status = ?`,
+    args: [agora, item.id, item.status],
+  });
+  if (claim.rowsAffected === 0) return null; // outro tick já reservou esse envio primeiro
+
+  return item;
+}
+
+async function broadcastMarcarEnviado(id) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE broadcast_agendado SET status = 'sent', sent_at = ? WHERE id = ?`,
+    args: [Date.now(), id],
+  });
+}
+
+async function broadcastMarcarErro(id, mensagem) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE broadcast_agendado SET status = 'error', erro = ? WHERE id = ?`,
+    args: [mensagem, id],
+  });
+}
+
+// Pendentes por conta — pro painel mostrar "N mensagens agendadas" no diálogo de campanha.
+async function broadcastPendentesResumo(businessId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT COUNT(*) AS total, MAX(agendado_para) AS ultimo
+          FROM broadcast_agendado WHERE business_id = ? AND status = 'pending'`,
+    args: [businessId],
+  });
+  return { pendentes: Number(result.rows[0]?.total || 0), ultimo: result.rows[0]?.ultimo || null };
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -971,4 +1060,9 @@ module.exports = {
   agendaListarRecentes,
   funilRegistrarEvento,
   funilResumo,
+  broadcastAgendarLote,
+  broadcastProximoDevido,
+  broadcastMarcarEnviado,
+  broadcastMarcarErro,
+  broadcastPendentesResumo,
 };
