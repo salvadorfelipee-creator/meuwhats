@@ -472,15 +472,17 @@ diferente da Felizcred/Cota Certa, `phone_number_id` `1264737673394463`, confirm
 
 1. Broadcast do painel manda o template aprovado (ex.: `bom_dia`, "Olá, boa tarde!") pro
    número/lista de leads.
-2. Quando a pessoa responde qualquer coisa, o fluxo espera **15 segundos** e manda "Espero
-   que esteja bem! Meu nome é Felipe."
-3. Em seguida manda a oferta (anúncio grátis no site) com **dois botões de resposta rápida**
-   — "Visitar site" e "No momento não" — e, em mensagem separada, um terceiro botão "Falar
-   com atendimento". "Visitar site" é botão de resposta (não link direto) de propósito: assim
+2. Quando a pessoa responde qualquer coisa, o fluxo espera **15 segundos** e manda a
+   apresentação ("Espero que esteja bem! Meu nome é Felipe, aqui é do escritório do site
+   CIAHOT..."), depois o objetivo em mensagem separada ("Nosso objetivo é criar anúncios
+   premium..."), e só então a oferta.
+3. A oferta (anúncio grátis no site) vem com **dois botões de resposta rápida** — "Conhecer
+   site" e "No momento não" — e, em mensagem separada, um terceiro botão "Falar com
+   atendimento". "Conhecer site" é botão de resposta (não link direto) de propósito: assim
    ele cabe ao lado de "No momento não" na mesma mensagem (a API não deixa misturar botão de
    link com botão de resposta) **e** o clique gera webhook normal, então dá pra saber que a
    pessoa clicou sem precisar de link de rastreio próprio.
-4. Clique em **"Visitar site"** → manda o link de verdade numa mensagem própria (aí sim como
+4. Clique em **"Conhecer site"** → manda o link de verdade numa mensagem própria (aí sim como
    botão de link `cta_url`, sozinho). **2 minutos** depois, manda a oferta com selo **VIP**
    ("Fazer anúncio" / "No momento não") — via o mesmo verificador de fluxos parados que manda
    o lembrete de 17min (não um `setTimeout` solto: sobrevive a redeploy/reinício no meio da

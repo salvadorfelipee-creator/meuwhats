@@ -817,10 +817,14 @@ const CIAHOT_NUMBER_ID = "1264737673394463";
 const CIAHOT_SITE_URL = "https://www.ciahot.com.br";
 const CIAHOT_ANUNCIAR_URL = "https://ciahot.com.br/anunciar/";
 
-const CIAHOT_TEXTO_BOAS_VINDAS = "Espero que esteja bem! 😊 Meu nome é Felipe.";
+const CIAHOT_TEXTO_BOAS_VINDAS =
+  "Espero que esteja bem! 😊 Meu nome é Felipe, aqui é do escritório do site CIAHOT — um site de " +
+  "anúncios aqui na região do Vale. 📣";
+
+const CIAHOT_TEXTO_OBJETIVO =
+  "Nosso objetivo é criar anúncios premium e gerar mais atendimentos, e facilitar a gestão do seu anúncio.";
 
 const CIAHOT_TEXTO_OFERTA =
-  "Aqui é do escritório do site CIAHOT, um site de anúncios aqui na região do Vale. 📣\n\n" +
   "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes! " +
   "Te convido a visitar nosso site pra ver como será seu anúncio — se desejar fazer, em 1 min você vê " +
   "e faz seu anúncio *premium*!";
@@ -849,8 +853,9 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
   setTimeout(async () => {
     try {
       await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_BOAS_VINDAS);
+      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OBJETIVO);
       await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, [
-        { id: "ciahot_visitar_site", title: "Visitar site" },
+        { id: "ciahot_visitar_site", title: "Conhecer site" },
         { id: "ciahot_site_agora_nao", title: "No momento não" },
       ]);
       await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ATENDIMENTO, [
