@@ -1,7 +1,14 @@
 import * as React from "react"
 import { useChannel } from "@/lib/channel-context"
 import { useUnread } from "@/lib/unread-context"
-import { api, type Conversation, type Message, type RespostaPronta } from "@/lib/api"
+import {
+  api,
+  type Conversation,
+  type Message,
+  type RespostaPronta,
+  type TemplateInfo,
+  type BroadcastResult,
+} from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -198,8 +205,15 @@ export function ChatsPage() {
                   )}
                 </Button>
               )}
-              <Button variant="ghost" size="icon" onClick={() => setBroadcastOpen(true)} title="Envio em massa">
-                <Radio className="h-4 w-4" />
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-1 gap-1.5"
+                onClick={() => setBroadcastOpen(true)}
+                title="Envio em massa"
+              >
+                <Radio className="h-3.5 w-3.5" />
+                Campanha
               </Button>
             </div>
           </div>
@@ -404,7 +418,7 @@ export function ChatsPage() {
         </SheetContent>
       </Sheet>
 
-      <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} businessId={current.id} />
+      <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
     </div>
   )
 }
@@ -448,20 +462,48 @@ function ContactDetails({
   )
 }
 
+// Conta (número) e template são escolhidos DENTRO do diálogo, independente de qual canal
+// está aberto no painel no momento — evita mandar campanha pelo número errado só porque era
+// o que estava selecionado na lista de conversas. O nome do template não é mais digitado à
+// mão: vem direto da lista de templates aprovados na Meta pra conta escolhida (ver
+// GET /painel/api/templates/:businessId), então não tem como digitar um nome inexistente ou
+// não aprovado — que era um jeito comum de "enviei mas não chegou" sem erro nenhum aparecer.
 function BroadcastDialog({
   open,
   onOpenChange,
-  businessId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  businessId: string
 }) {
-  const [template, setTemplate] = React.useState("")
-  const [idioma, setIdioma] = React.useState("pt_BR")
+  const { channels } = useChannel()
+  const contas = React.useMemo(() => channels.filter((c) => c.kind === "whatsapp"), [channels])
+  const [contaId, setContaId] = React.useState("")
+  const [templates, setTemplates] = React.useState<TemplateInfo[]>([])
+  const [templatesCarregando, setTemplatesCarregando] = React.useState(false)
+  const [templatesErro, setTemplatesErro] = React.useState<string | null>(null)
+  const [templateNome, setTemplateNome] = React.useState("")
   const [contatos, setContatos] = React.useState("")
   const [enviando, setEnviando] = React.useState(false)
-  const [resultado, setResultado] = React.useState<string | null>(null)
+  const [resumo, setResumo] = React.useState<string | null>(null)
+  const [falhas, setFalhas] = React.useState<BroadcastResult[]>([])
+
+  React.useEffect(() => {
+    if (open && !contaId && contas.length) setContaId(contas[0].id)
+  }, [open, contaId, contas])
+
+  React.useEffect(() => {
+    if (!open || !contaId) return
+    setTemplatesCarregando(true)
+    setTemplatesErro(null)
+    setTemplateNome("")
+    api
+      .templates(contaId)
+      .then(({ templates }) => setTemplates(templates))
+      .catch((err) => setTemplatesErro(err instanceof Error ? err.message : "Erro ao carregar templates"))
+      .finally(() => setTemplatesCarregando(false))
+  }, [open, contaId])
+
+  const templateSelecionado = templates.find((t) => t.name === templateNome)
 
   async function enviar() {
     const linhas = contatos
@@ -474,18 +516,25 @@ function BroadcastDialog({
       const name = (idx === -1 ? "" : l.slice(idx + 1)).trim()
       return { phone, name }
     })
-    if (!template || !contacts.length) {
-      setResultado("Preencha o template e ao menos um contato.")
+    if (!contaId || !templateNome || !contacts.length) {
+      setResumo("Escolha a conta, o template e ao menos um contato.")
+      setFalhas([])
       return
     }
     setEnviando(true)
-    setResultado(null)
+    setResumo(null)
+    setFalhas([])
     try {
-      const { resultados } = await api.broadcast(businessId, { template, language: idioma, contacts })
+      const { resultados } = await api.broadcast(contaId, {
+        template: templateNome,
+        language: templateSelecionado?.language || "pt_BR",
+        contacts,
+      })
       const ok = resultados.filter((r) => r.ok).length
-      setResultado(`${ok} enviada(s) com sucesso. ${resultados.length - ok} falharam.`)
+      setResumo(`${ok} enviada(s) com sucesso. ${resultados.length - ok} falharam.`)
+      setFalhas(resultados.filter((r) => !r.ok))
     } catch (err) {
-      setResultado(err instanceof Error ? err.message : "Erro ao enviar")
+      setResumo(err instanceof Error ? err.message : "Erro ao enviar")
     } finally {
       setEnviando(false)
     }
@@ -499,12 +548,44 @@ function BroadcastDialog({
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <div>
-            <label className="text-sm font-medium mb-1 block">Nome do template (aprovado na Meta)</label>
-            <Input value={template} onChange={(e) => setTemplate(e.target.value)} />
+            <label className="text-sm font-medium mb-1 block">Enviar de</label>
+            <select
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={contaId}
+              onChange={(e) => setContaId(e.target.value)}
+            >
+              {contas.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Idioma</label>
-            <Input value={idioma} onChange={(e) => setIdioma(e.target.value)} />
+            <label className="text-sm font-medium mb-1 block">Template (aprovado na Meta)</label>
+            {templatesErro ? (
+              <p className="text-sm text-destructive">Não consegui carregar os templates: {templatesErro}</p>
+            ) : (
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+                value={templateNome}
+                onChange={(e) => setTemplateNome(e.target.value)}
+                disabled={templatesCarregando || !templates.length}
+              >
+                <option value="">
+                  {templatesCarregando
+                    ? "Carregando..."
+                    : templates.length
+                    ? "Escolha um template"
+                    : "Nenhum template aprovado encontrado"}
+                </option>
+                {templates.map((t) => (
+                  <option key={`${t.name}-${t.language}`} value={t.name}>
+                    {t.name} ({t.language})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium mb-1 block">
@@ -517,10 +598,19 @@ function BroadcastDialog({
               placeholder={"5511999999999,João\n5511888888888"}
             />
           </div>
-          {resultado && <p className="text-sm">{resultado}</p>}
+          {resumo && <p className="text-sm">{resumo}</p>}
+          {falhas.length > 0 && (
+            <ul className="text-xs text-destructive space-y-0.5 max-h-24 overflow-y-auto">
+              {falhas.map((f, i) => (
+                <li key={i}>
+                  {f.phone}: {f.error || "falhou"}
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <DialogFooter>
-          <Button onClick={enviar} disabled={enviando}>
+          <Button onClick={enviar} disabled={enviando || !contaId || !templateNome}>
             {enviando ? "Enviando..." : "Enviar"}
           </Button>
         </DialogFooter>

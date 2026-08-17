@@ -38,6 +38,7 @@ export type RespostaPronta = { id: number; atalho: string; texto: string }
 
 export type BroadcastContact = { phone: string; name?: string }
 export type BroadcastResult = { phone: string; ok: boolean; error?: string }
+export type TemplateInfo = { name: string; status: string; language: string; category: string }
 
 export type Rede = "instagram" | "instagram_story" | "facebook" | "twitter" | "linkedin" | "threads"
 
@@ -230,6 +231,9 @@ export const api = {
 
   excluirRespostaPronta: (id: number) =>
     request<{ ok: true }>(`/painel/api/respostas-prontas/${id}`, { method: "DELETE" }),
+
+  templates: (businessId: string) =>
+    request<{ templates: TemplateInfo[] }>(`/painel/api/templates/${encodeURIComponent(businessId)}`),
 
   broadcast: (
     businessId: string,

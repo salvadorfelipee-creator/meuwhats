@@ -1253,6 +1253,37 @@ mesmo de sempre, só o front-end do `/painel` foi reescrito.
   piloto automático, espaço usado no R2) e Funil (ver abaixo) — todas ligadas às mesmas
   rotas que já existiam, backend sem mudança nenhuma (exceto o Funil, que é rota nova).
 
+### Envio em massa (campanha por template) — reformulado em 17/08/2026
+
+Botão **"Campanha"** no topo da lista de conversas (antes era só um ícone de rádio, sem
+rótulo). Duas mudanças de fundo, motivadas por um caso real de "enviei mas não chegou em
+nenhum dos dois números de teste, mesmo o painel mostrando sucesso":
+
+- **Conta de envio escolhida dentro do diálogo**, não mais herdada do canal aberto no
+  momento na lista de conversas — evita mandar campanha pelo número errado só porque
+  era o que estava selecionado.
+- **Nome do template não é mais digitado à mão** — vem de uma lista puxada direto da Meta
+  (`GET /painel/api/templates/:businessId`, só os com `status: "APPROVED"`), então não tem
+  mais como digitar um nome inexistente/não aprovado sem perceber. O idioma some do
+  formulário — é lido automaticamente do template escolhido.
+- Falhas agora aparecem **uma por uma** com o motivo (`resultados[].error`, texto cru que a
+  Meta devolveu) embaixo do resumo, em vez de só "X falharam" sem dizer por quê.
+
+Como descobre a WABA de cada número: `resolverWabaDoNumero` (server.js) mantém um cache de
+10min do mapa `phone_number_id → waba_id`, construído chamando
+`GET /{META_BUSINESS_ID}/owned_whatsapp_business_accounts` (WABAs que a Felizcred é dona) +
+`.../client_whatsapp_business_accounts` (WABAs que outro portfólio compartilhou — caso do
+Ciahot) e, pra cada uma, `GET /{waba_id}/phone_numbers`. `META_BUSINESS_ID` é o Business
+Manager `599219759208171`, hardcoded em `server.js` igual aos outros IDs fixos do arquivo —
+atualizar lá se algum dia migrar de Business Manager.
+
+⚠️ Causa real do "aceito mas não entregue" desse caso: a WABA usada no teste estava sem
+**forma de pagamento válida** cadastrada na Meta (Cobrança e pagamentos → Formas de
+pagamento) — sem isso, conversa iniciada pela empresa (qualquer template fora da janela de
+24h) é aceita pela API (retorna sucesso, gera `wamid`) mas a Meta **não entrega de fato**,
+sem erro nenhum aparecer. Cadastrar forma de pagamento (pode reaproveitar um cartão já
+cadastrado no portfólio) resolve.
+
 ### Funil de qualificação (aba "Funil") e lembrete em 2 toques
 
 Adicionado em 2026-08-15. Duas peças:

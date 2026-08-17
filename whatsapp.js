@@ -212,6 +212,48 @@ async function markAsRead(fromPhoneNumberId, messageId) {
   return json;
 }
 
+// Lista as contas do WhatsApp (WABA) visíveis pro Business Manager: as que ele É DONO
+// (owned_whatsapp_business_accounts) + as que outro portfólio COMPARTILHOU com ele
+// (client_whatsapp_business_accounts, caso do Ciahot). Usado pra descobrir automaticamente
+// qual WABA cada número pertence, sem precisar cadastrar isso à mão em lugar nenhum.
+async function listarWabasDoNegocio(businessId) {
+  const [own, client] = await Promise.all([
+    graphRequest("GET", "graph.facebook.com", `/${GRAPH_VERSION}/${businessId}/owned_whatsapp_business_accounts?fields=id,name`),
+    graphRequest("GET", "graph.facebook.com", `/${GRAPH_VERSION}/${businessId}/client_whatsapp_business_accounts?fields=id,name`),
+  ]);
+  const parse = (r) => {
+    const json = JSON.parse(r.buffer.toString("utf8") || "{}");
+    if (r.status >= 400) throw new Error(`Falha ao listar WABAs: ${JSON.stringify(json)}`);
+    return json.data || [];
+  };
+  return [...parse(own), ...parse(client)];
+}
+
+async function listarNumerosDaWaba(wabaId) {
+  const { status, buffer } = await graphRequest(
+    "GET",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${wabaId}/phone_numbers?fields=id,display_phone_number`
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao listar números da WABA: ${JSON.stringify(json)}`);
+  return json.data || [];
+}
+
+// Templates de mensagem aprovados na WABA — usado pro painel montar a lista de templates
+// disponíveis pra envio em massa, em vez da pessoa ter que digitar o nome de cabeça (e
+// arriscar errar ou usar um nome que não existe/não está aprovado).
+async function listarTemplates(wabaId) {
+  const { status, buffer } = await graphRequest(
+    "GET",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${wabaId}/message_templates?fields=name,status,language,category&limit=200`
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao listar templates: ${JSON.stringify(json)}`);
+  return json.data || [];
+}
+
 // Checa se o App está inscrito nos webhooks dessa conta do WhatsApp (WABA) — sem essa
 // inscrição, a Meta nunca avisa o servidor de mensagens novas (o número existe e manda
 // mensagem normal, mas o /webhook daqui nunca é chamado, então o bot nunca "vê" nada chegar).
@@ -279,6 +321,9 @@ module.exports = {
   registerNumber,
   checarInscricaoWebhook,
   inscreverWebhook,
+  listarWabasDoNegocio,
+  listarNumerosDaWaba,
+  listarTemplates,
   downloadMedia,
   markAsRead,
 };

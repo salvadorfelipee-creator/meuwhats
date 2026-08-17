@@ -126,6 +126,38 @@ const PHONE_NUMBERS = process.env.PHONE_NUMBERS_JSON
   ? [{ id: process.env.PHONE_NUMBER_ID, label: "Principal" }]
   : [];
 
+// Business Manager da Felizcred — dono da maioria das WABAs configuradas e, além disso,
+// destinatário do compartilhamento cross-portfólio da WABA da Ciahot (por isso o envio em
+// massa consegue descobrir a WABA de QUALQUER número configurado, mesmo os de outro
+// portfólio, sem precisar cadastrar isso em lugar nenhum — ver resolverWabaDoNumero).
+const META_BUSINESS_ID = "599219759208171";
+
+// Cache em memória (10min) do mapa phone_number_id → waba_id — evita rechamar a Meta a cada
+// clique no painel; listarTemplates já é rápido, mas listar TODAS as WABAs + números de cada
+// uma pra descobrir a dona de UM número é bem mais chamada de API do que vale a pena repetir.
+let cacheWabaPorNumero = null;
+let cacheWabaPorNumeroEm = 0;
+async function resolverWabaDoNumero(businessNumberId) {
+  const agora = Date.now();
+  if (!cacheWabaPorNumero || agora - cacheWabaPorNumeroEm > 10 * 60 * 1000) {
+    const wabas = await wa.listarWabasDoNegocio(META_BUSINESS_ID);
+    const mapa = {};
+    await Promise.all(
+      wabas.map(async (waba) => {
+        try {
+          const numeros = await wa.listarNumerosDaWaba(waba.id);
+          for (const n of numeros) mapa[n.id] = waba.id;
+        } catch (err) {
+          console.error(`Erro ao listar números da WABA ${waba.id}:`, err.message);
+        }
+      })
+    );
+    cacheWabaPorNumero = mapa;
+    cacheWabaPorNumeroEm = agora;
+  }
+  return cacheWabaPorNumero[businessNumberId] || null;
+}
+
 const MEDIA_DIR = path.join(__dirname, "media");
 fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
@@ -2016,6 +2048,24 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       await db.respostaProntaExcluir(Number(matchRespostaProntaDel[1]));
       return send(res, 200, { ok: true });
+    }
+
+    // GET /painel/api/templates/:businessId — templates aprovados da WABA desse número,
+    // pra montar o seletor de template do envio em massa (em vez de digitar o nome de cabeça).
+    const matchTemplates = path_.match(/^\/painel\/api\/templates\/([^/]+)$/);
+    if (req.method === "GET" && matchTemplates) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchTemplates[1]);
+      try {
+        const wabaId = await resolverWabaDoNumero(businessId);
+        if (!wabaId) return send(res, 404, { error: "Não achei a conta do WhatsApp (WABA) desse número" });
+        const templates = await wa.listarTemplates(wabaId);
+        const aprovados = templates.filter((t) => t.status === "APPROVED");
+        return send(res, 200, { templates: aprovados });
+      } catch (err) {
+        console.error("Erro ao listar templates:", err.message);
+        return send(res, 502, { error: err.message });
+      }
     }
 
     // POST /painel/api/broadcast/:businessId — envio em massa via template
