@@ -491,7 +491,11 @@ diferente da Felizcred/Cota Certa, `phone_number_id` `1264737673394463`, confirm
 6. Clique em **"Falar com atendimento"** → responde "Aguarde, em breve irei te responder." e
    encerra a automação (humano assume pelo painel).
 7. Se ninguém tocar em nenhum botão em **17 minutos**, manda um lembrete único: "O site
-   CIAHOT pode gerar mais contatos pra você...".
+   CIAHOT pode gerar mais contatos pra você...". **E só** — diferente dos outros fluxos
+   (Felizcred/Cota Certa), Ciahot **não** manda o segundo aviso de "ainda por aí?" perto das
+   24h de silêncio (`FLUXO_CIAHOT.semAvisoJanela = true`, checado no verificador de janela de
+   24h em `server.js`) — decisão explícita do usuário pra não insistir depois que a pessoa já
+   ignorou o primeiro toque.
 8. Na oferta VIP, "Fazer anúncio" → manda o link do formulário (`ciahot.com.br/anunciar/`,
    botão de link) +, em mensagem separada, botão "Anúncio concluído!". Ao concluir, confirma
    e pede pra salvar o contato + e-mail de suporte (`contato@ciahot.com.br`). "No momento não"

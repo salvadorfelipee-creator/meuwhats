@@ -995,16 +995,8 @@ const LEMBRETE_TEXTOS_CIAHOT = {
   padrao:
     "O site CIAHOT pode gerar mais contatos para você! 🚀 Não deixe de conferir e fazer seu anúncio " +
     `de forma gratuita: ${CIAHOT_SITE_URL}`,
-  // Varia pelo passo: quem já clicou "Fazer anúncio" e tá só faltando confirmar não pode
-  // receber o MESMO "não esqueça de conferir o site" de quem nem clicou em nada ainda —
-  // pareceria que o anúncio que a pessoa já fez nunca existiu (bug real, reportado
-  // 2026-08-18: cliente tinha ido até o formulário e ainda assim recebeu esse aviso genérico).
-  manter_janela: (passo) =>
-    passo === "ciahot_aguardando_conclusao"
-      ? "Ainda por aí? 😊 Se você já preencheu seu anúncio, é só tocar em \"Anúncio concluído!\" logo " +
-        "acima que a gente já providencia a liberação. Se ainda não terminou, o link continua valendo: " +
-        `${CIAHOT_ANUNCIAR_URL}`
-      : `Ainda por aí? 😊 Não deixe de conferir o site CIAHOT e fazer seu anúncio gratuito: ${CIAHOT_SITE_URL}`,
+  // Sem manter_janela de propósito — ver semAvisoJanela em FLUXO_CIAHOT: só esse lembrete de
+  // 17min e nada além disso, mesmo perto das 24h de silêncio.
 };
 
 // ─── HORÁRIO COMERCIAL (Cota Certa) ──────────────────────────────────────────
@@ -1291,6 +1283,9 @@ const FLUXO_CIAHOT = {
   lembreteTextos: LEMBRETE_TEXTOS_CIAHOT,
   lembreteHandlers: LEMBRETE_HANDLERS_CIAHOT,
   capturaTexto: {},
+  // Teto de mensagens automáticas: as 3 iniciais + 1 lembrete (17min) e nada mais — sem o
+  // segundo aviso de manter-janela (20h) que os outros fluxos mandam.
+  semAvisoJanela: true,
 };
 
 const FLUXOS_POR_NUMERO = {
@@ -2772,8 +2767,13 @@ setInterval(async () => {
     const pendentes = await db.listarJanelasParaManter();
     for (const p of pendentes) {
       if (!(await db.tentarMarcarJanelaLembreteEnviado(p.phone, p.business_number_id))) continue;
+      const fluxoDoContato = getFluxo(p.business_number_id);
+      // Ciahot: só o lembrete de 17min do passo "ciahot_oferta" (já é 1 toque só) — sem esse
+      // segundo aviso de manter-janela também, pra não ficar insistindo com quem já ignorou o
+      // primeiro. tentarMarcarJanelaLembreteEnviado acima já marca como tratado, então não
+      // reaparece nas próximas voltas do verificador.
+      if (fluxoDoContato.semAvisoJanela) continue;
       try {
-        const fluxoDoContato = getFluxo(p.business_number_id);
         const manterJanela = fluxoDoContato.lembreteTextos.manter_janela || LEMBRETE_TEXTOS_COTACERTA.manter_janela;
         const texto = typeof manterJanela === "function" ? manterJanela(p.fluxo_passo) : manterJanela;
         await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
