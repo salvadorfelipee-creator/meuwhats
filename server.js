@@ -995,7 +995,16 @@ const LEMBRETE_TEXTOS_CIAHOT = {
   padrao:
     "O site CIAHOT pode gerar mais contatos para você! 🚀 Não deixe de conferir e fazer seu anúncio " +
     `de forma gratuita: ${CIAHOT_SITE_URL}`,
-  manter_janela: () => `Ainda por aí? 😊 Não deixe de conferir o site CIAHOT e fazer seu anúncio gratuito: ${CIAHOT_SITE_URL}`,
+  // Varia pelo passo: quem já clicou "Fazer anúncio" e tá só faltando confirmar não pode
+  // receber o MESMO "não esqueça de conferir o site" de quem nem clicou em nada ainda —
+  // pareceria que o anúncio que a pessoa já fez nunca existiu (bug real, reportado
+  // 2026-08-18: cliente tinha ido até o formulário e ainda assim recebeu esse aviso genérico).
+  manter_janela: (passo) =>
+    passo === "ciahot_aguardando_conclusao"
+      ? "Ainda por aí? 😊 Se você já preencheu seu anúncio, é só tocar em \"Anúncio concluído!\" logo " +
+        "acima que a gente já providencia a liberação. Se ainda não terminou, o link continua valendo: " +
+        `${CIAHOT_ANUNCIAR_URL}`
+      : `Ainda por aí? 😊 Não deixe de conferir o site CIAHOT e fazer seu anúncio gratuito: ${CIAHOT_SITE_URL}`,
 };
 
 // ─── HORÁRIO COMERCIAL (Cota Certa) ──────────────────────────────────────────
@@ -2766,7 +2775,7 @@ setInterval(async () => {
       try {
         const fluxoDoContato = getFluxo(p.business_number_id);
         const manterJanela = fluxoDoContato.lembreteTextos.manter_janela || LEMBRETE_TEXTOS_COTACERTA.manter_janela;
-        const texto = typeof manterJanela === "function" ? manterJanela() : manterJanela;
+        const texto = typeof manterJanela === "function" ? manterJanela(p.fluxo_passo) : manterJanela;
         await enviarRespostaAutomatica(p.business_number_id, p.phone, texto);
         console.log(`🔔 Aviso de janela (20h) enviado para ${p.phone} (passo ${p.fluxo_passo})`);
       } catch (err) {
