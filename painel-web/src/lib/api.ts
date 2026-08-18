@@ -43,6 +43,7 @@ export type RespostaPronta = { id: number; atalho: string; texto: string }
 export type BroadcastContact = { phone: string; name?: string }
 export type BroadcastResult = { phone: string; ok: boolean; error?: string }
 export type TemplateInfo = { name: string; status: string; language: string; category: string }
+export type BroadcastFilaItem = { id: number; phone: string; name: string | null; template: string; agendado_para: number }
 
 export type Rede = "instagram" | "instagram_story" | "facebook" | "twitter" | "linkedin" | "threads"
 
@@ -256,6 +257,12 @@ export const api = {
         body: JSON.stringify(payload),
       },
     ),
+
+  broadcastFila: (businessId: string) =>
+    request<BroadcastFilaItem[]>(`/painel/api/broadcast-fila/${encodeURIComponent(businessId)}`),
+
+  broadcastCancelar: (id: number) =>
+    request<{ ok: true }>(`/painel/api/broadcast-fila/item/${id}`, { method: "DELETE" }),
 
   // ── Publique IV (publicação direta + agenda) ──────────────────────────────
   contasPublicar: () => request<ContaPublicar[]>("/painel/api/publicar/contas"),

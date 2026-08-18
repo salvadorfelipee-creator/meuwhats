@@ -2154,6 +2154,25 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { resultados, agendados, intervalSeconds: intervalo });
     }
 
+    // GET /painel/api/broadcast-fila/:businessId — itens de um broadcast com intervalo que
+    // ainda não saíram, pra mostrar a fila no painel e permitir cancelar individualmente.
+    const matchBroadcastFila = path_.match(/^\/painel\/api\/broadcast-fila\/([^/]+)$/);
+    if (req.method === "GET" && matchBroadcastFila) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchBroadcastFila[1]);
+      return send(res, 200, await db.broadcastListarPendentes(businessId));
+    }
+
+    // DELETE /painel/api/broadcast-fila/item/:id — cancela um envio agendado (só funciona se
+    // ainda estiver 'pending'; se o agendador já pegou pra enviar, é tarde demais).
+    const matchBroadcastCancelar = path_.match(/^\/painel\/api\/broadcast-fila\/item\/(\d+)$/);
+    if (req.method === "DELETE" && matchBroadcastCancelar) {
+      if (!requireAuth(req, res)) return;
+      const ok = await db.broadcastCancelar(Number(matchBroadcastCancelar[1]));
+      if (!ok) return send(res, 409, { error: "Não deu pra cancelar — já foi enviado ou já está sendo enviado agora" });
+      return send(res, 200, { ok: true });
+    }
+
     // POST /painel/api/registrar-numero/:businessId — registro único de um número novo na
     // Cloud API (depois de já verificado por SMS/ligação no Business Manager). Ação
     // administrativa de uma vez só por número, não faz parte do fluxo normal do painel — sem

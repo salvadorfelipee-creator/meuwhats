@@ -1029,6 +1029,29 @@ async function broadcastPendentesResumo(businessId) {
   return { pendentes: Number(result.rows[0]?.total || 0), ultimo: result.rows[0]?.ultimo || null };
 }
 
+// Lista os itens ainda não enviados de um broadcast com intervalo — pro painel mostrar a fila
+// e deixar cancelar individualmente (ver broadcastCancelar).
+async function broadcastListarPendentes(businessId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT id, phone, name, template, agendado_para FROM broadcast_agendado
+          WHERE business_id = ? AND status = 'pending' ORDER BY agendado_para ASC`,
+    args: [businessId],
+  });
+  return result.rows;
+}
+
+// Só cancela quem ainda está 'pending' — se já estiver 'processing' (o agendador pegou pra
+// enviar agora mesmo) ou 'sent', é tarde demais, não reverte um envio já em andamento/feito.
+async function broadcastCancelar(id) {
+  await ready;
+  const result = await client.execute({
+    sql: `DELETE FROM broadcast_agendado WHERE id = ? AND status = 'pending'`,
+    args: [id],
+  });
+  return result.rowsAffected > 0;
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -1095,4 +1118,6 @@ module.exports = {
   broadcastMarcarEnviado,
   broadcastMarcarErro,
   broadcastPendentesResumo,
+  broadcastListarPendentes,
+  broadcastCancelar,
 };

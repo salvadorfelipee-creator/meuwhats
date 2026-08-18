@@ -8,6 +8,7 @@ import {
   type RespostaPronta,
   type TemplateInfo,
   type BroadcastResult,
+  type BroadcastFilaItem,
 } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -548,10 +549,30 @@ function BroadcastDialog({
   const [enviando, setEnviando] = React.useState(false)
   const [resumo, setResumo] = React.useState<string | null>(null)
   const [falhas, setFalhas] = React.useState<BroadcastResult[]>([])
+  const [fila, setFila] = React.useState<BroadcastFilaItem[]>([])
 
   React.useEffect(() => {
     if (open && !contaId && contas.length) setContaId(contas[0].id)
   }, [open, contaId, contas])
+
+  const carregarFila = React.useCallback(() => {
+    if (!contaId) return
+    api.broadcastFila(contaId).then(setFila).catch(() => {})
+  }, [contaId])
+
+  React.useEffect(() => {
+    if (!open || !contaId) return
+    carregarFila()
+  }, [open, contaId, carregarFila])
+
+  async function cancelarItem(id: number) {
+    try {
+      await api.broadcastCancelar(id)
+      setFila((prev) => prev.filter((f) => f.id !== id))
+    } catch (err) {
+      setResumo(err instanceof Error ? err.message : "Erro ao cancelar")
+    }
+  }
 
   React.useEffect(() => {
     if (!open || !contaId) return
@@ -605,6 +626,7 @@ function BroadcastDialog({
       }
       setResumo(partes.join(" "))
       setFalhas(resultados.filter((r) => !r.ok))
+      if (agendados) carregarFila()
     } catch (err) {
       setResumo(err instanceof Error ? err.message : "Erro ao enviar")
     } finally {
@@ -697,6 +719,29 @@ function BroadcastDialog({
               O 1º contato sai na hora; os demais ficam agendados nesse intervalo, mesmo se você fechar o painel.
             </p>
           </div>
+          {fila.length > 0 && (
+            <div>
+              <label className="text-sm font-medium mb-1 block">Fila pendente ({fila.length})</label>
+              <ul className="text-xs border rounded-md divide-y max-h-32 overflow-y-auto">
+                {fila.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-2 px-2 py-1.5">
+                    <span className="truncate">
+                      {item.name ? `${item.name} · ` : ""}
+                      {item.phone} — {formatTime(item.agendado_para)}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-destructive shrink-0"
+                      onClick={() => cancelarItem(item.id)}
+                    >
+                      Cancelar
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {resumo && <p className="text-sm">{resumo}</p>}
           {falhas.length > 0 && (
             <ul className="text-xs text-destructive space-y-0.5 max-h-24 overflow-y-auto">

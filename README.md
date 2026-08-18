@@ -1288,6 +1288,17 @@ pagamento) — sem isso, conversa iniciada pela empresa (qualquer template fora 
 sem erro nenhum aparecer. Cadastrar forma de pagamento (pode reaproveitar um cartão já
 cadastrado no portfólio) resolve.
 
+**Intervalo entre mensagens + fila cancelável** (18/08/2026): o diálogo tem um campo
+"Intervalo entre mensagens" (min/seg, 0 = manda tudo de uma vez). Com intervalo > 0, só o
+1º contato sai na hora — os demais caem na tabela `broadcast_agendado` (banco, não memória do
+processo) com seu próprio `agendado_para`, processados por um `setInterval` de 20s em
+`server.js` (`broadcastProximoDevido`/`broadcastMarcarEnviado`/`broadcastMarcarErro`) — assim
+sobrevive a fechar o painel ou a um redeploy no meio do envio, diferente de um `setTimeout`
+solto. O diálogo mostra essa fila pendente (`GET /painel/api/broadcast-fila/:businessId`) com
+botão **Cancelar** por item (`DELETE /painel/api/broadcast-fila/item/:id`) — só cancela quem
+ainda está `pending`; se o agendador já pegou pra enviar (`processing`) ou já enviou (`sent`),
+não reverte.
+
 ### Funil de qualificação (aba "Funil") e lembrete em 2 toques
 
 Adicionado em 2026-08-15. Duas peças:
