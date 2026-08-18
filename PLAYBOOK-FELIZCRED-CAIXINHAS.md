@@ -37,10 +37,12 @@ rescisão (6), INSS (8), Consignado (6), PIS/Abono (2), Golpes (3), Seguros
 - **38 "texto"** — caixinha com a pergunta + resposta escrita no rodapé
   (gradiente escuro), vídeo mudo de 6s em loop, publicado só como
   **Instagram Story**.
-- **12 "áudio"** — caixinha só com a pergunta (sem resposta escrita); a
-  resposta sai em áudio (`pt-BR-AntonioNeural`, via `edge-tts`, grátis).
-  Publicado como **Story** (mesmo visual, mudo, 6s) **e também como Reels**
-  (mesmo visual, com o áudio, duração = duração da narração, ~14-20s).
+- **12 "áudio"** — caixinha com a pergunta **e** a resposta escrita (igual
+  ao modo texto — revisão pedida pelo usuário, ver seção abaixo), **e** a
+  resposta também narrada em áudio (`pt-BR-AntonioNeural`, via `edge-tts`,
+  grátis). Publicado como **Story** (mesmo visual, mudo, 6s) **e também como
+  Reels** (mesmo visual + selo "🔊 Ative o som" + o áudio, duração = duração
+  da narração, ~14-20s).
 
 Os 12 de áudio foram escolhidos pelo gancho/curiosidade mais forte (ex.
 "Hora extra tem que pagar quanto a mais?", "Gestante pode ser demitida
@@ -64,7 +66,56 @@ as outras séries já agendadas na conta felizcred (12h e 18h BRT ocupados
 pelas séries de crédito/informativos CLT). Reels correspondentes saem 6
 minutos depois do Story irmão, mesmo dia.
 
-IDs na agenda: **251 a 312** (62 no total — 50 Stories + 12 Reels).
+IDs na agenda: **251 a 312** originais, depois **313 a 336** (os 12 pares
+Story+Reels de áudio foram recriados com o conteúdo revisado — ver seção
+"Revisão pós-publicação" abaixo). 61 posts ativos no total (49 Stories + 12
+Reels — 1 Story já publicou durante o teste de diagnóstico, ver abaixo).
+
+## Bugs encontrados e corrigidos durante essa série (fora do escopo do conteúdo, mas bloqueavam a publicação)
+
+1. **Painel Agenda escondia posts pendentes de uma conta específica**:
+   `GET /painel/api/agenda/lista` aplica um `LIMIT 50` **global** (somando
+   todas as contas). Com 270+ posts pendentes no sistema, o clique num dia
+   específico ("Posts do dia X") não achava os posts da Felizcred porque a
+   tela usava essa lista limitada em vez da fila completa (sem limite) já
+   carregada. Corrigido em `painel-web/src/pages/agenda.tsx` — o painel
+   pendente agora vem sempre da fila completa por conta.
+2. **Post de vídeo não tinha prévia no painel**: `AgendaItem`/`PostCard` só
+   sabiam mostrar `imagemUrl`, nunca `videoUrl` (que o backend já retornava).
+   Corrigido em `api.ts`/`agenda.tsx`.
+3. **Instagram Stories em vídeo falhavam**: `publicarStory` só aceitava
+   `image_url` — qualquer Story com vídeo dava erro "Story exige uma
+   imagem". A API do Instagram aceita `video_url` em Stories do mesmo jeito
+   que aceita no Reels (mesmo mecanismo de container + espera). Corrigido em
+   `instagram.js`/`publique.js`. **Testado ao vivo** (via chamada direta à
+   Graph API, fora do fluxo normal, pra diagnosticar o erro em branco que o
+   painel mostrava) — funcionou, mas isso **publicou de verdade e fora de
+   hora** o Story do item #1 ("salário mínimo"), removido da fila depois
+   pra não duplicar no dia 18/08.
+
+## Revisão pós-publicação — texto + áudio + selo de som nos 12 itens de áudio
+
+Depois de agendado, o usuário pediu duas mudanças, uma possível e uma não:
+
+- **Pedido**: escrever a pergunta/resposta na legenda de "todos os posts
+  agendados" pra ajudar a indexar no Google. **Não é possível pro Story**: a
+  API do Instagram não tem parâmetro de legenda pra Stories (é uma limitação
+  da própria plataforma — quando alguém "escreve palavras" postando um Story
+  manualmente, isso vira texto desenhado na imagem, não uma legenda
+  separada). Só o Reels tem legenda de verdade.
+- **Decisão final do usuário**: escrever a resposta na imagem dos 12 itens
+  de áudio também (deixando de ser só pergunta) **e** manter o áudio **e**
+  adicionar um selo "🔊 Ative o som" — só no Reels (o Story desses itens
+  continua mudo, não tem o que ligar).
+
+Implementado em `felizcred-caixinhas/atualizar_audio_com_texto.py`: gera dois
+overlays novos por item (`overlay_v2_story.png` sem selo, `overlay_v2_reels.png`
+com selo), recompõe os dois vídeos, monta uma legenda rica só pro Reels
+(pergunta + resposta completa + CTA + hashtags do tema — ver
+`HASHTAGS_POR_CATEGORIA` no script) e apaga+recria os 24 posts (12 Story + 12
+Reels) nos mesmos horários já agendados, já que a API de agenda não tem
+"editar". Rodado com `--dry-run` primeiro pra conferir o mapeamento
+horário→ID antes de apagar de verdade.
 
 ## Armazenamento (R2)
 
