@@ -101,6 +101,21 @@ function normalizarTexto(texto) {
     .trim();
 }
 
+// Celular brasileiro tem o "9º dígito" (55 + DDD + 9 + 8 dígitos = 13 no total), mas número
+// digitado à mão (ex.: colado numa lista de campanha antiga) às vezes vem sem ele (55 + DDD +
+// 8 = 12). Sem normalizar, os dois formatos viram DUAS conversas diferentes pro mesmo contato
+// real — bug reportado 2026-08-18 (Larissa Cardoso aparecendo duplicada no painel). Todo
+// telefone precisa passar por aqui antes de virar chave de conversations/messages.
+function normalizarTelefoneBR(telefone) {
+  const digitos = (telefone || "").replace(/\D/g, "");
+  if (/^55\d{10}$/.test(digitos)) {
+    const ddd = digitos.slice(2, 4);
+    const resto = digitos.slice(4);
+    return `55${ddd}9${resto}`;
+  }
+  return digitos;
+}
+
 // Exige a mensagem inteira igual à palavra-chave (não só "conter" a palavra em algum lugar
 // de uma frase maior) — "fgts" sozinho aciona, "por que o fgts não caiu" não aciona (pedido
 // do usuário depois de ver a palavra disparando dentro de frases sem intenção clara).
@@ -162,7 +177,7 @@ async function resolverWabaDoNumero(businessNumberId) {
 // imediato (POST /painel/api/broadcast) quanto pelo agendador de envios intercalados (ver
 // setInterval do broadcast_agendado, mais abaixo). Retorna { ok, error }, nunca lança.
 async function enviarUmBroadcast(businessId, { phone, name, template, language, bodyPreview }) {
-  const telefoneLimpo = (phone || "").replace(/\D/g, "");
+  const telefoneLimpo = normalizarTelefoneBR(phone);
   const nome = (name || "").trim();
   if (!telefoneLimpo) return { ok: false, error: "telefone inválido" };
   try {
@@ -1324,7 +1339,7 @@ async function processarEntry(entry) {
       const fluxo = getFluxo(businessNumberId);
 
       for (const msg of mensagens) {
-        const de = msg.from;
+        const de = normalizarTelefoneBR(msg.from);
         const tipo = msg.type;
         const nome = contatos.find((c) => c.wa_id === de)?.profile?.name;
         const quando = Number(msg.timestamp) * 1000 || Date.now();
@@ -1962,7 +1977,8 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && matchReply) {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchReply[1]);
-      const phone = decodeURIComponent(matchReply[2]);
+      const phoneParam = decodeURIComponent(matchReply[2]);
+      const phone = businessId === "instagram" ? phoneParam : normalizarTelefoneBR(phoneParam);
       const body = await parseBody(req);
       const texto = (body.text || "").trim();
       if (!texto && !body.imagemBase64) return send(res, 400, { error: "Mensagem vazia" });
@@ -2143,7 +2159,7 @@ const server = http.createServer(async (req, res) => {
       ];
       const agora = Date.now();
       const itensAgendados = resto.map((contato, i) => ({
-        phone: (contato.phone || "").replace(/\D/g, ""),
+        phone: normalizarTelefoneBR(contato.phone),
         name: contato.name || null,
         template,
         language: language || "pt_BR",

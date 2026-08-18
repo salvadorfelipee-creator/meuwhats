@@ -276,6 +276,36 @@ const ready = (async () => {
     created_at INTEGER NOT NULL
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_broadcast_agendado_status ON broadcast_agendado(status, agendado_para)`);
+
+  // Mescla duplicatas causadas pelo "9º dígito" do celular brasileiro (mesmo contato virando
+  // duas conversas — uma com 5X99XXXXXXXX, outra com 5X9XXXXXXXX — dependendo de qual formato
+  // entrou primeiro). server.js agora normaliza tudo antes de gravar (normalizarTelefoneBR),
+  // isso aqui só limpa quem já ficou duplicado antes dessa correção. Idempotente: roda toda
+  // inicialização, só mexe se achar de fato um par duplicado.
+  const todasConversas = await client.execute(`SELECT phone, business_number_id, name, last_message_at FROM conversations`);
+  for (const row of todasConversas.rows) {
+    const digitos = String(row.phone);
+    if (!/^55\d{10}$/.test(digitos)) continue; // só o formato "sem o 9" (12 dígitos: 55+DDD+8)
+    const canonico = `55${digitos.slice(2, 4)}9${digitos.slice(4)}`;
+    const par = await client.execute({
+      sql: `SELECT name, last_message_at FROM conversations WHERE phone = ? AND business_number_id = ?`,
+      args: [canonico, row.business_number_id],
+    });
+    if (!par.rows.length) continue; // não existe o par canônico — número sem o 9 mesmo, deixa
+    await client.execute({
+      sql: `UPDATE messages SET phone = ? WHERE phone = ? AND business_number_id = ?`,
+      args: [canonico, digitos, row.business_number_id],
+    });
+    await client.execute({
+      sql: `UPDATE conversations SET name = COALESCE(name, ?), last_message_at = MAX(last_message_at, ?)
+            WHERE phone = ? AND business_number_id = ?`,
+      args: [row.name, row.last_message_at || 0, canonico, row.business_number_id],
+    });
+    await client.execute({
+      sql: `DELETE FROM conversations WHERE phone = ? AND business_number_id = ?`,
+      args: [digitos, row.business_number_id],
+    });
+  }
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {

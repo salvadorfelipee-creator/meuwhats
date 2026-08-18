@@ -1299,6 +1299,25 @@ botão **Cancelar** por item (`DELETE /painel/api/broadcast-fila/item/:id`) — 
 ainda está `pending`; se o agendador já pegou pra enviar (`processing`) ou já enviou (`sent`),
 não reverte.
 
+### Normalização do "9º dígito" (celular brasileiro) — 18/08/2026
+
+Bug reportado: o mesmo contato aparecendo **duas vezes** na lista de conversas (uma com o
+nome salvo, outra só com o número), cada uma com seu próprio histórico. Causa: celular
+brasileiro tem o 9º dígito (`55` + DDD + `9` + 8 dígitos = 13 no total), mas número digitado
+à mão (lista de campanha colada de outro lugar) às vezes vem sem ele (`55` + DDD + 8 = 12) —
+os dois formatos viravam chaves diferentes em `conversations`/`messages`
+(`PRIMARY KEY (phone, business_number_id)`), gerando duas linhas pro mesmo contato real.
+
+Corrigido em duas partes:
+- `normalizarTelefoneBR` (`server.js`) — insere o 9 quando falta, chamada em todo ponto que
+  grava telefone: entrada do webhook (`de = normalizarTelefoneBR(msg.from)`),
+  `enviarUmBroadcast`, item agendado da fila de broadcast, e a rota manual de resposta
+  (`/reply`, cobre o botão "Novo" de iniciar conversa digitando o número).
+- Migração automática em `db.js` (dentro do `ready`, roda toda inicialização, idempotente) —
+  varre `conversations` procurando pares "com/sem o 9" pro mesmo `business_number_id`, move as
+  mensagens da linha sem o 9 pra linha canônica (com o 9), funde nome/última-mensagem, e apaga
+  a duplicata. Só mexe se achar de fato um par — não força o 9 em número que nunca teve par.
+
 ### Funil de qualificação (aba "Funil") e lembrete em 2 toques
 
 Adicionado em 2026-08-15. Duas peças:
