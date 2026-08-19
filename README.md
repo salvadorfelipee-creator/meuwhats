@@ -1318,6 +1318,15 @@ Corrigido em duas partes:
   mensagens da linha sem o 9 pra linha canônica (com o 9), funde nome/última-mensagem, e apaga
   a duplicata. Só mexe se achar de fato um par — não força o 9 em número que nunca teve par.
 
+### Reabrir fluxo automático pelo painel — 19/08/2026
+
+Botão **"Reabrir fluxo automático"** no painel de detalhes do contato (ícone ⓘ da conversa,
+não aparece pro Instagram). Antes, a ÚNICA forma de reabrir um fluxo travado (ex.: falha
+passageira que interrompeu a sequência do Ciahot sem deixar rastro nenhum na conversa) era
+pedir pro CLIENTE digitar "menu" — sem jeito do atendente forçar isso do lado de cá.
+`POST /painel/api/conversations/:businessId/:phone/reabrir-fluxo` chama exatamente o mesmo
+`dispararInicioFluxo` que a palavra-chave "menu" aciona.
+
 ### Funil de qualificação (aba "Funil") e lembrete em 2 toques
 
 Adicionado em 2026-08-15. Duas peças:

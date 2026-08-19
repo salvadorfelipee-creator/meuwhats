@@ -209,6 +209,12 @@ export const api = {
       { method: "POST", body: JSON.stringify({ text, imagemBase64 }) },
     ),
 
+  reabrirFluxo: (businessId: string, phone: string) =>
+    request<{ ok: true }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/reabrir-fluxo`,
+      { method: "POST" },
+    ),
+
   setStatus: (businessId: string, phone: string, status: "novo" | "andamento" | "resolvido") =>
     request<{ ok: true }>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/status`,

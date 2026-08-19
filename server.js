@@ -2051,6 +2051,26 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // POST /painel/api/conversations/:businessId/:phone/reabrir-fluxo — reabre o fluxo
+    // automático desse contato (mesmo efeito de o CLIENTE mandar "menu", só que acionado pelo
+    // atendente aqui do painel — pra quando o fluxo falhou/travou e não dá pra pedir pro
+    // cliente digitar algo). Usa o fluxo do número (menu de novo, ou aoIniciar pra fluxos
+    // lineares como o Ciahot).
+    const matchReabrirFluxo = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/reabrir-fluxo$/);
+    if (req.method === "POST" && matchReabrirFluxo) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchReabrirFluxo[1]);
+      const phone = decodeURIComponent(matchReabrirFluxo[2]);
+      if (businessId === "instagram") return send(res, 400, { error: "Instagram não tem fluxo automático pra reabrir" });
+      try {
+        await dispararInicioFluxo(getFluxo(businessId), phone, businessId);
+        return send(res, 200, { ok: true });
+      } catch (err) {
+        console.error("Erro ao reabrir fluxo pelo painel:", err.message);
+        return send(res, 502, { error: err.message });
+      }
+    }
+
     // PATCH /painel/api/conversations/:businessId/:phone/status — muda status da conversa
     // (novo/andamento/resolvido — estilo Chatwoot)
     const matchStatus = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/status$/);

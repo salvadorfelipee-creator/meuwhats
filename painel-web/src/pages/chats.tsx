@@ -495,6 +495,8 @@ function ContactDetails({
 }) {
   const [nota, setNota] = React.useState(conversation.nota || "")
   const [salvando, setSalvando] = React.useState(false)
+  const [reabrindo, setReabrindo] = React.useState(false)
+  const [reabrirMsg, setReabrirMsg] = React.useState<string | null>(null)
 
   async function salvar() {
     setSalvando(true)
@@ -506,12 +508,38 @@ function ContactDetails({
     }
   }
 
+  // Mesmo efeito de o cliente mandar "menu" — pra quando o fluxo automático falhou/travou e
+  // não dá pra depender de pedir pro cliente digitar algo.
+  async function reabrirFluxo() {
+    setReabrindo(true)
+    setReabrirMsg(null)
+    try {
+      await api.reabrirFluxo(businessId, conversation.phone)
+      setReabrirMsg("Fluxo reaberto! ✅")
+    } catch (err) {
+      setReabrirMsg(err instanceof Error ? err.message : "Erro ao reabrir")
+    } finally {
+      setReabrindo(false)
+    }
+  }
+
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div>
         <p className="text-sm font-medium">{conversation.name || "Sem nome"}</p>
         <p className="text-sm text-muted-foreground">{conversation.phone}</p>
       </div>
+      {businessId !== "instagram" && (
+        <div>
+          <Button size="sm" variant="outline" onClick={reabrirFluxo} disabled={reabrindo}>
+            {reabrindo ? "Reabrindo..." : "Reabrir fluxo automático"}
+          </Button>
+          <p className="text-xs text-muted-foreground mt-1">
+            Mesmo efeito de o cliente mandar "menu" — use se a automação travou.
+          </p>
+          {reabrirMsg && <p className="text-xs mt-1">{reabrirMsg}</p>}
+        </div>
+      )}
       <div>
         <label className="text-sm font-medium mb-1 block">Nota interna</label>
         <Textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={5} />
