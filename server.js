@@ -2489,10 +2489,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await agenda.listarFila());
     }
 
-    // GET /painel/api/agenda/lista — histórico (pendentes + publicados + com erro)
+    // GET /painel/api/agenda/lista — histórico (pendentes + publicados + com erro). Aceita
+    // ?contaId= (filtra antes do LIMIT, senão contas com pouco volume somem numa fila grande
+    // de outras contas) e ?limit= (default 50).
     if (req.method === "GET" && path_ === "/painel/api/agenda/lista") {
       if (!requireAuth(req, res)) return;
-      const [resumo, recentes] = await Promise.all([agenda.resumo(), agenda.listarRecentes(50)]);
+      const contaId = url.searchParams.get("contaId") || null;
+      const limit = Math.max(Number(url.searchParams.get("limit")) || 50, 1);
+      const [resumo, recentes] = await Promise.all([agenda.resumo(), agenda.listarRecentes(limit, contaId)]);
       return send(res, 200, { resumo, recentes });
     }
 

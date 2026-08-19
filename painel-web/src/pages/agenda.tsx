@@ -61,10 +61,10 @@ export function AgendaPage() {
 
   const carregar = React.useCallback(() => {
     api.agendaFila().then(setFila).catch(() => {})
-    api.agendaLista().then((r) => {
+    api.agendaLista(contaFiltro).then((r) => {
       setRecentes(r.recentes)
     }).catch(() => {})
-  }, [])
+  }, [contaFiltro])
 
   React.useEffect(() => {
     carregar()

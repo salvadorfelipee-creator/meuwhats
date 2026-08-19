@@ -969,14 +969,20 @@ async function agendaResumo() {
   return resumo;
 }
 
-async function agendaListarRecentes(limit = 30) {
+// contaId opcional: sem ele, o LIMIT é aplicado somando todas as contas — com muitos posts
+// na fila, uma conta específica pode ficar de fora do recorte inteiro (já causou um bug no
+// painel, ver commit "Corrige painel Agenda: pendentes de uma conta somem do detalhe do dia").
+// Passando contaId, o filtro entra ANTES do LIMIT, então a conta sempre aparece.
+async function agendaListarRecentes(limit = 30, contaId = null) {
   await ready;
   const result = await client.execute({
-    sql: `SELECT * FROM posts_agendados ORDER BY
+    sql: `SELECT * FROM posts_agendados
+          ${contaId ? "WHERE conta_id = ?" : ""}
+          ORDER BY
             CASE WHEN status = 'pending' THEN 0 ELSE 1 END,
             agendado_para DESC
           LIMIT ?`,
-    args: [limit],
+    args: contaId ? [contaId, limit] : [limit],
   });
   return result.rows;
 }

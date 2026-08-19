@@ -288,8 +288,10 @@ export const api = {
 
   agendaFila: () => request<AgendaItem[]>("/painel/api/agenda/fila"),
 
-  agendaLista: () =>
-    request<{ resumo: AgendaResumo; recentes: AgendaItem[] }>("/painel/api/agenda/lista"),
+  agendaLista: (contaId?: string) =>
+    request<{ resumo: AgendaResumo; recentes: AgendaItem[] }>(
+      `/painel/api/agenda/lista${contaId ? `?contaId=${encodeURIComponent(contaId)}` : ""}`,
+    ),
 
   agendaCriar: (payload: CriarAgendamentoPayload) =>
     request<{ id: number; agendadoPara: number }>("/painel/api/agenda", {

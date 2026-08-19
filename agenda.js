@@ -160,8 +160,8 @@ async function listarFila() {
   return Promise.all(itens.map(enriquecerItem));
 }
 
-async function listarRecentes(limit = 30) {
-  const itens = await db.agendaListarRecentes(limit);
+async function listarRecentes(limit = 30, contaId = null) {
+  const itens = await db.agendaListarRecentes(limit, contaId);
   return Promise.all(itens.map(enriquecerItem));
 }
 
