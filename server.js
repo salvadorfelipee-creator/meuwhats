@@ -1368,9 +1368,13 @@ async function processarEntry(entry) {
         );
 
         const conversaAnterior = await db.getConversation(de, businessNumberId);
-        const conversaInativa =
-          !conversaAnterior ||
-          quando - Number(conversaAnterior.last_message_at || 0) > HORAS_INATIVIDADE_MENU * 60 * 60 * 1000;
+        // Baseado na última mensagem RECEBIDA, não em conversations.last_message_at (que
+        // também é tocado pelo NOSSO envio, ex.: template de campanha) — ver
+        // db.getUltimaMensagemRecebida. Sem isso, quem respondia rápido a uma campanha nunca
+        // disparava o fluxo automático, porque o próprio envio da campanha (segundos antes) já
+        // fazia a conversa parecer "ativa".
+        const ultimaRecebida = await db.getUltimaMensagemRecebida(de, businessNumberId);
+        const conversaInativa = !ultimaRecebida || quando - Number(ultimaRecebida) > HORAS_INATIVIDADE_MENU * 60 * 60 * 1000;
 
         await db.upsertConversation(de, businessNumberId, nome, quando);
 

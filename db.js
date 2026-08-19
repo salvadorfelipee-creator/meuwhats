@@ -422,6 +422,23 @@ async function getConversation(phone, businessNumberId) {
   return result.rows[0] || null;
 }
 
+// Só a última mensagem RECEBIDA (direction='in') — diferente de conversations.last_message_at,
+// que mistura envio e recebimento. Bug real (2026-08-19): mandar um template de campanha já
+// atualiza last_message_at na hora do envio, então quando o cliente responde segundos depois,
+// a checagem de "conversa inativa" (que decide se dispara o fluxo automático) via
+// last_message_at achava que a conversa "já estava ativa" (por causa do PRÓPRIO envio nosso) e
+// nunca disparava o fluxo pra quem respondia rápido — exatamente o caso mais comum. Usado só
+// pra decidir se dispara o fluxo automático; last_message_at continua servindo pra tudo mais
+// (ordenação da caixa de entrada, janela de 24h etc.).
+async function getUltimaMensagemRecebida(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT MAX(created_at) AS ultimo FROM messages WHERE phone = ? AND business_number_id = ? AND direction = 'in'`,
+    args: [phone, businessNumberId],
+  });
+  return result.rows[0]?.ultimo || null;
+}
+
 const STATUS_VALIDOS = ["novo", "andamento", "resolvido"];
 
 async function atualizarStatusConversa(phone, businessNumberId, status) {
@@ -1085,6 +1102,7 @@ async function broadcastCancelar(id) {
 module.exports = {
   upsertConversation,
   getConversation,
+  getUltimaMensagemRecebida,
   tentarMarcarMenuEnviado,
   setFluxoPasso,
   listarFluxosAguardando,

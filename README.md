@@ -1321,11 +1321,26 @@ Corrigido em duas partes:
 ### Reabrir fluxo automático pelo painel — 19/08/2026
 
 Botão **"Reabrir fluxo automático"** no painel de detalhes do contato (ícone ⓘ da conversa,
-não aparece pro Instagram). Antes, a ÚNICA forma de reabrir um fluxo travado (ex.: falha
-passageira que interrompeu a sequência do Ciahot sem deixar rastro nenhum na conversa) era
-pedir pro CLIENTE digitar "menu" — sem jeito do atendente forçar isso do lado de cá.
+não aparece pro Instagram). Antes, a ÚNICA forma de reabrir um fluxo travado era pedir pro
+CLIENTE digitar "menu" — sem jeito do atendente forçar isso do lado de cá.
 `POST /painel/api/conversations/:businessId/:phone/reabrir-fluxo` chama exatamente o mesmo
 `dispararInicioFluxo` que a palavra-chave "menu" aciona.
+
+### Bug: fluxo automático não disparava pra quem respondia rápido a uma campanha (19/08/2026)
+
+Causa raiz de vários casos de "cliente respondeu e a automação nunca chegou" — confirmado
+lendo os logs do Render (nenhum erro, nenhuma tentativa de envio registrada, o código nem
+chegava a tentar). `processarEntry` decidia se a conversa estava "inativa" (e portanto se
+devia disparar o menu/fluxo automático) comparando com `conversations.last_message_at` — mas
+essa coluna é atualizada tanto por mensagem RECEBIDA quanto ENVIADA. Mandar o template de
+campanha (`enviarUmBroadcast` → `db.upsertConversation`) já atualizava `last_message_at` na
+hora do envio; quando o cliente respondia poucos segundos depois, a conversa parecia "já
+ativa" (por causa do PRÓPRIO envio nosso, não da resposta dele) e o gatilho nunca abria.
+
+Corrigido trocando a checagem pra `db.getUltimaMensagemRecebida` — só olha mensagens com
+`direction = 'in'`, ignorando os envios da própria automação/campanha.
+`conversations.last_message_at` continua sendo usado pra tudo mais (ordenação da caixa de
+entrada, janela de 24h etc.), só a decisão de "disparar fluxo automático" mudou de fonte.
 
 ### Funil de qualificação (aba "Funil") e lembrete em 2 toques
 
