@@ -927,18 +927,35 @@ const CIAHOT_TEXTO_ANUNCIO_AGORA_NAO = "Sem problemas! 😊 Vamos ficar à dispo
 // Dispara depois que a pessoa responde o template de campanha (ver dispararInicioFluxo).
 // Espera 15s (tempo de "digitando..." natural) antes da primeira mensagem, manda a
 // sequência de aquecimento + oferta, e só então marca o passo que liga o lembrete de 17min.
+// Tenta de novo 1x (3s depois) antes de desistir — sem isso, um erro passageiro (rede,
+// rate limit momentâneo da Meta) na 1ª das 4 mensagens interrompia a sequência inteira, sem
+// nenhum vestígio na conversa (nada chegava a ser gravado), e só "menu" reabria manualmente.
+async function enviarComUmRetry(fn) {
+  try {
+    await fn();
+  } catch (err) {
+    console.error("Falha ao enviar, tentando 1x de novo em 3s:", err.message);
+    await new Promise((r) => setTimeout(r, 3000));
+    await fn();
+  }
+}
+
 async function iniciarFluxoCiahot(de, businessNumberId) {
   setTimeout(async () => {
     try {
-      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_BOAS_VINDAS);
-      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OBJETIVO);
-      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, [
-        { id: "ciahot_visitar_site", title: "Conhecer site" },
-        { id: "ciahot_site_agora_nao", title: "No momento não" },
-      ]);
-      await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ATENDIMENTO, [
-        { id: "ciahot_atendimento", title: "Falar com atendimento" },
-      ]);
+      await enviarComUmRetry(() => enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_BOAS_VINDAS));
+      await enviarComUmRetry(() => enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OBJETIVO));
+      await enviarComUmRetry(() =>
+        enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, [
+          { id: "ciahot_visitar_site", title: "Conhecer site" },
+          { id: "ciahot_site_agora_nao", title: "No momento não" },
+        ])
+      );
+      await enviarComUmRetry(() =>
+        enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ATENDIMENTO, [
+          { id: "ciahot_atendimento", title: "Falar com atendimento" },
+        ])
+      );
       await db.setFluxoPasso(de, businessNumberId, "ciahot_oferta");
     } catch (err) {
       console.error("Erro ao iniciar fluxo Ciahot:", err.message);
