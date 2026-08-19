@@ -78,8 +78,16 @@ function formatTime(ts: number | null) {
 
 export function ChatsPage() {
   const { channels, current, setCurrent } = useChannel()
-  const { notifPermission, requestNotifPermission, unreadChannels, unreadConversations, markConversationSeen, setActiveConversation } =
-    useUnread()
+  const {
+    notifPermission,
+    requestNotifPermission,
+    unreadChannels,
+    unreadConversations,
+    markConversationSeen,
+    setActiveConversation,
+    alvoAbrir,
+    limparAlvoAbrir,
+  } = useUnread()
   const [conversations, setConversations] = React.useState<Conversation[]>([])
   const [selected, setSelected] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -123,6 +131,16 @@ export function ChatsPage() {
     setMessages([])
     carregarConversas()
   }, [current, carregarConversas])
+
+  // Clique numa notificação do navegador (ver unread-context.tsx) pede pra abrir uma conversa
+  // específica — só aplica quando o canal já trocou pro certo (senão abriria o contato errado
+  // num canal errado por uma fração de segundo). Roda DEPOIS do efeito acima de propósito
+  // (mesma troca de canal zera `selected` pra null primeiro).
+  React.useEffect(() => {
+    if (!alvoAbrir || !current || alvoAbrir.channelId !== current.id) return
+    setSelected(alvoAbrir.phone)
+    limparAlvoAbrir()
+  }, [alvoAbrir, current, limparAlvoAbrir])
 
   React.useEffect(() => {
     carregarMensagens()

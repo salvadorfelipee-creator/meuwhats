@@ -20,6 +20,11 @@ type UnreadContextValue = {
   setActiveConversation: (channelId: string | null, phone: string | null) => void
   notifPermission: NotificationPermission | "unsupported"
   requestNotifPermission: () => void
+  // Clique numa notificação do navegador pede pra abrir uma conversa específica, mesmo que
+  // outro canal esteja aberto no momento — ChatsPage observa isso e troca de canal + seleciona
+  // o contato certo (ver limparAlvoAbrir, chamado depois de aplicar).
+  alvoAbrir: { channelId: string; phone: string } | null
+  limparAlvoAbrir: () => void
 }
 
 function chaveConversa(channelId: string, phone: string) {
@@ -65,6 +70,8 @@ function tocarSomNotificacao() {
 export function UnreadProvider({ children }: { children: React.ReactNode }) {
   const { setCurrent, channels } = useChannel()
   const [unreadConversations, setUnreadConversations] = React.useState<Set<string>>(new Set())
+  const [alvoAbrir, setAlvoAbrir] = React.useState<{ channelId: string; phone: string } | null>(null)
+  const limparAlvoAbrir = React.useCallback(() => setAlvoAbrir(null), [])
   const [notifPermission, setNotifPermission] = React.useState<NotificationPermission | "unsupported">(
     typeof Notification === "undefined" ? "unsupported" : Notification.permission,
   )
@@ -136,6 +143,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
           notif.onclick = () => {
             window.focus()
             if (canal) setCurrent(canal)
+            setAlvoAbrir({ channelId: chId, phone: c.phone })
           }
         }
       }
@@ -194,8 +202,20 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       setActiveConversation,
       notifPermission,
       requestNotifPermission,
+      alvoAbrir,
+      limparAlvoAbrir,
     }),
-    [unreadChannels, unreadConversations, markSeen, markConversationSeen, setActiveConversation, notifPermission, requestNotifPermission],
+    [
+      unreadChannels,
+      unreadConversations,
+      markSeen,
+      markConversationSeen,
+      setActiveConversation,
+      notifPermission,
+      requestNotifPermission,
+      alvoAbrir,
+      limparAlvoAbrir,
+    ],
   )
 
   return <UnreadContext.Provider value={value}>{children}</UnreadContext.Provider>
