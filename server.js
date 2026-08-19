@@ -1295,6 +1295,10 @@ const FLUXO_COTACERTA = {
   fluxoBotoes: FLUXO_BOTOES_COTACERTA,
   lembreteMinutos: LEMBRETE_MINUTOS_COTACERTA,
   lembreteTextos: LEMBRETE_TEXTOS_COTACERTA,
+  // Aviso de manter-janela ("sua cotação continua aberta") não faz sentido pra quem nunca
+  // passou do menu inicial — a pessoa recebeu o menu e não escolheu nenhuma opção, não hávia
+  // cotação nenhuma aberta pra "continuar". Ver setInterval do verificador de janela de 24h.
+  semAvisoJanelaEmPassos: ["menu_inicial"],
   capturaTexto: {
     cc_v_carro: handlerDadosVeiculo,
     cc_v_moto: handlerDadosVeiculo,
@@ -2853,6 +2857,7 @@ setInterval(async () => {
       // primeiro. tentarMarcarJanelaLembreteEnviado acima já marca como tratado, então não
       // reaparece nas próximas voltas do verificador.
       if (fluxoDoContato.semAvisoJanela) continue;
+      if (fluxoDoContato.semAvisoJanelaEmPassos?.includes(p.fluxo_passo)) continue;
       try {
         const manterJanela = fluxoDoContato.lembreteTextos.manter_janela || LEMBRETE_TEXTOS_COTACERTA.manter_janela;
         const texto = typeof manterJanela === "function" ? manterJanela(p.fluxo_passo) : manterJanela;
