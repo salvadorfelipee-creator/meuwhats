@@ -924,6 +924,8 @@ const CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA =
   "também nosso e-mail de suporte: contato@ciahot.com.br";
 const CIAHOT_TEXTO_ANUNCIO_AGORA_NAO = "Sem problemas! 😊 Vamos ficar à disposição, pode nos chamar se tiver alguma dúvida.";
 
+const CIAHOT_TEXTO_DIFICULDADE_ANUNCIO = "Está com dificuldades em fazer o anúncio? 🤔";
+
 // Dispara depois que a pessoa responde o template de campanha (ver dispararInicioFluxo).
 // Espera 15s (tempo de "digitando..." natural) antes da primeira mensagem, manda a
 // sequência de aquecimento + oferta, e só então marca o passo que liga o lembrete de 17min.
@@ -1003,6 +1005,18 @@ async function handlerCiahotAnuncioSim(de, businessNumberId) {
   await db.setFluxoPasso(de, businessNumberId, "ciahot_aguardando_conclusao");
 }
 
+// Lembrete do passo "ciahot_aguardando_conclusao" (ver LEMBRETE_MINUTOS_CIAHOT) — quem clicou
+// "Fazer anúncio" mas não voltou pra confirmar em 13min pode estar com dificuldade no
+// formulário. Reaproveita o botão "ciahot_atendimento" (mesmo id do menu inicial), que já
+// limpa o fluxo_passo e passa pro atendimento humano — não precisa de handler próprio pra
+// isso. Não muda o fluxo_passo aqui: continua "ciahot_aguardando_conclusao", esperando o
+// clique real em "Anúncio concluído!" se a pessoa voltar sozinha.
+async function handlerLembreteCiahotDificuldade(phone, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, phone, CIAHOT_TEXTO_DIFICULDADE_ANUNCIO, [
+    { id: "ciahot_atendimento", title: "Falar com atendimento" },
+  ]);
+}
+
 const FLUXO_BOTOES_CIAHOT = {
   ciahot_atendimento: {
     texto: "Perfeito! 👍 Aguarde, em breve irei te responder.",
@@ -1017,10 +1031,12 @@ const FLUXO_BOTOES_CIAHOT = {
 const LEMBRETE_MINUTOS_CIAHOT = {
   ciahot_oferta: 17,
   ciahot_pos_clique: 2,
+  ciahot_aguardando_conclusao: 13,
 };
 
 const LEMBRETE_HANDLERS_CIAHOT = {
   ciahot_pos_clique: handlerLembreteCiahotVip,
+  ciahot_aguardando_conclusao: handlerLembreteCiahotDificuldade,
 };
 
 const LEMBRETE_TEXTOS_CIAHOT = {
