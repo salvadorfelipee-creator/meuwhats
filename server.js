@@ -1340,9 +1340,113 @@ const FLUXO_CIAHOT = {
   semAvisoJanela: true,
 };
 
+// ─── FLUXO CAMPANHA CLT (número "Campanha CLT") ─────────────────────────────
+// Mesmo espírito do Ciahot: fluxo linear disparado por campanha de Marketing (template
+// simples "Olá, bom dia", sem botão embutido), não por menu. Dedicado a esse número
+// específico — diferente do RESPOSTAS_BOTAO["quero simular"] já existente em FLUXO_FELIZCRED,
+// que é pra quando o TEMPLATE aprovado já vem com botão (clique de botão de template, não
+// resposta de texto livre "bom dia"/"quem é" que dispara isso aqui).
+// "Campanha CLT" no painel = "Correspondente bancario" (+55 47 9274-7368) no Business Manager.
+const CAMPANHA_CLT_NUMBER_ID = "1335976862924566";
+
+const CAMPCLT_TEXTO_APRESENTACAO =
+  "Meu nome é Felipe e sou consultor de vendas na FelizCred, uma empresa parceira de alguns " +
+  "bancos, como Banco Pan, Banco C6, Banco BMG, Facta...";
+
+const CAMPCLT_TEXTO_PROPOSTA =
+  "O motivo do meu contato é que você tem uma proposta de *CONSIGNADO CLT APROVADA*, com o " +
+  "primeiro desconto somente daqui a 60 dias.";
+
+const CAMPCLT_TEXTO_SIMULAR =
+  "Show! 😊 Pra simular seu consignado CLT, preciso de mais 5 coisinhas, pode mandar tudo numa " +
+  "mensagem só ou em mensagens separadas:\n• Nome completo\n• CPF\n• Telefone\n• E-mail\n• Data de nascimento";
+
+const CAMPCLT_TEXTO_NAO_DESEJO = "Sem problemas! 😊 Fico à disposição se mudar de ideia.";
+
+const CAMPCLT_TEXTO_DUVIDA = "Ainda por aí? 😊 Ficou com alguma dúvida que te fez não seguir com a simulação?";
+
+// Espera 4s (pedido explícito) depois da resposta ao template, manda apresentação (com botão
+// de link pro site) + a proposta (com os 2 botões), e marca o passo que liga o lembrete de 7min.
+async function iniciarFluxoCampanhaCLT(de, businessNumberId) {
+  setTimeout(async () => {
+    try {
+      await enviarRespostaAutomatica(businessNumberId, de, CAMPCLT_TEXTO_APRESENTACAO, null, null, {
+        buttonText: "Conhecer site",
+        url: "https://www.felizcred.com.br",
+      });
+      await enviarRespostaAutomatica(businessNumberId, de, CAMPCLT_TEXTO_PROPOSTA, [
+        { id: "campclt_simular", title: "Simulação" },
+        { id: "campclt_nao_desejo", title: "Não desejo" },
+      ]);
+      await db.setFluxoPasso(de, businessNumberId, "campclt_oferta");
+    } catch (err) {
+      console.error("Erro ao iniciar fluxo Campanha CLT:", err.message);
+    }
+  }, 4000);
+}
+
+async function handlerCampanhaCLTSimular(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, CAMPCLT_TEXTO_SIMULAR);
+  await db.setFluxoPasso(de, businessNumberId, "campclt_aguardando_dados");
+}
+
+// Mesmo sinal de conclusão do resto do CLT (CPF em algum lugar da mensagem — ver REGEX_CPF),
+// funciona tanto pra quem manda tudo numa mensagem só quanto em várias soltas (cada mensagem é
+// checada por conta própria enquanto o passo estiver aberto). Sem CPF ainda, só ignora e
+// continua esperando — é o lembrete de 7min (não uma reafirmação a cada mensagem solta) que
+// cuida de quem trava no meio.
+async function handlerCapturaDadosCampanhaCLTNova(de, businessNumberId, corpo) {
+  if (!REGEX_CPF.test(corpo || "")) return;
+  logFunil(businessNumberId, de, "campanha_dados_completos");
+  setTimeout(async () => {
+    try {
+      await confirmarDadosRecebidos(de, businessNumberId);
+    } catch (err) {
+      console.error("Erro ao confirmar dados da Campanha CLT:", err.message);
+    }
+  }, 4000);
+}
+
+async function handlerLembreteDuvidaCampanhaCLT(phone, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, phone, CAMPCLT_TEXTO_DUVIDA, [
+    { id: "campclt_com_duvidas", title: "Estou com dúvidas" },
+  ]);
+}
+
+const FLUXO_BOTOES_CAMPANHA_CLT = {
+  campclt_simular: handlerCampanhaCLTSimular,
+  campclt_nao_desejo: { texto: CAMPCLT_TEXTO_NAO_DESEJO },
+  // Reaproveita confirmarEncaminhamentoHumano (mesma mensagem de "já vou te colocar com um
+  // atendente" usada no resto do CLT) — clicar em "dúvidas" já conta como pedido de humano.
+  campclt_com_duvidas: confirmarEncaminhamentoHumano,
+};
+
+const LEMBRETE_MINUTOS_CAMPANHA_CLT = {
+  campclt_aguardando_dados: 7,
+};
+
+const LEMBRETE_HANDLERS_CAMPANHA_CLT = {
+  campclt_aguardando_dados: handlerLembreteDuvidaCampanhaCLT,
+};
+
+const FLUXO_CAMPANHA_CLT = {
+  aoIniciar: iniciarFluxoCampanhaCLT,
+  fluxoBotoes: FLUXO_BOTOES_CAMPANHA_CLT,
+  lembreteMinutos: LEMBRETE_MINUTOS_CAMPANHA_CLT,
+  lembreteTextos: {},
+  lembreteHandlers: LEMBRETE_HANDLERS_CAMPANHA_CLT,
+  capturaTexto: {
+    campclt_aguardando_dados: handlerCapturaDadosCampanhaCLTNova,
+  },
+  // Sem manter_janela definido — igual ao Ciahot, sem o segundo aviso de "ainda por aí?" perto
+  // das 24h (só o lembrete de 7min e nada além disso).
+  semAvisoJanela: true,
+};
+
 const FLUXOS_POR_NUMERO = {
   [COTACERTA_NUMBER_ID]: FLUXO_COTACERTA,
   [CIAHOT_NUMBER_ID]: FLUXO_CIAHOT,
+  [CAMPANHA_CLT_NUMBER_ID]: FLUXO_CAMPANHA_CLT,
 };
 
 function getFluxo(businessNumberId) {

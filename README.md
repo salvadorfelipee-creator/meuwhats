@@ -512,6 +512,35 @@ O verificador de fluxos parados também ganhou esse mesmo suporte a handler-fun�
 (`lembreteHandlers`, ao lado de `lembreteMinutos`/`lembreteTextos`) pra lembretes que
 precisam mandar botões, não só texto — ver `handlerLembreteCiahotVip`.
 
+### Fluxo por número — Campanha CLT (20/08/2026)
+
+Número **"Campanha CLT"** no painel = **"Correspondente bancario"** (+55 47 9274-7368) no
+Business Manager, `phone_number_id` `1335976862924566` (`CAMPANHA_CLT_NUMBER_ID`). Mesmo
+espírito do Ciahot — fluxo linear disparado por campanha de Marketing (template simples tipo
+"Olá, bom dia!"/"Olá, boa tarde!", sem botão embutido), **não** o menu padrão do
+`FLUXO_FELIZCRED`. Dispara pra qualquer template usado nesse número (não amarrado a um nome
+de template específico — o gatilho é a pessoa responder, ver `getFluxo`/`FLUXOS_POR_NUMERO`).
+
+1. Cliente responde o template → espera **4 segundos** → manda a apresentação ("Meu nome é
+   Felipe e sou consultor de vendas na FelizCred...") com botão de link **"Conhecer site"**
+   (`www.felizcred.com.br`), seguida da proposta ("...CONSIGNADO CLT APROVADA, com o primeiro
+   desconto somente daqui a 60 dias") com botões **"Simulação"** / **"Não desejo"**.
+2. **"Não desejo"** → confirma e encerra.
+3. **"Simulação"** → pede os mesmos 5 dados do resto do funil CLT (nome, CPF, telefone,
+   e-mail, nascimento — `REGEX_CPF` detecta conclusão, funciona tanto numa mensagem só quanto
+   espalhado em várias). Ao detectar CPF, espera **4 segundos** e confirma
+   (`confirmarDadosRecebidos`, mesma função reaproveitada do funil CLT original).
+4. Sem resposta em **7 minutos** depois de "Simulação" → 1 lembrete sutil perguntando se ficou
+   com dúvida, com botão **"Estou com dúvidas"** → clicar reaproveita
+   `confirmarEncaminhamentoHumano` (mesma msg de "já vou te colocar com um atendente").
+5. Sem `manter_janela`/`semAvisoJanela: true` — mesmo padrão do Ciahot, sem o segundo aviso de
+   "ainda por aí?" perto das 24h.
+
+Não usa `RESPOSTAS_BOTAO["quero simular"]` (o funil de campanha antigo, `passo:
+"campanha_clt_dados"`) — aquele é pra quando o TEMPLATE aprovado já vem com botão de resposta
+embutido (clique de botão de template); este aqui é pra template só-texto, resposta livre do
+cliente que dispara a sequência.
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa
