@@ -225,6 +225,31 @@ const EXT_BY_MIME = {
   "application/pdf": "pdf",
 };
 
+// Caminho inverso de EXT_BY_MIME — usado por quem SERVE o arquivo de volta (GET /media/... e
+// GET /publicar-media/...) pra mandar o Content-Type certo. Sem isso, `send()` não define
+// Content-Type nenhum pra um Buffer (ver função send), e a plataforma cai no default
+// "application/octet-stream" — que o WhatsApp recusa quando busca a imagem pra reenviar
+// (erro "Unsupported Image mime type application/octet-stream").
+const MIME_BY_EXT = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  ogg: "audio/ogg",
+  mp3: "audio/mpeg",
+  amr: "audio/amr",
+  m4a: "audio/mp4",
+  mp4: "video/mp4",
+  "3gp": "video/3gpp",
+  pdf: "application/pdf",
+};
+
+function mimeDoArquivo(nomeArquivo) {
+  const ext = path.extname(nomeArquivo).slice(1).toLowerCase();
+  return MIME_BY_EXT[ext] || "application/octet-stream";
+}
+
 // ─── UTILS ───────────────────────────────────────────────────────────────────
 // Recebe 1 vídeo (+ campos de texto opcionais "legenda" e "data") enviado via
 // multipart/form-data e grava o vídeo direto em disco via streaming (não acumula o arquivo
@@ -2543,7 +2568,7 @@ const server = http.createServer(async (req, res) => {
       if (!filePath.startsWith(PUBLICAR_MEDIA_DIR) || !fs.existsSync(filePath)) {
         return send(res, 404, "Not found");
       }
-      return send(res, 200, fs.readFileSync(filePath));
+      return send(res, 200, fs.readFileSync(filePath), { "Content-Type": mimeDoArquivo(matchPublicarMedia[1]) });
     }
 
     // POST /painel/api/publicar/perfil-facebook — troca capa/foto de perfil/"sobre" da
@@ -2865,7 +2890,7 @@ const server = http.createServer(async (req, res) => {
       if (!filePath.startsWith(MEDIA_DIR) || !fs.existsSync(filePath)) {
         return send(res, 404, "Not found");
       }
-      return send(res, 200, fs.readFileSync(filePath));
+      return send(res, 200, fs.readFileSync(filePath), { "Content-Type": mimeDoArquivo(matchMedia[1]) });
     }
 
     // Health check
