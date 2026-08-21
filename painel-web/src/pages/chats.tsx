@@ -154,8 +154,26 @@ export function ChatsPage() {
     return () => clearInterval(id)
   }, [carregarConversas, carregarMensagens])
 
+  // O polling recarrega `messages` a cada 5s (ver setInterval acima). Antes, o efeito abaixo
+  // rolava pro final TODA vez que isso acontecia, mesmo se o usuário tivesse acabado de arrastar
+  // pra cima pra ler o histórico — por isso a rolagem "voltava sozinha" alguns segundos depois.
+  // Agora só rola pro final se o usuário já estava perto do final (perto = já lendo as últimas msgs).
+  const nearBottomRef = React.useRef(true)
+
+  function handleScrollMensagens() {
+    const el = scrollRef.current
+    if (!el) return
+    nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
+
   React.useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+    nearBottomRef.current = true
+  }, [selected])
+
+  React.useEffect(() => {
+    if (nearBottomRef.current) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+    }
   }, [messages])
 
   const conversaAtual = conversations.find((c) => c.phone === selected) || null
@@ -384,7 +402,7 @@ export function ChatsPage() {
             </div>
 
             {/* Mensagens */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
+            <div ref={scrollRef} onScroll={handleScrollMensagens} className="flex-1 overflow-y-auto px-4 py-3">
               <div className="flex flex-col gap-2">
                 {messages.map((m) => (
                   <div
