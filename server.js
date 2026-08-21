@@ -322,6 +322,17 @@ function salvarImagemPublicar(dataUrl) {
   return filename;
 }
 
+// Igual a salvarImagemPublicar, mas vídeo — usado pelo anexo de vídeo no reply do painel
+// (POST /painel/api/conversations/:businessId/:phone/reply).
+function salvarVideoPublicar(dataUrl) {
+  const match = /^data:(video\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || "");
+  if (!match) throw new Error("Formato de vídeo inválido");
+  const ext = EXT_BY_MIME[match[1]] || "mp4";
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  fs.writeFileSync(path.join(PUBLICAR_MEDIA_DIR, filename), Buffer.from(match[2], "base64"));
+  return filename;
+}
+
 // Igual a salvarImagemPublicar, mas devolve o buffer decodificado em vez de gravar em disco —
 // usado pela agenda de publicações, que guarda a imagem no R2 (precisa sobreviver a um
 // deploy/restart do Render, diferente da publicação imediata que só precisa durar segundos).
@@ -2141,8 +2152,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     // POST /painel/api/conversations/:businessId/:phone/reply — responder uma conversa.
-    // Aceita texto puro OU imagemBase64 (com ou sem legenda em `text`) — mesmo mecanismo de
-    // upload/URL pública do Publique IV (salvarImagemPublicar + /publicar-media/).
+    // Aceita texto puro OU imagemBase64 OU videoBase64 (com ou sem legenda em `text`) — mesmo
+    // mecanismo de upload/URL pública do Publique IV (salvarImagemPublicar/salvarVideoPublicar
+    // + /publicar-media/).
     const matchReply = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/reply$/);
     if (req.method === "POST" && matchReply) {
       if (!requireAuth(req, res)) return;
@@ -2151,11 +2163,11 @@ const server = http.createServer(async (req, res) => {
       const phone = businessId === "instagram" ? phoneParam : normalizarTelefoneBR(phoneParam);
       const body = await parseBody(req);
       const texto = (body.text || "").trim();
-      if (!texto && !body.imagemBase64) return send(res, 400, { error: "Mensagem vazia" });
+      if (!texto && !body.imagemBase64 && !body.videoBase64) return send(res, 400, { error: "Mensagem vazia" });
 
       if (businessId === "instagram") {
-        if (body.imagemBase64) {
-          return send(res, 400, { error: "Envio de imagem pelo Instagram ainda não é suportado — responda por texto." });
+        if (body.imagemBase64 || body.videoBase64) {
+          return send(res, 400, { error: "Envio de mídia pelo Instagram ainda não é suportado — responda por texto." });
         }
         let resultIg;
         try {
@@ -2168,10 +2180,18 @@ const server = http.createServer(async (req, res) => {
       }
 
       let imagemUrl = null;
+      let videoUrl = null;
       if (body.imagemBase64) {
         try {
           const filename = salvarImagemPublicar(body.imagemBase64);
           imagemUrl = `https://${req.headers.host}/publicar-media/${filename}`;
+        } catch (err) {
+          return send(res, 400, { error: err.message });
+        }
+      } else if (body.videoBase64) {
+        try {
+          const filename = salvarVideoPublicar(body.videoBase64);
+          videoUrl = `https://${req.headers.host}/publicar-media/${filename}`;
         } catch (err) {
           return send(res, 400, { error: err.message });
         }
@@ -2181,6 +2201,8 @@ const server = http.createServer(async (req, res) => {
       try {
         result = imagemUrl
           ? await wa.sendImage(businessId, phone, imagemUrl, texto || undefined)
+          : videoUrl
+          ? await wa.sendVideo(businessId, phone, videoUrl, texto || undefined)
           : await wa.sendText(businessId, phone, texto);
       } catch (err) {
         return send(res, 502, { error: `Falha ao enviar pelo WhatsApp: ${err.message}` });
@@ -2194,9 +2216,9 @@ const server = http.createServer(async (req, res) => {
         phone,
         business_number_id: businessId,
         direction: "out",
-        type: imagemUrl ? "image" : "text",
+        type: imagemUrl ? "image" : videoUrl ? "video" : "text",
         body: texto || null,
-        media_path: imagemUrl,
+        media_path: imagemUrl || videoUrl,
         wa_message_id: waId,
         status: "sent",
         created_at: now,

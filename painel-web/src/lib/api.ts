@@ -203,10 +203,10 @@ export const api = {
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/messages`,
     ),
 
-  reply: (businessId: string, phone: string, text: string, imagemBase64?: string) =>
+  reply: (businessId: string, phone: string, text: string, imagemBase64?: string, videoBase64?: string) =>
     request<{ ok: true }>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/reply`,
-      { method: "POST", body: JSON.stringify({ text, imagemBase64 }) },
+      { method: "POST", body: JSON.stringify({ text, imagemBase64, videoBase64 }) },
     ),
 
   reabrirFluxo: (businessId: string, phone: string) =>
