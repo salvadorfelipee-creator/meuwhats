@@ -19,3 +19,9 @@ sitefelizcred/
 # agenda, não precisam ficar versionados. Conteúdo/scripts continuam no Git.
 felizcred-caixinhas/saida/
 felizcred-caixinhas/*.mp4
+
+# Áudio/vídeo bruto de narração do reels de seguro empresarial (Cota Certa) —
+# reproduzível a partir dos scripts _narracao.py/_gravar_video.py, não precisa
+# ficar versionado.
+cotacerta-seguros/social/audio_partes/
+cotacerta-seguros/social/*.mp4
