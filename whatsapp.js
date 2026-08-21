@@ -3,6 +3,18 @@ const https = require("https");
 const GRAPH_VERSION = "v21.0";
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 
+// Números que nunca devem receber mensagem nossa (pedido explícito de bloqueio, ex.: reclamação
+// ou pedido pra parar). Checado em TODA função de envio abaixo, então cobre broadcast, lembretes
+// automáticos e respostas manuais do painel — não só um fluxo específico.
+const NUMEROS_BLOQUEADOS = new Set(["5548999166487", "5548988802379"]);
+
+function garantirNaoBloqueado(to) {
+  const digitos = String(to || "").replace(/\D/g, "");
+  if (NUMEROS_BLOQUEADOS.has(digitos)) {
+    throw new Error(`Envio bloqueado: número ${digitos} está na lista de bloqueio`);
+  }
+}
+
 function graphRequest(method, hostname, requestPath, { headers = {}, body } = {}) {
   return new Promise((resolve, reject) => {
     const payload = body ? (Buffer.isBuffer(body) ? body : JSON.stringify(body)) : null;
@@ -33,6 +45,7 @@ function graphRequest(method, hostname, requestPath, { headers = {}, body } = {}
 }
 
 async function sendText(fromPhoneNumberId, to, text) {
+  garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
@@ -54,6 +67,7 @@ async function sendText(fromPhoneNumberId, to, text) {
 // Envia uma imagem por link público (o WhatsApp busca a URL, não precisa subir binário pra
 // Meta antes) — usado pelo anexo de imagem no painel. `caption` é opcional.
 async function sendImage(fromPhoneNumberId, to, imageUrl, caption) {
+  garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
@@ -74,6 +88,7 @@ async function sendImage(fromPhoneNumberId, to, imageUrl, caption) {
 
 async function sendButtons(fromPhoneNumberId, to, bodyText, buttons) {
   // buttons: [{ id, title }] — a API aceita no máximo 3 botões, título com até 20 caracteres
+  garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
@@ -101,6 +116,7 @@ async function sendButtons(fromPhoneNumberId, to, bodyText, buttons) {
 async function sendList(fromPhoneNumberId, to, bodyText, buttonLabel, rows) {
   // Lista interativa: até 10 opções; título de linha com até 24 caracteres,
   // descrição opcional com até 72. buttonLabel (máx. 20) é o botão que abre a lista.
+  garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
@@ -127,6 +143,7 @@ async function sendList(fromPhoneNumberId, to, bodyText, buttonLabel, rows) {
 // rápidas), a API não deixa misturar um botão de link com botões de resposta na mesma
 // mensagem — por isso esse tipo sempre vem sozinho, em mensagem separada.
 async function sendCtaUrl(fromPhoneNumberId, to, bodyText, buttonText, url) {
+  garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
@@ -150,6 +167,7 @@ async function sendCtaUrl(fromPhoneNumberId, to, bodyText, buttonText, url) {
 }
 
 async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, components) {
+  garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
