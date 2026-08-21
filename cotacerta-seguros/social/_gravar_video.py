@@ -7,7 +7,7 @@ url = "file:///" + html_path.replace("\\", "/")
 video_dir = os.path.join(HERE, "_video_raw")
 os.makedirs(video_dir, exist_ok=True)
 
-DURATION_MS = 44000
+DURATION_MS = 19500
 
 with sync_playwright() as p:
     browser = p.chromium.launch()

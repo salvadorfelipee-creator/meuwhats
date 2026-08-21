@@ -43,6 +43,12 @@
     transition:opacity .5s ease, transform .5s ease;}
   .reveal.visible{opacity:1;transform:translateY(0) scale(1);}
 
+  .cta.pulsing{animation:pulse 1s ease-in-out infinite;}
+  @keyframes pulse{
+    0%,100%{box-shadow:0 0 0 0 rgba(37,211,102,.55);}
+    50%{box-shadow:0 0 0 18px rgba(37,211,102,0);}
+  }
+
   /* --- particle burst --- */
   .particle{position:absolute;border-radius:50%;background:#0066FF;pointer-events:none;
     left:50%;top:50%;width:8px;height:8px;
@@ -121,18 +127,19 @@
     var el = document.getElementById(id);
     el.classList.add('visible');
     burst(el, color, count);
+    if(id === 'cta'){ el.classList.add('pulsing'); }
   }
 
-  // timeline sincronizado com a narração (segundos)
+  // timeline sincronizado com a narração curta (só títulos), segundos
   var timeline = [
-    [0.15, 'title', 'blue', 14],
-    [3.0,  'badge', 'blue', 16],
-    [5.9,  'b1',    'blue', 8],
-    [14.4, 'b2',    'blue', 8],
-    [20.5, 'b3',    'blue', 8],
-    [27.2, 'b4',    'blue', 8],
-    [33.9, 'b5',    'blue', 8],
-    [40.3, 'cta',   'green', 18]
+    [0.05,  'title', 'blue',  14],
+    [2.2,   'badge', 'blue',  16],
+    [4.612, 'b1',    'blue',  8],
+    [7.184, 'b2',    'blue',  8],
+    [9.228, 'b3',    'blue',  8],
+    [11.68, 'b4',    'blue',  8],
+    [14.204,'b5',    'blue',  8],
+    [16.488,'cta',   'green', 18]
   ];
 
   timeline.forEach(function(step){
