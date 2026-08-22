@@ -13,6 +13,7 @@ const tg = require("./telegram");
 const publique = require("./publique");
 const reels = require("./reels");
 const agenda = require("./agenda");
+const backup = require("./backup");
 const { notificarLeadCotaCerta } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
@@ -3209,3 +3210,17 @@ setInterval(async () => {
     console.error("Erro na limpeza automática de posts agendados:", err.message);
   }
 }, 60 * 60 * 1000);
+
+// ─── BACKUP DIÁRIO PRA CONTA DE RESERVA (ver backup.js) ─────────────────────
+// Só roda de verdade se TURSO_BACKUP_URL/TURSO_BACKUP_TOKEN estiverem configurados (2ª
+// conta Turso, separada da principal) — sem isso, rodarBackup() só loga que pulou e
+// retorna, sem custo nenhum. Existe pra sobreviver a um bloqueio de conta como o de
+// 2026-08-22 (Turso travou a conta inteira por estourar cota de leitura): com a reserva em
+// dia, dá pra trocar TURSO_DATABASE_URL/TURSO_AUTH_TOKEN pro banco de backup sem perder
+// histórico de conversa. Primeira rodada 2min depois do boot (não espera 24h pro 1º backup).
+setTimeout(() => {
+  backup.rodarBackup().catch((err) => console.error("Erro no backup pra conta de reserva:", err.message));
+  setInterval(() => {
+    backup.rodarBackup().catch((err) => console.error("Erro no backup pra conta de reserva:", err.message));
+  }, 24 * 60 * 60 * 1000);
+}, 2 * 60 * 1000);
