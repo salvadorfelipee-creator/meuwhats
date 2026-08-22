@@ -37,6 +37,7 @@ async function migrarTabelaLegada(tabela, colunasOriginais, criarNova, colunasPa
 }
 
 const ready = (async () => {
+ try {
   await client.execute(`CREATE TABLE IF NOT EXISTS conversations (
     phone TEXT NOT NULL,
     business_number_id TEXT NOT NULL,
@@ -308,6 +309,15 @@ const ready = (async () => {
       args: [digitos, row.business_number_id],
     });
   }
+ } catch (err) {
+   // Nunca deixa uma falha aqui derrubar o processo inteiro (era exatamente isso que
+   // acontecia: erro sem catch numa IIFE assíncrona vira unhandled rejection, e o Node
+   // dessa versão mata o processo — loop de crash-restart-crash a cada tentativa). Um
+   // banco temporariamente indisponível (ex.: Turso bloqueando leitura por limite de
+   // plano) agora só faz cada request individual falhar (500 com o erro real pra quem
+   // está logado, ver isAuthorized no catch de server.js), sem tirar o servidor do ar.
+   console.error("Erro ao inicializar/migrar banco de dados:", err.message);
+ }
 })();
 
 async function upsertConversation(phone, businessNumberId, name, when) {
