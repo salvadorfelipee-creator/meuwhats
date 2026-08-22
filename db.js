@@ -93,6 +93,13 @@ const ready = (async () => {
 
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone, business_number_id)`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_message_id)`);
+  // Cobre "achar a mensagem mais recente de uma conversa" (ver listConversations) sem varrer
+  // o histórico inteiro do contato — sem esse índice, ORDER BY created_at DESC LIMIT 1 só
+  // consegue filtrar por phone/business_number_id (índice acima) e ainda precisa ler/ordenar
+  // TODAS as mensagens daquele contato pra achar a última. Com telas do painel consultando
+  // isso a cada 5s pra toda conversa de todo canal, foi o que estourou a cota de leitura do
+  // Turso (504M linhas lidas/mês) mesmo sem nenhum pico de tráfego incomum.
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_phone_created ON messages(phone, business_number_id, created_at DESC)`);
 
   const infoMessages = await client.execute(`PRAGMA table_info(messages)`);
   if (!infoMessages.rows.some((r) => r.name === "error_message")) {
@@ -559,14 +566,23 @@ async function updateStatusByWaId(waMessageId, status, errorMessage = null) {
 
 async function listConversations(businessNumberId) {
   await ready;
+  // Antes eram 3 sub-consultas correlacionadas por conversa (tipo/corpo/direção, cada uma
+  // repetindo o mesmo "ache a última mensagem"). Agora é 1 só (o id), com JOIN de volta pra
+  // pegar os 3 campos — junto com o índice idx_messages_phone_created (ver migração acima),
+  // isso é a correção do consumo de leitura que estourou a cota do Turso.
   const result = await client.execute({
     sql: `
       SELECT c.*,
-        (SELECT type FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_type,
-        (SELECT body FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_body,
-        (SELECT direction FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id ORDER BY m.created_at DESC LIMIT 1) AS last_direction,
+        lm.type AS last_type,
+        lm.body AS last_body,
+        lm.direction AS last_direction,
         (c.last_inbound_at IS NOT NULL AND (c.last_read_at IS NULL OR c.last_inbound_at > c.last_read_at)) AS nao_lida
       FROM conversations c
+      LEFT JOIN messages lm ON lm.id = (
+        SELECT m.id FROM messages m
+        WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id
+        ORDER BY m.created_at DESC LIMIT 1
+      )
       WHERE c.business_number_id = ?
       ORDER BY c.last_message_at DESC
     `,
