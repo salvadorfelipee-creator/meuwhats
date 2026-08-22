@@ -123,6 +123,8 @@ const ready = (async () => {
   // mensagem de saída e a mensagem do cliente que ninguém viu de verdade "some" da checagem).
   if (!infoConversations.rows.some((r) => r.name === "last_inbound_at")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN last_inbound_at INTEGER`);
+  }
+  if (!infoConversations.rows.some((r) => r.name === "last_read_at")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN last_read_at INTEGER`);
   }
 

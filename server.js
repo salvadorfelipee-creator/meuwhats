@@ -2923,7 +2923,9 @@ const server = http.createServer(async (req, res) => {
     send(res, 404, "Not found");
   } catch (err) {
     console.error("Erro no request:", err);
-    send(res, 500, { error: "Erro interno" });
+    // Detalhe real do erro só pra quem já passou por Basic Auth — rotas públicas (webhook,
+    // health check) continuam recebendo só "Erro interno", sem vazar detalhe de implementação.
+    send(res, 500, { error: isAuthorized(req) ? err.message : "Erro interno" });
   }
 });
 
