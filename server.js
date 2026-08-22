@@ -2129,12 +2129,15 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, conversas);
     }
 
-    // GET /painel/api/conversations/:businessId — lista de conversas de um número
+    // GET /painel/api/conversations/:businessId — lista de conversas de um número. Por
+    // padrão não traz finalizadas (ver listConversations) — ?finalizadas=1 traz só pra quem
+    // pediu explicitamente (aba "Finalizadas" do painel).
     const matchConversations = path_.match(/^\/painel\/api\/conversations\/([^/]+)$/);
     if (req.method === "GET" && matchConversations) {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchConversations[1]);
-      return send(res, 200, await db.listConversations(businessId));
+      const incluirFinalizadas = url.searchParams.get("finalizadas") === "1";
+      return send(res, 200, await db.listConversations(businessId, { incluirFinalizadas }));
     }
 
     // GET /painel/api/conversations/:businessId/:phone/messages — mensagens de uma conversa.
@@ -2149,6 +2152,45 @@ const server = http.createServer(async (req, res) => {
       const mensagens = await db.listMessages(phone, businessId);
       await db.marcarConversaLida(phone, businessId);
       return send(res, 200, mensagens);
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/exportar — baixa o histórico inteiro
+    // da conversa em .txt (data/hora, quem mandou, texto/tipo de cada mensagem) — pra guardar
+    // como registro (ex.: comprovar o que foi combinado por WhatsApp). Não sobe em lugar
+    // nenhum sozinho, só devolve o arquivo pro navegador baixar.
+    const matchExportar = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/exportar$/);
+    if (req.method === "GET" && matchExportar) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchExportar[1]);
+      const phone = decodeURIComponent(matchExportar[2]);
+      const [conversa, mensagens] = await Promise.all([
+        db.getConversation(phone, businessId),
+        db.listMessages(phone, businessId),
+      ]);
+      const nomeContato = conversa?.name || phone;
+      const linhas = [
+        `Conversa exportada — ${nomeContato} (${phone})`,
+        `Canal: ${businessId}`,
+        `Exportado em: ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+        "=".repeat(60),
+        "",
+        ...mensagens.map((m) => {
+          const quando = new Date(m.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+          const quem = m.direction === "out" ? "Atendente" : nomeContato;
+          const conteudo =
+            m.body ||
+            (m.media_path ? `[${m.type}] ${m.media_path}` : `[${m.type}]`);
+          const statusFalha = m.status === "failed" ? ` (NÃO ENTREGUE${m.error_message ? `: ${m.error_message}` : ""})` : "";
+          return `[${quando}] ${quem}: ${conteudo}${statusFalha}`;
+        }),
+        "",
+      ];
+      const arquivo = Buffer.from(linhas.join("\n"), "utf8");
+      const nomeArquivo = `conversa-${phone}-${new Date().toISOString().slice(0, 10)}.txt`;
+      return send(res, 200, arquivo, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${nomeArquivo}"`,
+      });
     }
 
     // POST /painel/api/conversations/:businessId/:phone/reply — responder uma conversa.

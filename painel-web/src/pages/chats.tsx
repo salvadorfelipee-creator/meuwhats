@@ -51,12 +51,13 @@ import {
   ChevronDown,
   Phone,
   AtSign as InstagramIcon,
+  Download,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
   novo: "Novo",
   andamento: "Em andamento",
-  resolvido: "Resolvido",
+  resolvido: "Finalizada",
 }
 
 const STATUS_VARIANT: Record<string, "default" | "warning" | "success"> = {
@@ -97,6 +98,7 @@ export function ChatsPage() {
   const [respostas, setRespostas] = React.useState<RespostaPronta[]>([])
   const [detailsOpen, setDetailsOpen] = React.useState(false)
   const [broadcastOpen, setBroadcastOpen] = React.useState(false)
+  const [mostrarFinalizadas, setMostrarFinalizadas] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -105,8 +107,8 @@ export function ChatsPage() {
 
   const carregarConversas = React.useCallback(() => {
     if (!current) return
-    api.conversations(current.id).then(setConversations).catch(() => {})
-  }, [current])
+    api.conversations(current.id, { finalizadas: mostrarFinalizadas }).then(setConversations).catch(() => {})
+  }, [current, mostrarFinalizadas])
 
   function selecionarCanal(c: Channel) {
     setCurrent(c)
@@ -223,6 +225,10 @@ export function ChatsPage() {
   async function mudarStatus(status: "novo" | "andamento" | "resolvido") {
     if (!current || !selected) return
     await api.setStatus(current.id, selected, status)
+    // Finalizar já some da lista sozinho no próximo carregarConversas (o backend exclui
+    // 'resolvido' por padrão) — só falta tirar a conversa da tela também, senão ficaria
+    // aberta uma conversa que não existe mais na lista visível.
+    if (status === "resolvido" && !mostrarFinalizadas) setSelected(null)
     carregarConversas()
   }
 
@@ -301,7 +307,7 @@ export function ChatsPage() {
             </div>
           </div>
 
-          <div className="relative px-3 py-3 shrink-0">
+          <div className="relative px-3 pt-3 pb-1 shrink-0">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar conversa"
@@ -309,6 +315,14 @@ export function ChatsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+          </div>
+          <div className="px-3 pb-2 shrink-0">
+            <button
+              className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+              onClick={() => setMostrarFinalizadas((v) => !v)}
+            >
+              {mostrarFinalizadas ? "← Ver conversas ativas" : "Ver conversas finalizadas"}
+            </button>
           </div>
 
           <ScrollArea className="flex-1">
@@ -396,6 +410,14 @@ export function ChatsPage() {
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Exportar conversa (.txt)"
+                  onClick={() => current && selected && api.exportarConversa(current.id, selected).catch((err) => alert(err instanceof Error ? err.message : "Erro ao exportar"))}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
                 <Button variant="ghost" size="icon" onClick={() => setDetailsOpen(true)}>
                   <Info className="h-4 w-4" />
                 </Button>

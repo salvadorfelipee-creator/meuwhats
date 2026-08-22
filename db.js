@@ -542,6 +542,13 @@ async function insertMessage(msg) {
             WHERE phone = ? AND business_number_id = ?`,
       args: [created_at, phone, business_number_id],
     });
+    // Conversa finalizada que o cliente escreveu de novo reabre sozinha — senão ela ficaria
+    // escondida da lista/checagens pra sempre (ver listConversations), mesmo com mensagem
+    // nova esperando resposta.
+    await client.execute({
+      sql: `UPDATE conversations SET status = 'novo' WHERE phone = ? AND business_number_id = ? AND status = 'resolvido'`,
+      args: [phone, business_number_id],
+    });
   }
   return result.lastInsertRowid;
 }
@@ -564,7 +571,12 @@ async function updateStatusByWaId(waMessageId, status, errorMessage = null) {
   });
 }
 
-async function listConversations(businessNumberId) {
+// incluirFinalizadas=false (padrão) exclui status='resolvido' — tanto da lista visível do
+// painel quanto da checagem automática de 5s (ver /painel/api/inbox), que é a maior parte do
+// consumo de leitura do banco. Uma conversa finalizada só reaparece aqui se o cliente
+// escrever de novo (ver insertMessage, que reabre sozinho) ou se pedirem explicitamente com
+// incluirFinalizadas=true (ver GET /painel/api/conversations/:businessId?finalizadas=1).
+async function listConversations(businessNumberId, { incluirFinalizadas = false } = {}) {
   await ready;
   // Antes eram 3 sub-consultas correlacionadas por conversa (tipo/corpo/direção, cada uma
   // repetindo o mesmo "ache a última mensagem"). Agora é 1 só (o id), com JOIN de volta pra
@@ -583,7 +595,7 @@ async function listConversations(businessNumberId) {
         WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id
         ORDER BY m.created_at DESC LIMIT 1
       )
-      WHERE c.business_number_id = ?
+      WHERE c.business_number_id = ? ${incluirFinalizadas ? "" : "AND c.status != 'resolvido'"}
       ORDER BY c.last_message_at DESC
     `,
     args: [businessNumberId],

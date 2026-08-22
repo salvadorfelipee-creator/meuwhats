@@ -195,13 +195,35 @@ export const api = {
 
   inbox: () => request<Conversation[]>("/painel/api/inbox"),
 
-  conversations: (businessId: string) =>
-    request<Conversation[]>(`/painel/api/conversations/${encodeURIComponent(businessId)}`),
+  conversations: (businessId: string, opts?: { finalizadas?: boolean }) =>
+    request<Conversation[]>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}${opts?.finalizadas ? "?finalizadas=1" : ""}`,
+    ),
 
   messages: (businessId: string, phone: string) =>
     request<Message[]>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/messages`,
     ),
+
+  // Baixa o .txt da conversa e já dispara o download no navegador — não usa request() porque
+  // a resposta não é JSON (é o arquivo em si).
+  exportarConversa: async (businessId: string, phone: string) => {
+    const creds = getCredentials()
+    const res = await fetch(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/exportar`,
+      { headers: creds ? { Authorization: `Basic ${creds}` } : {} },
+    )
+    if (!res.ok) throw new ApiError(res.status, `Erro ${res.status} ao exportar`)
+    const blob = await res.blob()
+    const nomeArquivo =
+      res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] || `conversa-${phone}.txt`
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = nomeArquivo
+    a.click()
+    URL.revokeObjectURL(url)
+  },
 
   reply: (businessId: string, phone: string, text: string, imagemBase64?: string, videoBase64?: string) =>
     request<{ ok: true }>(
