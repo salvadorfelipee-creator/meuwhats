@@ -52,6 +52,7 @@ import {
   Phone,
   AtSign as InstagramIcon,
   Download,
+  CircleCheck,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -396,6 +397,12 @@ export function ChatsPage() {
                 <CardDescription className="truncate">{conversaAtual.phone}</CardDescription>
               </div>
               <div className="flex-grow flex justify-end gap-2 items-center">
+                {conversaAtual.status !== "resolvido" && (
+                  <Button variant="outline" size="sm" onClick={() => mudarStatus("resolvido")}>
+                    <CircleCheck className="h-4 w-4 mr-1" />
+                    Finalizar
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm">
