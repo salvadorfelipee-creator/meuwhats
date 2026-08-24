@@ -28,8 +28,18 @@ Não resuma esta skill pro usuário. Vá direto pro Passo 1 com os temas que ele
   `https://wa.me/5547996103804`. Seguradoras parceiras: Porto Seguro, Allianz, HDI,
   Bradesco, Mapfre, Tokio Marine, Zurich, Suhai (conferir `llms.txt` pra lista atual).
 - Workflow é **100% autônomo**: nunca parar no meio pra pedir aprovação de conteúdo, nunca
-  perguntar "posso publicar?" — escrever, validar, `git commit` + `git push origin main`
-  sozinho. Só parar de verdade se um fato regulatório/legal não bater em duas fontes.
+  perguntar "posso publicar?" — escrever, validar, salvar na fila e `git commit` + `git push
+  origin main` sozinho. Só parar de verdade se um fato regulatório/legal não bater em duas
+  fontes.
+- **REGRA FIXA (2026-08-24, não é opcional): nunca criar rotina em nuvem (`RemoteTrigger`/
+  `schedule`) pra gerar conteúdo.** Uma rotina desse tipo dispara o Claude sozinho todo dia
+  pra escrever e publicar — isso gasta tokens de forma recorrente e sem supervisão (já
+  aconteceu de travar no `git push` e desperdiçar sessões inteiras sem nunca publicar, ver
+  `feedback_no_ai_scheduling_for_content`). Em vez disso: escrever **todo o lote de uma vez**
+  nesta própria sessão (custo único) e salvar na fila `content-queue/` com a data de
+  publicação de cada um (Passo 7). Quem publica depois, dia a dia, é um script Node
+  determinístico (`scripts/publish-content-queue.js`) rodando via GitHub Actions — zero IA,
+  zero custo de token, nunca trava esperando permissão.
 
 ## Passo 1. Classificar os temas da lista
 
@@ -121,20 +131,37 @@ Elementos obrigatórios em todo artigo novo:
    nova e específica pro tema. Reaproveitar só é aceitável entre um par PF/PJ da *mesma*
    notícia.
 
-## Passo 5. Integração final (fazer sempre, pros dois sites que forem tocados)
+## Passo 5. Montar as peças da fila (em vez de editar index/sitemap/llms direto)
 
-1. `sitemap.xml` — nova linha `<url>` por artigo novo, `lastmod` = hoje. Bump o `lastmod`
-   de `.../blog/` também.
-2. `llms.txt` — entrada nova no cluster temático certo (ou cria um cluster novo se for um
-   assunto sem lar ainda).
-3. `blog/index.html` — card novo (copiar o padrão dos cards mais recentes: FelizCred usa
-   `.card-thumb.photo` com `background-image`; Cota Certa usa `.card` com emoji `.ic`).
-   No FelizCred, também bumpar os 3 lugares com contador (`Todos (N)`, meta description,
-   `resultsCount`) — `grep -rn "Todos ("` pra achar o número atual antes de somar.
+Pra reforço de página existente (Passo 3), edita a página normalmente, é local e imediato
+— não passa pela fila. **Isso aqui é só pra artigo NOVO** (Passo 4): em vez de editar
+`blog/index.html`/`sitemap.xml`/`llms.txt` do site direto, prepara os pedaços que o
+publicador mecânico vai inserir sozinho no dia certo:
 
-## Passo 6. Validar antes de publicar
+1. `card.html` — o snippet `<a class="article-card"...>` (FelizCred, com `data-cat`/
+   `data-tags` corretos pro filtro) ou `<a class="card"...>` (Cota Certa) que viraria a
+   entrada do post na listagem. Copia o padrão dos cards mais recentes de cada site.
+2. `sitemap-entry.xml` — a linha `<url>...</url>` correspondente, `lastmod` = data de
+   publicação (não a data de hoje, se for uma data futura).
+3. `llms-entry.txt` (opcional) — a linha markdown pro cluster temático em `llms.txt`. Se
+   não tiver um jeito bom de escolher o cluster automaticamente, pode deixar esse arquivo de
+   fora (o post ainda fica indexado por sitemap/blog normalmente).
 
-Rodar (adaptando a lista de arquivos):
+Ver `content-queue/README.md` pro formato exato de cada arquivo.
+
+## Passo 5b. Decidir as datas de publicação
+
+Se o usuário não pediu uma data específica: espalha os posts do lote em dias alternados
+(dia sim, dia não) a partir de amanhã, mesmo padrão que a rotina antiga usava — evita
+publicar tudo de uma vez (ruim pra SEO) sem precisar de IA rodando todo dia. Se o usuário
+pediu uma janela ("até 30/09", "essa semana"), distribui dentro dela. Registra a data
+escolhida no `meta.json` de cada post (campo `publishDate`, formato `YYYY-MM-DD`, fuso
+UTC).
+
+## Passo 6. Validar antes de salvar na fila
+
+Rodar (adaptando a lista de arquivos — inclui os `post.html` de cada item da fila, não só
+páginas já publicadas):
 
 ```python
 import re, json
@@ -151,45 +178,41 @@ for f in ARQUIVOS_TOCADOS:
         print(f, "CANONICAL/OGURL MISMATCH")
 ```
 
-## Passo 7. Publicar
+## Passo 7. Salvar na fila e dar commit (não publica ao vivo ainda)
 
-`git add` **só** os arquivos desse trabalho (nunca `-A`; ignorar `.mcp.json`, `ciahot/`,
-imagens soltas na raiz de `cotacerta-seguros/` que não sejam do post — não são desse
-trabalho). `git commit` com mensagem descritiva em português. `git push origin main` —
-**sem pedir confirmação**, é o workflow estabelecido do projeto. Depois, `curl -s -o
-/dev/null -w "%{http_code}"` nas URLs novas pra confirmar 200.
+Pra cada artigo novo, criar `content-queue/<site>/<slug>/` com `meta.json`, `post.html`,
+`card.html`, `sitemap-entry.xml` e (se tiver) `llms-entry.txt` — ver
+`content-queue/README.md` pro formato exato.
+
+Reforços de página existente (Passo 3) são diferentes: já são a edição direta de um arquivo
+que já está no ar, então publicam **imediatamente** junto com o commit deste passo (não tem
+por que segurar isso na fila).
+
+`git add` **só** os arquivos desse trabalho (`content-queue/`, mais os arquivos tocados
+pelos reforços do Passo 3; nunca `-A`; ignorar `.mcp.json`, `ciahot/`, imagens soltas na
+raiz de `cotacerta-seguros/` que não sejam do post). `git commit` com mensagem descritiva em
+português. `git push origin main` — **sem pedir confirmação**, é o workflow estabelecido do
+projeto.
+
+Isso publica os reforços de FAQ na hora (fazem parte do commit), mas os artigos **novos**
+só vão pro ar no dia marcado em `publishDate` — quem faz isso é o GitHub Actions
+(`.github/workflows/publish-content-queue.yml`) rodando `scripts/publish-content-queue.js`
+sozinho, sem IA nenhuma. Não precisa (e não deve) chamar `RemoteTrigger`/`schedule` pra
+nada disso.
 
 Se `git push` demorar/travar, rodar em background (`run_in_background`) e conferir depois
 com `git status --short --branch` — já aconteceu de precisar retry.
 
 ## Passo 8. Resumo final pro usuário
 
-Título + URL de cada artigo criado/reforçado. O que foi descartado e por quê (falso
-positivo). Qualquer desvio do pedido original (ex: "esse tema já tinha página, reforcei em
-vez de duplicar").
+Título + data de publicação agendada de cada artigo novo (fila) + URL de cada reforço já no
+ar. O que foi descartado e por quê (falso positivo). Qualquer desvio do pedido original (ex:
+"esse tema já tinha página, reforcei em vez de duplicar").
 
-## Se o pedido for "programa pra [dia futuro]" em vez de "faz agora"
+## Se o usuário pedir pra publicar um artigo AGORA, sem esperar a fila
 
-Não é uma tarefa local — usar o skill `schedule` (rotina em nuvem via `RemoteTrigger`) pra
-criar um `run_once_at` (uma vez) ou `cron_expression` (recorrente) na data pedida. O prompt
-da rotina precisa ser **100% autocontido** (a sessão em nuvem não tem essa conversa) —
-incluir o contexto fixo acima, a lista de temas já classificada (Passo 1 feito por você
-antes de agendar, não deixe a IA da nuvem decidir sozinha o que é falso positivo sem essas
-instruções), e os Passos 2 a 8 inteiros colados no prompt.
-
-**Cuidado real, já aconteceu**: uma rotina agendada roda num checkout do repositório
-próprio, isolado. Se entre o momento em que ela foi criada e o momento em que ela dispara
-você (nesta sessão interativa) também publicar conteúdo no mesmo repo, o checkout dela fica
-desatualizado — ela pode: (a) escolher os mesmos temas/slugs que você já cobriu (colisão de
-nome de arquivo), e (b) travar no `git push` final porque o `origin/main` avançou (push
-não vai como fast-forward, e isso é seguro — o Git rejeita sozinho, não sobrescreve nada).
-Se isso acontecer: `git fetch origin main` pra confirmar que o remoto está intacto (quase
-sempre está — o push travado falha sem aplicar nada), e decidir se vale abrir a sessão da
-rotina (`claude.ai/code/session_...`, o link vem no `list_runs`) pra recuperar o conteúdo
-que ela gerou, ou só descartar e recriar os temas manualmente.
-
-## Rotinas em nuvem ativas (checar antes de recriar do zero)
-
-Antes de agendar algo novo, rode `RemoteTrigger` com `action: "list"` pra ver se já existe
-uma rotina cobrindo o mesmo período/tema — evita duplicar agendamento. Ver também a memória
-`project_blog_content_seo_workflow` pra saber quais rotinas foram criadas e seu status.
+É só pular a fila pra esse item específico: em vez de salvar em `content-queue/`, edita
+`blog/index.html`/`sitemap.xml`/`llms.txt` do site direto (mesma coisa que o publicador
+mecânico faria, só que feito por você nesta sessão) e publica no mesmo commit do Passo 7.
+Não é o padrão — só fazer isso quando o usuário pedir explicitamente algo tipo "publica isso
+já" ou "não precisa esperar".
