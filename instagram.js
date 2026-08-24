@@ -280,13 +280,18 @@ async function publicarCarrossel({ imagemUrls, legenda, accessToken, accountId, 
 // Publica um Reels (vídeo) no feed — usado pela fila de agendamento em massa (ver
 // PUBLIQUE-IV.md, seção Reels). Igual à publicação de imagem, mas com media_type REELS
 // e um tempo de espera bem maior no polling: processar vídeo demora bem mais que imagem.
-async function publicarReels({ videoUrl, legenda, accessToken, accountId, host }) {
+async function publicarReels({ videoUrl, legenda, accessToken, accountId, host, thumbOffsetMs }) {
   const token = accessToken || ACCESS_TOKEN;
   const conta = accountId || ACCOUNT_ID;
+  const params = { media_type: "REELS", video_url: videoUrl, caption: legenda || "", share_to_feed: true };
+  // Sem thumb_offset o Instagram usa o frame 0 como capa — em vídeos que abrem com fade-in
+  // (opacity:0 no primeiro instante, ex. os cards de benefícios) isso vira uma capa em branco.
+  // 1500ms cobre o pior caso observado (intro com título+badge revelando em até ~2s).
+  params.thumb_offset = thumbOffsetMs != null ? thumbOffsetMs : 1500;
   const { status, json: container } = await graphRequest(
     "POST",
     `/${GRAPH_VERSION}/${conta}/media`,
-    { media_type: "REELS", video_url: videoUrl, caption: legenda || "", share_to_feed: true },
+    params,
     token,
     host
   );
