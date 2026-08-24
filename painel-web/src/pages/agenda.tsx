@@ -284,13 +284,38 @@ function PostCard({
   onRemover: () => void
   onReenfileirar: () => void
 }) {
+  const [previewOpen, setPreviewOpen] = React.useState(false)
+
   return (
     <div className="border rounded-md p-3 flex gap-3">
       {item.imagemUrl && (
-        <img src={item.imagemUrl} alt="" className="h-14 w-14 rounded object-cover shrink-0" />
+        <img
+          src={item.imagemUrl}
+          alt=""
+          className="h-14 w-14 rounded object-cover shrink-0 cursor-pointer"
+          onClick={() => setPreviewOpen(true)}
+        />
       )}
       {!item.imagemUrl && item.videoUrl && (
-        <video src={item.videoUrl} muted controls className="h-14 w-14 rounded object-cover shrink-0" />
+        <video
+          src={item.videoUrl}
+          muted
+          className="h-14 w-14 rounded object-cover shrink-0 cursor-pointer"
+          onClick={() => setPreviewOpen(true)}
+        />
+      )}
+      {(item.imagemUrl || item.videoUrl) && (
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="sr-only">Preview do post</DialogTitle>
+            </DialogHeader>
+            {item.imagemUrl && <img src={item.imagemUrl} alt="" className="w-full rounded" />}
+            {!item.imagemUrl && item.videoUrl && (
+              <video src={item.videoUrl} controls autoPlay className="w-full rounded" />
+            )}
+          </DialogContent>
+        </Dialog>
       )}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap mb-1">
