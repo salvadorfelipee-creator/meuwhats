@@ -14,6 +14,7 @@ const publique = require("./publique");
 const reels = require("./reels");
 const agenda = require("./agenda");
 const backup = require("./backup");
+const r2 = require("./r2");
 const { notificarLeadCotaCerta } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
@@ -1635,7 +1636,9 @@ async function processarEntry(entry) {
             const { buffer, mimeType } = await wa.downloadMedia(media.id);
             const ext = EXT_BY_MIME[mimeType] || "bin";
             const filename = safeFilename(msg.id, ext);
-            fs.writeFileSync(path.join(MEDIA_DIR, filename), buffer);
+            // R2 em vez de disco local: o disco do Render é apagado a cada deploy/restart, o
+            // que fazia a foto/áudio/vídeo do cliente sumir do painel pouco depois de chegar.
+            await r2.enviarVideo(`clientes/${filename}`, buffer, mimeType);
             await db.insertMessage({
               ...base,
               type: tipo,
@@ -2947,15 +2950,17 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await db.telegramListContacts());
     }
 
-    // GET /media/:filename — servir arquivo de mídia
+    // GET /media/:filename — servir arquivo de mídia recebida de cliente (fica no R2, ver
+    // comentário em "clientes/" acima — disco local não sobrevive a deploy/restart do Render)
     const matchMedia = path_.match(/^\/media\/([a-zA-Z0-9_.-]+)$/);
     if (req.method === "GET" && matchMedia) {
       if (!requireAuth(req, res)) return;
-      const filePath = path.join(MEDIA_DIR, matchMedia[1]);
-      if (!filePath.startsWith(MEDIA_DIR) || !fs.existsSync(filePath)) {
+      try {
+        const { buffer } = await r2.baixarArquivo(`clientes/${matchMedia[1]}`);
+        return send(res, 200, buffer, { "Content-Type": mimeDoArquivo(matchMedia[1]) });
+      } catch {
         return send(res, 404, "Not found");
       }
-      return send(res, 200, fs.readFileSync(filePath), { "Content-Type": mimeDoArquivo(matchMedia[1]) });
     }
 
     // Health check

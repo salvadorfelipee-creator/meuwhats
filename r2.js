@@ -57,9 +57,19 @@ async function apagarVideo(key) {
   await cliente().send(new DeleteObjectCommand({ Bucket: bucket(), Key: key }));
 }
 
+// Baixa o arquivo inteiro pra um Buffer — usado pra servir de volta mídia recebida de
+// clientes (foto/áudio/vídeo do WhatsApp), que passou a ficar no R2 em vez do disco local
+// pelo mesmo motivo dos vídeos: disco do Render é apagado a cada deploy/restart.
+async function baixarArquivo(key) {
+  const resp = await cliente().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+  const chunks = [];
+  for await (const chunk of resp.Body) chunks.push(chunk);
+  return { buffer: Buffer.concat(chunks), contentType: resp.ContentType };
+}
+
 async function usoTotalBytes() {
   const objetos = await listarVideos();
   return objetos.reduce((soma, o) => soma + o.size, 0);
 }
 
-module.exports = { enviarVideo, listarVideos, urlAssinada, apagarVideo, usoTotalBytes };
+module.exports = { enviarVideo, listarVideos, urlAssinada, apagarVideo, usoTotalBytes, baixarArquivo };

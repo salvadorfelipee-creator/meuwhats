@@ -128,8 +128,8 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `TWITTER_ACCESS_TOKEN` / `TWITTER_ACCESS_SECRET` | Token de acesso da conta (gerado no mesmo App) | — |
 | `LINKEDIN_ACCESS_TOKEN` | Token OAuth2 do App LinkedIn (escopo `w_member_social` ou `w_organization_social`) | — |
 | `LINKEDIN_AUTHOR_URN` | `urn:li:person:XXX` (perfil) ou `urn:li:organization:XXX` (Página da empresa) | — |
-| `R2_ENDPOINT` | Endpoint da conta no Cloudflare R2 (Reels em massa — ver PUBLIQUE-IV.md) | — |
-| `R2_BUCKET` | Nome do bucket do R2 com os vídeos a publicar | — |
+| `R2_ENDPOINT` | Endpoint da conta no Cloudflare R2 (Reels em massa, imagens da Agenda e mídia recebida de clientes no painel — ver PUBLIQUE-IV.md) | — |
+| `R2_BUCKET` | Nome do bucket do R2 (vídeos a publicar, imagens da Agenda e fotos/áudios/vídeos que os clientes mandam no WhatsApp) | — |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Token de API do R2 (permissão Object Read & Write) | — |
 | `PUBLIC_URL` | URL pública do servidor (usada pelo auto-ping e pra montar a URL do vídeo que o Instagram busca) | `https://meuwhats.onrender.com` |
 
