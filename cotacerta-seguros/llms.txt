@@ -1,6 +1,6 @@
 # Cota Certa Seguros
 
-> Cota Certa Seguros é uma corretora de seguros digital, marca da FelizCred, sediada em Balneário Camboriú/SC. Compara cotações entre seguradoras parceiras — Porto Seguro, Allianz, HDI, Bradesco, Mapfre, Tokio Marine e Zurich — para Seguro Auto, Saúde, Vida, Residencial, Odonto, Viagem e Consórcio. Atendimento 100% pelo WhatsApp, sem compromisso.
+> Cota Certa Seguros é uma corretora de seguros digital, marca da FelizCred, sediada em Balneário Camboriú/SC. Compara cotações entre seguradoras parceiras — Porto Seguro, Allianz, HDI, Bradesco, Mapfre, Tokio Marine, Zurich e Suhai — para Seguro Auto, Saúde, Vida, Residencial, Odonto, Viagem e Consórcio. Atendimento 100% pelo WhatsApp, sem compromisso.
 
 ## Cotação
 
@@ -26,6 +26,11 @@ Guias sobre os produtos da Porto Seguro, uma das seguradoras parceiras da Cota C
 - [Seguro Fiança Locatícia Porto Seguro](https://www.cotacertaseguros.com.br/blog/porto-seguro-fianca-locaticia): alternativa ao fiador e à caução no aluguel
 - [Porto Seguro Empresarial (PME)](https://www.cotacertaseguros.com.br/blog/porto-seguro-empresarial): coberturas pra pequenas e médias empresas
 - [Porto Seguro Bike e Equipamentos Portáteis](https://www.cotacertaseguros.com.br/blog/porto-seguro-bike): seguro pra bicicleta, notebook, câmera e drone
+
+## Outras seguradoras parceiras
+
+- [Suhai Seguros: carro, moto e caminhão vale a pena?](https://www.cotacertaseguros.com.br/blog/suhai-seguros): seguradora parceira especializada em carro, moto e caminhão, sem restrição de idade do veículo e com opção sem franquia pra roubo/furto
+- [HDI Seguros: auto, residencial e empresarial](https://www.cotacertaseguros.com.br/blog/hdi-seguros): seguradora parceira do grupo alemão Talanx, linhas de auto, residencial, empresarial e vida
 
 ## Seguro auto e moto para motorista/entregador de aplicativo
 

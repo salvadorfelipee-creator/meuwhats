@@ -119,19 +119,24 @@ Todo conteúdo é cobertura genérica/típica de mercado (sem inventar valor,
 prazo ou regra de nenhuma seguradora específica) — mesma regra de segurança
 factual usada no resto do conteúdo da Cota Certa.
 
-## Falta fazer: a agenda de publicação
+## Agenda de publicação (feito em 24/08/2026)
 
-Os 4 temas × 3 formatos (12 arquivos) estão prontos, mas **nada foi
-agendado/publicado ainda**. Falta decidir com o usuário antes de criar os
-posts em `/painel/api/agenda` (`contaId: "cotacerta"`):
+Os 4 temas × 3 formatos (12 arquivos) foram agendados via
+`/painel/api/agenda` (`contaId: "cotacerta"`), IDs 425–436. Script usado:
+`cotacerta-seguros/social/agendar_cards_beneficios.py` (reaproveitável pra
+próximos temas — só editar a lista `TEMAS`).
 
-- **Datas/horários** — não colidir com a cadência dos carrosséis "formato
-  tuiter" (15h dia-sim-dia-não até 31/08) nem com as 100 caixinhas (8h e
-  19h30 até 26/08).
-- **Quais redes por formato** — Reels → `instagram_reels`; Story →
-  `instagram_story`; Feed → provavelmente `instagram`+`facebook`+`threads`
-  como os carrosséis (confirmar com o usuário).
-- **Ordem/espaçamento dos 4 temas** — publicar tudo junto ou intercalar com
-  o resto do calendário de agosto.
+Cadência escolhida: 1 tema por semana, toda terça-feira, começando depois
+que a agenda de agosto (carrosséis "formato tuiter" até 31/08 + 100
+caixinhas até 26/08) libera espaço:
 
-Não agendar/publicar nada sem essa conversa acontecer primeiro.
+| Tema | Data | Feed (10h, insta+fb+threads) | Story (13h, insta_story) | Reels (18h30, insta_reels) |
+|---|---|---|---|---|
+| Empresarial | 01/09/2026 | id 425 | id 426 | id 427 |
+| Residencial | 08/09/2026 | id 428 | id 429 | id 430 |
+| Funcionários | 15/09/2026 | id 431 | id 432 | id 433 |
+| Frotas | 22/09/2026 | id 434 | id 435 | id 436 |
+
+Rede por formato: Reels → `instagram_reels`; Story → `instagram_story`;
+Feed → `instagram`+`facebook`+`threads` (mesmo padrão dos carrosséis
+"formato tuiter").
