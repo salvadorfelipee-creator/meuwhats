@@ -35,7 +35,7 @@ Cada tema vira **3 arquivos** (mesmo conteúdo, formato/dimensão diferente):
 
 Todos ficam em `cotacerta-seguros/social/`.
 
-## Reels animado — como gerar
+## Reels animado — como funciona
 
 Regra do usuário: **narração só lê os títulos**, nunca a descrição inteira de
 cada benefício (senão o vídeo passa de 1 minuto). E **máximo ~19 segundos**
@@ -44,90 +44,94 @@ aparece na tela. Efeito de **partículas** (bolinhas que estouram e somem) em
 CADA bloco que aparece — título, badge, cada benefício e o CTA — não só no
 botão.
 
-Passo a passo (scripts em `cotacerta-seguros/social/_narracao.py` e
-`_gravar_video.py`, editar pra cada tema novo):
+Internamente (gerador único faz tudo isso — ver seção seguinte):
 
-1. **Narração por bloco** — `edge-tts`, voz `pt-BR-AntonioNeural`. Um mp3 por
-   bloco: `intro` (título + badge), `b1`..`b5` (só o título em negrito de
-   cada benefício, sem a descrição), `cta` (texto do botão). Editar a lista
-   `BLOCOS` em `_narracao.py`.
-2. **Medir duração de cada mp3** (`ffprobe -show_entries format=duration`) e
-   montar a timeline: cada bloco começa onde o anterior termina + 0.1s de
-   silêncio. Gerar esse silêncio com
-   `ffmpeg -f lavfi -i anullsrc=r=24000:cl=mono -t 0.1 ...` e concatenar tudo
-   com `-filter_complex concat` num único `narracao_completa.mp3`. Se a soma
-   passar de ~19s, cortar/reescrever os títulos (não a taxa de fala).
-3. **HTML animado**: cada bloco começa com `opacity:0` (classe `.reveal`).
-   Um `<script>` no fim da página tem um array `timeline = [[segundos, id,
-   cor, nº de partículas], ...]` com os tempos calculados no passo 2, e
-   `setTimeout` pra cada um chamar `reveal(id)` — que adiciona a classe
-   `visible` (fade+scale via CSS transition) e dispara `burst()` (gera N
-   `div.particle` no centro do elemento, cada uma anima até um ponto
-   aleatório e some em 0.7s). O bloco `cta` também ganha a classe `pulsing`
-   (box-shadow verde pulsando, `animation: pulse 1s infinite`).
-4. **Gravar o vídeo**: Playwright, `context = browser.new_context(viewport=
-   {1080,1920}, record_video_dir=..., record_video_size={1080,1920})`,
-   `page.goto(url)`, `page.wait_for_timeout(duração_do_áudio_ms + margem)`,
-   fechar o context pra salvar o `.webm`.
-5. **Juntar vídeo + áudio**: `ffmpeg -i video.webm -i narracao_completa.mp3
-   -map 0:v -map 1:a -c:v libx264 -pix_fmt yuv420p -crf 18 -c:a aac -b:a
-   192k -shortest saida.mp4` — o `-shortest` corta o vídeo (gravado mais
-   longo, com margem) pro tamanho exato do áudio.
-6. Apagar arquivos intermediários (`_video_raw/`, frames de preview,
-   `audio_partes/*.mp3` — esses ficam fora do Git, ver `.gitignore`).
+1. **Narração por bloco** — `edge-tts`, voz `pt-BR-AntonioNeural`, `rate=
+   "+8%"`. Um mp3 por bloco: `intro` (título + badge — o `badge_fala`, se
+   informado, é uma versão mais curta só pra fala), `b1`..`b5` (o `fala` de
+   cada benefício, se informado, senão o `titulo` mesmo — sem a `desc`),
+   `cta` (texto do botão). Cada tema que passar de ~19s precisa de um
+   `fala`/`badge_fala` mais curto no spec (não mexer na taxa de fala além
+   de +8%, fica robótico).
+2. Duração de cada mp3 medida via `ffprobe`, blocos concatenados com 0.1s de
+   silêncio entre eles (`ffmpeg -f lavfi anullsrc` + `concat` filter) num
+   único `narracao_completa.mp3`; a timeline de reveal (quando cada bloco
+   aparece) é calculada a partir dessas durações reais, não hardcoded.
+3. HTML animado: cada bloco começa com `opacity:0` (classe `.reveal`), um
+   `<script>` com `timeline = [[segundos, id, cor, nº partículas], ...]`
+   dispara `reveal(id)` no tempo certo — adiciona `.visible` (fade+scale) e
+   `burst()` (N `div.particle` saindo do centro do elemento). O `cta` também
+   ganha `.pulsing` (box-shadow verde em loop).
+4. Gravação via Playwright (`record_video_dir`, 1080×1920) pela duração do
+   áudio + margem; mux final com `ffmpeg -shortest` corta o vídeo pro
+   tamanho exato do áudio.
 
-## O que já existe no Git
+## Gerador (script único, parametrizado)
 
-- `_narracao.py`, `_gravar_video.py` — scripts genéricos, editar o conteúdo
-  pra cada tema novo (não são parametrizados por JSON ainda — é edição
-  manual dos textos/timeline a cada rodada).
-- `reels-seguro-empresarial-animado.html`/`.mp4` — modelo de Reels validado
-  (18.8s, narração só de títulos, partículas + botão pulsando).
-- `insta-story-seguro-empresarial-roubo-furto-vidro.html`/`.png` — Story.
-- `feed-seguro-empresarial-roubo-furto-vidro.html`/`.png` — Feed.
+`cotacerta-seguros/social/gerar_card_beneficios.py` — roda os 3 formatos de
+todos os temas de uma vez. Pra adicionar um tema novo, editar a lista
+`TEMAS` no fim do arquivo com esse formato:
 
-Conteúdo do primeiro tema (**Seguro Empresarial**, já pronto nos 3
-formatos): badge "roubo, furto e vidro" — Roubo e furto qualificado, Quebra
-de vidros, Cobertura para o estoque, Responsabilidade civil, Planos para
-PME. CTA "PERSONALIZE SEU PLANO".
+```python
+{
+    "slug": "seguro-x-badge-curto",       # vira o nome dos arquivos
+    "title": "Seguro X",
+    "badge": "coisa a, coisa b e coisa c",       # texto na tela
+    "badge_fala": "coisa a e coisa b",           # opcional, versão curta pra narração
+    "bullets": [
+        {"titulo": "Título do benefício", "fala": "versão curta", "desc": "descrição de 1-2 linhas."},
+        # ... 5 no total. "fala" é opcional (usa o "titulo" se faltar).
+    ],
+    "cta_text": "PERSONALIZE SEU PLANO",
+},
+```
 
-## Próximos temas (conteúdo já proposto, falta aprovação final do usuário)
+Depois: `python3 gerar_card_beneficios.py` — gera os 3 arquivos
+(`insta-story-<slug>.png`, `feed-<slug>.png`, `reels-<slug>-animado.mp4`) e
+avisa no terminal se a narração de algum tema passou de 19.5s (nesse caso,
+editar `fala`/`badge_fala` do spec pra encurtar e rodar de novo).
 
-**Seguro Residencial** — badge "incêndio, roubo e danos elétricos"
-1. Incêndio, raio e explosão — proteção patrimonial contra sinistros graves na casa
-2. Roubo e furto qualificado — indenização por bens subtraídos com arrombamento
-3. Danos elétricos — cobertura para eletrodomésticos e equipamentos danificados por sobrecarga
-4. Responsabilidade civil familiar — danos causados a terceiros dentro ou fora de casa
-5. Assistência residencial 24h — chaveiro, eletricista e encanador de emergência
+Os scripts antigos `_narracao.py`/`_gravar_video.py` (usados na primeira
+rodada, só pro tema Empresarial) foram **removidos** — esse gerador único
+os substitui.
 
-**Seguro para Funcionários** — badge "vida em grupo e acidentes pessoais"
-1. Vida em grupo — indenização aos beneficiários em caso de morte do colaborador
-2. Acidentes pessoais coletivo (APC) — cobertura por invalidez ou morte acidental
-3. Assistência funeral — suporte à família em caso de falecimento
-4. Invalidez por acidente — indenização proporcional ao grau da invalidez
-5. Adesão facilitada — sem exames médicos, contratação simplificada pra empresa
+## O que já existe no Git (4 temas prontos nos 3 formatos)
 
-**Seguro de Frotas** — badge "colisão, roubo e responsabilidade civil"
-1. Cobertura para toda a frota — uma única apólice pra todos os veículos da empresa
-2. Colisão, roubo e furto — proteção contra os principais sinistros da operação
-3. Responsabilidade civil facultativa (RCF) — cobre danos a terceiros causados pelos veículos
-4. Carro reserva — mantém a operação rodando enquanto o veículo é reparado
-5. Gestão simplificada — um vencimento único pra toda a frota, sem controle apólice por apólice
+1. **Seguro Empresarial** — badge "roubo, furto e vidro": Roubo e furto
+   qualificado, Quebra de vidros, Cobertura para o estoque, Responsabilidade
+   civil, Planos para PME.
+2. **Seguro Residencial** — badge "incêndio, roubo e danos elétricos":
+   Incêndio/raio/explosão, Roubo e furto qualificado, Danos elétricos,
+   Responsabilidade civil familiar, Assistência residencial 24h.
+3. **Seguro para Funcionários** — badge "vida em grupo e acidentes
+   pessoais": Vida em grupo, Acidentes pessoais coletivo, Assistência
+   funeral, Invalidez por acidente, Adesão facilitada.
+4. **Seguro de Frotas** — badge "colisão, roubo e responsabilidade civil":
+   Cobertura pra toda a frota, Colisão/roubo/furto, Responsabilidade civil
+   facultativa, Carro reserva, Gestão simplificada.
 
-Todos são coberturas genéricas/típicas de mercado (sem inventar valor, prazo
-ou regra de nenhuma seguradora específica) — mesma regra de segurança
+Todos com CTA "PERSONALIZE SEU PLANO", arquivos em
+`cotacerta-seguros/social/` (`insta-story-*.png`, `feed-*.png`,
+`reels-*-animado.mp4` — o `.mp4` fica fora do Git, ver `.gitignore`, mas o
+`.html`/`.py` que gera fica versionado).
+
+Todo conteúdo é cobertura genérica/típica de mercado (sem inventar valor,
+prazo ou regra de nenhuma seguradora específica) — mesma regra de segurança
 factual usada no resto do conteúdo da Cota Certa.
 
-## Depois que os 3 temas forem aprovados
+## Falta fazer: a agenda de publicação
 
-1. Gerar os 3 formatos (reels/story/feed) de cada tema novo, mesmo processo
-   acima.
-2. Criar a agenda de publicação em `/painel/api/agenda` (`contaId:
-   "cotacerta"`) pros 4 temas × 3 formatos — **ainda faltam decidir com o
-   usuário**: datas/horários (não colidir com a cadência dos carrosséis
-   "formato tuiter", que já ocupa 15h dia-sim-dia-não até 31/08, nem com as
-   100 caixinhas, que ocupam 8h/19h30 até 26/08), e se publica em quais
-   redes por formato (Reels → `instagram_reels`; Story → `instagram_story`;
-   Feed → provavelmente `instagram`+`facebook`+`threads` como os
-   carrosséis). Não agendar/publicar nada sem essa conversa acontecer
-   primeiro.
+Os 4 temas × 3 formatos (12 arquivos) estão prontos, mas **nada foi
+agendado/publicado ainda**. Falta decidir com o usuário antes de criar os
+posts em `/painel/api/agenda` (`contaId: "cotacerta"`):
+
+- **Datas/horários** — não colidir com a cadência dos carrosséis "formato
+  tuiter" (15h dia-sim-dia-não até 31/08) nem com as 100 caixinhas (8h e
+  19h30 até 26/08).
+- **Quais redes por formato** — Reels → `instagram_reels`; Story →
+  `instagram_story`; Feed → provavelmente `instagram`+`facebook`+`threads`
+  como os carrosséis (confirmar com o usuário).
+- **Ordem/espaçamento dos 4 temas** — publicar tudo junto ou intercalar com
+  o resto do calendário de agosto.
+
+Não agendar/publicar nada sem essa conversa acontecer primeiro.

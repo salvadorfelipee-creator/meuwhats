@@ -20,8 +20,10 @@ sitefelizcred/
 felizcred-caixinhas/saida/
 felizcred-caixinhas/*.mp4
 
-# Áudio/vídeo bruto de narração do reels de seguro empresarial (Cota Certa) —
-# reproduzível a partir dos scripts _narracao.py/_gravar_video.py, não precisa
-# ficar versionado.
+# Áudio/vídeo bruto de narração dos cards de benefícios (Cota Certa) —
+# reproduzível via cotacerta-seguros/social/gerar_card_beneficios.py, não
+# precisa ficar versionado (só o .mp4 final de cada tema fica fora do Git
+# também, mesmo padrão do felizcred-caixinhas acima).
 cotacerta-seguros/social/audio_partes/
+cotacerta-seguros/social/_audio_*/
 cotacerta-seguros/social/*.mp4
