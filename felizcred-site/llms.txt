@@ -52,6 +52,18 @@ Guia completo sobre a Reforma Tributária brasileira do consumo (EC 132/2023, LC
 - [Taxa de juros do consignado CLT em 2026](https://www.felizcred.com.br/blog/taxa-juros-consignado-clt-2026): faixa praticada, CET e o que influencia o valor final
 - [Emprega Brasil: o que é e como funciona](https://www.felizcred.com.br/blog/emprega-brasil-o-que-e-como-funciona): o portal do Governo Federal pra vagas, currículo e seguro-desemprego
 
+## Margem consignável do INSS (regras 2026)
+
+- [Margem disponível no extrato do INSS: por que pode ser falsa](https://www.felizcred.com.br/blog/margem-disponivel-extrato-inss-real-2026): explica a mudança de 45% pra 40% (MP 1.355/2026), margem extrapolada, e traz calculadora interativa
+- [Como consultar o extrato de consignado no Meu INSS](https://www.felizcred.com.br/blog/como-consultar-extrato-consignado-meu-inss): passo a passo pelo app e pelo site
+- [Golpe do falso INSS: como identificar ligações e mensagens falsas](https://www.felizcred.com.br/blog/golpe-falso-inss-ligacao-mensagem): sinais de fraude por telefone/SMS/WhatsApp
+- [13º salário do aposentado do INSS: como funciona a antecipação](https://www.felizcred.com.br/blog/decimo-terceiro-aposentado-inss-2026): quem tem direito e como é dividido
+- [Consignado para pensionista por morte: regras e diferenças](https://www.felizcred.com.br/blog/consignado-pensionista-por-morte-regras): quem está impedido de contratar e novas proteções antifraude
+
+## FGTS: além do saque-aniversário
+
+- [FGTS saque-aniversário: vale a pena voltar pro saque-rescisão?](https://www.felizcred.com.br/blog/fgts-saque-aniversario-migrar-saque-rescisao): a carência de 24 meses que pega gente de surpresa
+
 ## Benefícios do trabalhador
 
 - [Seguro-Desemprego 2026](https://www.felizcred.com.br/blog/seguro-desemprego-2026-duvidas-comuns): quantas parcelas, quando cai e prazo de saque
