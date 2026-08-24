@@ -5,13 +5,16 @@ const EMAIL_FROM = process.env.BREVO_EMAIL_FROM || "contato@cotacertaseguros.com
 const EMAIL_FROM_NOME = process.env.BREVO_EMAIL_FROM_NOME || "Cota Certa Seguros";
 const EMAIL_PARA = process.env.LEAD_EMAIL_TO;
 
-function enviarEmail({ to, toNome, subject, html }) {
+const FELIZCRED_EMAIL_FROM = process.env.FELIZCRED_EMAIL_FROM || "contato@felizcred.com.br";
+const FELIZCRED_EMAIL_FROM_NOME = process.env.FELIZCRED_EMAIL_FROM_NOME || "Felizcred";
+
+function enviarEmail({ to, toNome, subject, html, from, fromNome }) {
   return new Promise((resolve, reject) => {
     if (!BREVO_API_KEY) return reject(new Error("BREVO_API_KEY não configurada"));
-    if (!to) return reject(new Error("Destinatário do e-mail não configurado (LEAD_EMAIL_TO)"));
+    if (!to) return reject(new Error("Destinatário do e-mail não informado"));
 
     const body = JSON.stringify({
-      sender: { email: EMAIL_FROM, name: EMAIL_FROM_NOME },
+      sender: { email: from || EMAIL_FROM, name: fromNome || EMAIL_FROM_NOME },
       to: [{ email: to, name: toNome || to }],
       subject,
       htmlContent: html,
@@ -87,4 +90,30 @@ async function notificarLeadCotaCerta(lead) {
   });
 }
 
-module.exports = { enviarEmail, notificarLeadCotaCerta };
+// Disparado quando um funil automático do WhatsApp termina de coletar o e-mail do cliente (ver
+// capturarContatoEBoasVindas em server.js) — mesmo momento em que o contato é criado no Google
+// Contacts. Remetente próprio da Felizcred, não o da Cota Certa (marca diferente).
+async function enviarBoasVindasFelizcred({ nome, email }) {
+  const primeiroNome = (nome || "").trim().split(/\s+/)[0] || "";
+  const saudacao = primeiroNome ? `Olá, ${primeiroNome}!` : "Olá!";
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:560px">
+      <h2 style="color:#0066FF;margin:0 0 12px">Bem-vindo(a) à Felizcred!</h2>
+      <p style="color:#333">${saudacao} Recebemos seus dados e já estamos com o seu atendimento em mãos.</p>
+      <p style="color:#333">Em breve o Felipe continua a conversa com você diretamente pelo WhatsApp pra seguir com a
+      sua simulação — fique de olho por lá.</p>
+      <p style="color:#333">Obrigado por confiar na Felizcred! 🙌</p>
+    </div>`;
+
+  await enviarEmail({
+    to: email,
+    toNome: nome || email,
+    from: FELIZCRED_EMAIL_FROM,
+    fromNome: FELIZCRED_EMAIL_FROM_NOME,
+    subject: `Bem-vindo(a) à Felizcred${primeiroNome ? `, ${primeiroNome}` : ""}!`,
+    html,
+  });
+}
+
+module.exports = { enviarEmail, notificarLeadCotaCerta, enviarBoasVindasFelizcred };

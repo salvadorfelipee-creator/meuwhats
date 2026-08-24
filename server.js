@@ -15,7 +15,8 @@ const reels = require("./reels");
 const agenda = require("./agenda");
 const backup = require("./backup");
 const r2 = require("./r2");
-const { notificarLeadCotaCerta } = require("./email");
+const google = require("./google");
+const { notificarLeadCotaCerta, enviarBoasVindasFelizcred } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -806,9 +807,44 @@ const REGEX_CPF = /\d{3}\.?\d{3}\.?\d{3}-?\d{2}/;
 // campo tão identificável quanto o CPF, mas todos pedem e-mail no fim da lista).
 const REGEX_EMAIL = /\S+@\S+\.\S+/;
 
-// Confirmação de dados recebidos + aviso de horário — reaproveitada pelos 3 funis que pedem
-// dados e entregam pro atendimento humano (CLT, carro em garantia, financiamento).
-async function confirmarDadosRecebidos(de, businessNumberId) {
+// Dispara em paralelo ao atendimento humano assim que um funil termina de coletar dados e a
+// mensagem tem um e-mail nela: cria o contato no Google Contacts (nome + telefone, já
+// capturados antes, ver linha do webhook que lê contatos[].profile.name) e manda um e-mail de
+// boas-vindas via Brevo. Roda em segundo plano (fire-and-forget) — nunca deve atrasar nem
+// quebrar a resposta automática pro cliente no WhatsApp, por isso cada chamada externa tem seu
+// próprio try/catch e a função inteira nunca lança. Marca contato_salvo_em ANTES de chamar as
+// APIs externas pra não duplicar contato se a pessoa completar outro funil depois.
+async function capturarContatoEBoasVindas(de, businessNumberId, nome, email) {
+  try {
+    await db.marcarContatoSalvo(de, businessNumberId, email);
+  } catch (err) {
+    console.error("Erro ao marcar contato salvo:", err.message);
+    return; // sem marcar, melhor não tentar criar/enviar (evita duplicar numa corrida)
+  }
+  try {
+    await google.criarContato({ nome, telefone: de, email });
+  } catch (err) {
+    console.error("Erro ao criar contato no Google:", err.message);
+  }
+  try {
+    await enviarBoasVindasFelizcred({ nome, email });
+  } catch (err) {
+    console.error("Erro ao enviar e-mail de boas-vindas:", err.message);
+  }
+}
+
+// Confirmação de dados recebidos + aviso de horário — reaproveitada pelos funis que pedem
+// dados e entregam pro atendimento humano (CLT, carro em garantia, financiamento, FGTS).
+// `corpo` é a mensagem que completou os dados — se tiver e-mail nela e ainda não tivermos
+// salvo contato pra essa conversa, dispara capturarContatoEBoasVindas em paralelo.
+async function confirmarDadosRecebidos(de, businessNumberId, corpo) {
+  const email = (corpo || "").match(REGEX_EMAIL)?.[0]?.replace(/[.,;]+$/, "");
+  if (email) {
+    const conversa = await db.getConversation(de, businessNumberId);
+    if (!conversa?.contato_salvo_em) {
+      capturarContatoEBoasVindas(de, businessNumberId, conversa?.name, email).catch(() => {});
+    }
+  }
   await enviarRespostaAutomatica(
     businessNumberId,
     de,
@@ -846,7 +882,7 @@ async function confirmarEncaminhamentoHumano(de, businessNumberId) {
 async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
   if (REGEX_CPF.test(corpo || "")) {
     logFunil(businessNumberId, de, "clt_dados_completos");
-    await confirmarDadosRecebidos(de, businessNumberId);
+    await confirmarDadosRecebidos(de, businessNumberId, corpo);
     return;
   }
   // Já mandamos os 2 toques (o 2º pergunta se quer falar com atendente humano) — qualquer
@@ -867,7 +903,7 @@ async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
 async function handlerCapturaDadosCampanhaClt(de, businessNumberId, corpo) {
   if (REGEX_CPF.test(corpo || "")) {
     logFunil(businessNumberId, de, "campanha_dados_completos");
-    await confirmarDadosRecebidos(de, businessNumberId);
+    await confirmarDadosRecebidos(de, businessNumberId, corpo);
     return;
   }
   const conversa = await db.getConversation(de, businessNumberId);
@@ -887,7 +923,7 @@ async function handlerCapturaDadosCarroGarantia(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "carro_garantia_dados");
     return;
   }
-  await confirmarDadosRecebidos(de, businessNumberId);
+  await confirmarDadosRecebidos(de, businessNumberId, corpo);
 }
 
 async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
@@ -895,7 +931,7 @@ async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "financiamento_dados");
     return;
   }
-  await confirmarDadosRecebidos(de, businessNumberId);
+  await confirmarDadosRecebidos(de, businessNumberId, corpo);
 }
 
 // Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
@@ -906,7 +942,7 @@ async function handlerCapturaDadosFgts(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
     return;
   }
-  await confirmarDadosRecebidos(de, businessNumberId);
+  await confirmarDadosRecebidos(de, businessNumberId, corpo);
 }
 
 // ─── FLUXO COTA CERTA SEGUROS (número "felizcred n") ────────────────────────
@@ -1438,7 +1474,7 @@ async function handlerCapturaDadosCampanhaCLTNova(de, businessNumberId, corpo) {
   logFunil(businessNumberId, de, "campanha_dados_completos");
   setTimeout(async () => {
     try {
-      await confirmarDadosRecebidos(de, businessNumberId);
+      await confirmarDadosRecebidos(de, businessNumberId, corpo);
     } catch (err) {
       console.error("Erro ao confirmar dados da Campanha CLT:", err.message);
     }
@@ -2960,6 +2996,33 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, buffer, { "Content-Type": mimeDoArquivo(matchMedia[1]) });
       } catch {
         return send(res, 404, "Not found");
+      }
+    }
+
+    // GET /painel/api/google/autorizar — abre 1x (logado no painel) pra autorizar o acesso ao
+    // Google Contacts. Depois disso o refresh_token fica salvo no banco (ver google.js) e nunca
+    // mais precisa repetir. Ver passo a passo em CHAVES-LOCAL.md.
+    if (req.method === "GET" && path_ === "/painel/api/google/autorizar") {
+      if (!requireAuth(req, res)) return;
+      try {
+        res.writeHead(302, { Location: google.urlAutorizacao(req.headers.host) });
+        return res.end();
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
+    // GET /painel/api/google/callback — redirect de volta do Google com o "code" de
+    // autorização; troca por refresh_token e salva no banco.
+    if (req.method === "GET" && path_ === "/painel/api/google/callback") {
+      if (!requireAuth(req, res)) return;
+      const code = url.searchParams.get("code");
+      try {
+        if (!code) throw new Error("Google não mandou o código de autorização (usuário cancelou?).");
+        await google.trocarCodigoPorToken(code, req.headers.host);
+        return send(res, 200, "Google Contacts conectado! Pode fechar essa aba.", { "Content-Type": "text/html; charset=utf-8" });
+      } catch (err) {
+        return send(res, 500, `Erro ao conectar Google Contacts: ${err.message}`, { "Content-Type": "text/html; charset=utf-8" });
       }
     }
 

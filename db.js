@@ -135,6 +135,14 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "last_read_at")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN last_read_at INTEGER`);
   }
+  // email + contato_salvo_em: capturados quando o funil automático recebe o e-mail do cliente
+  // (ver confirmarDadosRecebidos em server.js) — contato_salvo_em marca que já tentamos criar
+  // o contato no Google/mandar o e-mail de boas-vindas, pra não duplicar se a pessoa passar por
+  // mais de um funil.
+  if (!infoConversations.rows.some((r) => r.name === "email")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN email TEXT`);
+    await client.execute(`ALTER TABLE conversations ADD COLUMN contato_salvo_em INTEGER`);
+  }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -206,6 +214,14 @@ const ready = (async () => {
   }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS reels_config (
+    chave TEXT PRIMARY KEY,
+    valor TEXT
+  )`);
+
+  // Mesmo padrão do reels_config acima — guarda o refresh_token do Google (Contacts) depois da
+  // autorização OAuth (ver google.js e GET /painel/api/google/callback em server.js), pra não
+  // precisar pedir pro usuário copiar/colar token nenhum.
+  await client.execute(`CREATE TABLE IF NOT EXISTS google_config (
     chave TEXT PRIMARY KEY,
     valor TEXT
   )`);
@@ -880,6 +896,32 @@ async function reelsConfigSet(chave, valor) {
   });
 }
 
+async function googleConfigGet(chave) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT valor FROM google_config WHERE chave = ?`, args: [chave] });
+  return result.rows[0]?.valor ?? null;
+}
+
+async function googleConfigSet(chave, valor) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO google_config (chave, valor) VALUES (?, ?)
+          ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor`,
+    args: [chave, valor],
+  });
+}
+
+// Marca que já tentamos criar o contato (Google) e mandar o e-mail de boas-vindas (Brevo) pra
+// essa conversa — chamado antes das chamadas externas em capturarContatoEBoasVindas (server.js)
+// pra não duplicar se a pessoa completar outro funil depois.
+async function marcarContatoSalvo(phone, businessNumberId, email) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET email = ?, contato_salvo_em = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [email, Date.now(), phone, businessNumberId],
+  });
+}
+
 async function agendaCriar({ contaId, texto, link, imagemKey, imagemKeys, imagemPorRedeKeys, videoKey, redes, agendadoPara }) {
   await ready;
   const result = await client.execute({
@@ -1186,6 +1228,9 @@ module.exports = {
   reelsListarRecentes,
   reelsConfigGet,
   reelsConfigSet,
+  googleConfigGet,
+  googleConfigSet,
+  marcarContatoSalvo,
   atualizarStatusConversa,
   atualizarNotaConversa,
   buscarMensagens,

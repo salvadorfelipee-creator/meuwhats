@@ -131,6 +131,8 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `R2_ENDPOINT` | Endpoint da conta no Cloudflare R2 (Reels em massa, imagens da Agenda e mídia recebida de clientes no painel — ver PUBLIQUE-IV.md) | — |
 | `R2_BUCKET` | Nome do bucket do R2 (vídeos a publicar, imagens da Agenda e fotos/áudios/vídeos que os clientes mandam no WhatsApp) | — |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Token de API do R2 (permissão Object Read & Write) | — |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Credencial OAuth do Google Cloud (People API — captura de contato do WhatsApp, ver CHAVES-LOCAL.md) | — |
+| `FELIZCRED_EMAIL_FROM` / `FELIZCRED_EMAIL_FROM_NOME` | Remetente do e-mail de boas-vindas da Felizcred (usa o mesmo `BREVO_API_KEY`) | `contato@felizcred.com.br` / "Felizcred" |
 | `PUBLIC_URL` | URL pública do servidor (usada pelo auto-ping e pra montar a URL do vídeo que o Instagram busca) | `https://meuwhats.onrender.com` |
 
 ⚠️ Defina `PAINEL_USER`/`PAINEL_PASS` com valores próprios — o painel mostra suas conversas.
@@ -586,6 +588,29 @@ o formulário também dispara (fire-and-forget, não bloqueia o fluxo) um `POST`
   (default `contato@cotacertaseguros.com.br` / "Cota Certa Seguros"). Sem `BREVO_API_KEY` o
   envio de e-mail falha silenciosamente (só loga erro) mas o lead **continua sendo salvo** no
   banco — o `try/catch` em volta do e-mail não bloqueia o `try/catch` em volta do save.
+
+### Captura de contato do WhatsApp → Google Contacts + boas-vindas (24/08/2026)
+
+Os funis automáticos do WhatsApp que pedem "nome, CPF, telefone, e-mail" numa mensagem só (CLT,
+carro em garantia, financiamento — ver `FLUXO_BOTOES`/`LEMBRETE_TEXTOS` em `server.js`) agora,
+ao reconhecer um e-mail na mensagem que fecha os dados, disparam em paralelo ao atendimento
+humano (fire-and-forget, nunca atrasa a resposta automática pro cliente):
+
+- **Cria o contato no Google Contacts** (nome já vinha do perfil do WhatsApp, telefone é o
+  próprio número da conversa) via `google.js` (People API, `https` puro, sem SDK — mesmo estilo
+  de `r2.js`/`email.js`). Exige autorização OAuth 1x, feita pelo usuário — ver `CHAVES-LOCAL.md`
+  → "Google Contacts (People API)" pro passo a passo e as rotas
+  `GET /painel/api/google/autorizar` / `GET /painel/api/google/callback`. Sem
+  `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` configurados (ou sem a autorização feita), essa
+  etapa só loga erro — não bloqueia nada.
+- **Manda um e-mail de boas-vindas da Felizcred** via Brevo (`email.js` →
+  `enviarBoasVindasFelizcred`, mesma API já usada pra Cota Certa, mas remetente próprio —
+  `contato@felizcred.com.br` por padrão, configurável via `FELIZCRED_EMAIL_FROM`/
+  `FELIZCRED_EMAIL_FROM_NOME`).
+- **Ponto único de integração**: `confirmarDadosRecebidos(de, businessNumberId, corpo)` em
+  `server.js` — reaproveitado por todos os funis que já chamavam essa função, não precisou
+  duplicar lógica em cada um. `conversations.contato_salvo_em` marca que já tentamos, pra não
+  duplicar contato/e-mail se a mesma pessoa completar mais de um funil depois.
 
 ---
 
