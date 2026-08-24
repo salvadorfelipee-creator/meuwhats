@@ -474,6 +474,20 @@ async function getUltimaMensagemRecebida(phone, businessNumberId) {
   return result.rows[0]?.ultimo || null;
 }
 
+// Já recebeu template de campanha (broadcast) desse número nos últimos `diasLimite` dias? —
+// trava contra reenvio pra quem já foi contactado (ver DIAS_BLOQUEIO_REENVIO_TEMPLATE em
+// server.js). Só mensagem de SAÍDA tipo 'template', não conta nada do fluxo automático.
+async function jaRecebeuTemplateRecente(phone, businessNumberId, diasLimite) {
+  await ready;
+  const desde = Date.now() - diasLimite * 24 * 60 * 60 * 1000;
+  const result = await client.execute({
+    sql: `SELECT 1 FROM messages WHERE phone = ? AND business_number_id = ? AND direction = 'out'
+          AND type = 'template' AND created_at > ? LIMIT 1`,
+    args: [phone, businessNumberId, desde],
+  });
+  return result.rows.length > 0;
+}
+
 const STATUS_VALIDOS = ["novo", "andamento", "resolvido"];
 
 async function atualizarStatusConversa(phone, businessNumberId, status) {
@@ -1191,6 +1205,7 @@ module.exports = {
   upsertConversation,
   getConversation,
   getUltimaMensagemRecebida,
+  jaRecebeuTemplateRecente,
   tentarMarcarMenuEnviado,
   setFluxoPasso,
   listarFluxosAguardando,

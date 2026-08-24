@@ -607,10 +607,19 @@ humano (fire-and-forget, nunca atrasa a resposta automática pro cliente):
   `enviarBoasVindasFelizcred`, mesma API já usada pra Cota Certa, mas remetente próprio —
   `contato@felizcred.com.br` por padrão, configurável via `FELIZCRED_EMAIL_FROM`/
   `FELIZCRED_EMAIL_FROM_NOME`).
-- **Ponto único de integração**: `confirmarDadosRecebidos(de, businessNumberId, corpo)` em
-  `server.js` — reaproveitado por todos os funis que já chamavam essa função, não precisou
+- **Ponto único de integração**: `confirmarDadosRecebidos(de, businessNumberId, corpo, prefixo)`
+  em `server.js` — reaproveitado por todos os funis que já chamavam essa função, não precisou
   duplicar lógica em cada um. `conversations.contato_salvo_em` marca que já tentamos, pra não
   duplicar contato/e-mail se a mesma pessoa completar mais de um funil depois.
+- **Prefixo por produto no nome do Google Contacts** (ex. `CLT - João Silva`, `GARANTIA - Maria`,
+  `FINANC - ...`, `FGTS - ...`): como Felizcred (empréstimo) e Cota Certa (seguro) salvam
+  contato na MESMA conta Google, o prefixo é só pra dar pra diferenciar de qual funil veio cada
+  um. Só aparece no Google — o e-mail de boas-vindas continua saudando pelo nome puro.
+- **Cota Certa é diferente**: o lead do formulário do site (`POST /cotacerta/lead`) também cria
+  contato no Google (prefixo `SEG -`), mas **não** dispara e-mail de boas-vindas da Felizcred —
+  só o aviso interno pro time que já existia (`notificarLeadCotaCerta`). O formulário manda o
+  WhatsApp sem código de país (`(11) 99999-9999`), então o servidor completa com `55` na frente
+  antes de mandar pro Google.
 
 ---
 

@@ -176,6 +176,14 @@ async function resolverWabaDoNumero(businessNumberId) {
   return cacheWabaPorNumero[businessNumberId] || null;
 }
 
+// Não manda template de campanha pro MESMO contato de novo dentro desse prazo — trava contra
+// lista repetida colada por engano num disparo posterior (caso real 2026-08-24: contato que já
+// tinha respondido e passado pelo fluxo inteiro no dia 21 recebeu o MESMO "bom_dia" de novo no
+// dia 24, porque a lista do segundo disparo se sobrepunha com a do primeiro sem o operador
+// perceber). Só conta mensagem de SAÍDA tipo 'template' (o próprio broadcast) — não bloqueia
+// nada do fluxo automático de resposta que vem depois.
+const DIAS_BLOQUEIO_REENVIO_TEMPLATE = 30;
+
 // Envia 1 mensagem de template de broadcast e grava na conversa — usado tanto pelo envio
 // imediato (POST /painel/api/broadcast) quanto pelo agendador de envios intercalados (ver
 // setInterval do broadcast_agendado, mais abaixo). Retorna { ok, error }, nunca lança.
@@ -183,6 +191,12 @@ async function enviarUmBroadcast(businessId, { phone, name, template, language, 
   const telefoneLimpo = normalizarTelefoneBR(phone);
   const nome = (name || "").trim();
   if (!telefoneLimpo) return { ok: false, error: "telefone inválido" };
+  if (await db.jaRecebeuTemplateRecente(telefoneLimpo, businessId, DIAS_BLOQUEIO_REENVIO_TEMPLATE)) {
+    return {
+      ok: false,
+      error: `Bloqueado: esse número já recebeu template desse canal nos últimos ${DIAS_BLOQUEIO_REENVIO_TEMPLATE} dias`,
+    };
+  }
   try {
     const components = nome ? [{ type: "body", parameters: [{ type: "text", text: nome }] }] : undefined;
     const result = await wa.sendTemplate(businessId, telefoneLimpo, template, language || "pt_BR", components);
@@ -814,7 +828,11 @@ const REGEX_EMAIL = /\S+@\S+\.\S+/;
 // quebrar a resposta automática pro cliente no WhatsApp, por isso cada chamada externa tem seu
 // próprio try/catch e a função inteira nunca lança. Marca contato_salvo_em ANTES de chamar as
 // APIs externas pra não duplicar contato se a pessoa completar outro funil depois.
-async function capturarContatoEBoasVindas(de, businessNumberId, nome, email) {
+// `prefixo` identifica o funil na frente do nome só dentro do Google Contacts (ex. "CLT",
+// "GARANTIA") — pedido do usuário pra distinguir os produtos dentro de um Google único, já
+// que Felizcred (empréstimo) e Cota Certa (seguro) salvam contato na mesma conta Google. O
+// e-mail de boas-vindas continua usando o nome puro (não faz sentido saudar "Olá, CLT João!").
+async function capturarContatoEBoasVindas(de, businessNumberId, nome, email, prefixo) {
   try {
     await db.marcarContatoSalvo(de, businessNumberId, email);
   } catch (err) {
@@ -822,7 +840,8 @@ async function capturarContatoEBoasVindas(de, businessNumberId, nome, email) {
     return; // sem marcar, melhor não tentar criar/enviar (evita duplicar numa corrida)
   }
   try {
-    await google.criarContato({ nome, telefone: de, email });
+    const nomeGoogle = prefixo && nome ? `${prefixo} - ${nome}` : prefixo ? prefixo : nome;
+    await google.criarContato({ nome: nomeGoogle, telefone: de, email });
   } catch (err) {
     console.error("Erro ao criar contato no Google:", err.message);
   }
@@ -836,13 +855,14 @@ async function capturarContatoEBoasVindas(de, businessNumberId, nome, email) {
 // Confirmação de dados recebidos + aviso de horário — reaproveitada pelos funis que pedem
 // dados e entregam pro atendimento humano (CLT, carro em garantia, financiamento, FGTS).
 // `corpo` é a mensagem que completou os dados — se tiver e-mail nela e ainda não tivermos
-// salvo contato pra essa conversa, dispara capturarContatoEBoasVindas em paralelo.
-async function confirmarDadosRecebidos(de, businessNumberId, corpo) {
+// salvo contato pra essa conversa, dispara capturarContatoEBoasVindas em paralelo. `prefixo`
+// (ex. "CLT", "GARANTIA", "FINANC") é só pra identificar o funil no nome salvo no Google.
+async function confirmarDadosRecebidos(de, businessNumberId, corpo, prefixo) {
   const email = (corpo || "").match(REGEX_EMAIL)?.[0]?.replace(/[.,;]+$/, "");
   if (email) {
     const conversa = await db.getConversation(de, businessNumberId);
     if (!conversa?.contato_salvo_em) {
-      capturarContatoEBoasVindas(de, businessNumberId, conversa?.name, email).catch(() => {});
+      capturarContatoEBoasVindas(de, businessNumberId, conversa?.name, email, prefixo).catch(() => {});
     }
   }
   await enviarRespostaAutomatica(
@@ -882,7 +902,7 @@ async function confirmarEncaminhamentoHumano(de, businessNumberId) {
 async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
   if (REGEX_CPF.test(corpo || "")) {
     logFunil(businessNumberId, de, "clt_dados_completos");
-    await confirmarDadosRecebidos(de, businessNumberId, corpo);
+    await confirmarDadosRecebidos(de, businessNumberId, corpo, "CLT");
     return;
   }
   // Já mandamos os 2 toques (o 2º pergunta se quer falar com atendente humano) — qualquer
@@ -903,7 +923,7 @@ async function handlerCapturaDadosClt(de, businessNumberId, corpo) {
 async function handlerCapturaDadosCampanhaClt(de, businessNumberId, corpo) {
   if (REGEX_CPF.test(corpo || "")) {
     logFunil(businessNumberId, de, "campanha_dados_completos");
-    await confirmarDadosRecebidos(de, businessNumberId, corpo);
+    await confirmarDadosRecebidos(de, businessNumberId, corpo, "CLT");
     return;
   }
   const conversa = await db.getConversation(de, businessNumberId);
@@ -923,7 +943,7 @@ async function handlerCapturaDadosCarroGarantia(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "carro_garantia_dados");
     return;
   }
-  await confirmarDadosRecebidos(de, businessNumberId, corpo);
+  await confirmarDadosRecebidos(de, businessNumberId, corpo, "GARANTIA");
 }
 
 async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
@@ -931,7 +951,7 @@ async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "financiamento_dados");
     return;
   }
-  await confirmarDadosRecebidos(de, businessNumberId, corpo);
+  await confirmarDadosRecebidos(de, businessNumberId, corpo, "FINANC");
 }
 
 // Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
@@ -942,7 +962,7 @@ async function handlerCapturaDadosFgts(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
     return;
   }
-  await confirmarDadosRecebidos(de, businessNumberId, corpo);
+  await confirmarDadosRecebidos(de, businessNumberId, corpo, "FGTS");
 }
 
 // ─── FLUXO COTA CERTA SEGUROS (número "felizcred n") ────────────────────────
@@ -1474,7 +1494,7 @@ async function handlerCapturaDadosCampanhaCLTNova(de, businessNumberId, corpo) {
   logFunil(businessNumberId, de, "campanha_dados_completos");
   setTimeout(async () => {
     try {
-      await confirmarDadosRecebidos(de, businessNumberId, corpo);
+      await confirmarDadosRecebidos(de, businessNumberId, corpo, "CLT");
     } catch (err) {
       console.error("Erro ao confirmar dados da Campanha CLT:", err.message);
     }
@@ -2082,6 +2102,15 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
           console.error("Erro ao salvar lead Cota Certa:", err.message);
         }
+        // Só salva no Google Contacts (prefixo "SEG" pra diferenciar dos funis de
+        // empréstimo, que caem na mesma conta Google) — Cota Certa NÃO manda e-mail de
+        // boas-vindas ao cliente, só o aviso interno acima (notificarLeadCotaCerta).
+        // Formulário manda o WhatsApp sem código de país (ex. "(11) 99999-9999").
+        const digitosWhats = String(lead.whatsapp || "").replace(/\D/g, "");
+        const telefoneCotaCerta = digitosWhats.length <= 11 ? `55${digitosWhats}` : digitosWhats;
+        google
+          .criarContato({ nome: `SEG - ${lead.nome}`, telefone: telefoneCotaCerta, email: lead.email })
+          .catch((err) => console.error("Erro ao criar contato Cota Certa no Google:", err.message));
         return send(res, 200, { ok: true }, corsHeaders);
       }
     }
