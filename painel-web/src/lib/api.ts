@@ -205,6 +205,14 @@ export const api = {
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/messages`,
     ),
 
+  // Chamar só quando a conversa está selecionada E a aba tem foco (document.hasFocus()) —
+  // ver comentário em server.js sobre por que isso é separado do fetch de mensagens.
+  marcarLida: (businessId: string, phone: string) =>
+    request<{ ok: boolean }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/marcar-lida`,
+      { method: "POST" },
+    ),
+
   // Baixa o .txt da conversa e já dispara o download no navegador — não usa request() porque
   // a resposta não é JSON (é o arquivo em si).
   exportarConversa: async (businessId: string, phone: string) => {

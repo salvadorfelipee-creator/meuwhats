@@ -129,6 +129,26 @@ export function ChatsPage() {
     api.messages(current.id, selected).then(setMessages).catch(() => {})
   }, [current, selected])
 
+  // Marca como lida no servidor SÓ quando a conversa está selecionada e a aba tem foco de
+  // verdade — nunca a partir do polling de mensagens sozinho (ver comentário em server.js).
+  // Sem essa trava, uma conversa que fica selecionada com a aba minimizada/trocada marcava
+  // como lida sozinha assim que chegava mensagem nova, e o piscar/negrito nunca aparecia.
+  const marcarLidaSeEmFoco = React.useCallback(() => {
+    if (!current || !selected) return
+    if (!document.hasFocus()) return
+    api.marcarLida(current.id, selected).catch(() => {})
+    markConversationSeen(current.id, selected)
+  }, [current, selected, markConversationSeen])
+
+  React.useEffect(() => {
+    marcarLidaSeEmFoco()
+  }, [marcarLidaSeEmFoco])
+
+  React.useEffect(() => {
+    window.addEventListener("focus", marcarLidaSeEmFoco)
+    return () => window.removeEventListener("focus", marcarLidaSeEmFoco)
+  }, [marcarLidaSeEmFoco])
+
   React.useEffect(() => {
     setSelected(null)
     setMessages([])
@@ -153,9 +173,10 @@ export function ChatsPage() {
     const id = setInterval(() => {
       carregarConversas()
       carregarMensagens()
+      marcarLidaSeEmFoco()
     }, 5000)
     return () => clearInterval(id)
-  }, [carregarConversas, carregarMensagens])
+  }, [carregarConversas, carregarMensagens, marcarLidaSeEmFoco])
 
   // O polling recarrega `messages` a cada 5s (ver setInterval acima). Antes, o efeito abaixo
   // rolava pro final TODA vez que isso acontecia, mesmo se o usuário tivesse acabado de arrastar

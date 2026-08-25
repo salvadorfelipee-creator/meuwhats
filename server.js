@@ -2209,18 +2209,31 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await db.listConversations(businessId, { incluirFinalizadas }));
     }
 
-    // GET /painel/api/conversations/:businessId/:phone/messages — mensagens de uma conversa.
-    // Só isso conta como "leu" (ver marcarConversaLida) — abrir a conversa no painel, nunca
-    // uma resposta automática do fluxo, que é exatamente o bug que motivou essa separação
-    // (mensagem do cliente "sumia" da checagem de não-lida assim que o bot respondia sozinho).
+    // GET /painel/api/conversations/:businessId/:phone/messages — só busca as mensagens, sem
+    // efeito colateral. Antes essa rota também marcava a conversa como lida — mas o painel
+    // busca mensagens em polling a cada 5s pra conversa selecionada, MESMO com a aba sem foco
+    // (minimizada/trocada), então uma mensagem nova nessa conversa virava "lida" sozinha antes
+    // do piscar/negrito aparecer. Marcar como lida agora é a rota separada abaixo, chamada pelo
+    // painel só quando a aba está com foco de verdade (ver marcar-lida e chats.tsx).
     const matchMessages = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/messages$/);
     if (req.method === "GET" && matchMessages) {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchMessages[1]);
       const phone = decodeURIComponent(matchMessages[2]);
       const mensagens = await db.listMessages(phone, businessId);
-      await db.marcarConversaLida(phone, businessId);
       return send(res, 200, mensagens);
+    }
+
+    // POST /painel/api/conversations/:businessId/:phone/marcar-lida — separado do GET
+    // .../messages de propósito (ver comentário acima). Chamado pelo painel só quando a
+    // conversa está selecionada E a aba tem foco (document.hasFocus()).
+    const matchMarcarLida = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/marcar-lida$/);
+    if (req.method === "POST" && matchMarcarLida) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchMarcarLida[1]);
+      const phone = decodeURIComponent(matchMarcarLida[2]);
+      await db.marcarConversaLida(phone, businessId);
+      return send(res, 200, { ok: true });
     }
 
     // GET /painel/api/conversations/:businessId/:phone/exportar — baixa o histórico inteiro
