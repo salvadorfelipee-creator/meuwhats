@@ -23,19 +23,23 @@ const CONTAS = [
     id: "felizcred",
     nome: "Felizcred",
     redes: {
+      // host: "graph.facebook.com" porque, desde 03/09/2026, essa conta usa um token de
+      // Usuário do Sistema (Business Manager, "Nunca expira") em vez do fluxo "Login do
+      // Instagram" antigo (limitado a ~60 dias, sem opção de token permanente) — mesma técnica
+      // já usada pro Cota Certa. Token de Usuário do Sistema só fala com a Graph API clássica.
       instagram:
         env("INSTAGRAM_ACCESS_TOKEN") && env("INSTAGRAM_ACCOUNT_ID")
-          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID") }
+          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID"), host: "graph.facebook.com" }
           : null,
       // Mesma credencial do Instagram acima — é a mesma conta, só um tipo de publicação
       // diferente (Stories em vez de feed). Fica marcável/desmarcável separado no painel.
       instagram_story:
         env("INSTAGRAM_ACCESS_TOKEN") && env("INSTAGRAM_ACCOUNT_ID")
-          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID") }
+          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID"), host: "graph.facebook.com" }
           : null,
       instagram_reels:
         env("INSTAGRAM_ACCESS_TOKEN") && env("INSTAGRAM_ACCOUNT_ID")
-          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID") }
+          ? { accessToken: env("INSTAGRAM_ACCESS_TOKEN"), accountId: env("INSTAGRAM_ACCOUNT_ID"), host: "graph.facebook.com" }
           : null,
       facebook:
         env("FACEBOOK_PAGE_ACCESS_TOKEN") && env("FACEBOOK_PAGE_ID")
