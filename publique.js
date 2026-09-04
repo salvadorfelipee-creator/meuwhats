@@ -88,15 +88,10 @@ const CONTAS = [
         env("FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN") && env("FACEBOOK_COTACERTA_PAGE_ID")
           ? { token: env("FACEBOOK_COTACERTA_PAGE_ACCESS_TOKEN"), paginaId: env("FACEBOOK_COTACERTA_PAGE_ID") }
           : null,
-      twitter:
-        env("TWITTER_COTACERTA_API_KEY") && env("TWITTER_COTACERTA_API_SECRET") && env("TWITTER_COTACERTA_ACCESS_TOKEN") && env("TWITTER_COTACERTA_ACCESS_SECRET")
-          ? {
-              apiKey: env("TWITTER_COTACERTA_API_KEY"),
-              apiSecret: env("TWITTER_COTACERTA_API_SECRET"),
-              accessToken: env("TWITTER_COTACERTA_ACCESS_TOKEN"),
-              accessSecret: env("TWITTER_COTACERTA_ACCESS_SECRET"),
-            }
-          : null,
+      // Twitter/X desligado de propósito (04/09/2026) — a API de postar exige plano pago,
+      // não vale a pena pro Cota Certa. Credenciais continuam no Render sem uso, só o código
+      // não oferece mais essa rede pra essa conta.
+      twitter: null,
       linkedin:
         env("LINKEDIN_COTACERTA_ACCESS_TOKEN") && env("LINKEDIN_COTACERTA_AUTHOR_URN")
           ? { token: env("LINKEDIN_COTACERTA_ACCESS_TOKEN"), autorUrn: env("LINKEDIN_COTACERTA_AUTHOR_URN") }
