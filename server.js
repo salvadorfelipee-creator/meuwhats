@@ -478,6 +478,22 @@ function logFunil(businessNumberId, phone, etapa) {
 // próximo passo do fluxo, identificado pelo id do botão clicado.
 const HORAS_INATIVIDADE_MENU = 24;
 
+// Sentinela salva em fluxo_passo quando o contato pede explicitamente pra parar de receber
+// mensagem (ex.: botão BLOQUEAR da campanha de indicação FGTS). Genérico de propósito — não é
+// específico de nenhuma campanha — pra qualquer fluxo futuro poder reaproveitar o mesmo opt-out
+// sem precisar de coluna nova no banco. Único efeito: barra o reenvio automático do início do
+// fluxo por inatividade (ver checagem perto de TIPOS_COM_MENU); a pessoa ainda pode reabrir na
+// mão digitando "menu", porque aí a iniciativa é dela.
+const PASSO_OPTOUT_BLOQUEADO = "bloqueado_optout";
+
+// Primeiro nome do perfil do WhatsApp, só se parecer um nome de verdade (nada de emoji sozinho,
+// nome vazio ou símbolo) — usado pra personalizar a abertura da campanha fria sem alongar o
+// texto (troca "Meu nome é Felipe" por "Oi, Marcos! Meu nome é Felipe").
+function extrairPrimeiroNome(nomeCompleto) {
+  const primeiro = (nomeCompleto || "").trim().split(/\s+/)[0] || "";
+  return /^[A-Za-zÀ-ÿ]{2,}$/.test(primeiro) ? primeiro : null;
+}
+
 function saudacaoDoDia() {
   const hora = Number(
     new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }).format(new Date())
@@ -1435,14 +1451,13 @@ const FLUXO_CIAHOT = {
 };
 
 // ─── FLUXO CAMPANHA CLT (número "Campanha CLT") ─────────────────────────────
-// Mesmo espírito do Ciahot: fluxo linear disparado por campanha de Marketing (template
-// simples "Olá, bom dia", sem botão embutido), não por menu. Dedicado a esse número
-// específico — diferente do RESPOSTAS_BOTAO["quero simular"] já existente em FLUXO_FELIZCRED,
-// que é pra quando o TEMPLATE aprovado já vem com botão (clique de botão de template, não
-// resposta de texto livre "bom dia"/"quem é" que dispara isso aqui).
 // "Campanha CLT" no painel = "Correspondente bancario" (+55 47 9274-7368) no Business Manager.
 const CAMPANHA_CLT_NUMBER_ID = "1335976862924566";
 
+// ARQUIVADO em 15/09/2026 — trocado pelo funil "Indicação FGTS → horas extras" logo abaixo.
+// Não apagado de propósito (mesmo padrão do menuInicialGerenteArquivado): é só reatribuir
+// FLUXOS_POR_NUMERO[CAMPANHA_CLT_NUMBER_ID] pra FLUXO_CAMPANHA_CLT (este aqui) pra reativar
+// o pitch de "consignado já aprovado".
 const CAMPCLT_TEXTO_APRESENTACAO =
   "Meu nome é Felipe e sou consultor de vendas na FelizCred, uma empresa parceira de alguns " +
   "bancos, como Banco Pan, Banco C6, Banco BMG, Facta...";
@@ -1537,10 +1552,198 @@ const FLUXO_CAMPANHA_CLT = {
   semAvisoJanela: true,
 };
 
+// ─── FLUXO INDICAÇÃO FGTS → HORAS EXTRAS (novo padrão do número Campanha CLT) ───────────────
+// Mensagem fria via indicação (não clique de anúncio): a pessoa recebe um template "Olá, boa
+// tarde." mandado por fora desse código (broadcast manual/Business Manager) — esse fluxo só
+// cuida do que acontece DEPOIS que ela responde qualquer coisa (aoIniciar dispara na primeira
+// mensagem recebida). Reaproveita a virada validada no funil do anúncio (ver
+// menuInicialGerenteArquivado / FLUXO_BOTOES.gerente_*): perguntar se batia ponto é o teste de
+// "cargo de confiança de fachada" que revela possível direito a horas extras, não só FGTS.
+//
+// Sem lembrete de silêncio nenhum por enquanto (lembreteMinutos/Textos/Handlers vazios) — pedido
+// explícito do usuário: contato frio não deve ser cutucado, só quem responde continua andando.
+//
+// Todos os passos depois da abertura são botão→botão (roteados pelo id clicado, ver
+// fluxo.fluxoBotoes[reply.id] no processamento do webhook) — não dependem de fluxo_passo salvo,
+// EXCETO ind_autorizo (nome/cidade em texto livre), que por isso precisa de handler próprio
+// marcando o passo na mão (handlerIndAutoriza), em vez do atalho genérico baseado em
+// lembreteMinutos que os outros fluxos usam.
+async function iniciarFluxoIndicacaoFGTS(de, businessNumberId) {
+  setTimeout(async () => {
+    try {
+      const conversa = await db.getConversation(de, businessNumberId);
+      const primeiroNome = extrairPrimeiroNome(conversa?.name);
+      const saudacaoNome = primeiroNome ? `Oi, ${primeiroNome}! ` : "";
+      await enviarRespostaAutomatica(
+        businessNumberId,
+        de,
+        `${saudacaoNome}Meu nome é Felipe, sou consultor na empresa FelizCred, correspondente ` +
+          "bancário — somos especialistas em crédito do FGTS. Atendemos muitas pessoas por " +
+          "indicação, recebemos o seu contato assim, e vou ser breve pra não tomar seu tempo."
+      );
+      await enviarRespostaAutomatica(
+        businessNumberId,
+        de,
+        "Muitas pessoas que ocuparam cargo de confiança como Gerente ou Supervisor *deixaram* de " +
+          "receber FGTS e acabam nem sabendo desse direito. Podemos fazer uma análise gratuita " +
+          "pra ver se é o seu caso!",
+        [
+          { id: "ind_saber_mais", title: "SABER MAIS" },
+          { id: "ind_sair", title: "SAIR" },
+          { id: "ind_bloquear", title: "BLOQUEAR" },
+        ]
+      );
+    } catch (err) {
+      console.error("Erro ao iniciar fluxo Indicação FGTS:", err.message);
+    }
+  }, 5000);
+}
+
+async function handlerIndSaberMais(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, "Perfeito. É bem rápido.");
+  await enviarRespostaAutomatica(businessNumberId, de, "Você ainda trabalha como gerente ou supervisor?", [
+    { id: "ind_trabalha_sim", title: "SIM" },
+    { id: "ind_trabalha_nao", title: "NÃO" },
+  ]);
+}
+
+// BLOQUEAR precisa ser handler (não objeto estático) porque, além de responder, marca o opt-out
+// permanente — exigência da própria política de mensageria da Meta, não só educação.
+async function handlerIndBloquear(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Combinado, você não vai mais receber mensagens da gente por aqui. Se mudar de ideia, é só " +
+      "me chamar. 🙏"
+  );
+  await db.setFluxoPasso(de, businessNumberId, PASSO_OPTOUT_BLOQUEADO);
+}
+
+async function handlerIndRevelacao(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Isso muda bastante o seu caso 👀\n\nQuando alguém é registrado como gerente ou supervisor " +
+      "mas bate ponto igual a qualquer outro funcionário, a lei entende que na prática não tinha " +
+      "a autonomia que o cargo de confiança exige — e isso costuma dar direito a receber as " +
+      "horas extras não pagas desses anos, não só o FGTS."
+  );
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "O escritório parceiro analisa os dois pontos juntos, de graça, só pra te dizer se é o seu " +
+      "caso. Posso encaminhar?",
+    [
+      { id: "ind_autoriza_sim", title: "AUTORIZO" },
+      { id: "ind_autoriza_nao", title: "AGORA NÃO" },
+    ]
+  );
+}
+
+async function handlerIndAutoriza(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Show! Só preciso do seu nome e da cidade onde mora, que eu já encaminho pro escritório.\n\n" +
+      "Eles analisam o FGTS e as possíveis horas extras juntos, e te chamam por aqui pelo número " +
+      "(47) 99978-2256 — sem compromisso."
+  );
+  await db.setFluxoPasso(de, businessNumberId, "ind_autorizo");
+}
+
+const PERGUNTA_BATEU_PONTO =
+  "Nesse cargo, você batia ponto ou tinha horário fixo de entrada e saída controlado?";
+const BOTOES_BATEU_PONTO = [
+  { id: "ind_ponto_sim", title: "SIM, BATIA PONTO" },
+  { id: "ind_ponto_nao", title: "NÃO, ERA LIVRE" },
+];
+
+const FLUXO_BOTOES_CAMPANHA_CLT_INDICACAO_FGTS = {
+  ind_saber_mais: handlerIndSaberMais,
+  ind_sair: { texto: "Sem problemas! 😊 Fico à disposição se mudar de ideia — é só me chamar por aqui." },
+  ind_bloquear: handlerIndBloquear,
+  ind_trabalha_sim: {
+    texto: "Você sabe se o seu FGTS foi depositado corretamente?",
+    botoes: [
+      { id: "ind_fgts_sim", title: "SIM" },
+      { id: "ind_fgts_nao", title: "NÃO" },
+    ],
+  },
+  ind_trabalha_nao: {
+    texto: "Entendi. Faz mais de 2 anos que você saiu desse cargo?",
+    botoes: [
+      { id: "ind_saiu_sim", title: "SIM" },
+      { id: "ind_saiu_nao", title: "NÃO" },
+    ],
+  },
+  ind_fgts_sim: {
+    texto:
+      "Que bom que você fica de olho nisso! 😊 Mesmo assim, tem um detalhe que quase ninguém " +
+      "verifica e que pode valer ainda mais que o FGTS — só mais uma pergunta rápida:\n\n" +
+      PERGUNTA_BATEU_PONTO,
+    botoes: BOTOES_BATEU_PONTO,
+  },
+  ind_fgts_nao: {
+    texto:
+      "Isso é mais comum do que parece, viu? 😳 Vale a pena checar direitinho — só mais uma " +
+      "pergunta rápida antes:\n\n" +
+      PERGUNTA_BATEU_PONTO,
+    botoes: BOTOES_BATEU_PONTO,
+  },
+  ind_saiu_sim: {
+    texto:
+      "Preciso ser honesto: como já passou de 2 anos desde que você saiu, o prazo legal pra " +
+      "reaver tanto o FGTS quanto eventuais horas extras já passou (prescrição de 2 anos) 😕\n\n" +
+      "Mas ainda dá pra te ajudar com outras opções:",
+    lista: LISTA_PRODUTOS,
+  },
+  ind_saiu_nao: {
+    texto: "Ótimo, ainda dá tempo! Só mais uma pergunta rápida antes de encaminhar:\n\n" + PERGUNTA_BATEU_PONTO,
+    botoes: BOTOES_BATEU_PONTO,
+  },
+  ind_ponto_sim: handlerIndRevelacao,
+  ind_ponto_nao: {
+    texto:
+      "Entendi! Mesmo assim, vale avaliar o FGTS com quem entende do assunto — às vezes tem " +
+      "outros detalhes do contrato que pesam.\n\nPosso encaminhar seu caso pro escritório " +
+      "parceiro, sem custo nenhum?",
+    botoes: [
+      { id: "ind_autoriza_sim", title: "AUTORIZO" },
+      { id: "ind_autoriza_nao", title: "AGORA NÃO" },
+    ],
+  },
+  ind_autoriza_sim: handlerIndAutoriza,
+  ind_autoriza_nao: {
+    texto:
+      "Sem problemas! 😊 Fico à disposição se quiser retomar, é só me chamar por aqui.\n\n" +
+      "Só lembrando: esse prazo de 2 anos é real — quanto antes avaliar, melhor.",
+  },
+  // Reaproveita a lista de outras opções (mesmos handlers/textos do funil do anúncio) pra quem
+  // cai no ramo "prescrito".
+  prod_clt: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO CLT") },
+  prod_inss: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO INSS") },
+  prod_fgts: { texto: PRODUTO_CONFIRMACAO("o SAQUE-ANIVERSÁRIO FGTS") },
+  prod_carro: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO COM CARRO EM GARANTIA") },
+  prod_seguro: { texto: PRODUTO_CONFIRMACAO("o SEGURO VEICULAR") },
+};
+
+const FLUXO_CAMPANHA_CLT_INDICACAO_FGTS = {
+  aoIniciar: iniciarFluxoIndicacaoFGTS,
+  fluxoBotoes: FLUXO_BOTOES_CAMPANHA_CLT_INDICACAO_FGTS,
+  // Vazios de propósito: sem lembrete de silêncio nenhum por enquanto (pedido do usuário).
+  lembreteMinutos: {},
+  lembreteTextos: {},
+  lembreteHandlers: {},
+  capturaTexto: {
+    ind_autorizo: handlerConfirmacaoAgenda,
+  },
+  semAvisoJanela: true,
+};
+
 const FLUXOS_POR_NUMERO = {
   [COTACERTA_NUMBER_ID]: FLUXO_COTACERTA,
   [CIAHOT_NUMBER_ID]: FLUXO_CIAHOT,
-  [CAMPANHA_CLT_NUMBER_ID]: FLUXO_CAMPANHA_CLT,
+  [CAMPANHA_CLT_NUMBER_ID]: FLUXO_CAMPANHA_CLT_INDICACAO_FGTS,
 };
 
 function getFluxo(businessNumberId) {
@@ -1716,7 +1919,12 @@ async function processarEntry(entry) {
         // Cliques em botão não contam (continuação do fluxo), nem "unsupported"/"reaction"
         // (costumam vir de números de sistema que não aceitam resposta).
         const TIPOS_COM_MENU = ["text", "image", "audio", "video", "document", "sticker"];
-        if (!mensagemJaTratada && conversaInativa && TIPOS_COM_MENU.includes(tipo)) {
+        if (
+          !mensagemJaTratada &&
+          conversaInativa &&
+          TIPOS_COM_MENU.includes(tipo) &&
+          conversaAnterior?.fluxo_passo !== PASSO_OPTOUT_BLOQUEADO
+        ) {
           try {
             const podeEnviar = await db.tentarMarcarMenuEnviado(
               de,
