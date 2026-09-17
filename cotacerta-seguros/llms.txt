@@ -63,6 +63,8 @@ Guias por modelo de carro para quem dirige por Uber/99: [Onix](https://www.cotac
 ## Publicados recentemente
 
 <!-- FILA-AUTO:NOVOS-AQUI -->
+- [Porto Seguro Saúde: carência, o que é e quanto dura](https://www.cotacertaseguros.com.br/blog/porto-seguro-saude-carencia-quanto-tempo): o que é a carência do plano de saúde, os prazos máximos da ANS e quando pode ser reduzida
+
 - [Porto Seguro Saúde: como funciona o reembolso](https://www.cotacertaseguros.com.br/blog/porto-seguro-saude-como-funciona-reembolso): como funciona o reembolso do plano de saúde: documentos, prazo e quanto costuma ser devolvido
 
 - [Porto Seguro Vida: documentos e prazo pra indenização](https://www.cotacertaseguros.com.br/blog/porto-seguro-vida-documentos-prazo-indenizacao): documentos necessários e prazo legal (SUSEP) para pagamento da indenização do seguro de vida
