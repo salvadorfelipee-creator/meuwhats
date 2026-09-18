@@ -1641,7 +1641,9 @@ const FLUXO_BOTOES_CAMPANHA_CLT_INDICACAO_FGTS = {
     ],
   },
   ind_trabalha_nao: {
-    texto: "Entendi. Faz mais de 2 anos que você saiu desse cargo?",
+    // "empresa" em vez de "cargo" — pedido do usuário em 18/09/2026, só nessa variante (a 2 fica
+    // com a redação original, ver mais abaixo).
+    texto: "Entendi. Faz mais de 2 anos que você saiu dessa empresa?",
     botoes: [
       { id: "ind_saiu_sim", title: "SIM" },
       { id: "ind_saiu_nao", title: "NÃO" },
@@ -1663,9 +1665,7 @@ const FLUXO_BOTOES_CAMPANHA_CLT_INDICACAO_FGTS = {
     texto:
       "Infelizmente, existe um prazo previsto em lei para que se possa buscar os direitos — " +
       "baseado na sua resposta, o seu já passou 😕. Caso queira, podemos avaliar essa questão " +
-      "do prazo, basta que nos envie um print do contrato de trabalho encerrado.\n\n" +
-      "E, ainda dá pra te ajudar com outras opções:",
-    lista: LISTA_PRODUTOS,
+      "do prazo, basta que nos envie um print do contrato de trabalho encerrado.",
   },
   ind_saiu_nao: {
     texto: "Ótimo, ainda dá tempo! Só mais uma pergunta rápida antes de encaminhar:\n" + PERGUNTA_BATEU_PONTO,
@@ -1675,9 +1675,7 @@ const FLUXO_BOTOES_CAMPANHA_CLT_INDICACAO_FGTS = {
   ind_ponto_sim: {
     texto:
       "Infelizmente, neste caso, não podemos te ajudar, pois as diferenças são calculadas " +
-      "justamente para quem não tem controle de ponto.\n\nMas, ainda dá pra te ajudar com " +
-      "outras opções:",
-    lista: LISTA_PRODUTOS,
+      "justamente para quem não tem controle de ponto.",
   },
   ind_ponto_nao: {
     texto: "Este é exatamente o caso em que podemos ajudar. Podemos te conectar com a equipe responsável?",
@@ -1696,13 +1694,6 @@ const FLUXO_BOTOES_CAMPANHA_CLT_INDICACAO_FGTS = {
       "Sem problemas! 😊 Fico à disposição se quiser retomar, é só me chamar por aqui. Só " +
       "lembrando, existe um prazo limite previsto em lei, quanto antes avaliar, melhor.",
   },
-  // Reaproveita a lista de outras opções (mesmos handlers/textos do funil do anúncio) pra quem
-  // cai no ramo "prescrito" ou "batia ponto".
-  prod_clt: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO CLT") },
-  prod_inss: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO INSS") },
-  prod_fgts: { texto: PRODUTO_CONFIRMACAO("o SAQUE-ANIVERSÁRIO FGTS") },
-  prod_carro: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO COM CARRO EM GARANTIA") },
-  prod_seguro: { texto: PRODUTO_CONFIRMACAO("o SEGURO VEICULAR") },
 };
 
 const FLUXO_CAMPANHA_CLT_INDICACAO_FGTS = {
@@ -1716,13 +1707,173 @@ const FLUXO_CAMPANHA_CLT_INDICACAO_FGTS = {
   semAvisoJanela: true,
 };
 
+// ─── VARIANTE 2 (teste A/B contra a variante 1 acima) ───────────────────────────────────────
+// Reconstrução fiel da PRIMEIRA versão desse funil (antes da rodada de edições de texto e da
+// inversão do critério do ponto em 18/09/2026): revelação positiva (bater ponto = pode ter
+// direito a horas extras) e pede nome/cidade antes de encaminhar. Único ajuste pedido pro teste
+// valer: tirou a lista de produtos do final do ramo "prescrito" (mesmo pedido da variante 1) —
+// resto é literalmente a redação original, "empresa"/"cargo" incluso (não trocado aqui de
+// propósito, só na variante 1).
+async function iniciarFluxoIndicacaoFGTSV2(de, businessNumberId) {
+  setTimeout(async () => {
+    try {
+      const conversa = await db.getConversation(de, businessNumberId);
+      const primeiroNome = extrairPrimeiroNome(conversa?.name);
+      const saudacaoNome = primeiroNome ? `Oi, ${primeiroNome}! ` : "";
+      await enviarRespostaAutomatica(
+        businessNumberId,
+        de,
+        `${saudacaoNome}Meu nome é Felipe, sou consultor na empresa FelizCred, correspondente ` +
+          "bancário — somos especialistas em crédito do FGTS. Atendemos muitas pessoas por " +
+          "indicação, recebemos o seu contato assim, e vou ser breve pra não tomar seu tempo."
+      );
+      await enviarRespostaAutomatica(
+        businessNumberId,
+        de,
+        "Muitas pessoas que ocuparam cargo de confiança como Gerente ou Supervisor *deixaram* de " +
+          "receber FGTS e acabam nem sabendo desse direito. Podemos fazer uma análise gratuita " +
+          "pra ver se é o seu caso!",
+        [
+          { id: "ind_saber_mais", title: "SABER MAIS" },
+          { id: "ind_sair", title: "SAIR" },
+          { id: "ind_bloquear", title: "BLOQUEAR" },
+        ]
+      );
+    } catch (err) {
+      console.error("Erro ao iniciar fluxo Indicação FGTS (variante 2):", err.message);
+    }
+  }, 5000);
+}
+
+async function handlerIndRevelacaoV2(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Isso muda bastante o seu caso 👀\n\nQuando alguém é registrado como gerente ou supervisor " +
+      "mas bate ponto igual a qualquer outro funcionário, a lei entende que na prática não tinha " +
+      "a autonomia que o cargo de confiança exige — e isso costuma dar direito a receber as " +
+      "horas extras não pagas desses anos, não só o FGTS."
+  );
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "O escritório parceiro analisa os dois pontos juntos, de graça, só pra te dizer se é o seu " +
+      "caso. Posso encaminhar?",
+    [
+      { id: "ind_autoriza_sim", title: "AUTORIZO" },
+      { id: "ind_autoriza_nao", title: "AGORA NÃO" },
+    ]
+  );
+}
+
+async function handlerIndAutorizaV2(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Show! Só preciso do seu nome e da cidade onde mora, que eu já encaminho pro escritório.\n\n" +
+      "Eles analisam o FGTS e as possíveis horas extras juntos, e te chamam por aqui pelo número " +
+      "(47) 99978-2256 — sem compromisso."
+  );
+  await db.setFluxoPasso(de, businessNumberId, "ind_autorizo");
+}
+
+const PERGUNTA_BATEU_PONTO_V2 =
+  "Nesse cargo, você batia ponto ou tinha horário fixo de entrada e saída controlado?";
+const BOTOES_BATEU_PONTO_V2 = [
+  { id: "ind_ponto_sim", title: "SIM, BATIA PONTO" },
+  { id: "ind_ponto_nao", title: "NÃO, ERA LIVRE" },
+];
+
+const FLUXO_BOTOES_CAMPANHA_CLT_INDICACAO_FGTS_V2 = {
+  ind_saber_mais: handlerIndSaberMais,
+  ind_sair: { texto: "Sem problemas! 😊 Fico à disposição se mudar de ideia — é só me chamar por aqui." },
+  ind_bloquear: handlerIndBloquear,
+  ind_trabalha_sim: {
+    texto: "Você sabe se o seu FGTS foi depositado corretamente?",
+    botoes: [
+      { id: "ind_fgts_sim", title: "SIM" },
+      { id: "ind_fgts_nao", title: "NÃO" },
+    ],
+  },
+  ind_trabalha_nao: {
+    texto: "Entendi. Faz mais de 2 anos que você saiu desse cargo?",
+    botoes: [
+      { id: "ind_saiu_sim", title: "SIM" },
+      { id: "ind_saiu_nao", title: "NÃO" },
+    ],
+  },
+  ind_fgts_sim: {
+    texto:
+      "Que bom que você fica de olho nisso! 😊 Mesmo assim, tem um detalhe que quase ninguém " +
+      "verifica e que pode valer ainda mais que o FGTS — só mais uma pergunta rápida:\n\n" +
+      PERGUNTA_BATEU_PONTO_V2,
+    botoes: BOTOES_BATEU_PONTO_V2,
+  },
+  ind_fgts_nao: {
+    texto:
+      "Isso é mais comum do que parece, viu? 😳 Vale a pena checar direitinho — só mais uma " +
+      "pergunta rápida antes:\n\n" +
+      PERGUNTA_BATEU_PONTO_V2,
+    botoes: BOTOES_BATEU_PONTO_V2,
+  },
+  ind_saiu_sim: {
+    texto:
+      "Preciso ser honesto: como já passou de 2 anos desde que você saiu, o prazo legal pra " +
+      "reaver tanto o FGTS quanto eventuais horas extras já passou (prescrição de 2 anos) 😕",
+  },
+  ind_saiu_nao: {
+    texto: "Ótimo, ainda dá tempo! Só mais uma pergunta rápida antes de encaminhar:\n\n" + PERGUNTA_BATEU_PONTO_V2,
+    botoes: BOTOES_BATEU_PONTO_V2,
+  },
+  ind_ponto_sim: handlerIndRevelacaoV2,
+  ind_ponto_nao: {
+    texto:
+      "Entendi! Mesmo assim, vale avaliar o FGTS com quem entende do assunto — às vezes tem " +
+      "outros detalhes do contrato que pesam.\n\nPosso encaminhar seu caso pro escritório " +
+      "parceiro, sem custo nenhum?",
+    botoes: [
+      { id: "ind_autoriza_sim", title: "AUTORIZO" },
+      { id: "ind_autoriza_nao", title: "AGORA NÃO" },
+    ],
+  },
+  ind_autoriza_sim: handlerIndAutorizaV2,
+  ind_autoriza_nao: {
+    texto:
+      "Sem problemas! 😊 Fico à disposição se quiser retomar, é só me chamar por aqui.\n\n" +
+      "Só lembrando: esse prazo de 2 anos é real — quanto antes avaliar, melhor.",
+  },
+};
+
+const FLUXO_CAMPANHA_CLT_INDICACAO_FGTS_V2 = {
+  aoIniciar: iniciarFluxoIndicacaoFGTSV2,
+  fluxoBotoes: FLUXO_BOTOES_CAMPANHA_CLT_INDICACAO_FGTS_V2,
+  lembreteMinutos: {},
+  lembreteTextos: {},
+  lembreteHandlers: {},
+  capturaTexto: {
+    ind_autorizo: handlerConfirmacaoAgenda,
+  },
+  semAvisoJanela: true,
+};
+
+// CAMPANHA_CLT_NUMBER_ID não entra aqui de propósito — é resolvido à parte em getFluxo
+// (escolherVarianteCampanhaCLT), que decide entre as variantes 1 e 2 por telefone.
 const FLUXOS_POR_NUMERO = {
   [COTACERTA_NUMBER_ID]: FLUXO_COTACERTA,
   [CIAHOT_NUMBER_ID]: FLUXO_CIAHOT,
-  [CAMPANHA_CLT_NUMBER_ID]: FLUXO_CAMPANHA_CLT_INDICACAO_FGTS,
 };
 
-function getFluxo(businessNumberId) {
+// Divide contato por contato entre a variante 1 (ativa) e a 2 (nova, em teste) da Campanha CLT —
+// último dígito do telefone par vai pra 1, ímpar pra 2. Fixo por número de telefone (não por
+// hora nem ordem de resposta): não importa quando cada pessoa responde ao template, ela sempre
+// cai na mesma variante em toda a conversa.
+function escolherVarianteCampanhaCLT(phone) {
+  const ultimoDigito = Number(String(phone || "").slice(-1));
+  return ultimoDigito % 2 === 0 ? FLUXO_CAMPANHA_CLT_INDICACAO_FGTS : FLUXO_CAMPANHA_CLT_INDICACAO_FGTS_V2;
+}
+
+function getFluxo(businessNumberId, phone) {
+  if (businessNumberId === CAMPANHA_CLT_NUMBER_ID) return escolherVarianteCampanhaCLT(phone);
   return FLUXOS_POR_NUMERO[businessNumberId] || FLUXO_FELIZCRED;
 }
 
@@ -1750,10 +1901,11 @@ async function processarEntry(entry) {
       const mensagens = value.messages || [];
       const businessNumberId = value.metadata?.phone_number_id;
 
-      const fluxo = getFluxo(businessNumberId);
-
       for (const msg of mensagens) {
         const de = normalizarTelefoneBR(msg.from);
+        // Por telefone, não por número de negócio, porque a Campanha CLT hoje divide o
+        // contato entre 2 variantes (teste 1 x 2) — ver getFluxo.
+        const fluxo = getFluxo(businessNumberId, de);
         const tipo = msg.type;
         const nome = contatos.find((c) => c.wa_id === de)?.profile?.name;
         const quando = Number(msg.timestamp) * 1000 || Date.now();
@@ -2546,7 +2698,7 @@ const server = http.createServer(async (req, res) => {
       const phone = decodeURIComponent(matchReabrirFluxo[2]);
       if (businessId === "instagram") return send(res, 400, { error: "Instagram não tem fluxo automático pra reabrir" });
       try {
-        await dispararInicioFluxo(getFluxo(businessId), phone, businessId);
+        await dispararInicioFluxo(getFluxo(businessId, phone), phone, businessId);
         return send(res, 200, { ok: true });
       } catch (err) {
         console.error("Erro ao reabrir fluxo pelo painel:", err.message);
@@ -3314,7 +3466,7 @@ setInterval(async () => {
     const pendentes = await db.listarFluxosAguardando();
     const agora = Date.now();
     for (const p of pendentes) {
-      const fluxoDoContato = getFluxo(p.business_number_id);
+      const fluxoDoContato = getFluxo(p.business_number_id, p.phone);
       const config = fluxoDoContato.lembreteMinutos[p.fluxo_passo];
       // Cada passo pode ter 1 lembrete (número, comportamento de sempre) ou vários (array de
       // minutos, contados sempre a partir de fluxo_passo_at — não incremental do lembrete
@@ -3357,7 +3509,7 @@ setInterval(async () => {
     const pendentes = await db.listarJanelasParaManter();
     for (const p of pendentes) {
       if (!(await db.tentarMarcarJanelaLembreteEnviado(p.phone, p.business_number_id))) continue;
-      const fluxoDoContato = getFluxo(p.business_number_id);
+      const fluxoDoContato = getFluxo(p.business_number_id, p.phone);
       // Ciahot: só o lembrete de 17min do passo "ciahot_oferta" (já é 1 toque só) — sem esse
       // segundo aviso de manter-janela também, pra não ficar insistindo com quem já ignorou o
       // primeiro. tentarMarcarJanelaLembreteEnviado acima já marca como tratado, então não
