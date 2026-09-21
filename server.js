@@ -2790,8 +2790,9 @@ const server = http.createServer(async (req, res) => {
         const wabaId = await resolverWabaDoNumero(businessId);
         if (!wabaId) return send(res, 404, { error: "Não achei a conta do WhatsApp (WABA) desse número" });
         const templates = await wa.listarTemplates(wabaId);
-        const aprovados = templates.filter((t) => t.status === "APPROVED");
-        return send(res, 200, { templates: aprovados });
+        // ?todos=1 lista também pendentes/recusados (diagnóstico); sem isso, só aprovados.
+        const lista = url.searchParams.get("todos") ? templates : templates.filter((t) => t.status === "APPROVED");
+        return send(res, 200, { templates: lista });
       } catch (err) {
         console.error("Erro ao listar templates:", err.message);
         return send(res, 502, { error: err.message });
