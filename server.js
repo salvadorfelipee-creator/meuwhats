@@ -2844,6 +2844,30 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { resultados, agendados, intervalSeconds: intervalo });
     }
 
+    // POST /painel/api/broadcast-agendar/:businessId — enfileira envios de template cada um
+    // com SEU horário exato (`agendadoPara`, ms epoch), em vez de intervalo fixo — pra
+    // campanhas com janela diária (ex.: 5 por dia, seg-sex, 9h-17h). Mesma fila e mesmo
+    // agendador do broadcast com intervalo; nada sai na hora. Ação administrativa, sem botão.
+    const matchBroadcastAgendar = path_.match(/^\/painel\/api\/broadcast-agendar\/([^/]+)$/);
+    if (req.method === "POST" && matchBroadcastAgendar) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchBroadcastAgendar[1]);
+      const body = await parseBody(req);
+      const itens = (Array.isArray(body.contacts) ? body.contacts : []).map((c) => ({
+        phone: normalizarTelefoneBR(c.phone),
+        name: c.name || null,
+        template: c.template,
+        language: c.language || "pt_BR",
+        bodyPreview: c.bodyPreview || null,
+        agendadoPara: Number(c.agendadoPara),
+      }));
+      if (!itens.length || itens.some((i) => !i.phone || !i.template || !Number.isFinite(i.agendadoPara))) {
+        return send(res, 400, { error: "Cada contato precisa de phone, template e agendadoPara (ms)" });
+      }
+      const agendados = await db.broadcastAgendarLote(businessId, itens);
+      return send(res, 200, { agendados });
+    }
+
     // GET /painel/api/broadcast-fila/:businessId — itens de um broadcast com intervalo que
     // ainda não saíram, pra mostrar a fila no painel e permitir cancelar individualmente.
     const matchBroadcastFila = path_.match(/^\/painel\/api\/broadcast-fila\/([^/]+)$/);

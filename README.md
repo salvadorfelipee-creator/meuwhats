@@ -1365,6 +1365,13 @@ botão **Cancelar** por item (`DELETE /painel/api/broadcast-fila/item/:id`) — 
 ainda está `pending`; se o agendador já pegou pra enviar (`processing`) ou já enviou (`sent`),
 não reverte.
 
+**Horário exato por contato** (21/09/2026): `POST /painel/api/broadcast-agendar/:businessId`
+(sem botão, chamada direta autenticada) enfileira na mesma tabela/agendador, mas cada item
+leva seu `agendadoPara` (ms epoch) — usado pra campanha com janela diária. Sempre mandar o
+telefone **com `55` na frente** (`55`+DDD+9+8 dígitos): é o formato em que a resposta do
+cliente chega no webhook, senão a conversa duplica. A trava de 30 dias contra reenvio de
+template ao mesmo contato continua valendo (item vira `error`, não é reenviado).
+
 ### Normalização do "9º dígito" (celular brasileiro) — 18/08/2026
 
 Bug reportado: o mesmo contato aparecendo **duas vezes** na lista de conversas (uma com o
