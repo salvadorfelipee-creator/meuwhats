@@ -293,6 +293,21 @@ async function listarTemplates(wabaId) {
   return json.data || [];
 }
 
+// Cria template de texto simples (só corpo, sem variável/botão) na WABA — a Meta analisa e
+// aprova depois (status PENDING até lá). Usado pra replicar um template que já existe em outra
+// WABA (templates são por conta, não compartilhados).
+async function criarTemplateTexto(wabaId, { name, language, category, text }) {
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${wabaId}/message_templates`,
+    { body: { name, language: language || "pt_BR", category: category || "MARKETING", components: [{ type: "BODY", text }] } }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao criar template: ${JSON.stringify(json)}`);
+  return json; // { id, status, category }
+}
+
 // Checa se o App está inscrito nos webhooks dessa conta do WhatsApp (WABA) — sem essa
 // inscrição, a Meta nunca avisa o servidor de mensagens novas (o número existe e manda
 // mensagem normal, mas o /webhook daqui nunca é chamado, então o bot nunca "vê" nada chegar).
@@ -364,6 +379,7 @@ module.exports = {
   listarWabasDoNegocio,
   listarNumerosDaWaba,
   listarTemplates,
+  criarTemplateTexto,
   downloadMedia,
   markAsRead,
 };

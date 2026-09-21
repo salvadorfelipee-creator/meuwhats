@@ -2780,6 +2780,22 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // POST /painel/api/template-criar/:businessId — cria um template de texto simples na WABA
+    // desse número (body: { name, text, language?, category? }). Ação administrativa, sem botão.
+    const matchTemplateCriar = path_.match(/^\/painel\/api\/template-criar\/([^/]+)$/);
+    if (req.method === "POST" && matchTemplateCriar) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.name || !body.text) return send(res, 400, { error: "Informe name e text" });
+      try {
+        const wabaId = await resolverWabaDoNumero(decodeURIComponent(matchTemplateCriar[1]));
+        if (!wabaId) return send(res, 404, { error: "Não achei a conta do WhatsApp (WABA) desse número" });
+        return send(res, 200, await wa.criarTemplateTexto(wabaId, body));
+      } catch (err) {
+        return send(res, 502, { error: err.message });
+      }
+    }
+
     // GET /painel/api/templates/:businessId — templates aprovados da WABA desse número,
     // pra montar o seletor de template do envio em massa (em vez de digitar o nome de cabeça).
     const matchTemplates = path_.match(/^\/painel\/api\/templates\/([^/]+)$/);
