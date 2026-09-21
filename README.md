@@ -438,7 +438,10 @@ no painel — candidato natural pra próxima melhoria, usando a funcionalidade q
 
 ### Fluxo por número — Cota Certa Seguros (30/07/2026)
 
-O número **"felizcred n"** (`phone_number_id` `518007084723311`, WhatsApp `5547996103804`)
+O número da **Cota Certa** (`phone_number_id` `1337870802740904`, WhatsApp `5547996103804`,
+WABA "Cotacerta seguros" `959964999950985`; até 21/09/2026 era o "felizcred n", ID antigo
+`518007084723311`, movido pra fugir da linha de crédito do ManyChat que bloqueava forma de
+pagamento)
 tem seu **próprio fluxo**, diferente do fluxo padrão (FGTS/gerente) acima. Mecanismo:
 `FLUXOS_POR_NUMERO` mapeia `businessNumberId → objeto de fluxo` (`menuInicial`, `fluxoBotoes`,
 `lembreteMinutos`, `lembreteTextos`, `capturaTexto`); `getFluxo(businessNumberId)` cai no

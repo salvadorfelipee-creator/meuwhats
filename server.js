@@ -988,7 +988,9 @@ async function handlerCapturaDadosFgts(de, businessNumberId, corpo) {
 //     ligação...") — nesse caso só confirmamos o recebimento, sem menu.
 //  2) Cliente manda mensagem direto pro número — recebe o menu com os tipos
 //     de seguro; só o Auto tem um fluxo de perguntas (é o produto principal).
-const COTACERTA_NUMBER_ID = "518007084723311";
+// Migrado em 2026-09-21 para a WABA "Cotacerta seguros" (959964999950985): o ID antigo
+// (518007084723311) estava na WABA felizcred n, presa a linha de crédito do ManyChat.
+const COTACERTA_NUMBER_ID = "1337870802740904";
 
 const REGEX_SITE_COTACAO = /^Ol[áa]!\s*Quero cotar/i;
 const REGEX_SITE_CALLBACK = /^Ol[áa]!\s*Quero receber uma liga[çc][ãa]o/i;
