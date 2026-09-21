@@ -1732,9 +1732,10 @@ async function iniciarFluxoIndicacaoFGTSV2(de, businessNumberId) {
       await enviarRespostaAutomatica(
         businessNumberId,
         de,
-        "Muitas pessoas que ocuparam cargo de confiança como Gerente ou Supervisor *deixaram* de " +
-          "receber FGTS e acabam nem sabendo desse direito. Podemos fazer uma análise gratuita " +
-          "pra ver se é o seu caso!",
+        "*Uma coisa no seu FGTS pode ter passado despercebido por anos.*\n" +
+          "Muitas pessoas que ocuparam cargo de confiança como Gerente ou Supervisor deixaram de " +
+          "receber FGTS e acabam nem sabendo desse direito. Caso você tenha trabalhado em uma " +
+          "dessas funções, eu posso fazer uma análise gratuita pra ver se é o seu caso!",
         [
           { id: "ind_saber_mais", title: "SABER MAIS" },
           { id: "ind_sair", title: "SAIR" },
