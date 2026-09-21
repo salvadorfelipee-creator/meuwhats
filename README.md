@@ -546,6 +546,21 @@ Não usa `RESPOSTAS_BOTAO["quero simular"]` (o funil de campanha antigo, `passo:
 embutido (clique de botão de template); este aqui é pra template só-texto, resposta livre do
 cliente que dispara a sequência.
 
+### Campanhas agendadas e teste A/B da Campanha CLT (21/09/2026)
+
+- **A/B por telefone** (`escolherVarianteCampanhaCLT`): último dígito **par → variante 1**
+  (`iniciarFluxoIndicacaoFGTS`), **ímpar → variante 2** (`iniciarFluxoIndicacaoFGTSV2`). Mensagem 1
+  igual; mensagem 2, pergunta do ponto e passo final diferem. A 2ª mensagem da variante 2 começa com
+  o título em negrito "Uma coisa no seu FGTS pode ter passado despercebido por anos."
+- **Fila de envios** (tabela `broadcast_agendado`, ver "Horário exato por contato" acima):
+  Campanha CLT = 39 clientes, seg-sex, 09:00/10:36/12:12/13:48/15:24 (`bomdia` antes do meio-dia,
+  `boatarde` depois), 22/09 a 01/10. Ciahot = 55 contatos, seg-sex,
+  13:00/14:25/15:50/17:15/18:40/20:05 com `bom_dia`, 21/09 a 02/10.
+- **Cobrança por WABA:** a WABA "felizcred n" antiga segue presa à linha de crédito do ManyChat;
+  o número da Cota Certa foi movido pra WABA própria "Cotacerta seguros" (ver seção da Cota Certa).
+- Endpoints admin novos: `POST /painel/api/template-criar/:businessId` (cria template de texto
+  simples na WABA do número) e `GET /painel/api/templates/:id?todos=1` (inclui pendentes).
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa
