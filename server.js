@@ -985,6 +985,69 @@ async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
 // Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
 // verdade na mensagem — qualquer outra coisa só reseta o relógio do lembrete, sem confirmar
 // nada errado (mesmo cuidado do handlerCapturaDadosClt, ver comentário lá em cima).
+const FGTSORIG_TEXTO_SEM_OFERTA = {
+  autorizacao:
+    "Não encontrei oferta disponível agora — provavelmente falta autorizar a J17 no app Meu " +
+    "FGTS (Autorizações). Autoriza lá e manda 'menu' que eu tento de novo.",
+  sem_saldo:
+    "Pelo que vi, você já usou o saque-aniversário nos últimos 12 meses — a regra só permite " +
+    "1 vez nesse período. Pode tentar de novo depois desse prazo.",
+  desconhecido:
+    "No momento não encontrei condições disponíveis pro seu FGTS. Se quiser, tenta de novo " +
+    "mais tarde.",
+};
+
+// Chamada pelo verificador (setInterval mais abaixo) pra cada linha em etapa 'abrindo'. Consulta
+// o status; se tiver oferta J17, apresenta valor/condições; se não tiver (ou só de outro banco),
+// classifica o motivo e avisa o cliente, fechando a solicitação.
+async function processarEtapaAbrindo(row) {
+  const status = await unnotech.consultarStatus(row.application_id);
+  if (status.status === "OFFERS_AVAILABLE") {
+    const completa = await unnotech.consultarSolicitacaoCompleta(row.application_id);
+    const oferta = unnotech.filtrarOfertaJ17(completa.offers);
+    if (!oferta) {
+      await finalizarSemOferta(row, completa);
+      return;
+    }
+    const parcela = oferta.installments?.[0]?.amount;
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      `Simulação pronta! 🎉 Você tem *R$ ${oferta.net_amount.toFixed(2)}* liberado, em ` +
+        `${oferta.installments?.length || 0}x de R$ ${parcela ? parcela.toFixed(2) : "-"}, taxa de ` +
+        `${oferta.monthly_interest_rate}% ao mês. Quer contratar?`,
+      [
+        { id: "fgtsorig_contratar", title: "QUERO CONTRATAR" },
+        { id: "fgtsorig_agora_nao", title: "AGORA NÃO" },
+      ]
+    );
+    await db.fgtsOriginationAtualizar(row.id, {
+      etapa: "oferta_apresentada",
+      offer_id: oferta.offer_id,
+      status_unnotech: status.status,
+    });
+    await db.setFluxoPasso(row.phone, row.business_number_id, "fgtsorig_oferta_apresentada");
+  } else if (status.status === "NO_OFFERS" || status.status === "EXPIRED") {
+    const completa = await unnotech.consultarSolicitacaoCompleta(row.application_id);
+    await finalizarSemOferta(row, completa);
+  } else {
+    // Ainda QUOTING (ou outro estado intermediário) — só atualiza o status guardado, o
+    // verificador tenta de novo no próximo ciclo.
+    await db.fgtsOriginationAtualizar(row.id, { status_unnotech: status.status });
+  }
+}
+
+async function finalizarSemOferta(row, completa) {
+  const motivoTexto =
+    completa.quotes?.find((q) => q.reason)?.reason ||
+    completa.offers?.find((o) => o.rejection_reason)?.rejection_reason?.message ||
+    "";
+  const categoria = unnotech.classificarRecusa(motivoTexto);
+  await enviarRespostaAutomatica(row.business_number_id, row.phone, FGTSORIG_TEXTO_SEM_OFERTA[categoria]);
+  await db.fgtsOriginationAtualizar(row.id, { etapa: "sem_oferta" });
+  await db.setFluxoPasso(row.phone, row.business_number_id, null);
+}
+
 // Ponto de entrada único pras 3 origens que coletam CPF pra FGTS (menu padrão, Instagram — que
 // converge pro mesmo handlerCapturaDadosFgts —, e o fluxo do anúncio). Se já existir uma
 // solicitação aberta pra esse contato, não abre outra — só confirma que já está em andamento.
@@ -3887,6 +3950,26 @@ setInterval(async () => {
     console.error("Erro no agendador de broadcast intercalado:", err.message);
   }
 }, 20 * 1000);
+
+// ─── VERIFICADOR DE ORIGINAÇÃO FGTS (Unnotech) ──────────────────────────────
+// A cada 30s: consulta o status de cada solicitação aberta e avança a conversa quando o estado
+// mudar de um jeito que importa. Todo o estado fica no banco (fgts_origination), não em
+// memória — sobrevive a redeploy/reinício no meio de uma solicitação.
+setInterval(async () => {
+  try {
+    const abertas = await db.fgtsOriginationListarAbertas();
+    for (const row of abertas) {
+      try {
+        if (row.etapa === "abrindo") await processarEtapaAbrindo(row);
+        // Etapas seguintes (aguardando_assinatura, aguardando_pagamento) entram na Task 10.
+      } catch (err) {
+        console.error(`Erro ao processar originação FGTS #${row.id} (etapa ${row.etapa}):`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no verificador de originação FGTS:", err.message);
+  }
+}, 30 * 1000);
 
 setInterval(async () => {
   try {
