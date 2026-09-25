@@ -770,6 +770,9 @@ function confirmacaoAgenda() {
 }
 
 const FLUXO_BOTOES = {
+  // Botões da oferta apresentada pelo verificador de originação FGTS (ver processarEtapaAbrindo).
+  fgtsorig_contratar: handlerFgtsOrigContratar,
+  fgtsorig_agora_nao: handlerFgtsOrigAgoraNao,
   fluxo_gerente: {
     texto:
       "Olá! Vejo que você clicou no nosso anúncio direcionado para GERENTE/SUPERVISOR. " +
@@ -1070,6 +1073,27 @@ async function iniciarOriginacaoFgts(de, businessNumberId, cpf) {
     console.error("Erro ao abrir solicitação FGTS na Unnotech:", err.message);
     await confirmarEncaminhamentoHumano(de, businessNumberId);
   }
+}
+
+// Envia o WhatsApp Flow de coleta de dados (implementado de verdade na Task 9 — aqui ainda é um
+// placeholder testável).
+async function enviarFormularioFgts(de, businessNumberId, row) {
+  await enviarRespostaAutomatica(businessNumberId, de, "(placeholder — Flow chega na próxima tarefa)");
+}
+
+async function handlerFgtsOrigContratar(de, businessNumberId) {
+  const row = await db.fgtsOriginationBuscarAberta(de, businessNumberId);
+  if (!row) return; // sem solicitação aberta, ignora clique órfão
+  await enviarFormularioFgts(de, businessNumberId, row);
+  await db.fgtsOriginationAtualizar(row.id, { etapa: "formulario" });
+  await db.setFluxoPasso(de, businessNumberId, "fgtsorig_formulario");
+}
+
+async function handlerFgtsOrigAgoraNao(de, businessNumberId) {
+  const row = await db.fgtsOriginationBuscarAberta(de, businessNumberId);
+  await enviarRespostaAutomatica(businessNumberId, de, "Sem problemas! 😊 Fico à disposição se mudar de ideia.");
+  await db.setFluxoPasso(de, businessNumberId, null);
+  if (row) await db.fgtsOriginationAtualizar(row.id, { etapa: "sem_oferta" });
 }
 
 async function handlerCapturaDadosFgts(de, businessNumberId, corpo) {
