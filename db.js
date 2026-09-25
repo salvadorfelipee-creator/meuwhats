@@ -490,6 +490,21 @@ async function jaRecebeuTemplateRecente(phone, businessNumberId, diasLimite) {
   return result.rows.length > 0;
 }
 
+// Esse contato já recebeu ALGUMA VEZ um template com esse nome nesse número (sem limite de
+// dias, "sticky" pra sempre) — usado por getFluxo (server.js) pra decidir se um número que
+// também tem tráfego orgânico (ex.: Felizcred principal) deve entrar num fluxo de campanha
+// específico em vez do menu padrão. Ignora falhas ('failed'), mesmo motivo de
+// jaRecebeuTemplateRecente: envio que não chegou não deve contar como "recebeu".
+async function recebeuTemplate(phone, businessNumberId, nomeTemplate) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT 1 FROM messages WHERE phone = ? AND business_number_id = ? AND direction = 'out'
+          AND type = 'template' AND body LIKE ? AND COALESCE(status, '') != 'failed' LIMIT 1`,
+    args: [phone, businessNumberId, `%${nomeTemplate}%`],
+  });
+  return result.rows.length > 0;
+}
+
 const STATUS_VALIDOS = ["novo", "andamento", "resolvido"];
 
 async function atualizarStatusConversa(phone, businessNumberId, status) {
@@ -1208,6 +1223,7 @@ module.exports = {
   getConversation,
   getUltimaMensagemRecebida,
   jaRecebeuTemplateRecente,
+  recebeuTemplate,
   tentarMarcarMenuEnviado,
   setFluxoPasso,
   listarFluxosAguardando,

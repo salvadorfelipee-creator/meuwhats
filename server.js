@@ -1859,6 +1859,109 @@ const FLUXO_CAMPANHA_CLT_INDICACAO_FGTS_V2 = {
   semAvisoJanela: true,
 };
 
+// ─── FLUXO "AMIGO INDICOU" (número Felizcred principal, +55 47 9686-4687) ───────────────────
+// Disparado pelo template `amigo_indicou` ("Oi, tudo bem? um amigo indic...") — mas, diferente
+// da Campanha CLT/Ciahot, esse número TAMBÉM recebe tráfego orgânico e de anúncio o dia todo
+// (é o número principal, FLUXO_FELIZCRED por padrão). Por isso esse fluxo não pode entrar em
+// FLUXOS_POR_NUMERO (isso trocaria o menu padrão pra TODO MUNDO, não só quem veio da campanha)
+// — em vez disso, `getFluxo` checa (ver função abaixo) se aquele contato específico já recebeu
+// o template `amigo_indicou` alguma vez (`db.recebeuTemplate`, sticky pro resto da conversa,
+// mesmo padrão de detecção usado pelos links do site na Cota Certa). Pedido explícito do
+// usuário 25/09/2026: NÃO mexer no fluxo da Campanha CLT, só nesse número.
+const FELIZCRED_PRINCIPAL_NUMBER_ID = "1265497659990803";
+
+const AMIGOIND_TEXTO_APRESENTACAO =
+  "Eu me chamo Felipe, fiz o crédito do trabalhador para um colega seu que trabalha na mesma " +
+  "empresa, e recebemos seu contato como indicação!";
+
+const AMIGOIND_TEXTO_OFERTA =
+  "Caso deseje, posso verificar o valor que está aprovado para você! Trabalhamos com vários " +
+  "bancos, e vejo qual tem a melhor oferta.";
+
+const AMIGOIND_TEXTO_SIMULAR =
+  "Certo! Para simular, preciso de mais 5 coisinhas, pode mandar tudo numa mensagem só ou em " +
+  "mensagens separadas:\n• Nome completo\n• CPF\n• Telefone\n• E-mail\n• Data de nascimento";
+
+const AMIGOIND_TEXTO_LINK_SITE = "Claro! Você pode conhecer melhor a empresa no nosso site:";
+const AMIGOIND_SITE_URL = "https://www.felizcred.com.br";
+
+const AMIGOIND_TEXTO_BLOQUEADO = "Combinado, você foi bloqueado e não vai mais receber mensagens da gente por aqui.";
+
+async function iniciarFluxoAmigoIndicou(de, businessNumberId) {
+  setTimeout(async () => {
+    try {
+      await enviarComUmRetry(() => enviarRespostaAutomatica(businessNumberId, de, AMIGOIND_TEXTO_APRESENTACAO));
+      await enviarComUmRetry(() =>
+        enviarRespostaAutomatica(businessNumberId, de, AMIGOIND_TEXTO_OFERTA, [
+          { id: "amigoind_simular", title: "DESEJO SIMULAR" },
+          { id: "amigoind_conhecer", title: "CONHECER A EMPRESA" },
+          { id: "amigoind_bloquear", title: "BLOQUEAR" },
+        ])
+      );
+      await db.setFluxoPasso(de, businessNumberId, "amigoind_oferta");
+    } catch (err) {
+      console.error("Erro ao iniciar fluxo Amigo Indicou:", err.message);
+    }
+  }, 5000);
+}
+
+async function handlerAmigoIndicouSimular(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, AMIGOIND_TEXTO_SIMULAR);
+  await db.setFluxoPasso(de, businessNumberId, "amigoind_aguardando_dados");
+}
+
+// "CONHECER A EMPRESA" é botão de resposta (não link direto) só pra poder ficar lado a lado
+// com os outros dois botões — a API não deixa misturar botão de link com botão de resposta na
+// mesma mensagem (mesmo motivo do "Visitar site" do Ciahot). O link de verdade vem agora, numa
+// mensagem própria, como botão cta_url. Fica esperando no mesmo passo "amigoind_oferta" —
+// clicar de novo em "DESEJO SIMULAR"/"BLOQUEAR" depois continua funcionando normalmente.
+async function handlerAmigoIndicouConhecer(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, AMIGOIND_TEXTO_LINK_SITE, null, null, {
+    buttonText: "Conhecer site",
+    url: AMIGOIND_SITE_URL,
+  });
+}
+
+// Exigência da política de mensageria da Meta (opt-out precisa ser respeitado de verdade, não
+// só cosmético) — mesmo padrão do handlerIndBloquear da Campanha CLT.
+async function handlerAmigoIndicouBloquear(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, AMIGOIND_TEXTO_BLOQUEADO);
+  await db.setFluxoPasso(de, businessNumberId, PASSO_OPTOUT_BLOQUEADO);
+}
+
+// Mesmo padrão de espera-paciente-por-CPF do resto do CLT (funciona numa mensagem só ou
+// espalhado em várias) — ver handlerCapturaDadosCampanhaCLTNova.
+async function handlerAmigoIndicouCapturaDados(de, businessNumberId, corpo) {
+  if (!REGEX_CPF.test(corpo || "")) return;
+  setTimeout(async () => {
+    try {
+      await confirmarDadosRecebidos(de, businessNumberId, corpo, "CLT");
+    } catch (err) {
+      console.error("Erro ao confirmar dados do Amigo Indicou:", err.message);
+    }
+  }, 4000);
+}
+
+const FLUXO_BOTOES_AMIGO_INDICOU = {
+  amigoind_simular: handlerAmigoIndicouSimular,
+  amigoind_conhecer: handlerAmigoIndicouConhecer,
+  amigoind_bloquear: handlerAmigoIndicouBloquear,
+};
+
+const FLUXO_AMIGO_INDICOU = {
+  aoIniciar: iniciarFluxoAmigoIndicou,
+  fluxoBotoes: FLUXO_BOTOES_AMIGO_INDICOU,
+  lembreteMinutos: {},
+  lembreteTextos: {},
+  lembreteHandlers: {},
+  capturaTexto: {
+    amigoind_aguardando_dados: handlerAmigoIndicouCapturaDados,
+  },
+  // Sem manter_janela — mesmo espírito do Ciahot/Campanha CLT: contato de campanha não é
+  // cutucado por padrão.
+  semAvisoJanela: true,
+};
+
 // CAMPANHA_CLT_NUMBER_ID não entra aqui de propósito — é resolvido à parte em getFluxo
 // (escolherVarianteCampanhaCLT), que decide entre as variantes 1 e 2 por telefone.
 const FLUXOS_POR_NUMERO = {
@@ -1875,8 +1978,15 @@ function escolherVarianteCampanhaCLT(phone) {
   return ultimoDigito % 2 === 0 ? FLUXO_CAMPANHA_CLT_INDICACAO_FGTS : FLUXO_CAMPANHA_CLT_INDICACAO_FGTS_V2;
 }
 
-function getFluxo(businessNumberId, phone) {
+// Agora async: a checagem do Amigo Indicou (número principal) precisa consultar o banco pra
+// saber se ESSE contato específico já recebeu aquele template — sem isso o fluxo trocaria pra
+// todo mundo que manda mensagem nesse número, orgânico incluso. "Sticky": uma vez que a pessoa
+// recebeu o template, ela sempre cai nesse fluxo (nunca mais no menu padrão), mesmo dias depois.
+async function getFluxo(businessNumberId, phone) {
   if (businessNumberId === CAMPANHA_CLT_NUMBER_ID) return escolherVarianteCampanhaCLT(phone);
+  if (businessNumberId === FELIZCRED_PRINCIPAL_NUMBER_ID && (await db.recebeuTemplate(phone, businessNumberId, "amigo_indicou"))) {
+    return FLUXO_AMIGO_INDICOU;
+  }
   return FLUXOS_POR_NUMERO[businessNumberId] || FLUXO_FELIZCRED;
 }
 
@@ -1908,7 +2018,7 @@ async function processarEntry(entry) {
         const de = normalizarTelefoneBR(msg.from);
         // Por telefone, não por número de negócio, porque a Campanha CLT hoje divide o
         // contato entre 2 variantes (teste 1 x 2) — ver getFluxo.
-        const fluxo = getFluxo(businessNumberId, de);
+        const fluxo = await getFluxo(businessNumberId, de);
         const tipo = msg.type;
         const nome = contatos.find((c) => c.wa_id === de)?.profile?.name;
         const quando = Number(msg.timestamp) * 1000 || Date.now();
@@ -2701,7 +2811,7 @@ const server = http.createServer(async (req, res) => {
       const phone = decodeURIComponent(matchReabrirFluxo[2]);
       if (businessId === "instagram") return send(res, 400, { error: "Instagram não tem fluxo automático pra reabrir" });
       try {
-        await dispararInicioFluxo(getFluxo(businessId, phone), phone, businessId);
+        await dispararInicioFluxo(await getFluxo(businessId, phone), phone, businessId);
         return send(res, 200, { ok: true });
       } catch (err) {
         console.error("Erro ao reabrir fluxo pelo painel:", err.message);
@@ -3510,7 +3620,7 @@ setInterval(async () => {
     const pendentes = await db.listarFluxosAguardando();
     const agora = Date.now();
     for (const p of pendentes) {
-      const fluxoDoContato = getFluxo(p.business_number_id, p.phone);
+      const fluxoDoContato = await getFluxo(p.business_number_id, p.phone);
       const config = fluxoDoContato.lembreteMinutos[p.fluxo_passo];
       // Cada passo pode ter 1 lembrete (número, comportamento de sempre) ou vários (array de
       // minutos, contados sempre a partir de fluxo_passo_at — não incremental do lembrete
@@ -3553,7 +3663,7 @@ setInterval(async () => {
     const pendentes = await db.listarJanelasParaManter();
     for (const p of pendentes) {
       if (!(await db.tentarMarcarJanelaLembreteEnviado(p.phone, p.business_number_id))) continue;
-      const fluxoDoContato = getFluxo(p.business_number_id, p.phone);
+      const fluxoDoContato = await getFluxo(p.business_number_id, p.phone);
       // Ciahot: só o lembrete de 17min do passo "ciahot_oferta" (já é 1 toque só) — sem esse
       // segundo aviso de manter-janela também, pra não ficar insistindo com quem já ignorou o
       // primeiro. tentarMarcarJanelaLembreteEnviado acima já marca como tratado, então não

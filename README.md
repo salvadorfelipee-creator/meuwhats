@@ -579,6 +579,31 @@ ID no código (usa o fluxo padrão `FLUXO_FELIZCRED`), então a troca é só no 
 — nenhuma mudança em `server.js`. Conversas antigas continuam no banco vinculadas ao ID velho;
 não migradas automaticamente pro ID novo.
 
+### Fluxo "Amigo indicou" — só no número principal (25/09/2026)
+
+Template `amigo_indicou` ("Oi, tudo bem? um amigo indic...", Marketing) disparado pro número
+**Felizcred principal** (`FELIZCRED_PRINCIPAL_NUMBER_ID`, `1265497659990803`, o mesmo migrado
+acima) — pedido explícito do usuário: **só nesse número, sem mexer em nada da Campanha CLT**.
+
+Diferença de arquitetura importante em relação aos outros fluxos de campanha (Ciahot, Campanha
+CLT): esses dois números só recebem tráfego de campanha (nunca orgânico), então dava pra
+simplesmente mapear `FLUXOS_POR_NUMERO[id] → fluxo`. O número principal recebe campanha **e**
+tráfego orgânico/anúncio o dia todo (menu padrão `FLUXO_FELIZCRED`) — colocá-lo em
+`FLUXOS_POR_NUMERO` trocaria o menu de TODO MUNDO, não só de quem veio da campanha. Solução:
+`getFluxo` (agora `async`) consulta `db.recebeuTemplate(phone, businessNumberId, "amigo_indicou")`
+— só quem já recebeu esse template alguma vez (sticky, sem limite de dias) cai no
+`FLUXO_AMIGO_INDICOU`; todo o resto continua no menu padrão. Broadcast desse template deve ir
+**sem** `bodyPreview` (deixa gravar `[template] amigo_indicou` no body da mensagem, que é o que
+essa checagem casa via `LIKE`).
+
+Roteiro: apresentação ("Meu nome é Felipe, fiz o crédito do trabalhador pra um colega seu...")
+→ oferta com 3 botões **DESEJO SIMULAR** / **CONHECER A EMPRESA** / **BLOQUEAR**. Simular pede
+os 5 dados de sempre (nome/CPF/telefone/e-mail/nascimento, detecta CPF pra confirmar — mesmo
+padrão paciente multi-mensagem do resto do CLT). Conhecer a empresa manda o link do site como
+botão `cta_url` numa mensagem separada (API não deixa misturar botão de link com botão de
+resposta — mesmo motivo do "Visitar site" do Ciahot). Bloquear marca opt-out permanente
+(`PASSO_OPTOUT_BLOQUEADO`). Sem lembrete de silêncio (`semAvisoJanela: true`).
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa
