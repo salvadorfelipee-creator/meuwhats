@@ -1,5 +1,6 @@
 const http = require("http");
 const https = require("https");
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -15,6 +16,7 @@ const reels = require("./reels");
 const agenda = require("./agenda");
 const backup = require("./backup");
 const r2 = require("./r2");
+const unnotech = require("./unnotech");
 const google = require("./google");
 const { notificarLeadCotaCerta, enviarBoasVindasFelizcred } = require("./email");
 
@@ -983,12 +985,39 @@ async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
 // Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
 // verdade na mensagem — qualquer outra coisa só reseta o relógio do lembrete, sem confirmar
 // nada errado (mesmo cuidado do handlerCapturaDadosClt, ver comentário lá em cima).
+// Ponto de entrada único pras 3 origens que coletam CPF pra FGTS (menu padrão, Instagram — que
+// converge pro mesmo handlerCapturaDadosFgts —, e o fluxo do anúncio). Se já existir uma
+// solicitação aberta pra esse contato, não abre outra — só confirma que já está em andamento.
+async function iniciarOriginacaoFgts(de, businessNumberId, cpf) {
+  const existente = await db.fgtsOriginationBuscarAberta(de, businessNumberId);
+  if (existente) {
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      "Você já tem uma simulação em andamento — já já eu te aviso por aqui assim que tiver novidade. 😊"
+    );
+    return;
+  }
+  await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Já estou consultando seu FGTS, isso leva só um minutinho ⏳");
+  try {
+    const idempotencyKey = crypto.randomUUID();
+    const app = await unnotech.criarSolicitacao(cpf, idempotencyKey);
+    await db.fgtsOriginationCriar(de, businessNumberId, app.application_id, cpf, idempotencyKey);
+  } catch (err) {
+    console.error("Erro ao abrir solicitação FGTS na Unnotech:", err.message);
+    await confirmarEncaminhamentoHumano(de, businessNumberId);
+  }
+}
+
 async function handlerCapturaDadosFgts(de, businessNumberId, corpo) {
-  if (!REGEX_CPF.test(corpo || "")) {
+  const cpf = (corpo.match(REGEX_CPF) || [])[0]?.replace(/\D/g, "");
+  if (!cpf) {
     await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
     return;
   }
-  await confirmarDadosRecebidos(de, businessNumberId, corpo, "FGTS");
+  logFunil(businessNumberId, de, "fgts_dados_completos");
+  await db.setFluxoPasso(de, businessNumberId, null);
+  await iniciarOriginacaoFgts(de, businessNumberId, cpf);
 }
 
 // ─── FLUXO COTA CERTA SEGUROS (número "felizcred n") ────────────────────────
@@ -1993,8 +2022,6 @@ const FGTSAD_TEXTO_APRESENTACAO =
 
 const FGTSAD_TEXTO_PEDIR_CPF = "Certo! Agora me informa o CPF pra eu poder simular.";
 
-const FGTSAD_TEXTO_CONFIRMACAO = "Agora é só aguardar o atendimento, por favor.";
-
 async function iniciarFluxoFgtsAnuncio(de, businessNumberId) {
   try {
     await enviarRespostaAutomatica(businessNumberId, de, FGTSAD_TEXTO_APRESENTACAO, [
@@ -2014,9 +2041,10 @@ async function handlerFgtsAnuncioAutorizei(de, businessNumberId) {
 // Mesmo padrão paciente do resto do CLT/FGTS: só reage quando encontra um CPF no que a pessoa
 // mandou, funciona numa mensagem só ou espalhado em várias.
 async function handlerFgtsAnuncioCapturaCpf(de, businessNumberId, corpo) {
-  if (!REGEX_CPF.test(corpo || "")) return;
-  await enviarRespostaAutomatica(businessNumberId, de, FGTSAD_TEXTO_CONFIRMACAO);
+  const cpf = (corpo.match(REGEX_CPF) || [])[0]?.replace(/\D/g, "");
+  if (!cpf) return;
   await db.setFluxoPasso(de, businessNumberId, null);
+  await iniciarOriginacaoFgts(de, businessNumberId, cpf);
 }
 
 const FLUXO_FGTS_ANUNCIO = {
