@@ -604,6 +604,11 @@ botão `cta_url` numa mensagem separada (API não deixa misturar botão de link 
 resposta — mesmo motivo do "Visitar site" do Ciahot). Bloquear marca opt-out permanente
 (`PASSO_OPTOUT_BLOQUEADO`). Sem lembrete de silêncio (`semAvisoJanela: true`).
 
+Depois que a pessoa manda os 5 dados (detecta pelo CPF), a confirmação é diferente da genérica
+do resto do CLT: **"Certo! Agora é só aguardar um minuto."** (+ aviso de fora do horário
+comercial, se for o caso) — `confirmarDadosRecebidos` ganhou um 5º parâmetro opcional
+`textoConfirmacao` pra isso, sem mudar o texto padrão dos outros fluxos que já usam essa função.
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa
