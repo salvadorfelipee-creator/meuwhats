@@ -1965,6 +1965,66 @@ const FLUXO_AMIGO_INDICOU = {
   semAvisoJanela: true,
 };
 
+// ─── FLUXO "FGTS via anúncio do Instagram" (número principal) ───────────────────────────────
+// Clique num anúncio impulsionado do Instagram chega no WhatsApp com um campo `referral` no
+// webhook (source_type "ad"/"post", headline, body, ctwa_clid etc.) — diferente do template de
+// campanha, aqui NADA é disparado por nós, é a Meta que anexa esse campo na primeira mensagem
+// de quem veio do anúncio. Pedido do usuário 25/09/2026: quem vem de um anúncio sobre FGTS
+// pula o menu padrão inteiro (as 5 opções) e cai direto nesse fluxo dedicado.
+// Detecção: `msg.referral` presente + "fgts" no headline OU no body (case-insensitive) — ver
+// REGEX_FGTS_ANUNCIO e o trecho que checa isso em processarEntry. Só a MENSAGEM QUE CHEGOU COM
+// o referral aciona a entrada nesse fluxo; depois disso, `getFluxo` mantém a pessoa nele
+// enquanto o `fluxo_passo` começar com "fgtsad_" (mesma ideia "sticky" do Amigo Indicou, só que
+// via passo salvo em vez de template recebido — não tem template nenhum aqui).
+const REGEX_FGTS_ANUNCIO = /fgts/i;
+
+const FGTSAD_TEXTO_APRESENTACAO =
+  "Olá, me chamo Felipe e vou dar continuidade no seu atendimento! Para simular o saque do seu " +
+  "FGTS, você precisa autorizar o BMS no app do FGTS.";
+
+const FGTSAD_TEXTO_PEDIR_CPF = "Certo! Agora me informa o CPF pra eu poder simular.";
+
+const FGTSAD_TEXTO_CONFIRMACAO = "Agora é só aguardar o atendimento, por favor.";
+
+async function iniciarFluxoFgtsAnuncio(de, businessNumberId) {
+  try {
+    await enviarRespostaAutomatica(businessNumberId, de, FGTSAD_TEXTO_APRESENTACAO, [
+      { id: "fgtsad_autorizei", title: "JÁ AUTORIZEI" },
+    ]);
+    await db.setFluxoPasso(de, businessNumberId, "fgtsad_aguardando_autorizacao");
+  } catch (err) {
+    console.error("Erro ao iniciar fluxo FGTS via anúncio:", err.message);
+  }
+}
+
+async function handlerFgtsAnuncioAutorizei(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, FGTSAD_TEXTO_PEDIR_CPF);
+  await db.setFluxoPasso(de, businessNumberId, "fgtsad_aguardando_cpf");
+}
+
+// Mesmo padrão paciente do resto do CLT/FGTS: só reage quando encontra um CPF no que a pessoa
+// mandou, funciona numa mensagem só ou espalhado em várias.
+async function handlerFgtsAnuncioCapturaCpf(de, businessNumberId, corpo) {
+  if (!REGEX_CPF.test(corpo || "")) return;
+  await enviarRespostaAutomatica(businessNumberId, de, FGTSAD_TEXTO_CONFIRMACAO);
+  await db.setFluxoPasso(de, businessNumberId, null);
+}
+
+const FLUXO_FGTS_ANUNCIO = {
+  // A entrada de verdade é pela detecção do `referral` em processarEntry (que já chama
+  // iniciarFluxoFgtsAnuncio direto), não pelo mecanismo padrão de conversaInativa. `aoIniciar`
+  // fica definido mesmo assim só pra cobrir quem digitar "menu" enquanto está PRESO nesse
+  // fluxo (dispararInicioFluxo exige aoIniciar OU menuInicial, senão dá erro silencioso) — nesse
+  // caso reabre do zero a apresentação + botão "JÁ AUTORIZEI".
+  aoIniciar: iniciarFluxoFgtsAnuncio,
+  fluxoBotoes: { fgtsad_autorizei: handlerFgtsAnuncioAutorizei },
+  lembreteMinutos: {},
+  lembreteTextos: {},
+  lembreteHandlers: {},
+  capturaTexto: { fgtsad_aguardando_cpf: handlerFgtsAnuncioCapturaCpf },
+  semAvisoJanela: true,
+};
+
 // CAMPANHA_CLT_NUMBER_ID não entra aqui de propósito — é resolvido à parte em getFluxo
 // (escolherVarianteCampanhaCLT), que decide entre as variantes 1 e 2 por telefone.
 const FLUXOS_POR_NUMERO = {
@@ -1985,10 +2045,14 @@ function escolherVarianteCampanhaCLT(phone) {
 // saber se ESSE contato específico já recebeu aquele template — sem isso o fluxo trocaria pra
 // todo mundo que manda mensagem nesse número, orgânico incluso. "Sticky": uma vez que a pessoa
 // recebeu o template, ela sempre cai nesse fluxo (nunca mais no menu padrão), mesmo dias depois.
-async function getFluxo(businessNumberId, phone) {
+// `fluxoPassoAtual` é opcional — quando o chamador já tem o `fluxo_passo` em mãos (ex.:
+// processarEntry, que já buscou a conversa), evita uma consulta a mais. Passo começando com
+// "fgtsad_" manda pro fluxo do anúncio de FGTS (sticky por passo salvo, não por template).
+async function getFluxo(businessNumberId, phone, fluxoPassoAtual) {
   if (businessNumberId === CAMPANHA_CLT_NUMBER_ID) return escolherVarianteCampanhaCLT(phone);
-  if (businessNumberId === FELIZCRED_PRINCIPAL_NUMBER_ID && (await db.recebeuTemplate(phone, businessNumberId, "amigo_indicou"))) {
-    return FLUXO_AMIGO_INDICOU;
+  if (businessNumberId === FELIZCRED_PRINCIPAL_NUMBER_ID) {
+    if (String(fluxoPassoAtual || "").startsWith("fgtsad_")) return FLUXO_FGTS_ANUNCIO;
+    if (await db.recebeuTemplate(phone, businessNumberId, "amigo_indicou")) return FLUXO_AMIGO_INDICOU;
   }
   return FLUXOS_POR_NUMERO[businessNumberId] || FLUXO_FELIZCRED;
 }
@@ -2019,9 +2083,6 @@ async function processarEntry(entry) {
 
       for (const msg of mensagens) {
         const de = normalizarTelefoneBR(msg.from);
-        // Por telefone, não por número de negócio, porque a Campanha CLT hoje divide o
-        // contato entre 2 variantes (teste 1 x 2) — ver getFluxo.
-        const fluxo = await getFluxo(businessNumberId, de);
         const tipo = msg.type;
         const nome = contatos.find((c) => c.wa_id === de)?.profile?.name;
         const quando = Number(msg.timestamp) * 1000 || Date.now();
@@ -2033,6 +2094,10 @@ async function processarEntry(entry) {
         );
 
         const conversaAnterior = await db.getConversation(de, businessNumberId);
+        // Por telefone, não por número de negócio, porque a Campanha CLT hoje divide o
+        // contato entre 2 variantes (teste 1 x 2), e o número principal pode ter o contato
+        // "preso" num fluxo de anúncio (fluxo_passo) — ver getFluxo.
+        const fluxo = await getFluxo(businessNumberId, de, conversaAnterior?.fluxo_passo);
         // Baseado na última mensagem RECEBIDA, não em conversations.last_message_at (que
         // também é tocado pelo NOSSO envio, ex.: template de campanha) — ver
         // db.getUltimaMensagemRecebida. Sem isso, quem respondia rápido a uma campanha nunca
@@ -2057,6 +2122,10 @@ async function processarEntry(entry) {
         if (tipo === "text") {
           await db.insertMessage({ ...base, type: "text", body: msg.text?.body });
           const corpo = msg.text?.body || "";
+          // Diagnóstico: loga QUALQUER referral de anúncio que chegar (mesmo sem bater "fgts"),
+          // pra conferir nos logs do Render os campos reais (headline/body) caso o fluxo abaixo
+          // não dispare como esperado — sem precisar mudar código às cegas.
+          if (msg.referral) console.log(`📣 Referral recebido de ${de} (${businessNumberId}):`, JSON.stringify(msg.referral));
           // Palavra-chave "menu" reabre o menu inicial do fluxo a qualquer momento,
           // não importa em que passo a conversa está.
           if (normalizarTexto(corpo) === "menu") {
@@ -2081,6 +2150,19 @@ async function processarEntry(entry) {
               mensagemJaTratada = true;
             } catch (err) {
               console.error("Erro ao responder pedido de ligação vindo do site:", err.message);
+            }
+          } else if (
+            businessNumberId === FELIZCRED_PRINCIPAL_NUMBER_ID &&
+            msg.referral &&
+            REGEX_FGTS_ANUNCIO.test(`${msg.referral.headline || ""} ${msg.referral.body || ""}`)
+          ) {
+            // Clique num anúncio impulsionado do Instagram sobre FGTS — pula o menu padrão
+            // inteiro (o referral já foi logado acima).
+            try {
+              await iniciarFluxoFgtsAnuncio(de, businessNumberId);
+              mensagemJaTratada = true;
+            } catch (err) {
+              console.error("Erro ao iniciar fluxo FGTS via anúncio:", err.message);
             }
           } else {
             // Passo aguardando resposta em texto livre (ex.: nome/cidade, modelo do
@@ -3623,7 +3705,7 @@ setInterval(async () => {
     const pendentes = await db.listarFluxosAguardando();
     const agora = Date.now();
     for (const p of pendentes) {
-      const fluxoDoContato = await getFluxo(p.business_number_id, p.phone);
+      const fluxoDoContato = await getFluxo(p.business_number_id, p.phone, p.fluxo_passo);
       const config = fluxoDoContato.lembreteMinutos[p.fluxo_passo];
       // Cada passo pode ter 1 lembrete (número, comportamento de sempre) ou vários (array de
       // minutos, contados sempre a partir de fluxo_passo_at — não incremental do lembrete
@@ -3666,7 +3748,7 @@ setInterval(async () => {
     const pendentes = await db.listarJanelasParaManter();
     for (const p of pendentes) {
       if (!(await db.tentarMarcarJanelaLembreteEnviado(p.phone, p.business_number_id))) continue;
-      const fluxoDoContato = await getFluxo(p.business_number_id, p.phone);
+      const fluxoDoContato = await getFluxo(p.business_number_id, p.phone, p.fluxo_passo);
       // Ciahot: só o lembrete de 17min do passo "ciahot_oferta" (já é 1 toque só) — sem esse
       // segundo aviso de manter-janela também, pra não ficar insistindo com quem já ignorou o
       // primeiro. tentarMarcarJanelaLembreteEnviado acima já marca como tratado, então não

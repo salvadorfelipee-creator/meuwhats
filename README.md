@@ -609,6 +609,34 @@ do resto do CLT: **"Certo! Agora é só aguardar um minuto."** (+ aviso de fora 
 comercial, se for o caso) — `confirmarDadosRecebidos` ganhou um 5º parâmetro opcional
 `textoConfirmacao` pra isso, sem mudar o texto padrão dos outros fluxos que já usam essa função.
 
+### Fluxo "FGTS via anúncio do Instagram" — também só no número principal (25/09/2026)
+
+Quando o usuário impulsiona um post do Instagram sobre FGTS, quem clica no botão do anúncio e
+manda a mensagem padrão ("Olá! Posso ter mais informações sobre isso?") chega no webhook com um
+campo `referral` (Meta anexa isso automaticamente em clique de anúncio/post — `source_type`,
+`headline`, `body`, `ctwa_clid` etc., **não é nada que a gente dispara**, diferente do
+`amigo_indicou` acima). Pedido do usuário: pra esse caso, **pular o menu padrão inteiro** (as 5
+opções) — a pessoa já veio querendo falar de FGTS, não faz sentido perguntar de novo.
+
+Detecção em `processarEntry`: `msg.referral` presente + `"fgts"` no `headline` ou no `body`
+(`REGEX_FGTS_ANUNCIO`, case-insensitive) — **só** no número principal
+(`FELIZCRED_PRINCIPAL_NUMBER_ID`). Todo `referral` recebido nesse número é logado no Render
+(`📣 Referral recebido...`) mesmo quando não bate "fgts", pra conferir os campos reais que a
+Meta manda se algum anúncio não disparar o fluxo como esperado.
+
+Roteiro (`FLUXO_FGTS_ANUNCIO`, sem `menuInicial`, iniciado direto por `iniciarFluxoFgtsAnuncio`,
+não pelo mecanismo padrão de conversa inativa): "Olá, me chamo Felipe e vou dar continuidade no
+seu atendimento! Para simular o saque do seu FGTS, você precisa autorizar o BMS no app do
+FGTS." com 1 botão **JÁ AUTORIZEI** → "Certo! Agora me informa o CPF pra eu poder simular."
+→ detecta CPF (mesmo padrão paciente de sempre) → "Agora é só aguardar o atendimento, por
+favor." e limpa o `fluxo_passo`.
+
+Diferente do Amigo Indicou (sticky por template recebido), esse fluxo é **sticky por
+`fluxo_passo`**: `getFluxo` (que agora recebe um 3º parâmetro opcional, o `fluxo_passo` atual,
+pra evitar uma consulta a mais quando o chamador já tem a conversa em mãos) manda pro
+`FLUXO_FGTS_ANUNCIO` sempre que o passo salvo começar com `"fgtsad_"` — não depende de nenhum
+template, já que aqui a pessoa nunca recebeu uma mensagem nossa antes de escrever.
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa
