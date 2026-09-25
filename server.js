@@ -17,6 +17,7 @@ const agenda = require("./agenda");
 const backup = require("./backup");
 const r2 = require("./r2");
 const unnotech = require("./unnotech");
+const flowCrypto = require("./flow-crypto");
 const google = require("./google");
 const { notificarLeadCotaCerta, enviarBoasVindasFelizcred } = require("./email");
 
@@ -2814,6 +2815,48 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, "OK");
       }
       return send(res, 404, "Not found");
+    }
+
+    // POST /webhook/flow-data — endpoint de dados do WhatsApp Flow de FGTS (autopreenchimento
+    // de CEP). Sem requireAuth de propósito: é a Meta chamando (com criptografia própria do
+    // protocolo de Flow), não o navegador do painel. Ver flow-crypto.js.
+    if (req.method === "POST" && path_ === "/webhook/flow-data") {
+      const body = await parseBody(req);
+      const { request, aesKey, iv } = flowCrypto.decrypt(body.encrypted_flow_data, body.encrypted_aes_key, body.initial_vector);
+      let respostaPayload;
+      if (request.action === "ping") {
+        respostaPayload = { data: { status: "active" } };
+      } else if (request.action === "data_exchange" && request.screen === "ENDERECO" && request.data?.cep) {
+        const cepLimpo = String(request.data.cep).replace(/\D/g, "");
+        try {
+          const viaCepResp = await new Promise((resolve, reject) => {
+            https
+              .get(`https://viacep.com.br/ws/${cepLimpo}/json/`, (r) => {
+                let buf = "";
+                r.on("data", (c) => (buf += c));
+                r.on("end", () => resolve(JSON.parse(buf)));
+              })
+              .on("error", reject);
+          });
+          respostaPayload = {
+            screen: "ENDERECO",
+            data: {
+              rua: viaCepResp.logradouro || "",
+              bairro: viaCepResp.bairro || "",
+              cidade: viaCepResp.localidade || "",
+              uf: viaCepResp.uf || "",
+            },
+          };
+        } catch (err) {
+          respostaPayload = { screen: "ENDERECO", data: { rua: "", bairro: "", cidade: "", uf: "" } };
+        }
+      } else {
+        respostaPayload = { screen: request.screen, data: {} };
+      }
+      const respostaCriptografada = flowCrypto.encrypt(respostaPayload, aesKey, iv);
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end(respostaCriptografada);
+      return;
     }
 
     // GET /webhook/instagram — verificação do Meta
