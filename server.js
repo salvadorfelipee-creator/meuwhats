@@ -1088,6 +1088,31 @@ async function enviarFormularioFgts(de, businessNumberId, row) {
   });
 }
 
+async function processarSubmissaoFormularioFgts(originationId, dados) {
+  const row = await db.fgtsOriginationBuscarPorId(originationId);
+  if (!row || row.etapa !== "formulario") return; // submissão órfã/duplicada, ignora
+  const kyc = unnotech.montarPayloadKyc(row.cpf, dados);
+  await unnotech.enviarKyc(row.application_id, kyc);
+  const idempotencyKey = crypto.randomUUID();
+  try {
+    await unnotech.aceitarOferta(row.application_id, row.offer_id, idempotencyKey);
+  } catch (err) {
+    if (err.codigo === "OFFER_EXPIRED") {
+      await unnotech.requotar(row.application_id, crypto.randomUUID());
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "A oferta expirou enquanto você preenchia — já busquei uma nova simulação, só um instante..."
+      );
+      await db.fgtsOriginationAtualizar(row.id, { etapa: "abrindo", offer_id: null, idempotency_key_atual: idempotencyKey });
+      return;
+    }
+    throw err;
+  }
+  await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
+  await db.fgtsOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", idempotency_key_atual: idempotencyKey });
+}
+
 async function handlerFgtsOrigContratar(de, businessNumberId) {
   const row = await db.fgtsOriginationBuscarAberta(de, businessNumberId);
   if (!row) return; // sem solicitação aberta, ignora clique órfão
@@ -2333,6 +2358,22 @@ async function processarEntry(entry) {
               await db.setFluxoPasso(de, businessNumberId, resposta.passo || null);
             } catch (err) {
               console.error("Erro ao enviar resposta automática:", err.message);
+            }
+          }
+        } else if (tipo === "interactive" && msg.interactive?.nfm_reply) {
+          // Submissão de um WhatsApp Flow (formulário nativo) — é como a Meta manda a resposta
+          // de um Flow ESTÁTICO, sem endpoint, direto nesse webhook normal (diferente do Flow
+          // com endpoint da Task 13, que responde por outro caminho). O flow_token carrega o id
+          // da linha de fgts_origination (ver enviarFormularioFgts).
+          const dados = JSON.parse(msg.interactive.nfm_reply.response_json);
+          const flowToken = msg.interactive.nfm_reply.flow_token || "";
+          const originationId = Number(flowToken.replace("fgtsorig_", ""));
+          await db.insertMessage({ ...base, type: "button", body: "[formulário FGTS preenchido]" });
+          if (originationId) {
+            try {
+              await processarSubmissaoFormularioFgts(originationId, dados);
+            } catch (err) {
+              console.error("Erro ao processar formulário FGTS:", err.message);
             }
           }
         } else if (tipo === "interactive") {
