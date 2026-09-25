@@ -303,6 +303,30 @@ const ready = (async () => {
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_broadcast_agendado_status ON broadcast_agendado(status, agendado_para)`);
 
+  // Uma linha por solicitação de FGTS em andamento na Unnotech (ver PROJETO de originação
+  // automática de FGTS) — etapa controla onde a conversa está, status_unnotech guarda o último
+  // ApplicationStatus que a API devolveu, só pra debug/painel.
+  await client.execute(`CREATE TABLE IF NOT EXISTS fgts_origination (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    business_number_id TEXT NOT NULL,
+    application_id TEXT,
+    cpf TEXT,
+    offer_id TEXT,
+    proposal_uuid TEXT,
+    etapa TEXT NOT NULL DEFAULT 'abrindo',
+    status_unnotech TEXT,
+    idempotency_key_atual TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`);
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_fgts_origination_etapa ON fgts_origination(etapa, updated_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_fgts_origination_phone ON fgts_origination(phone, business_number_id)`
+  );
+
   // Mescla duplicatas causadas pelo "9º dígito" do celular brasileiro (mesmo contato virando
   // duas conversas — uma com 5X99XXXXXXXX, outra com 5X9XXXXXXXX — dependendo de qual formato
   // entrou primeiro). server.js agora normaliza tudo antes de gravar (normalizarTelefoneBR),
@@ -1127,6 +1151,66 @@ async function funilResumo(desdeMs) {
   return resumo;
 }
 
+// Uma linha por solicitação de FGTS em andamento na Unnotech — etapa controla onde a conversa
+// está (ver as funções `processarEtapa*` em server.js), status_unnotech guarda o último
+// ApplicationStatus que a API devolveu, só pra debug/painel.
+async function fgtsOriginationCriar(phone, businessNumberId, applicationId, cpf, idempotencyKey) {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `INSERT INTO fgts_origination
+            (phone, business_number_id, application_id, cpf, etapa, idempotency_key_atual, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 'abrindo', ?, ?, ?)`,
+    args: [phone, businessNumberId, applicationId, cpf, idempotencyKey, agora, agora],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+// Etapas terminais não contam como "aberta" — evita abrir uma segunda solicitação em cima de
+// uma já concluída/sem oferta/com erro, se o cliente mandar "fgts" de novo no meio do caminho.
+const FGTS_ORIGINATION_ETAPAS_TERMINAIS = ["concluido", "sem_oferta", "erro"];
+
+async function fgtsOriginationBuscarAberta(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM fgts_origination WHERE phone = ? AND business_number_id = ?
+          AND etapa NOT IN (${FGTS_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
+          ORDER BY id DESC LIMIT 1`,
+    args: [phone, businessNumberId, ...FGTS_ORIGINATION_ETAPAS_TERMINAIS],
+  });
+  return result.rows[0] || null;
+}
+
+async function fgtsOriginationBuscarPorId(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM fgts_origination WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+// `campos` é um objeto { coluna: valor } — só atualiza o que for passado, sempre toca
+// `updated_at` (é o que o verificador usa pra saber quando reconsultar).
+async function fgtsOriginationAtualizar(id, campos) {
+  await ready;
+  const colunas = Object.keys(campos);
+  if (!colunas.length) return;
+  const sets = colunas.map((c) => `${c} = ?`).join(", ");
+  await client.execute({
+    sql: `UPDATE fgts_origination SET ${sets}, updated_at = ? WHERE id = ?`,
+    args: [...colunas.map((c) => campos[c]), Date.now(), id],
+  });
+}
+
+async function fgtsOriginationListarAbertas() {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM fgts_origination
+          WHERE etapa NOT IN (${FGTS_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
+          ORDER BY updated_at ASC`,
+    args: FGTS_ORIGINATION_ETAPAS_TERMINAIS,
+  });
+  return result.rows;
+}
+
 // Agenda os contatos 2+ de um broadcast com intervalo — cada item já vem com seu
 // agendado_para calculado pelo chamador (server.js: agora + i * intervaloSegundos).
 async function broadcastAgendarLote(businessId, itens) {
@@ -1224,6 +1308,11 @@ module.exports = {
   getUltimaMensagemRecebida,
   jaRecebeuTemplateRecente,
   recebeuTemplate,
+  fgtsOriginationCriar,
+  fgtsOriginationBuscarAberta,
+  fgtsOriginationBuscarPorId,
+  fgtsOriginationAtualizar,
+  fgtsOriginationListarAbertas,
   tentarMarcarMenuEnviado,
   setFluxoPasso,
   listarFluxosAguardando,
