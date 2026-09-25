@@ -873,7 +873,10 @@ async function capturarContatoEBoasVindas(de, businessNumberId, nome, email, pre
 // `corpo` é a mensagem que completou os dados — se tiver e-mail nela e ainda não tivermos
 // salvo contato pra essa conversa, dispara capturarContatoEBoasVindas em paralelo. `prefixo`
 // (ex. "CLT", "GARANTIA", "FINANC") é só pra identificar o funil no nome salvo no Google.
-async function confirmarDadosRecebidos(de, businessNumberId, corpo, prefixo) {
+// `textoConfirmacao` é opcional — por padrão manda a mensagem genérica de sempre; fluxos que
+// precisam de um texto próprio (ex.: Amigo Indicou) passam o deles, sempre com o aviso de fora
+// do horário comercial anexado no final (mesma regra pra todo mundo).
+async function confirmarDadosRecebidos(de, businessNumberId, corpo, prefixo, textoConfirmacao) {
   const email = (corpo || "").match(REGEX_EMAIL)?.[0]?.replace(/[.,;]+$/, "");
   if (email) {
     const conversa = await db.getConversation(de, businessNumberId);
@@ -881,13 +884,11 @@ async function confirmarDadosRecebidos(de, businessNumberId, corpo, prefixo) {
       capturarContatoEBoasVindas(de, businessNumberId, conversa?.name, email, prefixo).catch(() => {});
     }
   }
-  await enviarRespostaAutomatica(
-    businessNumberId,
-    de,
+  const texto =
+    textoConfirmacao ||
     "Perfeito! ✅ Já anotei tudo, agora é só aguardar atendimento — em breve eu, Felipe, vou te responder " +
-      "por aqui pra fazer sua simulação. 🙌" +
-      avisoForaHorarioCotaCerta()
-  );
+      "por aqui pra fazer sua simulação. 🙌";
+  await enviarRespostaAutomatica(businessNumberId, de, texto + avisoForaHorarioCotaCerta());
   await db.setFluxoPasso(de, businessNumberId, null);
 }
 
@@ -1931,11 +1932,13 @@ async function handlerAmigoIndicouBloquear(de, businessNumberId) {
 
 // Mesmo padrão de espera-paciente-por-CPF do resto do CLT (funciona numa mensagem só ou
 // espalhado em várias) — ver handlerCapturaDadosCampanhaCLTNova.
+const AMIGOIND_TEXTO_CONFIRMACAO = "Certo! Agora é só aguardar um minuto.";
+
 async function handlerAmigoIndicouCapturaDados(de, businessNumberId, corpo) {
   if (!REGEX_CPF.test(corpo || "")) return;
   setTimeout(async () => {
     try {
-      await confirmarDadosRecebidos(de, businessNumberId, corpo, "CLT");
+      await confirmarDadosRecebidos(de, businessNumberId, corpo, "CLT", AMIGOIND_TEXTO_CONFIRMACAO);
     } catch (err) {
       console.error("Erro ao confirmar dados do Amigo Indicou:", err.message);
     }
