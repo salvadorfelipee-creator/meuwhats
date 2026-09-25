@@ -57,7 +57,53 @@ async function getAccessToken() {
   return tokenCache.accessToken;
 }
 
+async function criarSolicitacao(cpf, idempotencyKey) {
+  const accessToken = await getAccessToken();
+  const { status, body } = await unnotechRequest("POST", "/api/v1/fgts/applications", {
+    accessToken,
+    idempotencyKey,
+    body: { customer: { cpf } },
+  });
+  if (status >= 400) throw new Error(`Falha ao abrir solicitação FGTS: ${JSON.stringify(body)}`);
+  return body;
+}
+
+// Versão otimizada (sem quotes/offers no corpo) — usada pelo polling frequente do verificador.
+async function consultarStatus(applicationId) {
+  const accessToken = await getAccessToken();
+  const { status, body } = await unnotechRequest("GET", `/api/v1/fgts/applications/${applicationId}/status`, {
+    accessToken,
+  });
+  if (status >= 400) throw new Error(`Falha ao consultar status: ${JSON.stringify(body)}`);
+  return body;
+}
+
+// Recurso completo, com quotes[]/offers[] — usada só quando precisamos ler o motivo de recusa
+// ou os detalhes de uma oferta específica (o /status não traz isso).
+async function consultarSolicitacaoCompleta(applicationId) {
+  const accessToken = await getAccessToken();
+  const { status, body } = await unnotechRequest("GET", `/api/v1/fgts/applications/${applicationId}`, {
+    accessToken,
+  });
+  if (status >= 400) throw new Error(`Falha ao consultar solicitação: ${JSON.stringify(body)}`);
+  return body;
+}
+
+async function requotar(applicationId, idempotencyKey) {
+  const accessToken = await getAccessToken();
+  const { status, body } = await unnotechRequest("POST", `/api/v1/fgts/applications/${applicationId}/requote`, {
+    accessToken,
+    idempotencyKey,
+  });
+  if (status >= 400) throw new Error(`Falha ao repetir cotação: ${JSON.stringify(body)}`);
+  return body;
+}
+
 module.exports = {
   unnotechRequest,
   getAccessToken,
+  criarSolicitacao,
+  consultarStatus,
+  consultarSolicitacaoCompleta,
+  requotar,
 };
