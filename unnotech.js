@@ -186,6 +186,40 @@ function montarPayloadKyc(cpf, dados) {
   };
 }
 
+// Upsert — a doc confirma que não exige Idempotency-Key aqui (só as rotas de abertura/aceite
+// exigem).
+async function enviarKyc(applicationId, kyc) {
+  const accessToken = await getAccessToken();
+  const { status, body } = await unnotechRequest("POST", `/api/v1/fgts/applications/${applicationId}/kyc`, {
+    accessToken,
+    body: kyc,
+  });
+  if (status >= 400) throw new Error(`Falha ao enviar KYC: ${JSON.stringify(body)}`);
+  return body;
+}
+
+async function aceitarOferta(applicationId, offerId, idempotencyKey) {
+  const accessToken = await getAccessToken();
+  const { status, body } = await unnotechRequest(
+    "POST",
+    `/api/v1/fgts/applications/${applicationId}/offers/${offerId}/accept`,
+    { accessToken, idempotencyKey }
+  );
+  if (status >= 400) {
+    const err = new Error(`Falha ao aceitar oferta: ${JSON.stringify(body)}`);
+    err.codigo = body?.error?.code || null;
+    throw err;
+  }
+  return body;
+}
+
+async function consultarProposta(proposalUuid) {
+  const accessToken = await getAccessToken();
+  const { status, body } = await unnotechRequest("GET", `/api/v1/proposals/${proposalUuid}`, { accessToken });
+  if (status >= 400) throw new Error(`Falha ao consultar proposta: ${JSON.stringify(body)}`);
+  return body.data;
+}
+
 module.exports = {
   unnotechRequest,
   getAccessToken,
@@ -198,4 +232,7 @@ module.exports = {
   BANCOS_COMPE,
   MAPA_TIPO_CONTA,
   montarPayloadKyc,
+  enviarKyc,
+  aceitarOferta,
+  consultarProposta,
 };
