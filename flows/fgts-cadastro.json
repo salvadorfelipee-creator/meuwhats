@@ -1,0 +1,201 @@
+{
+  "version": "3.1",
+  "screens": [
+    {
+      "id": "DADOS_PESSOAIS",
+      "title": "Dados pessoais",
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "form_dados",
+            "children": [
+              { "type": "TextInput", "name": "nome", "label": "Nome completo", "required": true },
+              { "type": "DatePicker", "name": "data_nascimento", "label": "Data de nascimento", "required": true },
+              {
+                "type": "Dropdown", "name": "genero", "label": "Gênero", "required": true,
+                "data-source": [
+                  { "id": "MALE", "title": "Masculino" },
+                  { "id": "FEMALE", "title": "Feminino" },
+                  { "id": "OTHER", "title": "Outro" }
+                ]
+              },
+              { "type": "TextInput", "name": "email", "label": "E-mail", "input-type": "email", "required": true },
+              { "type": "TextInput", "name": "celular", "label": "Celular (DDD + número)", "input-type": "phone", "required": true },
+              {
+                "type": "Dropdown", "name": "estado_civil", "label": "Estado civil", "required": true,
+                "init-value": "SINGLE",
+                "data-source": [
+                  { "id": "SINGLE", "title": "Solteiro(a)" },
+                  { "id": "MARRIED", "title": "Casado(a)" },
+                  { "id": "DIVORCED", "title": "Divorciado(a)" },
+                  { "id": "WIDOWED", "title": "Viúvo(a)" },
+                  { "id": "SEPARATED", "title": "Separado(a)" },
+                  { "id": "OTHER", "title": "Outro" }
+                ]
+              },
+              {
+                "type": "Dropdown", "name": "escolaridade", "label": "Escolaridade", "required": true,
+                "init-value": "Ensino Médio",
+                "data-source": [
+                  { "id": "Fundamental", "title": "Ensino Fundamental" },
+                  { "id": "Ensino Médio", "title": "Ensino Médio" },
+                  { "id": "Superior", "title": "Ensino Superior" },
+                  { "id": "Pós-graduação", "title": "Pós-graduação" }
+                ]
+              },
+              { "type": "TextInput", "name": "nome_mae", "label": "Nome completo da mãe", "required": true },
+              {
+                "type": "Footer", "label": "Continuar",
+                "on-click-action": { "name": "navigate", "next": { "type": "screen", "name": "DOCUMENTO" }, "payload": {} }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "DOCUMENTO",
+      "title": "Documento (RG)",
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form", "name": "form_documento",
+            "children": [
+              { "type": "TextInput", "name": "rg_numero", "label": "Número do RG", "required": true },
+              {
+                "type": "Dropdown", "name": "rg_orgao", "label": "Órgão emissor", "required": true,
+                "init-value": "SSP",
+                "data-source": [
+                  { "id": "SSP", "title": "SSP" },
+                  { "id": "DETRAN", "title": "DETRAN" },
+                  { "id": "PC", "title": "Polícia Civil" },
+                  { "id": "IFP", "title": "IFP" }
+                ]
+              },
+              {
+                "type": "Dropdown", "name": "rg_uf", "label": "Estado emissor", "required": true,
+                "data-source": [
+                  { "id": "AC", "title": "AC" }, { "id": "AL", "title": "AL" }, { "id": "AM", "title": "AM" },
+                  { "id": "AP", "title": "AP" }, { "id": "BA", "title": "BA" }, { "id": "CE", "title": "CE" },
+                  { "id": "DF", "title": "DF" }, { "id": "ES", "title": "ES" }, { "id": "GO", "title": "GO" },
+                  { "id": "MA", "title": "MA" }, { "id": "MG", "title": "MG" }, { "id": "MS", "title": "MS" },
+                  { "id": "MT", "title": "MT" }, { "id": "PA", "title": "PA" }, { "id": "PB", "title": "PB" },
+                  { "id": "PE", "title": "PE" }, { "id": "PI", "title": "PI" }, { "id": "PR", "title": "PR" },
+                  { "id": "RJ", "title": "RJ" }, { "id": "RN", "title": "RN" }, { "id": "RO", "title": "RO" },
+                  { "id": "RR", "title": "RR" }, { "id": "RS", "title": "RS" }, { "id": "SC", "title": "SC" },
+                  { "id": "SE", "title": "SE" }, { "id": "SP", "title": "SP" }, { "id": "TO", "title": "TO" }
+                ]
+              },
+              {
+                "type": "Footer", "label": "Continuar",
+                "on-click-action": { "name": "navigate", "next": { "type": "screen", "name": "ENDERECO" }, "payload": {} }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ENDERECO",
+      "title": "Endereço",
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form", "name": "form_endereco",
+            "children": [
+              { "type": "TextInput", "name": "cep", "label": "CEP", "required": true },
+              { "type": "TextInput", "name": "rua", "label": "Rua/Logradouro", "required": true },
+              { "type": "TextInput", "name": "bairro", "label": "Bairro", "required": true },
+              { "type": "TextInput", "name": "cidade", "label": "Cidade", "required": true },
+              {
+                "type": "Dropdown", "name": "uf", "label": "Estado", "required": true,
+                "data-source": [
+                  { "id": "AC", "title": "AC" }, { "id": "AL", "title": "AL" }, { "id": "AM", "title": "AM" },
+                  { "id": "AP", "title": "AP" }, { "id": "BA", "title": "BA" }, { "id": "CE", "title": "CE" },
+                  { "id": "DF", "title": "DF" }, { "id": "ES", "title": "ES" }, { "id": "GO", "title": "GO" },
+                  { "id": "MA", "title": "MA" }, { "id": "MG", "title": "MG" }, { "id": "MS", "title": "MS" },
+                  { "id": "MT", "title": "MT" }, { "id": "PA", "title": "PA" }, { "id": "PB", "title": "PB" },
+                  { "id": "PE", "title": "PE" }, { "id": "PI", "title": "PI" }, { "id": "PR", "title": "PR" },
+                  { "id": "RJ", "title": "RJ" }, { "id": "RN", "title": "RN" }, { "id": "RO", "title": "RO" },
+                  { "id": "RR", "title": "RR" }, { "id": "RS", "title": "RS" }, { "id": "SC", "title": "SC" },
+                  { "id": "SE", "title": "SE" }, { "id": "SP", "title": "SP" }, { "id": "TO", "title": "TO" }
+                ]
+              },
+              { "type": "TextInput", "name": "numero", "label": "Número", "required": true },
+              { "type": "TextInput", "name": "complemento", "label": "Complemento (opcional)", "required": false },
+              {
+                "type": "Footer", "label": "Continuar",
+                "on-click-action": { "name": "navigate", "next": { "type": "screen", "name": "DESEMBOLSO" }, "payload": {} }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "DESEMBOLSO",
+      "title": "Como receber",
+      "terminal": true,
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form", "name": "form_desembolso",
+            "children": [
+              {
+                "type": "RadioButtonsGroup", "name": "forma_desembolso", "label": "Como você quer receber o valor?",
+                "required": true,
+                "data-source": [
+                  { "id": "PIX", "title": "PIX (com a chave do seu CPF)" },
+                  { "id": "CONTA", "title": "Conta bancária" }
+                ]
+              },
+              {
+                "type": "Dropdown", "name": "banco", "label": "Banco", "required": false,
+                "visible": "${form.forma_desembolso} == 'CONTA'",
+                "data-source": [
+                  { "id": "Banco do Brasil", "title": "Banco do Brasil" },
+                  { "id": "Santander", "title": "Santander" },
+                  { "id": "Caixa Econômica Federal", "title": "Caixa Econômica Federal" },
+                  { "id": "Bradesco", "title": "Bradesco" },
+                  { "id": "Itaú", "title": "Itaú" },
+                  { "id": "Nubank", "title": "Nubank" },
+                  { "id": "Inter", "title": "Inter" },
+                  { "id": "C6 Bank", "title": "C6 Bank" },
+                  { "id": "PagBank", "title": "PagBank" },
+                  { "id": "Mercado Pago", "title": "Mercado Pago" },
+                  { "id": "PicPay", "title": "PicPay" },
+                  { "id": "Banco Original", "title": "Banco Original" },
+                  { "id": "Sicoob", "title": "Sicoob" },
+                  { "id": "Sicredi", "title": "Sicredi" },
+                  { "id": "Safra", "title": "Safra" },
+                  { "id": "BTG Pactual", "title": "BTG Pactual" }
+                ]
+              },
+              {
+                "type": "Dropdown", "name": "tipo_conta", "label": "Tipo de conta", "required": false,
+                "visible": "${form.forma_desembolso} == 'CONTA'",
+                "data-source": [
+                  { "id": "Corrente", "title": "Corrente" },
+                  { "id": "Poupança", "title": "Poupança" },
+                  { "id": "Salário", "title": "Salário" }
+                ]
+              },
+              { "type": "TextInput", "name": "agencia", "label": "Agência", "required": false, "visible": "${form.forma_desembolso} == 'CONTA'" },
+              { "type": "TextInput", "name": "conta", "label": "Número da conta", "required": false, "visible": "${form.forma_desembolso} == 'CONTA'" },
+              { "type": "TextInput", "name": "digito_conta", "label": "Dígito da conta", "required": false, "visible": "${form.forma_desembolso} == 'CONTA'" },
+              {
+                "type": "Footer", "label": "Enviar",
+                "on-click-action": { "name": "complete", "payload": {} }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

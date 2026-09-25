@@ -187,6 +187,42 @@ async function sendCtaUrl(fromPhoneNumberId, to, bodyText, buttonText, url) {
   return json;
 }
 
+// Envia um formulário nativo do WhatsApp (WhatsApp Flow) — usado pela originação de FGTS
+// (Unnotech) pra coletar os dados de cadastro numa tela só, em vez de mensagem por mensagem.
+async function sendFlow(fromPhoneNumberId, to, { flowId, flowToken, bodyText, ctaText, screenId }) {
+  garantirNaoBloqueado(to);
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "flow",
+          body: { text: bodyText },
+          action: {
+            name: "flow",
+            parameters: {
+              flow_message_version: "3",
+              flow_token: flowToken,
+              flow_id: flowId,
+              flow_cta: ctaText,
+              flow_action: "navigate",
+              flow_action_payload: { screen: screenId, data: {} },
+            },
+          },
+        },
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao enviar Flow: ${JSON.stringify(json)}`);
+  return json;
+}
+
 async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, components) {
   garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
@@ -372,6 +408,7 @@ module.exports = {
   sendButtons,
   sendList,
   sendCtaUrl,
+  sendFlow,
   sendTemplate,
   registerNumber,
   checarInscricaoWebhook,

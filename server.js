@@ -1075,10 +1075,17 @@ async function iniciarOriginacaoFgts(de, businessNumberId, cpf) {
   }
 }
 
-// Envia o WhatsApp Flow de coleta de dados (implementado de verdade na Task 9 — aqui ainda é um
-// placeholder testável).
+// Envia o WhatsApp Flow de coleta de dados (formulário nativo) — o `flow_token` carrega o id da
+// linha de fgts_origination, pra saber a qual solicitação a submissão pertence quando ela voltar
+// (ver processarSubmissaoFormularioFgts).
 async function enviarFormularioFgts(de, businessNumberId, row) {
-  await enviarRespostaAutomatica(businessNumberId, de, "(placeholder — Flow chega na próxima tarefa)");
+  await wa.sendFlow(businessNumberId, de, {
+    flowId: process.env.FGTS_FLOW_ID,
+    flowToken: `fgtsorig_${row.id}`,
+    bodyText: "Show! Só preciso de mais alguns dados pra fechar a contratação. Toca no botão abaixo:",
+    ctaText: "Preencher dados",
+    screenId: "DADOS_PESSOAIS",
+  });
 }
 
 async function handlerFgtsOrigContratar(de, businessNumberId) {
