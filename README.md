@@ -122,6 +122,9 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `TELEGRAM_WEBHOOK_SECRET` | Segredo opcional pra validar que o webhook vem do Telegram | — (sem validação) |
 | `TELEGRAM_START_MESSAGE` | Texto enviado ao receber `/start` (com botão de compartilhar contato) | (ver seção Telegram) |
 | `TELEGRAM_THANKS_MESSAGE` | Texto enviado depois que o usuário compartilha o contato | (ver seção Telegram) |
+| `UNNOTECH_CLIENT_ID` | Credencial da API da Unnotech (originação de crédito FGTS) | — |
+| `UNNOTECH_CLIENT_SECRET` | Credencial da API da Unnotech (originação de crédito FGTS) | — |
+| `FGTS_FLOW_ID` | ID do WhatsApp Flow de coleta de dados do FGTS, gerado ao publicar o Flow | — |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | Token de acesso da Página do Facebook (`pages_manage_posts` + `pages_manage_metadata`) | — |
 | `FACEBOOK_PAGE_ID` | ID numérico da Página do Facebook | — |
 | `TWITTER_API_KEY` / `TWITTER_API_SECRET` | Chaves do App no X Developer Portal | — |
@@ -651,6 +654,35 @@ de verdade pro cliente autorizar lá é **"J17"** (confirmado pelo usuário, é 
 "UNNO - FGTS J17 - ÔNIX" da comissão) — trocado nos 3 lugares que tinham esse texto: menu
 principal (`iniciarFluxoFgtsMenu`), Instagram (`INSTAGRAM_OPCOES_MENU`) e o lembrete de
 silêncio do passo `fgts_cpf`. `FLUXO_FGTS_ANUNCIO` (seção acima) já nasceu certo, com "J17".
+
+### Originação automática de FGTS via Unnotech (25/09/2026)
+
+Depois que o CPF é capturado (pelas 3 entradas acima), o pedido passa a ser processado de
+verdade — simulação, formulário de dados (WhatsApp Flow), aceite da oferta, assinatura e
+acompanhamento até o pagamento, sem humano no meio. Ver a spec completa em
+`docs/superpowers/specs/2026-09-25-fgts-unnotech-design.md` e o plano de implementação em
+`docs/superpowers/plans/2026-09-25-fgts-unnotech.md`.
+
+**Módulo `unnotech.js`** — cliente puro da API pública da Unnotech (parceiro
+`LEV INTERMEDIACAO DE NEGOCIOS LTDA`, tabela comercial **J17/ÔNIX** — qualquer oferta de outro
+banco na cotação é ignorada). **Tabela `fgts_origination`** (banco) guarda cada solicitação em
+andamento. Um verificador (`setInterval`, 30s) consulta o status periodicamente e avança a
+conversa — todo o estado fica no banco, sobrevive a redeploy no meio de uma solicitação.
+
+**Credenciais** (variáveis de ambiente no Render, nunca commitadas):
+- `UNNOTECH_CLIENT_ID` / `UNNOTECH_CLIENT_SECRET` — gerados no portal da Unnotech
+  (app.unnotech.com.br → Configurações → Integrações → API keys; exige usuário no perfil
+  **MARTER-CORBAN**).
+- `FGTS_FLOW_ID` — ID do WhatsApp Flow de coleta de dados (`flows/fgts-cadastro.json`),
+  gerado ao publicar o Flow no WhatsApp Manager → Flows.
+
+**Formulário de dados**: WhatsApp Flow nativo (`flows/fgts-cadastro.json`) em 4 telas — dados
+pessoais, documento (RG), endereço e forma de desembolso. PIX só aceita chave = CPF do próprio
+tomador (regra da Unnotech), então a chave nunca é perguntada — é sempre o CPF já capturado no
+início. Estado civil, escolaridade e órgão emissor vêm pré-preenchidos (Solteiro/Ensino
+Médio/SSP) e editáveis — decisão explícita do usuário, aceitando o risco de sair errado se não
+for o caso do cliente. A versão atual **não** autopreenche o CEP (fica pra uma fase seguinte,
+com endpoint criptografado do Flow — ver spec).
 
 ### Aviso de horário comercial (31/07/2026)
 
