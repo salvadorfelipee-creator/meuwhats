@@ -120,8 +120,15 @@ header.site{background:#fff;border-bottom:1px solid var(--border)}
 .f-row.opt{opacity:.58;transition:opacity .15s}
 .f-row.opt:focus-within,.f-row.opt:hover{opacity:1}
 .f-row.opt label{font-weight:500}
-.f-row input.invalid,.f-row select.invalid{border-color:#E5484D;background:#FFF5F5}
+.f-row input.invalid,.f-row select.invalid{border-color:#E5484D;background:#FFF5F5;animation:pulseInvalid 900ms ease-out 2}
 .f-row input.invalid:focus{box-shadow:0 0 0 4px rgba(229,72,77,.14)}
+@keyframes pulseInvalid{
+  0%,100%{box-shadow:0 0 0 0 rgba(229,72,77,.5)}
+  50%{box-shadow:0 0 0 7px rgba(229,72,77,0)}
+}
+@media (prefers-reduced-motion: reduce){
+  .f-row input.invalid,.f-row select.invalid{animation:none}
+}
 .f-error{display:none;font-size:12px;color:#E5484D;margin-top:5px;font-weight:600}
 .f-row input.invalid ~ .f-error,.f-row select.invalid ~ .f-error{display:block}
 .f-hint{font-size:12px;color:var(--muted);margin-top:5px}
@@ -391,7 +398,7 @@ src="https://www.facebook.com/tr?id=1060589406422111&ev=PageView&noscript=1"
             </div>
             <div class="f-grid2">
               <div class="f-row opt"><label>E-mail <span class="opt">(opcional)</span></label><input type="text" id="contEmail" placeholder="seu@email.com"></div>
-              <div class="f-row opt"><label>CPF <span class="opt">(opcional)</span></label><input type="text" id="contCpf" placeholder="000.000.000-00"></div>
+              <div class="f-row req"><label>CPF</label><input type="text" id="contCpf" placeholder="000.000.000-00" inputmode="numeric" data-required><span class="f-error">Informe um CPF válido</span></div>
             </div>
             <label class="consent">
               <input type="checkbox" id="contConsent">
@@ -526,6 +533,12 @@ function maskCep(el){
   const el = document.getElementById(id);
   if(el) el.addEventListener('input', ()=>maskCep(el));
 });
+function maskCpf(el){
+  let v = el.value.replace(/\D/g,'').slice(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  el.value = v;
+}
+document.getElementById('contCpf').addEventListener('input', function(){ maskCpf(this); });
 
 document.querySelectorAll('[data-required]').forEach(el=>{
   el.addEventListener('input', ()=>el.classList.remove('invalid'));
@@ -534,16 +547,25 @@ document.querySelectorAll('[data-required]').forEach(el=>{
 function campoValido(el){
   if(!el.value.trim()) return false;
   if((el.id === 'autoCep' || el.id === 'resCep')) return /^\d{5}-\d{3}$/.test(el.value.trim());
+  if(el.id === 'contCpf') return el.value.replace(/\D/g,'').length === 11;
   return true;
 }
 
+// Tira e recoloca a classe 'invalid' (com reflow forçado no meio) em vez de só adicionar —
+// senão, se o campo já estava marcado de um clique anterior, a animação de pulso não toca de
+// novo na 2ª tentativa (CSS não reinicia keyframes só porque a classe já tava lá).
 function validarObrigatorios(container){
   if(!container) return true;
   let ok = true, primeiroInvalido = null;
   container.querySelectorAll('[data-required]').forEach(el=>{
     const valido = campoValido(el);
-    el.classList.toggle('invalid', !valido);
-    if(!valido){ ok = false; if(!primeiroInvalido) primeiroInvalido = el; }
+    el.classList.remove('invalid');
+    if(!valido){
+      ok = false;
+      void el.offsetWidth;
+      el.classList.add('invalid');
+      if(!primeiroInvalido) primeiroInvalido = el;
+    }
   });
   if(primeiroInvalido){ primeiroInvalido.scrollIntoView({behavior:'smooth', block:'center'}); primeiroInvalido.focus(); }
   return ok;
