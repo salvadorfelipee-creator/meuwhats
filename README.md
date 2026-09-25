@@ -637,6 +637,21 @@ pra evitar uma consulta a mais quando o chamador já tem a conversa em mãos) ma
 `FLUXO_FGTS_ANUNCIO` sempre que o passo salvo começar com `"fgtsad_"` — não depende de nenhum
 template, já que aqui a pessoa nunca recebeu uma mensagem nossa antes de escrever.
 
+### Atalho "fgts"/"saque" a qualquer momento + correção BMS → J17 (25/09/2026)
+
+Bug: digitar "fgts" como PRIMEIRA mensagem (contato novo) mandava o menu padrão inteiro — a
+detecção de "fgts" (`detectarOpcaoMenuPrincipal`) só rodava depois que o menu já tinha sido
+enviado uma vez (via `capturaTexto[menu_inicial]`). Corrigido: mesmo padrão da palavra-chave
+"menu" (funciona a qualquer momento, não só depois do menu) — `iniciarFluxoFgtsMenu` foi
+extraído da opção "5" do `handlerMenuPrincipal` pra poder ser chamado direto de
+`processarEntry` quando `fluxo === FLUXO_FELIZCRED` e a mensagem for exatamente "fgts"/"saque".
+
+Também corrigido o texto: pedia pra "autorizar o banco BMS" no app do FGTS, mas o que aparece
+de verdade pro cliente autorizar lá é **"J17"** (confirmado pelo usuário, é a tabela comercial
+"UNNO - FGTS J17 - ÔNIX" da comissão) — trocado nos 3 lugares que tinham esse texto: menu
+principal (`iniciarFluxoFgtsMenu`), Instagram (`INSTAGRAM_OPCOES_MENU`) e o lembrete de
+silêncio do passo `fgts_cpf`. `FLUXO_FGTS_ANUNCIO` (seção acima) já nasceu certo, com "J17".
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa

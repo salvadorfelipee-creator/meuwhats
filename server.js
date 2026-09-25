@@ -76,8 +76,9 @@ const INSTAGRAM_OPCOES_MENU = [
     produto: "Saque do FGTS",
     chaves: ["3", "fgts", "saque"],
     resposta:
-      "Para fazer a simulação do saque do FGTS, é necessário autorizar o banco BMS lá no aplicativo " +
-      "do FGTS. Depois de autorizar, é só me informar o seu CPF que a gente já parte pro atendimento. 😊",
+      "Para fazer a simulação do saque do FGTS, é necessário autorizar a *J17* lá no aplicativo " +
+      "do FGTS (Meu FGTS > Autorizações). Depois de autorizar, é só me informar o seu CPF que a gente já " +
+      "parte pro atendimento. 😊",
     aguardaDados: "saque_fgts",
   },
   { produto: "Empréstimo com carro em garantia", chaves: ["4", "garantia"] },
@@ -641,17 +642,25 @@ async function handlerMenuPrincipal(de, businessNumberId, corpo) {
     );
     await db.setFluxoPasso(de, businessNumberId, "financiamento_dados");
   } else if (escolha === "5") {
-    // Mesmo texto/fluxo já usado no Instagram (autorizar o BMS, depois mandar o CPF) —
-    // consistência entre os dois canais, ver INSTAGRAM_OPCOES_MENU.
-    await enviarRespostaAutomatica(
-      businessNumberId,
-      de,
-      "Para fazer a simulação do saque do FGTS, é necessário autorizar o banco BMS lá no aplicativo " +
-        "do FGTS. Depois de autorizar, é só me mandar o seu CPF que a gente já parte pro atendimento. 😊"
-    );
-    await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
+    await iniciarFluxoFgtsMenu(de, businessNumberId);
   }
   // Não reconheceu a opção → fica no passo menu_inicial (mantém o lembrete sutil ativo)
+}
+
+// Extraído da opção "5" do menu principal pra poder ser chamado direto — sem passar pelo menu
+// inteiro primeiro — quando a pessoa já escreve "fgts"/"saque" na primeira mensagem (ver
+// checagem em processarEntry, mesmo espírito da palavra-chave "menu"). Mesmo texto/fluxo já
+// usado no Instagram (autorizar a J17, depois mandar o CPF) — consistência entre os dois canais,
+// ver INSTAGRAM_OPCOES_MENU.
+async function iniciarFluxoFgtsMenu(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Para fazer a simulação do saque do FGTS, é necessário autorizar a *J17* lá no aplicativo do FGTS " +
+      "(Meu FGTS > Autorizações). Depois de autorizar, é só me mandar o seu CPF que a gente já parte " +
+      "pro atendimento. 😊"
+  );
+  await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
 }
 
 // Lista de produtos oferecida quando a revisão de FGTS não se aplica
@@ -732,7 +741,7 @@ const LEMBRETE_TEXTOS = {
     "Foto do documento do veículo, endereço completo, profissão e renda, foto do seu documento e e-mail.",
   fgts_cpf:
     "Olá! Só lembrando que pra eu simular o saque do FGTS, preciso do seu CPF 😊 (depois de você já ter " +
-    "autorizado o banco BMS lá no aplicativo do FGTS).",
+    "autorizado a J17 lá no aplicativo do FGTS).",
   campanha_clt_dados: [
     "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
       "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
@@ -1980,7 +1989,7 @@ const REGEX_FGTS_ANUNCIO = /fgts/i;
 
 const FGTSAD_TEXTO_APRESENTACAO =
   "Olá, me chamo Felipe e vou dar continuidade no seu atendimento! Para simular o saque do seu " +
-  "FGTS, você precisa autorizar o BMS no app do FGTS.";
+  "FGTS, você precisa autorizar a *J17* no app do FGTS (Meu FGTS > Autorizações).";
 
 const FGTSAD_TEXTO_PEDIR_CPF = "Certo! Agora me informa o CPF pra eu poder simular.";
 
@@ -2134,6 +2143,18 @@ async function processarEntry(entry) {
               mensagemJaTratada = true;
             } catch (err) {
               console.error("Erro ao reabrir menu inicial:", err.message);
+            }
+          } else if (fluxo === FLUXO_FELIZCRED && ["fgts", "saque"].includes(normalizarTexto(corpo))) {
+            // "fgts"/"saque" funciona como atalho a qualquer momento (mesmo espírito do "menu"
+            // acima) — antes só funcionava DEPOIS do menu completo já ter sido mandado (checado
+            // via capturaTexto[menu_inicial]), então quem mandasse "fgts" como primeira mensagem
+            // caía no menu inteiro, ignorando o que a pessoa pediu. Só no fluxo padrão
+            // (FLUXO_FELIZCRED) — os outros números já têm entrada própria.
+            try {
+              await iniciarFluxoFgtsMenu(de, businessNumberId);
+              mensagemJaTratada = true;
+            } catch (err) {
+              console.error("Erro ao iniciar atalho de FGTS:", err.message);
             }
           } else if (businessNumberId === COTACERTA_NUMBER_ID && REGEX_SITE_COTACAO.test(corpo)) {
             try {
