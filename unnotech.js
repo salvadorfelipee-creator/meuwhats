@@ -99,6 +99,93 @@ async function requotar(applicationId, idempotencyKey) {
   return body;
 }
 
+// Só a tabela J17 (ÔNIX) interessa — pedido explícito do usuário: se vier oferta de outro
+// banco na cotação, ignorar.
+function filtrarOfertaJ17(offers) {
+  return (offers || []).find((o) => o.source === "J17") || null;
+}
+
+// A API não documenta uma lista fechada de códigos de recusa — classifica pelo texto (reason da
+// quote, ou rejection_reason.message da oferta). Ajustar as palavras-chave assim que virmos
+// respostas reais (ver spec, seção "Itens em aberto").
+function classificarRecusa(texto) {
+  const t = (texto || "").toLowerCase();
+  // Raiz "autoriz" (não "autoriza") pra pegar qualquer conjugação: autorizou, autorizado,
+  // autorizar, autorização — "autoriza" sozinho não bate com "autorizou" (ver ledger da Task 4).
+  if (t.includes("autoriz")) return "autorizacao";
+  if (t.includes("saldo") || t.includes("sem valor") || t.includes("indispon")) return "sem_saldo";
+  return "desconhecido";
+}
+
+// Nomes que aparecem no dropdown do Flow → código COMPE que a Unnotech espera. Lista inicial
+// pelos bancos mais comuns — expandir durante o uso real (ver spec).
+const BANCOS_COMPE = {
+  "Banco do Brasil": "001",
+  Santander: "033",
+  "Caixa Econômica Federal": "104",
+  Bradesco: "237",
+  Itaú: "341",
+  Nubank: "260",
+  Inter: "077",
+  "C6 Bank": "336",
+  PagBank: "290",
+  "Mercado Pago": "323",
+  PicPay: "380",
+  "Banco Original": "212",
+  Sicoob: "756",
+  Sicredi: "748",
+  Safra: "422",
+  "BTG Pactual": "208",
+};
+
+const MAPA_TIPO_CONTA = {
+  Corrente: "CHECKING_ACCOUNT",
+  Poupança: "SAVINGS_ACCOUNT",
+  Salário: "SALARY_ACCOUNT",
+};
+
+// `dados` vem da resposta do WhatsApp Flow (ver Task 9) — chaves em snake_case batendo com os
+// nomes dos campos do formulário (mesmos nomes usados no flow_json da Task 8). `cpf` é o que já
+// temos desde a simulação (não vem do formulário) — usado como chave PIX quando for o caso, já
+// que a Unnotech só aceita PIX = CPF do próprio tomador.
+function montarPayloadKyc(cpf, dados) {
+  const bank =
+    dados.forma_desembolso === "PIX"
+      ? { disbursement_method: "PIX", pix_key: cpf, pix_type: "CPF" }
+      : {
+          disbursement_method: "BANK_ACCOUNT",
+          bank_code: BANCOS_COMPE[dados.banco] || null,
+          account_type: MAPA_TIPO_CONTA[dados.tipo_conta] || null,
+          agency: dados.agencia,
+          agency_digit: "0",
+          account_number: dados.conta,
+          account_digit: dados.digito_conta,
+        };
+  return {
+    name: dados.nome,
+    birth_date: dados.data_nascimento,
+    phone: dados.celular,
+    email: dados.email,
+    gender: dados.genero,
+    civil_status: dados.estado_civil,
+    scholarity: dados.escolaridade,
+    mothers_name: dados.nome_mae,
+    rg_number: dados.rg_numero,
+    rg_organ: dados.rg_orgao,
+    rg_uf: dados.rg_uf,
+    address: {
+      zip_code: dados.cep,
+      uf: dados.uf,
+      city: dados.cidade,
+      district: dados.bairro,
+      street: dados.rua,
+      number: dados.numero,
+      complement: dados.complemento || null,
+    },
+    bank,
+  };
+}
+
 module.exports = {
   unnotechRequest,
   getAccessToken,
@@ -106,4 +193,9 @@ module.exports = {
   consultarStatus,
   consultarSolicitacaoCompleta,
   requotar,
+  filtrarOfertaJ17,
+  classificarRecusa,
+  BANCOS_COMPE,
+  MAPA_TIPO_CONTA,
+  montarPayloadKyc,
 };
