@@ -1088,6 +1088,66 @@ async function enviarFormularioFgts(de, businessNumberId, row) {
   });
 }
 
+// Depois do aceite, o proposal_uuid pode demorar um pouco pra aparecer no status — só busca a
+// proposta quando ele já estiver lá. Manda o botão de assinatura assim que o signature_link
+// vier preenchido (só 1 vez — controla isso checando se já tinha proposal_uuid salvo antes).
+async function processarEtapaAguardandoAssinatura(row) {
+  const status = await unnotech.consultarStatus(row.application_id);
+  if (!status.proposal_uuid) {
+    await db.fgtsOriginationAtualizar(row.id, { status_unnotech: status.status });
+    return;
+  }
+  const jaTinhaProposta = Boolean(row.proposal_uuid);
+  if (!jaTinhaProposta) {
+    await db.fgtsOriginationAtualizar(row.id, { proposal_uuid: status.proposal_uuid, status_unnotech: status.status });
+  }
+  if (status.status === "SIGNED" || status.status === "ENDORSED") {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      "Contrato assinado! 🎉 Agora é só aguardar o depósito — te aviso assim que cair na sua conta."
+    );
+    await db.fgtsOriginationAtualizar(row.id, { etapa: "aguardando_pagamento", status_unnotech: status.status });
+    return;
+  }
+  if (["CONTRACT_REJECTED", "FAILED", "REJECTED", "CANCELLED"].includes(status.status)) {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      "Tivemos um problema pra finalizar essa contratação. Vou te colocar com um atendente pra ver o que aconteceu."
+    );
+    await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    await db.fgtsOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    return;
+  }
+  const proposta = await unnotech.consultarProposta(status.proposal_uuid);
+  if (proposta.signature_link && !jaTinhaProposta) {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      "Seu contrato está pronto! ✍️ Assim que você assinar, eu te aviso por aqui."
+    );
+    // texto de verdade no cta (nunca null) — mesmo padrão do resto do código (ex.:
+    // handlerAmigoIndicouConhecer/handlerCiahotVisitarSite), a API do WhatsApp exige um body.text
+    // não vazio numa mensagem de botão de link.
+    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Toque no botão abaixo pra assinar:", null, null, {
+      buttonText: "Assinar contrato",
+      url: proposta.signature_link,
+    });
+  }
+}
+
+async function processarEtapaAguardandoPagamento(row) {
+  const status = await unnotech.consultarStatus(row.application_id);
+  if (status.status === "DISBURSED") {
+    await enviarRespostaAutomatica(row.business_number_id, row.phone, "O valor já caiu! 💰 Qualquer coisa, é só me chamar.");
+    await db.fgtsOriginationAtualizar(row.id, { etapa: "concluido", status_unnotech: status.status });
+    await db.setFluxoPasso(row.phone, row.business_number_id, null);
+  } else {
+    await db.fgtsOriginationAtualizar(row.id, { status_unnotech: status.status });
+  }
+}
+
 async function processarSubmissaoFormularioFgts(originationId, dados) {
   const row = await db.fgtsOriginationBuscarPorId(originationId);
   if (!row || row.etapa !== "formulario") return; // submissão órfã/duplicada, ignora
@@ -4033,7 +4093,8 @@ setInterval(async () => {
     for (const row of abertas) {
       try {
         if (row.etapa === "abrindo") await processarEtapaAbrindo(row);
-        // Etapas seguintes (aguardando_assinatura, aguardando_pagamento) entram na Task 10.
+        else if (row.etapa === "aguardando_assinatura") await processarEtapaAguardandoAssinatura(row);
+        else if (row.etapa === "aguardando_pagamento") await processarEtapaAguardandoPagamento(row);
       } catch (err) {
         console.error(`Erro ao processar originação FGTS #${row.id} (etapa ${row.etapa}):`, err.message);
       }
