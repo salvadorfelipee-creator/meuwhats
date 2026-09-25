@@ -561,6 +561,24 @@ cliente que dispara a sequência.
 - Endpoints admin novos: `POST /painel/api/template-criar/:businessId` (cria template de texto
   simples na WABA do número) e `GET /painel/api/templates/:id?todos=1` (inclui pendentes).
 
+### Número principal migrado (25/09/2026)
+
+O número **+55 47 9686-4687** ("Felizcred correspondente bancario", rótulo "Felizcred
+(principal)" no painel) estava sozinho na WABA "felizcred n" (`423932854146884`), que segue
+presa à linha de crédito do ManyChat — mesma causa raiz da migração da Cota Certa (ver
+"Como resolver: 'forma de pagamento válida'" mais abaixo). Diferente da Cota Certa, dessa vez
+o número foi movido **direto pra dentro da WABA que já existe do Campanha CLT**
+(`1430846515482269`, "Correspondente bancario"), em vez de nascer numa conta nova — como essa
+WABA já tinha pagamento, webhook inscrito e o usuário de sistema `bot-webhook` com acesso, não
+precisou repetir nenhum desses passos, só registrar o número na Cloud API
+(`POST /painel/api/registrar-numero/:id`, PIN 483920).
+
+**Novo `phone_number_id`: `1265497659990803`** (era `524457590747945`). `PHONE_NUMBERS_JSON`
+no Render e o `id` correspondente devem refletir esse valor. Sem lógica de fluxo travada nesse
+ID no código (usa o fluxo padrão `FLUXO_FELIZCRED`), então a troca é só no `PHONE_NUMBERS_JSON`
+— nenhuma mudança em `server.js`. Conversas antigas continuam no banco vinculadas ao ID velho;
+não migradas automaticamente pro ID novo.
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa
