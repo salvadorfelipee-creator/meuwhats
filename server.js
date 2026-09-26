@@ -1301,13 +1301,20 @@ async function processarSubmissaoFormularioFgts(flowToken, de, businessNumberId,
       }
       throw err;
     }
-    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
+    // Estado no banco ANTES de avisar (achado na revisão da originação CLT, mesmo risco aqui:
+    // se o aviso falhar depois do aceite já ter sido feito de verdade na Unnotech, a linha não
+    // pode cair em 'erro' — senão o verificador para de acompanhar um contrato já em andamento).
     await db.fgtsOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", idempotency_key_atual: idempotencyKey });
     // Fim da coleta de dados — daqui em diante o acompanhamento é só pelo verificador (etapa da
     // linha), não pela conversa; limpa o fluxo_passo pra não ficar preso em "fgtsorig_formulario"
     // (achado na revisão final: senão o lembrete de formulário abandonado dispararia errado
     // durante a espera de assinatura/pagamento).
     await db.setFluxoPasso(row.phone, row.business_number_id, null);
+    try {
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
+    } catch (err) {
+      console.error(`Erro ao avisar cliente do aceite FGTS (linha #${row.id}):`, err.message);
+    }
   } catch (err) {
     console.error(`Erro ao processar formulário FGTS (linha #${row.id}):`, err.message);
     // Estado no banco primeiro, tentativa de aviso ao cliente depois — achado testando local:
@@ -1348,11 +1355,13 @@ async function handlerFgtsOrigAgoraNao(de, businessNumberId) {
 // com 3 portões que o FGTS não tem: autorização do trabalhador, consulta de margem por
 // vínculo, e escolha entre parcela/valor líquido antes de simular.
 //
-// Trava de standby — a Unnotech ainda não liberou credencial de produção pro parceiro
-// (mesma pendência que já bloqueia o FGTS). Enquanto false, "3 MESES OU MAIS" continua se
-// comportando exatamente como hoje (pede os 5 dados em texto livre, atendimento humano).
-// Pra ativar depois que a credencial chegar: troque pra true (e confirme que
-// UNNOTECH_CLIENT_ID/UNNOTECH_CLIENT_SECRET são válidos) e faça o deploy.
+// Trava de standby — a Unnotech ainda não liberou credencial de produção pro parceiro (mesma
+// pendência que já bloqueia o FGTS). Enquanto false, "3 MESES OU MAIS" continua se comportando
+// exatamente como hoje (pede os 5 dados em texto livre, atendimento humano). Pra ativar: (1)
+// confirme que UNNOTECH_CLIENT_ID/UNNOTECH_CLIENT_SECRET são válidos, (2) publique
+// flows/clt-cadastro.json no WhatsApp Manager → Flows e configure CLT_FLOW_ID, (3) troque esta
+// constante pra true e faça o deploy — ver README, seção "Originação automática de consignado
+// CLT via Unnotech".
 const CLT_ORIGINATION_ATIVO = false;
 
 const CLTORIG_TEXTO_TERMINAL = {
@@ -1369,42 +1378,87 @@ const CLTORIG_TEXTO_TERMINAL = {
 };
 
 async function finalizarCltSemOferta(row, categoria) {
-  await enviarRespostaAutomatica(
-    row.business_number_id,
-    row.phone,
-    CLTORIG_TEXTO_TERMINAL[categoria] || CLTORIG_TEXTO_TERMINAL.desconhecido
-  );
+  // Estado no banco ANTES de avisar (achado na revisão final: mandar a mensagem primeiro fazia
+  // o verificador refazer a MESMA consulta e reenviar a MESMA mensagem a cada 30s pra sempre se
+  // o envio falhasse por qualquer motivo — ex.: janela de 24h do WhatsApp fechada).
   await db.cltOriginationAtualizar(row.id, { etapa: "sem_oferta" });
   await db.setFluxoPasso(row.phone, row.business_number_id, null);
+  try {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      CLTORIG_TEXTO_TERMINAL[categoria] || CLTORIG_TEXTO_TERMINAL.desconhecido
+    );
+  } catch (err) {
+    console.error(`Erro ao avisar cliente de encerramento sem oferta CLT (linha #${row.id}):`, err.message);
+  }
 }
 
-// Prazo pra etapas que esperam uma RESPOSTA DO CLIENTE (escolher vínculo, escolher base, digitar
-// valor, decidir a oferta, preencher o formulário) — mesma folga de 1h30 já usada no FGTS.
-// 'aguardando_autorizacao' fica de FORA de propósito (ruling na spec): assinar o termo de
-// consentimento é ação do cliente fora do nosso controle, pode levar qualquer tempo, e o poll
-// nessa etapa é uma única chamada GET barata — não faz sentido expirar.
+// Prazo pra etapas que esperam uma resposta RÁPIDA do cliente (escolher vínculo, escolher base,
+// digitar valor, decidir a oferta, preencher o formulário) — mesma folga de 1h30 já usada no
+// FGTS. Inclui também os estados transitórios reivindicados (abrindo_solicitacao/
+// simulando_pendente/retentando_oferta) como rede de segurança contra um crash no meio do
+// processamento (mesmo espírito de 'enviando_kyc' no FGTS).
 const CLTORIG_PRAZO_MS = 90 * 60 * 1000;
-const CLTORIG_ETAPAS_COM_PRAZO = [
+const CLTORIG_ETAPAS_COM_PRAZO_CURTO = [
   "aguardando_email",
+  "abrindo_solicitacao",
   "escolhendo_vinculo",
   "escolhendo_valor",
   "aguardando_valor",
+  "simulando_pendente",
   "oferta_apresentada",
   "formulario",
   "enviando_kyc",
+  "retentando_oferta",
 ];
+// 'aguardando_autorizacao' tem prazo PRÓPRIO, bem mais longo — achado na revisão final: a
+// versão anterior não expirava essa etapa nunca, então quem nunca assinasse o termo (uma fração
+// grande dos leads, esperado) ficava bloqueado PRA SEMPRE de tentar de novo (toda nova tentativa
+// de CPF caía em "já em andamento"). Assinar o termo é ação do cliente fora do nosso controle,
+// mas não é infinita — 72h é generoso sem travar o lead pro resto da vida.
+const CLTORIG_PRAZO_AUTORIZACAO_MS = 72 * 60 * 60 * 1000;
+// Pós-assinatura/pagamento — processos do banco (averbação, liquidação) podem legitimamente
+// levar alguns dias úteis; 5 dias de folga antes de escalar como travado (achado na revisão
+// final: as etapas de assinatura/pagamento não tinham NENHUM teto pra status desconhecido).
+const CLTORIG_PRAZO_LONGO_MS = 5 * 24 * 60 * 60 * 1000;
 // A consulta de margem tem retentativa automática do lado da Unnotech por até 30min (ver guia)
 // — 45min de folga antes de tratar como travada de vez.
 const CLTORIG_PRAZO_MARGEM_MS = 45 * 60 * 1000;
 
-// Extrai um valor em reais de texto livre ("R$ 1.500,00", "1500", "500,50") — undefined/null se
-// não achar nada que pareça número.
+// Mensagem (e passo de captura de texto, se houver um esperando) pra quem manda o CPF de novo
+// enquanto já tem uma solicitação em andamento — achado na revisão final: a versão anterior
+// respondia "já em andamento" pra QUALQUER etapa, mesmo nas que literalmente esperam uma ação
+// do próprio cliente (escolher vínculo, digitar valor, decidir a oferta...), e nunca corrigia o
+// fluxo_passo, então a próxima mensagem da pessoa podia cair no lugar errado.
+const CLTORIG_ETAPA_REENTRADA = {
+  escolhendo_vinculo: { texto: "Ainda esperando você escolher o vínculo na lista que te mandei ali acima 😊", passo: null },
+  escolhendo_valor: { texto: "Ainda esperando você escolher entre parcela ou valor líquido nos botões que te mandei ali acima 😊", passo: null },
+  aguardando_valor: { texto: "Ainda esperando você me mandar o valor — pode mandar só o número? 😊", passo: "cltorig_valor" },
+  oferta_apresentada: { texto: "Já te mandei sua oferta ali acima — toca em QUERO CONTRATAR ou AGORA NÃO 😊", passo: null },
+  formulario: { texto: "Ainda esperando você preencher o formulário que te mandei ali acima 😊", passo: null },
+};
+
+// Extrai um valor em reais de texto livre. Achado na revisão final: a versão anterior tratava
+// QUALQUER ponto como separador decimal — "3.000" (do jeito que brasileiro digita 3 mil) virava
+// 3, não 3000. Ponto seguido de exatamente 3 dígitos até o fim do número (sem vírgula no meio) é
+// separador de milhar, nunca decimal; "2 mil"/"3 mil reais" também é reconhecido. Undefined/null
+// se não achar nada que pareça número (a mensagem tem que COMEÇAR com um dígito de verdade —
+// "R$. 500" não confundia mais o "." solto com o número).
 function extrairValorReais(texto) {
-  const m = String(texto || "").match(/[\d.,]+/);
+  const t = String(texto || "");
+  const m = t.match(/\d[\d.,]*/);
   if (!m) return null;
-  let s = m[0];
-  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
-  const n = parseFloat(s);
+  const s = m[0];
+  let n;
+  if (s.includes(",")) {
+    n = parseFloat(s.replace(/\./g, "").replace(",", "."));
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
+    n = parseFloat(s.replace(/\./g, ""));
+  } else {
+    n = parseFloat(s);
+  }
+  if (Number.isFinite(n) && /\bmil\b/i.test(t)) n *= 1000;
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
@@ -1441,15 +1495,36 @@ async function handlerCltOrigCapturaCpf(de, businessNumberId, corpo) {
   }
   const existente = await db.cltOriginationBuscarAberta(de, businessNumberId);
   if (existente) {
+    const prazoAplicavel =
+      existente.etapa === "aguardando_autorizacao"
+        ? CLTORIG_PRAZO_AUTORIZACAO_MS
+        : CLTORIG_ETAPAS_COM_PRAZO_CURTO.includes(existente.etapa)
+        ? CLTORIG_PRAZO_MS
+        : null; // 'aguardando_pagamento' etc — sem prazo aqui, essas legitimamente levam dias
     const expirada =
-      CLTORIG_ETAPAS_COM_PRAZO.includes(existente.etapa) &&
-      Date.now() - Number(existente.etapa_em || existente.updated_at) > CLTORIG_PRAZO_MS;
+      prazoAplicavel !== null && Date.now() - Number(existente.etapa_em || existente.updated_at) > prazoAplicavel;
     if (!expirada) {
+      if (existente.etapa === "aguardando_email") {
+        // Corrige o CPF sem trocar de etapa — permite corrigir um typo sem esperar o prazo
+        // inteiro (achado na revisão final).
+        await db.cltOriginationAtualizar(existente.id, { cpf });
+        await enviarRespostaAutomatica(businessNumberId, de, "CPF atualizado! Agora me manda seu e-mail, por favor 😊");
+        await db.setFluxoPasso(de, businessNumberId, "cltorig_email");
+        return;
+      }
+      if (existente.etapa === "aguardando_autorizacao") {
+        const linkTexto = existente.consent_url ? `\n${existente.consent_url}` : "";
+        await enviarRespostaAutomatica(businessNumberId, de, `Ainda esperando você assinar o termo de autorização.${linkTexto}`);
+        return;
+      }
+      const info = CLTORIG_ETAPA_REENTRADA[existente.etapa];
       await enviarRespostaAutomatica(
         businessNumberId,
         de,
-        "Você já tem uma simulação de consignado CLT em andamento — já já eu te aviso por aqui assim que tiver novidade. 😊"
+        info?.texto ||
+          "Você já tem uma simulação de consignado CLT em andamento — já já eu te aviso por aqui assim que tiver novidade. 😊"
       );
+      await db.setFluxoPasso(de, businessNumberId, info?.passo ?? null);
       return;
     }
     await db.cltOriginationAtualizar(existente.id, { etapa: "sem_oferta" });
@@ -1473,23 +1548,33 @@ async function handlerCltOrigCapturaEmail(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "cltorig_cpf");
     return;
   }
+  // Reivindicação atômica antes de chamar a Unnotech (achado na revisão final: sem isso, uma
+  // reentrega do mesmo webhook pela Meta, ou o cliente mandando o e-mail 2x rápido, abria 2
+  // solicitações de verdade na Unnotech pra mesma pessoa).
+  const reivindicou = await db.cltOriginationReivindicar(row.id, "aguardando_email", "abrindo_solicitacao");
+  if (!reivindicou) return;
   await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Só um instante enquanto eu abro sua solicitação... ⏳");
   try {
     const idempotencyKey = crypto.randomUUID();
     const telefone = de.replace(/\D/g, "");
     const app = await unnotech.criarSolicitacaoClt(row.cpf, telefone, email, idempotencyKey);
+    const consentUrl = app.authorization?.consent_url || null;
     await db.cltOriginationAtualizar(row.id, {
       application_id: app.application_id,
       etapa: "aguardando_autorizacao",
       idempotency_key_atual: idempotencyKey,
+      consent_url: consentUrl,
     });
-    const consentUrl = app.authorization?.consent_url;
+    // Guarda contra consent_url ausente (achado na revisão final: sem isso, uma resposta sem o
+    // link virava "assine:\nundefined" pro cliente).
     await enviarRespostaAutomatica(
       businessNumberId,
       de,
-      `Pra continuar, você precisa assinar o termo de autorização (é só 1 vez, vale pra todas as ` +
-        `instituições parceiras). Toque no link e assine:\n${consentUrl}\n\nAssim que você assinar, eu ` +
-        `continuo automaticamente por aqui — pode levar alguns minutinhos. 😊`
+      consentUrl
+        ? `Pra continuar, você precisa assinar o termo de autorização (é só 1 vez, vale pra todas as ` +
+            `instituições parceiras). Toque no link e assine:\n${consentUrl}\n\nAssim que você assinar, eu ` +
+            `continuo automaticamente por aqui — pode levar alguns minutinhos. 😊`
+        : "Pra continuar, você precisa assinar o termo de autorização — já já eu te mando o link. 😊"
     );
     await db.setFluxoPasso(de, businessNumberId, null);
   } catch (err) {
@@ -1505,8 +1590,21 @@ async function processarEtapaCltAguardandoAutorizacao(row) {
     await db.cltOriginationAtualizar(row.id, { etapa: "consultando_margem", status_unnotech: status.status });
     return;
   }
-  if (status.authorization_status === "NOT_AVAILABLE") {
+  // Achado na revisão final: só checava NOT_AVAILABLE — se o `status` geral da solicitação
+  // virasse EXPIRED/CANCELLED/FAILED por qualquer motivo do lado da Unnotech, a linha continuava
+  // sendo consultada pra sempre (o teto de tempo abaixo cobre o resto, mas um status terminal
+  // conhecido não precisa esperar o prazo inteiro).
+  if (status.authorization_status === "NOT_AVAILABLE" || ["EXPIRED", "CANCELLED", "FAILED"].includes(status.status)) {
     await finalizarCltSemOferta(row, "autorizacao_indisponivel");
+    return;
+  }
+  if (Date.now() - Number(row.etapa_em || row.created_at) > CLTORIG_PRAZO_AUTORIZACAO_MS) {
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de autorização travada (linha CLT #${row.id}):`, err.message);
+    }
     return;
   }
   await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
@@ -1514,21 +1612,26 @@ async function processarEtapaCltAguardandoAutorizacao(row) {
 
 // Depois de escolher/receber o vínculo (1 só ou escolhido numa lista), pergunta parcela x valor
 // líquido — mostra a margem disponível na mesma mensagem, ajuda o cliente a já pensar num número.
+// Estado no banco ANTES de enviar (achado na revisão final, mesmo padrão de finalizarCltSemOferta).
 async function prosseguirComVinculoClt(row, vinculo) {
   await db.cltOriginationAtualizar(row.id, {
     employment_id: vinculo.employment_id,
-    margem_disponivel: vinculo.available_margin || null,
+    margem_disponivel: vinculo.available_margin ?? null,
     etapa: "escolhendo_valor",
   });
-  await enviarRespostaAutomatica(
-    row.business_number_id,
-    row.phone,
-    `Sua margem disponível é de R$ ${Number(vinculo.available_margin || 0).toFixed(2)} por mês. Como você prefere simular?`,
-    [
-      { id: "cltorig_parcela", title: "VALOR DA PARCELA" },
-      { id: "cltorig_liquido", title: "VALOR QUE RECEBO" },
-    ]
-  );
+  try {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      `Sua margem disponível é de R$ ${Number(vinculo.available_margin || 0).toFixed(2)} por mês. Como você prefere simular?`,
+      [
+        { id: "cltorig_parcela", title: "VALOR DA PARCELA" },
+        { id: "cltorig_liquido", title: "VALOR QUE RECEBO" },
+      ]
+    );
+  } catch (err) {
+    console.error(`Erro ao mandar pergunta de base de simulação CLT (linha #${row.id}):`, err.message);
+  }
 }
 
 async function processarEtapaCltConsultandoMargem(row) {
@@ -1537,7 +1640,15 @@ async function processarEtapaCltConsultandoMargem(row) {
     await finalizarCltSemOferta(row, "sem_margem");
     return;
   }
-  if (status.status === "MARGIN_QUERY") {
+  if (["EXPIRED", "CANCELLED", "FAILED"].includes(status.status)) {
+    await finalizarCltSemOferta(row, "desconhecido");
+    return;
+  }
+  if (status.status !== "AWAITING_SIMULATION") {
+    // Ainda processando (MARGIN_QUERY ou outro status intermediário) — achado na revisão final:
+    // a versão anterior só media o prazo quando o status era LITERALMENTE "MARGIN_QUERY"; se a
+    // API devolvesse qualquer outro status intermediário não mapeado, o relógio de 45min nunca
+    // rodava e a linha ficava consultando pra sempre.
     if (Date.now() - Number(row.etapa_em || row.created_at) > CLTORIG_PRAZO_MARGEM_MS) {
       await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
       try {
@@ -1550,35 +1661,46 @@ async function processarEtapaCltConsultandoMargem(row) {
     await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
     return;
   }
-  // Passou de MARGIN_QUERY (normalmente AWAITING_SIMULATION) — busca os vínculos de verdade.
   const margem = await unnotech.consultarMargemClt(row.application_id);
   const vinculos = margem.employments || [];
   if (!vinculos.length) {
     await finalizarCltSemOferta(row, "sem_margem");
     return;
   }
-  await db.cltOriginationAtualizar(row.id, { employments_cache: JSON.stringify(vinculos), status_unnotech: status.status });
   if (vinculos.length === 1) {
+    await db.cltOriginationAtualizar(row.id, { employments_cache: JSON.stringify(vinculos), status_unnotech: status.status });
     await prosseguirComVinculoClt(row, vinculos[0]);
     return;
   }
-  // Lista limitada a 10 (limite do WhatsApp) — caso real de mais vínculos que isso é tratado
-  // como o mesmo cuidado do resto do código: melhor mostrar os 10 primeiros do que travar.
-  await enviarRespostaAutomatica(
-    row.business_number_id,
-    row.phone,
-    "Encontrei mais de um vínculo de trabalho no seu nome — qual você quer usar pra simular?",
-    null,
-    {
-      botao: "Escolher vínculo",
-      opcoes: vinculos.slice(0, 10).map((v, i) => ({
-        id: `cltorig_vinculo_${v.employment_id}`,
-        title: (v.employer_name || `Vínculo ${i + 1}`).slice(0, 24),
-        description: `Margem disponível: R$ ${Number(v.available_margin || 0).toFixed(2)}`,
-      })),
-    }
-  );
-  await db.cltOriginationAtualizar(row.id, { etapa: "escolhendo_vinculo" });
+  // Lista limitada a 10 (limite do WhatsApp) — ordena pelas maiores margens primeiro pra não
+  // esconder os melhores vínculos de quem tiver mais de 10 (achado na revisão final).
+  const ordenados = [...vinculos].sort((a, b) => Number(b.available_margin || 0) - Number(a.available_margin || 0));
+  // Estado no banco ANTES de mandar a lista (achado na revisão final: mandar primeiro fazia o
+  // verificador refazer a MESMA consulta de margem e reenviar a MESMA lista a cada 30s se o
+  // envio falhasse por qualquer motivo).
+  await db.cltOriginationAtualizar(row.id, {
+    employments_cache: JSON.stringify(vinculos),
+    status_unnotech: status.status,
+    etapa: "escolhendo_vinculo",
+  });
+  try {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      "Encontrei mais de um vínculo de trabalho no seu nome — qual você quer usar pra simular?",
+      null,
+      {
+        botao: "Escolher vínculo",
+        opcoes: ordenados.slice(0, 10).map((v, i) => ({
+          id: `cltorig_vinculo_${v.employment_id}`,
+          title: (v.employer_name || `Vínculo ${i + 1}`).slice(0, 24),
+          description: `Margem disponível: R$ ${Number(v.available_margin || 0).toFixed(2)}`,
+        })),
+      }
+    );
+  } catch (err) {
+    console.error(`Erro ao mandar lista de vínculos CLT (linha #${row.id}):`, err.message);
+  }
 }
 
 // Clique numa linha da lista de vínculos — id dinâmico ("cltorig_vinculo_<employment_id>"), por
@@ -1592,7 +1714,10 @@ async function handlerCltOrigEscolherVinculo(de, businessNumberId, employmentId)
   } catch {
     vinculos = [];
   }
-  const vinculo = vinculos.find((v) => v.employment_id === employmentId);
+  // String() dos dois lados (achado na revisão final: employmentId vem sempre como string do
+  // id do botão, mas nada garante que a API devolve employment_id como string também — uma
+  // comparação estrita ia deixar a pessoa travada em silêncio se viesse número).
+  const vinculo = vinculos.find((v) => String(v.employment_id) === employmentId);
   if (!vinculo) return;
   await prosseguirComVinculoClt(row, vinculo);
 }
@@ -1620,6 +1745,10 @@ async function handlerCltOrigLiquido(de, businessNumberId) {
 async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
   const valor = extrairValorReais(corpo);
   if (!valor) {
+    // Achado na revisão final: quando não reconhecia nenhum valor, a versão anterior não
+    // mandava mensagem nenhuma (só resetava o passo) — quem digitasse algo que não parecesse
+    // número ficava em silêncio total, sem saber o que fazer.
+    await enviarRespostaAutomatica(businessNumberId, de, "Não consegui entender esse valor — me manda só o número, por favor (ex.: 300 ou 3000). 😊");
     await db.setFluxoPasso(de, businessNumberId, "cltorig_valor");
     return;
   }
@@ -1635,6 +1764,10 @@ async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, "cltorig_valor");
     return;
   }
+  // Reivindicação atômica (achado na revisão final: mesmo risco de duplo-processamento do
+  // e-mail — mensagem repetida/reentregue podia disparar 2 simulações pro mesmo pedido).
+  const reivindicou = await db.cltOriginationReivindicar(row.id, "aguardando_valor", "simulando_pendente");
+  if (!reivindicou) return;
   await enviarRespostaAutomatica(businessNumberId, de, "Simulando... isso leva só um minutinho ⏳");
   try {
     const idempotencyKey = crypto.randomUUID();
@@ -1643,7 +1776,11 @@ async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
     await db.setFluxoPasso(de, businessNumberId, null);
   } catch (err) {
     if (err.codigo === "INSTALLMENT_EXCEEDS_MARGIN" || /INSTALLMENT_EXCEEDS_MARGIN/.test(err.message || "")) {
-      await enviarRespostaAutomatica(businessNumberId, de, "Esse valor passa da sua margem disponível — me manda um valor de parcela menor, por favor.");
+      // Volta pra 'aguardando_valor' (tínhamos reivindicado 'simulando_pendente' acima) —
+      // achado na revisão final: sem isso a linha ficava presa nesse estado transitório.
+      const maxTexto = row.margem_disponivel ? ` (limite: R$ ${Number(row.margem_disponivel).toFixed(2)} por mês)` : "";
+      await enviarRespostaAutomatica(businessNumberId, de, `Esse valor passa da sua margem disponível${maxTexto} — me manda um valor de parcela menor, por favor.`);
+      await db.cltOriginationAtualizar(row.id, { etapa: "aguardando_valor" });
       await db.setFluxoPasso(de, businessNumberId, "cltorig_valor");
       return;
     }
@@ -1655,7 +1792,10 @@ async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
 
 async function processarEtapaCltSimulando(row) {
   const status = await unnotech.consultarStatusClt(row.application_id);
-  if (status.status === "OFFERS_AVAILABLE") {
+  // Achado na revisão final: reagir a OFFERS_AVAILABLE sem checar quotes_pending podia ler um
+  // menu PARCIAL (a primeira bancarizadora respondeu, as outras ainda estão cotando) — a doc é
+  // clara que essa etapa espera quotes_pending chegar a 0.
+  if (status.status === "OFFERS_AVAILABLE" && Number(status.quotes_pending || 0) === 0) {
     const completa = await unnotech.consultarSolicitacaoCompletaClt(row.application_id);
     const oferta = unnotech.escolherMelhorOferta(completa.offers);
     if (!oferta) {
@@ -1699,14 +1839,22 @@ async function handlerCltOrigContratar(de, businessNumberId) {
   const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
   if (!row || row.etapa !== "oferta_apresentada") return;
   const flowToken = crypto.randomUUID();
+  try {
+    // Manda o Flow ANTES de gravar a etapa (achado na revisão final: a ordem inversa deixava a
+    // linha travada em 'formulario' pra sempre se o envio falhasse — ex.: CLT_FLOW_ID errado ou
+    // Flow não publicado — porque a guarda de etapa acima passa a ignorar um 2º clique).
+    await wa.sendFlow(businessNumberId, de, {
+      flowId: process.env.CLT_FLOW_ID,
+      flowToken,
+      bodyText: "Show! Só preciso de mais alguns dados pra fechar a contratação. Toca no botão abaixo:",
+      ctaText: "Preencher dados",
+      screenId: "DADOS_PESSOAIS",
+    });
+  } catch (err) {
+    console.error(`Erro ao enviar Flow CLT (linha #${row.id}):`, err.message);
+    return;
+  }
   await db.cltOriginationAtualizar(row.id, { flow_token: flowToken, etapa: "formulario" });
-  await wa.sendFlow(businessNumberId, de, {
-    flowId: process.env.CLT_FLOW_ID,
-    flowToken,
-    bodyText: "Show! Só preciso de mais alguns dados pra fechar a contratação. Toca no botão abaixo:",
-    ctaText: "Preencher dados",
-    screenId: "DADOS_PESSOAIS",
-  });
   await db.setFluxoPasso(de, businessNumberId, "cltorig_formulario");
 }
 
@@ -1731,32 +1879,46 @@ async function processarSubmissaoFormularioClt(flowToken, de, businessNumberId, 
   try {
     const kyc = unnotech.montarPayloadKycClt(row.cpf, dados);
     await unnotech.enviarKycClt(row.application_id, kyc);
-    const idempotencyKey = crypto.randomUUID();
+    const idempotencyKeyAceite = crypto.randomUUID();
     try {
-      await unnotech.aceitarOfertaClt(row.application_id, row.offer_id, idempotencyKey);
+      await unnotech.aceitarOfertaClt(row.application_id, row.offer_id, idempotencyKeyAceite);
     } catch (err) {
       const expirou = err.codigo === "OFFER_EXPIRED" || /OFFER_EXPIRED/.test(err.message || "");
       if (expirou) {
         // Sem endpoint de "requote" no CLT (a doc é explícita) — a única forma de renovar o menu
-        // é simular de novo com os mesmos parâmetros já escolhidos (vínculo, base, valor).
+        // é simular de novo com os mesmos parâmetros já escolhidos (vínculo, base, valor). Chave
+        // de idempotência NOVA (achado na revisão final: reaproveitar a do /accept que acabou de
+        // falhar arriscava a Unnotech tratar como replay daquela chamada, não como simulação nova).
+        const idempotencyKeySimulacao = crypto.randomUUID();
         await unnotech.simularClt(
           row.application_id,
           { employmentId: row.employment_id, basis: row.basis, valor: row.valor_desejado },
-          idempotencyKey
+          idempotencyKeySimulacao
         );
-        await enviarRespostaAutomatica(
-          row.business_number_id,
-          row.phone,
-          "A oferta expirou enquanto você preenchia — já busquei uma nova simulação, só um instante..."
-        );
-        await db.cltOriginationAtualizar(row.id, { etapa: "simulando", offer_id: null, idempotency_key_atual: idempotencyKey });
+        await db.cltOriginationAtualizar(row.id, { etapa: "simulando", offer_id: null, idempotency_key_atual: idempotencyKeySimulacao });
+        try {
+          await enviarRespostaAutomatica(
+            row.business_number_id,
+            row.phone,
+            "A oferta expirou enquanto você preenchia — já busquei uma nova simulação, só um instante..."
+          );
+        } catch (err2) {
+          console.error(`Erro ao avisar cliente de reoferta CLT (linha #${row.id}):`, err2.message);
+        }
         return;
       }
       throw err;
     }
-    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
-    await db.cltOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", idempotency_key_atual: idempotencyKey });
+    // Estado no banco ANTES de avisar o cliente (achado na revisão final: se o aviso falhar
+    // depois do aceite já ter sido feito de verdade na Unnotech, a linha não pode cair em 'erro'
+    // — senão o verificador para de acompanhar um contrato que já está em andamento de verdade).
+    await db.cltOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", idempotency_key_atual: idempotencyKeyAceite });
     await db.setFluxoPasso(row.phone, row.business_number_id, null);
+    try {
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
+    } catch (err) {
+      console.error(`Erro ao avisar cliente do aceite CLT (linha #${row.id}):`, err.message);
+    }
   } catch (err) {
     console.error(`Erro ao processar formulário CLT (linha #${row.id}):`, err.message);
     await db.cltOriginationAtualizar(row.id, { etapa: "erro" });
@@ -1769,61 +1931,33 @@ async function processarSubmissaoFormularioClt(flowToken, de, businessNumberId, 
 }
 
 // Diferente do FGTS, CONTRACT_REJECTED não é terminal aqui (a doc é explícita: aceitando outra
-// oferta do mesmo menu a solicitação volta a CONTRACTING) — tenta a próxima oferta elegível do
-// offers_cache automaticamente, sem precisar pedir nada de novo ao cliente (o KYC já está salvo
-// na Unnotech). Só escala pro humano quando esgotar o menu inteiro.
+// oferta do mesmo menu a solicitação volta a CONTRACTING) — tenta a próxima oferta elegível
+// automaticamente, sem precisar pedir nada de novo ao cliente (o KYC já está salvo na
+// Unnotech). Só escala pro humano quando esgotar o menu inteiro.
 async function processarEtapaCltAguardandoAssinatura(row) {
   const status = await unnotech.consultarStatusClt(row.application_id);
   if (status.status === "CONTRACT_REJECTED") {
-    let ofertas = [];
-    let tentadas = [];
-    try {
-      ofertas = JSON.parse(row.offers_cache || "[]");
-    } catch {
-      ofertas = [];
-    }
-    try {
-      tentadas = JSON.parse(row.tentativas_offer_ids || "[]");
-    } catch {
-      tentadas = [];
-    }
-    if (row.offer_id && !tentadas.includes(row.offer_id)) tentadas.push(row.offer_id);
-    const proxima = unnotech.escolherMelhorOferta(ofertas, tentadas);
-    if (!proxima) {
-      await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
-      try {
-        await enviarRespostaAutomatica(
-          row.business_number_id,
-          row.phone,
-          "Nenhuma das ofertas foi aprovada pelos bancos. Vou te colocar com um atendente pra ver outras opções."
-        );
-        await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
-      } catch (err) {
-        console.error(`Erro ao avisar cliente de recusa total CLT (linha #${row.id}):`, err.message);
-      }
-      return;
-    }
-    try {
-      const idempotencyKey = crypto.randomUUID();
-      await unnotech.aceitarOfertaClt(row.application_id, proxima.offer_id, idempotencyKey);
-      await db.cltOriginationAtualizar(row.id, {
-        offer_id: proxima.offer_id,
-        tentativas_offer_ids: JSON.stringify(tentadas),
-        idempotency_key_atual: idempotencyKey,
-        status_unnotech: status.status,
-      });
-    } catch (err) {
-      console.error(`Erro ao tentar próxima oferta CLT (linha #${row.id}):`, err.message);
-      await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
-      try {
-        await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
-      } catch (err2) {
-        console.error(`Erro ao avisar cliente (linha CLT #${row.id}):`, err2.message);
-      }
-    }
+    // Reivindicação atômica ANTES de tentar a próxima oferta — achado na revisão final: sem
+    // isso, se o aceite anterior ainda não tivesse "pegado" do lado da Unnotech quando o próximo
+    // tick rodasse, dois ticks liam CONTRACT_REJECTED em sequência e aceitavam 2 ofertas
+    // diferentes, queimando o menu à toa.
+    const reivindicou = await db.cltOriginationReivindicar(row.id, "aguardando_assinatura", "retentando_oferta");
+    if (!reivindicou) return; // outro tick já está tratando essa recusa
+    await tratarOfertaRecusadaClt(row);
     return;
   }
   if (!status.proposal_uuid) {
+    // Achado na revisão final: essa etapa não tinha teto de tempo nenhum pra status que não é
+    // nem CONTRACT_REJECTED nem terminal — um estado inesperado travava pra sempre.
+    if (Date.now() - Number(row.etapa_em || row.created_at) > CLTORIG_PRAZO_LONGO_MS) {
+      await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+      try {
+        await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+      } catch (err) {
+        console.error(`Erro ao avisar cliente de assinatura travada CLT (linha #${row.id}):`, err.message);
+      }
+      return;
+    }
     await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
     return;
   }
@@ -1831,12 +1965,17 @@ async function processarEtapaCltAguardandoAssinatura(row) {
     await db.cltOriginationAtualizar(row.id, { proposal_uuid: status.proposal_uuid, status_unnotech: status.status });
   }
   if (status.status === "SIGNED" || status.status === "ENDORSED") {
-    await enviarRespostaAutomatica(
-      row.business_number_id,
-      row.phone,
-      "Contrato assinado! 🎉 Agora é só aguardar a averbação e o depósito — te aviso assim que cair na sua conta."
-    );
+    // Estado no banco antes do aviso (achado na revisão final, mesmo padrão do resto do bloco).
     await db.cltOriginationAtualizar(row.id, { etapa: "aguardando_pagamento", status_unnotech: status.status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Contrato assinado! 🎉 Agora é só aguardar a averbação e o depósito — te aviso assim que cair na sua conta."
+      );
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de assinatura CLT (linha #${row.id}):`, err.message);
+    }
     return;
   }
   if (["FAILED", "REJECTED", "CANCELLED"].includes(status.status)) {
@@ -1856,21 +1995,110 @@ async function processarEtapaCltAguardandoAssinatura(row) {
   if (row.link_assinatura_enviado_em) return;
   const proposta = await unnotech.consultarProposta(status.proposal_uuid);
   if (proposta.signature_link) {
-    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Seu contrato está pronto! ✍️ Assim que você assinar, eu te aviso por aqui.");
-    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Toque no botão abaixo pra assinar:", null, null, {
-      buttonText: "Assinar contrato",
-      url: proposta.signature_link,
-    });
     await db.cltOriginationAtualizar(row.id, { link_assinatura_enviado_em: Date.now() });
+    try {
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "Seu contrato está pronto! ✍️ Assim que você assinar, eu te aviso por aqui.");
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "Toque no botão abaixo pra assinar:", null, null, {
+        buttonText: "Assinar contrato",
+        url: proposta.signature_link,
+      });
+    } catch (err) {
+      console.error(`Erro ao mandar link de assinatura CLT (linha #${row.id}):`, err.message);
+    }
+  }
+}
+
+// Extraído de processarEtapaCltAguardandoAssinatura pra rodar só depois da reivindicação
+// atômica (ver comentário lá). Busca o menu de ofertas AO VIVO — achado na revisão final: usar
+// o offers_cache (a foto tirada no momento da simulação) pra escolher a próxima tentativa é
+// arriscado, porque na hora da recusa a Unnotech já reavaliou KYC/crédito, e o `expires_at`
+// daquela foto provavelmente já passou — o offers_cache é só ATUALIZADO com o menu novo, nunca
+// mais usado como fonte pra escolher.
+async function tratarOfertaRecusadaClt(row) {
+  let tentadas = [];
+  try {
+    tentadas = JSON.parse(row.tentativas_offer_ids || "[]");
+  } catch {
+    tentadas = [];
+  }
+  if (row.offer_id && !tentadas.includes(row.offer_id)) tentadas.push(row.offer_id);
+  let ofertasVivas;
+  try {
+    const completa = await unnotech.consultarSolicitacaoCompletaClt(row.application_id);
+    ofertasVivas = completa.offers || [];
+  } catch (err) {
+    console.error(`Erro ao rebuscar ofertas CLT após recusa (linha #${row.id}):`, err.message);
+    // Volta pra 'aguardando_assinatura' (reivindicamos 'retentando_oferta' antes de chamar esta
+    // função) — tenta de novo no próximo tick, sem perder o registro do que já foi tentado.
+    await db.cltOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", tentativas_offer_ids: JSON.stringify(tentadas) });
+    return;
+  }
+  const proxima = unnotech.escolherMelhorOferta(ofertasVivas, tentadas);
+  if (!proxima) {
+    // 'sem_oferta' (não 'erro') — recusa de todo o menu é desfecho de negócio, não falha técnica.
+    await db.cltOriginationAtualizar(row.id, { etapa: "sem_oferta", tentativas_offer_ids: JSON.stringify(tentadas) });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Nenhuma das ofertas foi aprovada pelos bancos. Vou te colocar com um atendente pra ver outras opções."
+      );
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de recusa total CLT (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  try {
+    const idempotencyKey = crypto.randomUUID();
+    await unnotech.aceitarOfertaClt(row.application_id, proxima.offer_id, idempotencyKey);
+    // Zera proposal_uuid/link — a nova aceitação gera uma proposta NOVA (achado na revisão
+    // final: sem isso, a trava "já mandei o link" impedia mandar o link do CONTRATO NOVO, e o
+    // cliente ficava só com o link do contrato já recusado).
+    await db.cltOriginationAtualizar(row.id, {
+      etapa: "aguardando_assinatura",
+      offer_id: proxima.offer_id,
+      offers_cache: JSON.stringify(ofertasVivas),
+      tentativas_offer_ids: JSON.stringify(tentadas),
+      idempotency_key_atual: idempotencyKey,
+      proposal_uuid: null,
+      link_assinatura_enviado_em: null,
+    });
+    try {
+      // Achado na revisão final (ruling amendado): a oferta nova pode ter termos diferentes da
+      // que o cliente aceitou antes (valor, parcela, taxa, até banco) — avisar em vez de trocar
+      // em silêncio.
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        `A oferta anterior não foi aprovada pelo banco, mas encontrei outra opção: *R$ ${Number(proxima.net_amount).toFixed(2)}* ` +
+          `liberado, em ${proxima.installment_count}x de R$ ${Number(proxima.installment_amount).toFixed(2)}, taxa de ` +
+          `${proxima.monthly_interest_rate}% ao mês. Vou seguir com essa — se preferir não continuar, é só me avisar. 😊`
+      );
+    } catch (err) {
+      console.error(`Erro ao avisar cliente da nova oferta CLT (linha #${row.id}):`, err.message);
+    }
+  } catch (err) {
+    console.error(`Erro ao tentar próxima oferta CLT (linha #${row.id}):`, err.message);
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro", tentativas_offer_ids: JSON.stringify(tentadas) });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente (linha CLT #${row.id}):`, err2.message);
+    }
   }
 }
 
 async function processarEtapaCltAguardandoPagamento(row) {
   const status = await unnotech.consultarStatusClt(row.application_id);
   if (status.status === "DISBURSED") {
-    await enviarRespostaAutomatica(row.business_number_id, row.phone, "O valor já caiu! 💰 Qualquer coisa, é só me chamar.");
     await db.cltOriginationAtualizar(row.id, { etapa: "concluido", status_unnotech: status.status });
     await db.setFluxoPasso(row.phone, row.business_number_id, null);
+    try {
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "O valor já caiu! 💰 Qualquer coisa, é só me chamar.");
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de pagamento CLT (linha #${row.id}):`, err.message);
+    }
   } else if (["FAILED", "REJECTED", "CANCELLED"].includes(status.status)) {
     await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
     try {
@@ -1882,6 +2110,14 @@ async function processarEtapaCltAguardandoPagamento(row) {
       await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
     } catch (err) {
       console.error(`Erro ao avisar cliente de falha pós-assinatura CLT (linha #${row.id}):`, err.message);
+    }
+  } else if (Date.now() - Number(row.etapa_em || row.created_at) > CLTORIG_PRAZO_LONGO_MS) {
+    // Achado na revisão final: essa etapa também não tinha teto de tempo nenhum.
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de pagamento travado CLT (linha #${row.id}):`, err.message);
     }
   } else {
     await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });

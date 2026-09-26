@@ -366,6 +366,7 @@ const ready = (async () => {
     proposal_uuid TEXT,
     link_assinatura_enviado_em INTEGER,
     flow_token TEXT,
+    consent_url TEXT,
     etapa TEXT NOT NULL DEFAULT 'aguardando_autorizacao',
     etapa_em INTEGER,
     status_unnotech TEXT,
@@ -1385,11 +1386,16 @@ async function cltOriginationBuscarPorFlowToken(token) {
   return result.rows[0] || null;
 }
 
+// Também marca etapa_em (achado na revisão final: cltOriginationAtualizar já faz isso quando
+// `etapa` está entre os campos, mas essa função tem seu próprio UPDATE — sem espelhar aqui, uma
+// reivindicação (ex.: 'aguardando_valor' -> 'simulando_pendente') não resetava o relógio do
+// prazo por etapa, quebrando a invariante que o resto do código conta com).
 async function cltOriginationReivindicar(id, etapaEsperada, etapaNova) {
   await ready;
+  const agora = Date.now();
   const result = await client.execute({
-    sql: `UPDATE clt_origination SET etapa = ?, updated_at = ? WHERE id = ? AND etapa = ?`,
-    args: [etapaNova, Date.now(), id, etapaEsperada],
+    sql: `UPDATE clt_origination SET etapa = ?, etapa_em = ?, updated_at = ? WHERE id = ? AND etapa = ?`,
+    args: [etapaNova, agora, agora, id, etapaEsperada],
   });
   return result.rowsAffected > 0;
 }

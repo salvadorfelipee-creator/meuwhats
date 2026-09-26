@@ -281,7 +281,13 @@ async function criarSolicitacaoClt(cpf, phone, email, idempotencyKey) {
     idempotencyKey,
     body: { customer: { cpf, phone, email } },
   });
-  if (status >= 400) throw new Error(`Falha ao abrir solicitação CLT: ${JSON.stringify(body)}`);
+  if (status >= 400) {
+    // .codigo propagado (achado na revisão final) — sem isso, não dava pra distinguir um 409 de
+    // "já existe solicitação aberta pra esse CPF" de qualquer outra falha.
+    const err = new Error(`Falha ao abrir solicitação CLT: ${JSON.stringify(body)}`);
+    err.codigo = body?.error?.code || null;
+    throw err;
+  }
   return body;
 }
 
@@ -302,12 +308,6 @@ async function consultarSolicitacaoCompletaClt(applicationId) {
 async function consultarMargemClt(applicationId) {
   const { status, body } = await chamarAutenticado("GET", `/api/v1/clt/applications/${applicationId}/margin`);
   if (status >= 400) throw new Error(`Falha ao consultar margem CLT: ${JSON.stringify(body)}`);
-  return body;
-}
-
-async function forcarVerificacaoConsentimentoClt(applicationId) {
-  const { status, body } = await chamarAutenticado("POST", `/api/v1/clt/applications/${applicationId}/authorization`);
-  if (status >= 400) throw new Error(`Falha ao forçar verificação de consentimento: ${JSON.stringify(body)}`);
   return body;
 }
 
@@ -437,7 +437,6 @@ module.exports = {
   consultarStatusClt,
   consultarSolicitacaoCompletaClt,
   consultarMargemClt,
-  forcarVerificacaoConsentimentoClt,
   simularClt,
   montarPayloadKycClt,
   enviarKycClt,
