@@ -725,6 +725,8 @@ const LEMBRETE_MINUTOS = {
   financiamento_dados: 15,
   fgts_cpf: 15,
   campanha_clt_dados: [15, 240],
+  cltorig_cpf: 15,
+  cltorig_email: 15,
 };
 
 const LEMBRETE_TEXTOS = {
@@ -760,6 +762,8 @@ const LEMBRETE_TEXTOS = {
   fgts_cpf:
     "Olá! Só lembrando que pra eu simular o saque do FGTS, preciso do seu CPF 😊 (depois de você já ter " +
     "autorizado a J17 lá no aplicativo do FGTS).",
+  cltorig_cpf: "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso do seu CPF 😊",
+  cltorig_email: "Olá! Só lembrando que pra eu abrir sua solicitação de consignado CLT, preciso do seu e-mail 😊",
   campanha_clt_dados: [
     "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso desses dados 😊\n" +
       "Nome completo, CPF, telefone, e-mail e data de nascimento — pode mandar tudo numa mensagem só.",
@@ -789,6 +793,11 @@ const FLUXO_BOTOES = {
   // Botões da oferta apresentada pelo verificador de originação FGTS (ver processarEtapaAbrindo).
   fgtsorig_contratar: handlerFgtsOrigContratar,
   fgtsorig_agora_nao: handlerFgtsOrigAgoraNao,
+  // Botões da originação automática de consignado CLT (ver bloco CLT_ORIGINATION_ATIVO acima).
+  cltorig_parcela: handlerCltOrigParcela,
+  cltorig_liquido: handlerCltOrigLiquido,
+  cltorig_contratar: handlerCltOrigContratar,
+  cltorig_agora_nao: handlerCltOrigAgoraNao,
   fluxo_gerente: {
     texto:
       "Olá! Vejo que você clicou no nosso anúncio direcionado para GERENTE/SUPERVISOR. " +
@@ -844,13 +853,11 @@ const FLUXO_BOTOES = {
       "Enquanto isso, você pode conhecer nosso site: www.felizcred.com.br",
   },
   // Funil de Consignado CLT (12/08/2026) — resposta da qualificação de tempo de carteira
-  // assinada, enviada por handlerMenuPrincipal (opção 1). clt_3mais segue pra captura de
-  // dados (handlerCapturaDadosClt); clt_menos3 é terminal, sem mais nada esperado da pessoa.
-  clt_3mais: {
-    texto:
-      "Show! 😊 Pra simular preciso de mais 5 coisinhas, pode mandar tudo numa mensagem só:\n" +
-      "• Nome completo\n• CPF\n• Telefone\n• E-mail\n• Data de nascimento",
-  },
+  // assinada, enviada por handlerMenuPrincipal (opção 1). Virou função (handlerCltTresMaisMeses)
+  // em 26/09/2026 pra poder decidir entre a automação Unnotech (em standby) e o comportamento
+  // manual de sempre (handlerCapturaDadosClt); clt_menos3 é terminal, sem mais nada esperado da
+  // pessoa, continua igual.
+  clt_3mais: handlerCltTresMaisMeses,
   clt_menos3: {
     texto:
       "Como você ainda não completou 3 meses no seu trabalho atual, não é possível simular agora. " +
@@ -1335,6 +1342,552 @@ async function handlerFgtsOrigAgoraNao(de, businessNumberId) {
   if (row) await db.fgtsOriginationAtualizar(row.id, { etapa: "sem_oferta" });
 }
 
+// ─── ORIGINAÇÃO AUTOMÁTICA DE CONSIGNADO CLT VIA UNNOTECH ──────────────────────────────────
+// Ver docs/superpowers/specs/2026-09-26-clt-unnotech-design.md pro desenho completo. Mesmo
+// papel que o bloco de FGTS acima (tabela própria clt_origination + verificador de 30s), mas
+// com 3 portões que o FGTS não tem: autorização do trabalhador, consulta de margem por
+// vínculo, e escolha entre parcela/valor líquido antes de simular.
+//
+// Trava de standby — a Unnotech ainda não liberou credencial de produção pro parceiro
+// (mesma pendência que já bloqueia o FGTS). Enquanto false, "3 MESES OU MAIS" continua se
+// comportando exatamente como hoje (pede os 5 dados em texto livre, atendimento humano).
+// Pra ativar depois que a credencial chegar: troque pra true (e confirme que
+// UNNOTECH_CLIENT_ID/UNNOTECH_CLIENT_SECRET são válidos) e faça o deploy.
+const CLT_ORIGINATION_ATIVO = false;
+
+const CLTORIG_TEXTO_TERMINAL = {
+  autorizacao_indisponivel:
+    "Não consegui confirmar sua autorização — pelo visto seu CPF ainda não está disponível pra " +
+    "consulta na Carteira de Trabalho Digital agora. Se quiser, tenta de novo mais tarde ou fala " +
+    "com um atendente.",
+  sem_margem:
+    "No momento você não tem margem disponível pra consignado CLT. Isso pode mudar mês a mês — " +
+    "se quiser, tenta de novo depois.",
+  desconhecido:
+    "No momento não encontrei condições disponíveis pro seu consignado CLT. Se quiser, tenta de " +
+    "novo mais tarde.",
+};
+
+async function finalizarCltSemOferta(row, categoria) {
+  await enviarRespostaAutomatica(
+    row.business_number_id,
+    row.phone,
+    CLTORIG_TEXTO_TERMINAL[categoria] || CLTORIG_TEXTO_TERMINAL.desconhecido
+  );
+  await db.cltOriginationAtualizar(row.id, { etapa: "sem_oferta" });
+  await db.setFluxoPasso(row.phone, row.business_number_id, null);
+}
+
+// Prazo pra etapas que esperam uma RESPOSTA DO CLIENTE (escolher vínculo, escolher base, digitar
+// valor, decidir a oferta, preencher o formulário) — mesma folga de 1h30 já usada no FGTS.
+// 'aguardando_autorizacao' fica de FORA de propósito (ruling na spec): assinar o termo de
+// consentimento é ação do cliente fora do nosso controle, pode levar qualquer tempo, e o poll
+// nessa etapa é uma única chamada GET barata — não faz sentido expirar.
+const CLTORIG_PRAZO_MS = 90 * 60 * 1000;
+const CLTORIG_ETAPAS_COM_PRAZO = [
+  "aguardando_email",
+  "escolhendo_vinculo",
+  "escolhendo_valor",
+  "aguardando_valor",
+  "oferta_apresentada",
+  "formulario",
+  "enviando_kyc",
+];
+// A consulta de margem tem retentativa automática do lado da Unnotech por até 30min (ver guia)
+// — 45min de folga antes de tratar como travada de vez.
+const CLTORIG_PRAZO_MARGEM_MS = 45 * 60 * 1000;
+
+// Extrai um valor em reais de texto livre ("R$ 1.500,00", "1500", "500,50") — undefined/null se
+// não achar nada que pareça número.
+function extrairValorReais(texto) {
+  const m = String(texto || "").match(/[\d.,]+/);
+  if (!m) return null;
+  let s = m[0];
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(s);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Clique em "3 MESES OU MAIS" — substitui o antigo passo declarativo (FLUXO_BOTOES.clt_3mais)
+// por uma função pra poder decidir entre a automação nova e o comportamento manual de sempre.
+async function handlerCltTresMaisMeses(de, businessNumberId) {
+  if (CLT_ORIGINATION_ATIVO) {
+    await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Pra eu simular, me manda o seu CPF, por favor 😊");
+    await db.setFluxoPasso(de, businessNumberId, "cltorig_cpf");
+    return;
+  }
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Show! 😊 Pra simular preciso de mais 5 coisinhas, pode mandar tudo numa mensagem só:\n" +
+      "• Nome completo\n• CPF\n• Telefone\n• E-mail\n• Data de nascimento"
+  );
+  await db.setFluxoPasso(de, businessNumberId, "clt_3mais");
+}
+
+// Rascunho (CPF) → e-mail → abre a solicitação de verdade. O CLT exige e-mail já na abertura
+// (a FGTS não), então precisa desses 2 passos antes de existir application_id — ver
+// cltOriginationCriarRascunho em db.js.
+async function handlerCltOrigCapturaCpf(de, businessNumberId, corpo) {
+  const cpfBruto = (corpo.match(REGEX_CPF) || [])[0];
+  if (!cpfBruto) {
+    await db.setFluxoPasso(de, businessNumberId, "cltorig_cpf"); // reafirma, reseta o lembrete
+    return;
+  }
+  const cpf = cpfBruto.replace(/\D/g, "");
+  if (!unnotech.cpfValido(cpf)) {
+    await enviarRespostaAutomatica(businessNumberId, de, "Esse CPF não parece válido — confere os números e manda de novo, por favor. 😊");
+    return;
+  }
+  const existente = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (existente) {
+    const expirada =
+      CLTORIG_ETAPAS_COM_PRAZO.includes(existente.etapa) &&
+      Date.now() - Number(existente.etapa_em || existente.updated_at) > CLTORIG_PRAZO_MS;
+    if (!expirada) {
+      await enviarRespostaAutomatica(
+        businessNumberId,
+        de,
+        "Você já tem uma simulação de consignado CLT em andamento — já já eu te aviso por aqui assim que tiver novidade. 😊"
+      );
+      return;
+    }
+    await db.cltOriginationAtualizar(existente.id, { etapa: "sem_oferta" });
+  }
+  await db.cltOriginationCriarRascunho(de, businessNumberId, cpf);
+  await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Agora me manda seu e-mail, por favor 😊");
+  await db.setFluxoPasso(de, businessNumberId, "cltorig_email");
+}
+
+async function handlerCltOrigCapturaEmail(de, businessNumberId, corpo) {
+  const email = (corpo.match(REGEX_EMAIL) || [])[0]?.replace(/[.,;]+$/, "");
+  if (!email) {
+    await db.setFluxoPasso(de, businessNumberId, "cltorig_email");
+    return;
+  }
+  const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (!row) {
+    // Sessão perdida entre as 2 mensagens (ex.: reinício do servidor) — pede pra recomeçar em
+    // vez de travar em silêncio.
+    await enviarRespostaAutomatica(businessNumberId, de, "Deu uma falha aqui do meu lado — pode mandar seu CPF de novo pra eu recomeçar? 🙏");
+    await db.setFluxoPasso(de, businessNumberId, "cltorig_cpf");
+    return;
+  }
+  await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Só um instante enquanto eu abro sua solicitação... ⏳");
+  try {
+    const idempotencyKey = crypto.randomUUID();
+    const telefone = de.replace(/\D/g, "");
+    const app = await unnotech.criarSolicitacaoClt(row.cpf, telefone, email, idempotencyKey);
+    await db.cltOriginationAtualizar(row.id, {
+      application_id: app.application_id,
+      etapa: "aguardando_autorizacao",
+      idempotency_key_atual: idempotencyKey,
+    });
+    const consentUrl = app.authorization?.consent_url;
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      `Pra continuar, você precisa assinar o termo de autorização (é só 1 vez, vale pra todas as ` +
+        `instituições parceiras). Toque no link e assine:\n${consentUrl}\n\nAssim que você assinar, eu ` +
+        `continuo automaticamente por aqui — pode levar alguns minutinhos. 😊`
+    );
+    await db.setFluxoPasso(de, businessNumberId, null);
+  } catch (err) {
+    console.error("Erro ao abrir solicitação CLT na Unnotech:", err.message);
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro" });
+    await confirmarEncaminhamentoHumano(de, businessNumberId);
+  }
+}
+
+async function processarEtapaCltAguardandoAutorizacao(row) {
+  const status = await unnotech.consultarStatusClt(row.application_id);
+  if (status.authorization_status === "AUTHORIZED") {
+    await db.cltOriginationAtualizar(row.id, { etapa: "consultando_margem", status_unnotech: status.status });
+    return;
+  }
+  if (status.authorization_status === "NOT_AVAILABLE") {
+    await finalizarCltSemOferta(row, "autorizacao_indisponivel");
+    return;
+  }
+  await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
+}
+
+// Depois de escolher/receber o vínculo (1 só ou escolhido numa lista), pergunta parcela x valor
+// líquido — mostra a margem disponível na mesma mensagem, ajuda o cliente a já pensar num número.
+async function prosseguirComVinculoClt(row, vinculo) {
+  await db.cltOriginationAtualizar(row.id, {
+    employment_id: vinculo.employment_id,
+    margem_disponivel: vinculo.available_margin || null,
+    etapa: "escolhendo_valor",
+  });
+  await enviarRespostaAutomatica(
+    row.business_number_id,
+    row.phone,
+    `Sua margem disponível é de R$ ${Number(vinculo.available_margin || 0).toFixed(2)} por mês. Como você prefere simular?`,
+    [
+      { id: "cltorig_parcela", title: "VALOR DA PARCELA" },
+      { id: "cltorig_liquido", title: "VALOR QUE RECEBO" },
+    ]
+  );
+}
+
+async function processarEtapaCltConsultandoMargem(row) {
+  const status = await unnotech.consultarStatusClt(row.application_id);
+  if (status.status === "NO_MARGIN") {
+    await finalizarCltSemOferta(row, "sem_margem");
+    return;
+  }
+  if (status.status === "MARGIN_QUERY") {
+    if (Date.now() - Number(row.etapa_em || row.created_at) > CLTORIG_PRAZO_MARGEM_MS) {
+      await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+      try {
+        await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+      } catch (err) {
+        console.error(`Erro ao avisar cliente de consulta de margem travada (linha CLT #${row.id}):`, err.message);
+      }
+      return;
+    }
+    await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
+    return;
+  }
+  // Passou de MARGIN_QUERY (normalmente AWAITING_SIMULATION) — busca os vínculos de verdade.
+  const margem = await unnotech.consultarMargemClt(row.application_id);
+  const vinculos = margem.employments || [];
+  if (!vinculos.length) {
+    await finalizarCltSemOferta(row, "sem_margem");
+    return;
+  }
+  await db.cltOriginationAtualizar(row.id, { employments_cache: JSON.stringify(vinculos), status_unnotech: status.status });
+  if (vinculos.length === 1) {
+    await prosseguirComVinculoClt(row, vinculos[0]);
+    return;
+  }
+  // Lista limitada a 10 (limite do WhatsApp) — caso real de mais vínculos que isso é tratado
+  // como o mesmo cuidado do resto do código: melhor mostrar os 10 primeiros do que travar.
+  await enviarRespostaAutomatica(
+    row.business_number_id,
+    row.phone,
+    "Encontrei mais de um vínculo de trabalho no seu nome — qual você quer usar pra simular?",
+    null,
+    {
+      botao: "Escolher vínculo",
+      opcoes: vinculos.slice(0, 10).map((v, i) => ({
+        id: `cltorig_vinculo_${v.employment_id}`,
+        title: (v.employer_name || `Vínculo ${i + 1}`).slice(0, 24),
+        description: `Margem disponível: R$ ${Number(v.available_margin || 0).toFixed(2)}`,
+      })),
+    }
+  );
+  await db.cltOriginationAtualizar(row.id, { etapa: "escolhendo_vinculo" });
+}
+
+// Clique numa linha da lista de vínculos — id dinâmico ("cltorig_vinculo_<employment_id>"), por
+// isso não é um botão estático registrado em FLUXO_BOTOES (ver despacho no webhook).
+async function handlerCltOrigEscolherVinculo(de, businessNumberId, employmentId) {
+  const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "escolhendo_vinculo") return;
+  let vinculos = [];
+  try {
+    vinculos = JSON.parse(row.employments_cache || "[]");
+  } catch {
+    vinculos = [];
+  }
+  const vinculo = vinculos.find((v) => v.employment_id === employmentId);
+  if (!vinculo) return;
+  await prosseguirComVinculoClt(row, vinculo);
+}
+
+async function handlerCltOrigEscolherBasis(de, businessNumberId, basis) {
+  const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "escolhendo_valor") return;
+  await db.cltOriginationAtualizar(row.id, { basis, etapa: "aguardando_valor" });
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    basis === "INSTALLMENT"
+      ? "Quanto você quer pagar de parcela por mês? Me manda só o número (ex.: 300)."
+      : "Quanto você quer receber? Me manda só o número (ex.: 3000)."
+  );
+  await db.setFluxoPasso(de, businessNumberId, "cltorig_valor");
+}
+async function handlerCltOrigParcela(de, businessNumberId) {
+  await handlerCltOrigEscolherBasis(de, businessNumberId, "INSTALLMENT");
+}
+async function handlerCltOrigLiquido(de, businessNumberId) {
+  await handlerCltOrigEscolherBasis(de, businessNumberId, "NET_AMOUNT");
+}
+
+async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
+  const valor = extrairValorReais(corpo);
+  if (!valor) {
+    await db.setFluxoPasso(de, businessNumberId, "cltorig_valor");
+    return;
+  }
+  const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "aguardando_valor") return;
+  if (row.basis === "INSTALLMENT" && row.margem_disponivel && valor > Number(row.margem_disponivel)) {
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      `Esse valor passa da sua margem disponível (R$ ${Number(row.margem_disponivel).toFixed(2)} por mês). ` +
+        "Me manda um valor de parcela até esse limite, por favor."
+    );
+    await db.setFluxoPasso(de, businessNumberId, "cltorig_valor");
+    return;
+  }
+  await enviarRespostaAutomatica(businessNumberId, de, "Simulando... isso leva só um minutinho ⏳");
+  try {
+    const idempotencyKey = crypto.randomUUID();
+    await unnotech.simularClt(row.application_id, { employmentId: row.employment_id, basis: row.basis, valor }, idempotencyKey);
+    await db.cltOriginationAtualizar(row.id, { valor_desejado: valor, etapa: "simulando", idempotency_key_atual: idempotencyKey });
+    await db.setFluxoPasso(de, businessNumberId, null);
+  } catch (err) {
+    if (err.codigo === "INSTALLMENT_EXCEEDS_MARGIN" || /INSTALLMENT_EXCEEDS_MARGIN/.test(err.message || "")) {
+      await enviarRespostaAutomatica(businessNumberId, de, "Esse valor passa da sua margem disponível — me manda um valor de parcela menor, por favor.");
+      await db.setFluxoPasso(de, businessNumberId, "cltorig_valor");
+      return;
+    }
+    console.error("Erro ao simular CLT:", err.message);
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro" });
+    await confirmarEncaminhamentoHumano(de, businessNumberId);
+  }
+}
+
+async function processarEtapaCltSimulando(row) {
+  const status = await unnotech.consultarStatusClt(row.application_id);
+  if (status.status === "OFFERS_AVAILABLE") {
+    const completa = await unnotech.consultarSolicitacaoCompletaClt(row.application_id);
+    const oferta = unnotech.escolherMelhorOferta(completa.offers);
+    if (!oferta) {
+      await finalizarCltSemOferta(row, "desconhecido");
+      return;
+    }
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      `Simulação pronta! 🎉 Você tem *R$ ${Number(oferta.net_amount).toFixed(2)}* liberado, em ` +
+        `${oferta.installment_count}x de R$ ${Number(oferta.installment_amount).toFixed(2)}, taxa de ` +
+        `${oferta.monthly_interest_rate}% ao mês. Quer contratar?`,
+      [
+        { id: "cltorig_contratar", title: "QUERO CONTRATAR" },
+        { id: "cltorig_agora_nao", title: "AGORA NÃO" },
+      ]
+    );
+    await db.cltOriginationAtualizar(row.id, {
+      etapa: "oferta_apresentada",
+      offer_id: oferta.offer_id,
+      offers_cache: JSON.stringify(completa.offers || []),
+      tentativas_offer_ids: JSON.stringify([]),
+      status_unnotech: status.status,
+    });
+    await db.setFluxoPasso(row.phone, row.business_number_id, "cltorig_oferta_apresentada");
+  } else if (status.status === "NO_OFFERS" || status.status === "EXPIRED") {
+    await finalizarCltSemOferta(row, "desconhecido");
+  } else if (Date.now() - Number(row.etapa_em || row.created_at) > CLTORIG_PRAZO_MS) {
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de cotação CLT travada (linha #${row.id}):`, err.message);
+    }
+  } else {
+    await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
+  }
+}
+
+async function handlerCltOrigContratar(de, businessNumberId) {
+  const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "oferta_apresentada") return;
+  const flowToken = crypto.randomUUID();
+  await db.cltOriginationAtualizar(row.id, { flow_token: flowToken, etapa: "formulario" });
+  await wa.sendFlow(businessNumberId, de, {
+    flowId: process.env.CLT_FLOW_ID,
+    flowToken,
+    bodyText: "Show! Só preciso de mais alguns dados pra fechar a contratação. Toca no botão abaixo:",
+    ctaText: "Preencher dados",
+    screenId: "DADOS_PESSOAIS",
+  });
+  await db.setFluxoPasso(de, businessNumberId, "cltorig_formulario");
+}
+
+async function handlerCltOrigAgoraNao(de, businessNumberId) {
+  const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (row && row.etapa !== "oferta_apresentada") return;
+  await enviarRespostaAutomatica(businessNumberId, de, "Sem problemas! 😊 Fico à disposição se mudar de ideia.");
+  await db.setFluxoPasso(de, businessNumberId, null);
+  if (row) await db.cltOriginationAtualizar(row.id, { etapa: "sem_oferta" });
+}
+
+async function processarSubmissaoFormularioClt(flowToken, de, businessNumberId, dados) {
+  if (!flowToken) return;
+  const row = await db.cltOriginationBuscarPorFlowToken(flowToken);
+  if (!row) return;
+  if (row.phone !== de || row.business_number_id !== businessNumberId) {
+    console.error(`Submissão de Flow CLT com remetente divergente da linha #${row.id} (esperado ${row.phone}, veio ${de}) — ignorada.`);
+    return;
+  }
+  const reivindicou = await db.cltOriginationReivindicar(row.id, "formulario", "enviando_kyc");
+  if (!reivindicou) return;
+  try {
+    const kyc = unnotech.montarPayloadKycClt(row.cpf, dados);
+    await unnotech.enviarKycClt(row.application_id, kyc);
+    const idempotencyKey = crypto.randomUUID();
+    try {
+      await unnotech.aceitarOfertaClt(row.application_id, row.offer_id, idempotencyKey);
+    } catch (err) {
+      const expirou = err.codigo === "OFFER_EXPIRED" || /OFFER_EXPIRED/.test(err.message || "");
+      if (expirou) {
+        // Sem endpoint de "requote" no CLT (a doc é explícita) — a única forma de renovar o menu
+        // é simular de novo com os mesmos parâmetros já escolhidos (vínculo, base, valor).
+        await unnotech.simularClt(
+          row.application_id,
+          { employmentId: row.employment_id, basis: row.basis, valor: row.valor_desejado },
+          idempotencyKey
+        );
+        await enviarRespostaAutomatica(
+          row.business_number_id,
+          row.phone,
+          "A oferta expirou enquanto você preenchia — já busquei uma nova simulação, só um instante..."
+        );
+        await db.cltOriginationAtualizar(row.id, { etapa: "simulando", offer_id: null, idempotency_key_atual: idempotencyKey });
+        return;
+      }
+      throw err;
+    }
+    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
+    await db.cltOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", idempotency_key_atual: idempotencyKey });
+    await db.setFluxoPasso(row.phone, row.business_number_id, null);
+  } catch (err) {
+    console.error(`Erro ao processar formulário CLT (linha #${row.id}):`, err.message);
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro" });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente do encaminhamento CLT (linha #${row.id}):`, err2.message);
+    }
+  }
+}
+
+// Diferente do FGTS, CONTRACT_REJECTED não é terminal aqui (a doc é explícita: aceitando outra
+// oferta do mesmo menu a solicitação volta a CONTRACTING) — tenta a próxima oferta elegível do
+// offers_cache automaticamente, sem precisar pedir nada de novo ao cliente (o KYC já está salvo
+// na Unnotech). Só escala pro humano quando esgotar o menu inteiro.
+async function processarEtapaCltAguardandoAssinatura(row) {
+  const status = await unnotech.consultarStatusClt(row.application_id);
+  if (status.status === "CONTRACT_REJECTED") {
+    let ofertas = [];
+    let tentadas = [];
+    try {
+      ofertas = JSON.parse(row.offers_cache || "[]");
+    } catch {
+      ofertas = [];
+    }
+    try {
+      tentadas = JSON.parse(row.tentativas_offer_ids || "[]");
+    } catch {
+      tentadas = [];
+    }
+    if (row.offer_id && !tentadas.includes(row.offer_id)) tentadas.push(row.offer_id);
+    const proxima = unnotech.escolherMelhorOferta(ofertas, tentadas);
+    if (!proxima) {
+      await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+      try {
+        await enviarRespostaAutomatica(
+          row.business_number_id,
+          row.phone,
+          "Nenhuma das ofertas foi aprovada pelos bancos. Vou te colocar com um atendente pra ver outras opções."
+        );
+        await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+      } catch (err) {
+        console.error(`Erro ao avisar cliente de recusa total CLT (linha #${row.id}):`, err.message);
+      }
+      return;
+    }
+    try {
+      const idempotencyKey = crypto.randomUUID();
+      await unnotech.aceitarOfertaClt(row.application_id, proxima.offer_id, idempotencyKey);
+      await db.cltOriginationAtualizar(row.id, {
+        offer_id: proxima.offer_id,
+        tentativas_offer_ids: JSON.stringify(tentadas),
+        idempotency_key_atual: idempotencyKey,
+        status_unnotech: status.status,
+      });
+    } catch (err) {
+      console.error(`Erro ao tentar próxima oferta CLT (linha #${row.id}):`, err.message);
+      await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+      try {
+        await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+      } catch (err2) {
+        console.error(`Erro ao avisar cliente (linha CLT #${row.id}):`, err2.message);
+      }
+    }
+    return;
+  }
+  if (!status.proposal_uuid) {
+    await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
+    return;
+  }
+  if (row.proposal_uuid !== status.proposal_uuid) {
+    await db.cltOriginationAtualizar(row.id, { proposal_uuid: status.proposal_uuid, status_unnotech: status.status });
+  }
+  if (status.status === "SIGNED" || status.status === "ENDORSED") {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      "Contrato assinado! 🎉 Agora é só aguardar a averbação e o depósito — te aviso assim que cair na sua conta."
+    );
+    await db.cltOriginationAtualizar(row.id, { etapa: "aguardando_pagamento", status_unnotech: status.status });
+    return;
+  }
+  if (["FAILED", "REJECTED", "CANCELLED"].includes(status.status)) {
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Tivemos um problema pra finalizar essa contratação. Vou te colocar com um atendente pra ver o que aconteceu."
+      );
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente da recusa de contrato CLT (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  if (row.link_assinatura_enviado_em) return;
+  const proposta = await unnotech.consultarProposta(status.proposal_uuid);
+  if (proposta.signature_link) {
+    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Seu contrato está pronto! ✍️ Assim que você assinar, eu te aviso por aqui.");
+    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Toque no botão abaixo pra assinar:", null, null, {
+      buttonText: "Assinar contrato",
+      url: proposta.signature_link,
+    });
+    await db.cltOriginationAtualizar(row.id, { link_assinatura_enviado_em: Date.now() });
+  }
+}
+
+async function processarEtapaCltAguardandoPagamento(row) {
+  const status = await unnotech.consultarStatusClt(row.application_id);
+  if (status.status === "DISBURSED") {
+    await enviarRespostaAutomatica(row.business_number_id, row.phone, "O valor já caiu! 💰 Qualquer coisa, é só me chamar.");
+    await db.cltOriginationAtualizar(row.id, { etapa: "concluido", status_unnotech: status.status });
+    await db.setFluxoPasso(row.phone, row.business_number_id, null);
+  } else if (["FAILED", "REJECTED", "CANCELLED"].includes(status.status)) {
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Tivemos um problema depois da assinatura do seu contrato. Vou te colocar com um atendente pra resolver."
+      );
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de falha pós-assinatura CLT (linha #${row.id}):`, err.message);
+    }
+  } else {
+    await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
+  }
+}
+
 // Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
 // verdade na mensagem — qualquer outra coisa só reseta o relógio do lembrete, sem confirmar
 // nada errado (mesmo cuidado do handlerCapturaDadosClt, ver comentário lá em cima).
@@ -1783,6 +2336,9 @@ const FLUXO_FELIZCRED = {
     financiamento_dados: handlerCapturaDadosFinanciamento,
     fgts_cpf: handlerCapturaDadosFgts,
     campanha_clt_dados: handlerCapturaDadosCampanhaClt,
+    cltorig_cpf: handlerCltOrigCapturaCpf,
+    cltorig_email: handlerCltOrigCapturaEmail,
+    cltorig_valor: handlerCltOrigCapturaValor,
   },
 };
 
@@ -2584,13 +3140,29 @@ async function processarEntry(entry) {
             console.error("Erro ao interpretar resposta do Flow (JSON inválido):", err.message);
             dados = null;
           }
-          await db.insertMessage({ ...base, type: "button", body: "[formulário FGTS preenchido]" });
+          await db.insertMessage({ ...base, type: "button", body: "[formulário preenchido]" });
           if (dados) {
+            const token = String(dados.flow_token || "");
             try {
-              await processarSubmissaoFormularioFgts(String(dados.flow_token || ""), de, businessNumberId, dados);
+              await processarSubmissaoFormularioFgts(token, de, businessNumberId, dados);
             } catch (err) {
               console.error("Erro ao processar formulário FGTS:", err.message);
             }
+            try {
+              await processarSubmissaoFormularioClt(token, de, businessNumberId, dados);
+            } catch (err) {
+              console.error("Erro ao processar formulário CLT:", err.message);
+            }
+          }
+        } else if (tipo === "interactive" && (msg.interactive?.list_reply?.id || "").startsWith("cltorig_vinculo_")) {
+          // Escolha de vínculo empregatício (ver processarEtapaCltConsultandoMargem) — id
+          // dinâmico por vínculo, por isso não é um botão estático em FLUXO_BOTOES.
+          const reply = msg.interactive.list_reply;
+          await db.insertMessage({ ...base, type: "button", body: reply.title || "[vínculo escolhido]" });
+          try {
+            await handlerCltOrigEscolherVinculo(de, businessNumberId, reply.id.slice("cltorig_vinculo_".length));
+          } catch (err) {
+            console.error("Erro ao processar escolha de vínculo CLT:", err.message);
           }
         } else if (tipo === "interactive") {
           // Clique em um botão do fluxo automático (mensagens interativas)
@@ -4339,6 +4911,36 @@ setInterval(async () => {
     console.error("Erro no verificador de originação FGTS:", err.message);
   } finally {
     verificandoFgtsOrigination = false;
+  }
+}, 30 * 1000);
+
+// Mesmo padrão do verificador de FGTS acima — booleano local (1 processo Render, 1 setInterval
+// só pra essa tabela) evita reprocessar a mesma linha se um tick demorar mais que 30s.
+let verificandoCltOrigination = false;
+setInterval(async () => {
+  if (verificandoCltOrigination) return;
+  verificandoCltOrigination = true;
+  try {
+    const abertas = await db.cltOriginationListarAbertas();
+    for (const row of abertas) {
+      try {
+        if (row.etapa === "aguardando_autorizacao") await processarEtapaCltAguardandoAutorizacao(row);
+        else if (row.etapa === "consultando_margem") await processarEtapaCltConsultandoMargem(row);
+        else if (row.etapa === "simulando") await processarEtapaCltSimulando(row);
+        else if (row.etapa === "aguardando_assinatura") await processarEtapaCltAguardandoAssinatura(row);
+        else if (row.etapa === "aguardando_pagamento") await processarEtapaCltAguardandoPagamento(row);
+        // 'aguardando_email', 'escolhendo_vinculo', 'escolhendo_valor', 'aguardando_valor',
+        // 'oferta_apresentada', 'formulario' e 'enviando_kyc' esperam uma ação do cliente (ou já
+        // foram reivindicadas por processarSubmissaoFormularioClt) — o verificador não tem nada
+        // a fazer nelas, só o prazo de handlerCltOrigCapturaCpf/webhook cuida de destravar.
+      } catch (err) {
+        console.error(`Erro ao processar originação CLT #${row.id} (etapa ${row.etapa}):`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no verificador de originação CLT:", err.message);
+  } finally {
+    verificandoCltOrigination = false;
   }
 }, 30 * 1000);
 

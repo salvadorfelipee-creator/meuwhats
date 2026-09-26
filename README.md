@@ -125,6 +125,7 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `UNNOTECH_CLIENT_ID` | Credencial da API da Unnotech (originação de crédito FGTS) | — |
 | `UNNOTECH_CLIENT_SECRET` | Credencial da API da Unnotech (originação de crédito FGTS) | — |
 | `FGTS_FLOW_ID` | ID do WhatsApp Flow de coleta de dados do FGTS, gerado ao publicar o Flow | — |
+| `CLT_FLOW_ID` | ID do WhatsApp Flow de coleta de dados do consignado CLT (`flows/clt-cadastro.json`) | — |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | Token de acesso da Página do Facebook (`pages_manage_posts` + `pages_manage_metadata`) | — |
 | `FACEBOOK_PAGE_ID` | ID numérico da Página do Facebook | — |
 | `TWITTER_API_KEY` / `TWITTER_API_SECRET` | Chaves do App no X Developer Portal | — |
@@ -688,6 +689,35 @@ início. Estado civil, escolaridade e órgão emissor vêm pré-preenchidos (Sol
 Médio/SSP) e editáveis — decisão explícita do usuário, aceitando o risco de sair errado se não
 for o caso do cliente. A versão atual **não** autopreenche o CEP (fica pra uma fase seguinte,
 com endpoint criptografado do Flow — ver spec).
+
+### Originação automática de consignado CLT via Unnotech (26/09/2026) — EM STANDBY
+
+Mesma ideia do FGTS acima (tabela própria + verificador de 30s), mas o CLT tem 3 portões que o
+FGTS não tem: autorização do trabalhador (assinatura de um termo, fora do nosso controle),
+consulta de margem por vínculo empregatício, e escolha entre "valor da parcela" ou "valor que
+quero receber" antes de simular. Ver a spec completa em
+`docs/superpowers/specs/2026-09-26-clt-unnotech-design.md`.
+
+**Ainda desligado de propósito** — a constante `CLT_ORIGINATION_ATIVO` no topo do bloco CLT em
+`server.js` está `false`. Enquanto isso, clicar em "3 MESES OU MAIS" continua se comportando
+exatamente como antes (pede os 5 dados em texto livre, atendimento humano). **Para ativar**,
+depois que a Unnotech liberar a credencial de produção (mesma pendência de permissão
+MARTER-CORBAN que já bloqueia o FGTS):
+1. Confirme que `UNNOTECH_CLIENT_ID`/`UNNOTECH_CLIENT_SECRET` são válidos.
+2. Publique `flows/clt-cadastro.json` no WhatsApp Manager → Flows e configure `CLT_FLOW_ID`.
+3. Troque `CLT_ORIGINATION_ATIVO` para `true` em `server.js` e faça o deploy.
+
+**Diferente do FGTS, não há restrição de banco** — a Unnotech já devolve as ofertas de
+consignado ordenadas pela melhor condição (`net_amount` decrescente), então a automação aceita
+a primeira oferta elegível de qualquer bancarizadora parceira, sem filtrar por `source`.
+`CONTRACT_REJECTED` também não é tratado como erro terminal aqui: a doc da Unnotech é explícita
+que aceitar outra oferta do mesmo menu volta pra contratação — a automação tenta a próxima
+oferta em cache automaticamente, sem pedir nada de novo ao cliente, e só escala pro atendimento
+humano se o menu inteiro for recusado.
+
+**Formulário de dados**: WhatsApp Flow nativo (`flows/clt-cadastro.json`), mesma estrutura de 4
+telas do FGTS, com 2 campos extras opcionais (e-mail/telefone do RH) na última tela. Mesmas
+regras de PIX=CPF e pré-preenchimento (Solteiro/Ensino Médio/SSP) do FGTS.
 
 ### Aviso de horário comercial (31/07/2026)
 

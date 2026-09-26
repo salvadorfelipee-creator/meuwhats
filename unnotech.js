@@ -270,6 +270,153 @@ async function consultarProposta(proposalUuid) {
   return body.data;
 }
 
+// ─── CLT (consignado privado) ───────────────────────────────────────────────
+// Mesmo cliente HTTP/autenticação de cima — só endpoints diferentes. Ver
+// docs/superpowers/specs/2026-09-26-clt-unnotech-design.md pro fluxo completo (tem 3 portões
+// que o FGTS não tem: autorização do trabalhador, consulta de margem, escolha parcela x
+// valor líquido).
+
+async function criarSolicitacaoClt(cpf, phone, email, idempotencyKey) {
+  const { status, body } = await chamarAutenticado("POST", "/api/v1/clt/applications", {
+    idempotencyKey,
+    body: { customer: { cpf, phone, email } },
+  });
+  if (status >= 400) throw new Error(`Falha ao abrir solicitação CLT: ${JSON.stringify(body)}`);
+  return body;
+}
+
+async function consultarStatusClt(applicationId) {
+  const { status, body } = await chamarAutenticado("GET", `/api/v1/clt/applications/${applicationId}/status`);
+  if (status >= 400) throw new Error(`Falha ao consultar status CLT: ${JSON.stringify(body)}`);
+  return body;
+}
+
+// Recurso completo — só tem offers[]/quotes[] completos aqui (o /status é enxuto de propósito
+// pro polling barato, igual ao FGTS).
+async function consultarSolicitacaoCompletaClt(applicationId) {
+  const { status, body } = await chamarAutenticado("GET", `/api/v1/clt/applications/${applicationId}`);
+  if (status >= 400) throw new Error(`Falha ao consultar solicitação CLT: ${JSON.stringify(body)}`);
+  return body;
+}
+
+async function consultarMargemClt(applicationId) {
+  const { status, body } = await chamarAutenticado("GET", `/api/v1/clt/applications/${applicationId}/margin`);
+  if (status >= 400) throw new Error(`Falha ao consultar margem CLT: ${JSON.stringify(body)}`);
+  return body;
+}
+
+async function forcarVerificacaoConsentimentoClt(applicationId) {
+  const { status, body } = await chamarAutenticado("POST", `/api/v1/clt/applications/${applicationId}/authorization`);
+  if (status >= 400) throw new Error(`Falha ao forçar verificação de consentimento: ${JSON.stringify(body)}`);
+  return body;
+}
+
+// `basis` é "INSTALLMENT" (parcela) ou "NET_AMOUNT" (valor líquido) — só um dos dois valores é
+// enviado, o outro fica de fora do corpo (a doc trata como campo condicional, não os dois).
+async function simularClt(applicationId, { employmentId, basis, valor }, idempotencyKey) {
+  const body = { employment_id: employmentId, basis };
+  if (basis === "INSTALLMENT") body.installment_amount = valor;
+  else body.net_amount = valor;
+  const { status, body: resposta } = await chamarAutenticado(
+    "POST",
+    `/api/v1/clt/applications/${applicationId}/simulations`,
+    { idempotencyKey, body }
+  );
+  if (status >= 400) {
+    const err = new Error(`Falha ao simular CLT: ${JSON.stringify(resposta)}`);
+    err.codigo = resposta?.error?.code || null;
+    throw err;
+  }
+  return resposta;
+}
+
+// Upsert, sem Idempotency-Key (mesma regra do FGTS) — `dados.employer` é opcional (e-mail/
+// telefone do RH), só entra no payload se pelo menos um dos dois vier preenchido.
+function montarPayloadKycClt(cpf, dados) {
+  const bank =
+    dados.forma_desembolso === "PIX"
+      ? { disbursement_method: "PIX", pix_key: cpf, pix_type: "CPF" }
+      : {
+          disbursement_method: "BANK_ACCOUNT",
+          bank_code: BANCOS_COMPE[dados.banco] || null,
+          account_type: MAPA_TIPO_CONTA[dados.tipo_conta] || null,
+          agency: dados.agencia,
+          agency_digit: "0",
+          account_number: dados.conta,
+          account_digit: dados.digito_conta,
+        };
+  const payload = {
+    name: dados.nome,
+    birth_date: normalizarDataFlow(dados.data_nascimento),
+    phone: String(dados.celular || "").replace(/\D/g, ""),
+    email: dados.email,
+    gender: dados.genero,
+    civil_status: dados.estado_civil,
+    scholarity: dados.escolaridade,
+    mothers_name: dados.nome_mae,
+    rg_number: dados.rg_numero,
+    rg_organ: dados.rg_orgao,
+    rg_uf: dados.rg_uf,
+    address: {
+      zip_code: String(dados.cep || "").replace(/\D/g, ""),
+      uf: dados.uf,
+      city: dados.cidade,
+      district: dados.bairro,
+      street: dados.rua,
+      number: dados.numero,
+      complement: dados.complemento || null,
+    },
+    bank,
+  };
+  const emailRh = (dados.email_rh || "").trim();
+  const telefoneRh = (dados.telefone_rh || "").trim();
+  if (emailRh || telefoneRh) {
+    payload.employer = {};
+    if (emailRh) payload.employer.email = emailRh;
+    if (telefoneRh) payload.employer.phone = telefoneRh.replace(/\D/g, "");
+  }
+  return payload;
+}
+
+async function enviarKycClt(applicationId, kyc) {
+  const { status, body } = await chamarAutenticado("POST", `/api/v1/clt/applications/${applicationId}/kyc`, {
+    body: kyc,
+  });
+  if (status >= 400) throw new Error(`Falha ao enviar KYC CLT: ${JSON.stringify(body)}`);
+  return body;
+}
+
+// Sem corpo — os dados de desembolso que valem já são os do KYC (a doc é explícita: o bloco
+// bank_account do aceite só existe pra quando a conta de crédito ainda não foi informada).
+async function aceitarOfertaClt(applicationId, offerId, idempotencyKey) {
+  const { status, body } = await chamarAutenticado(
+    "POST",
+    `/api/v1/clt/applications/${applicationId}/offers/${offerId}/accept`,
+    { idempotencyKey }
+  );
+  if (status >= 400) {
+    const err = new Error(`Falha ao aceitar oferta CLT: ${JSON.stringify(body)}`);
+    err.codigo = body?.error?.code || null;
+    throw err;
+  }
+  return body;
+}
+
+// `offers` já vem ordenada pela própria Unnotech (net_amount desc, installment_amount asc,
+// recusadas no final — ver guia) — só filtra disponibilidade, validade e o que já foi tentado
+// (usado na re-tentativa automática depois de CONTRACT_REJECTED).
+function escolherMelhorOferta(offers, idsJaTentados = []) {
+  const agora = Date.now();
+  return (
+    (offers || []).find(
+      (o) =>
+        o.status === "AVAILABLE" &&
+        !idsJaTentados.includes(o.offer_id) &&
+        (!o.expires_at || new Date(o.expires_at).getTime() > agora)
+    ) || null
+  );
+}
+
 module.exports = {
   unnotechRequest,
   getAccessToken,
@@ -286,4 +433,14 @@ module.exports = {
   enviarKyc,
   aceitarOferta,
   consultarProposta,
+  criarSolicitacaoClt,
+  consultarStatusClt,
+  consultarSolicitacaoCompletaClt,
+  consultarMargemClt,
+  forcarVerificacaoConsentimentoClt,
+  simularClt,
+  montarPayloadKycClt,
+  enviarKycClt,
+  aceitarOfertaClt,
+  escolherMelhorOferta,
 };

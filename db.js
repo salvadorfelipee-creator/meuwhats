@@ -344,6 +344,45 @@ const ready = (async () => {
     await client.execute(`CREATE INDEX IF NOT EXISTS idx_fgts_origination_flow_token ON fgts_origination(flow_token)`);
   }
 
+  // Uma linha por solicitação de consignado CLT em andamento na Unnotech (ver
+  // docs/superpowers/specs/2026-09-26-clt-unnotech-design.md) — mesmo papel que
+  // fgts_origination, mas com colunas extras pros 3 portões que o CLT tem e o FGTS não:
+  // autorização do trabalhador, escolha de vínculo/base de valor, e a re-tentativa automática
+  // de oferta depois de CONTRACT_REJECTED (offers_cache + tentativas_offer_ids).
+  await client.execute(`CREATE TABLE IF NOT EXISTS clt_origination (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    business_number_id TEXT NOT NULL,
+    application_id TEXT,
+    cpf TEXT,
+    employments_cache TEXT,
+    employment_id TEXT,
+    margem_disponivel REAL,
+    basis TEXT,
+    valor_desejado REAL,
+    offer_id TEXT,
+    offers_cache TEXT,
+    tentativas_offer_ids TEXT,
+    proposal_uuid TEXT,
+    link_assinatura_enviado_em INTEGER,
+    flow_token TEXT,
+    etapa TEXT NOT NULL DEFAULT 'aguardando_autorizacao',
+    etapa_em INTEGER,
+    status_unnotech TEXT,
+    idempotency_key_atual TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`);
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_clt_origination_etapa ON clt_origination(etapa, updated_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_clt_origination_phone ON clt_origination(phone, business_number_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_clt_origination_flow_token ON clt_origination(flow_token)`
+  );
+
   // Mescla duplicatas causadas pelo "9º dígito" do celular brasileiro (mesmo contato virando
   // duas conversas — uma com 5X99XXXXXXXX, outra com 5X9XXXXXXXX — dependendo de qual formato
   // entrou primeiro). server.js agora normaliza tudo antes de gravar (normalizarTelefoneBR),
@@ -1273,6 +1312,88 @@ async function fgtsOriginationReivindicar(id, etapaEsperada, etapaNova) {
   return result.rowsAffected > 0;
 }
 
+// ─── clt_origination — mesmo padrão de fgts_origination acima ──────────────────────────────
+// Rascunho criado ao capturar o CPF, antes de existir application_id de verdade (o CLT ainda
+// precisa do e-mail antes de poder abrir a solicitação na Unnotech — ver
+// docs/superpowers/specs/2026-09-26-clt-unnotech-design.md). Etapa própria ('aguardando_email')
+// pra já contar como "solicitação aberta" (evita abrir 2 rascunhos se o cliente mandar o CPF de
+// novo antes de mandar o e-mail).
+async function cltOriginationCriarRascunho(phone, businessNumberId, cpf) {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `INSERT INTO clt_origination (phone, business_number_id, cpf, etapa, etapa_em, created_at, updated_at)
+          VALUES (?, ?, ?, 'aguardando_email', ?, ?, ?)`,
+    args: [phone, businessNumberId, cpf, agora, agora, agora],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+const CLT_ORIGINATION_ETAPAS_TERMINAIS = ["concluido", "sem_oferta", "erro"];
+
+async function cltOriginationBuscarAberta(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM clt_origination WHERE phone = ? AND business_number_id = ?
+          AND etapa NOT IN (${CLT_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
+          ORDER BY id DESC LIMIT 1`,
+    args: [phone, businessNumberId, ...CLT_ORIGINATION_ETAPAS_TERMINAIS],
+  });
+  return result.rows[0] || null;
+}
+
+async function cltOriginationBuscarPorId(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM clt_origination WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+// Toda vez que `campos.etapa` muda, também marca `etapa_em` — diferente do FGTS (que só tem
+// 'abrindo'/'oferta_apresentada'/etc. e usa created_at como base do prazo de cotação travada),
+// o CLT passa por vários portões de duração muito diferente (autorização pode levar dias,
+// simulação alguns segundos); sem um relógio por etapa, o prazo de "travado" de qualquer etapa
+// teria que usar created_at (a hora em que a solicitação inteira foi aberta) e dispararia falso
+// positivo pra quem só demorou pra autorizar antes de chegar na etapa seguinte.
+async function cltOriginationAtualizar(id, campos) {
+  await ready;
+  const colunas = Object.keys(campos);
+  if (!colunas.length) return;
+  const agora = Date.now();
+  const sets = colunas.map((c) => `${c} = ?`).join(", ");
+  const valores = colunas.map((c) => campos[c]);
+  const setaEtapaEm = "etapa" in campos;
+  await client.execute({
+    sql: `UPDATE clt_origination SET ${sets}${setaEtapaEm ? ", etapa_em = ?" : ""}, updated_at = ? WHERE id = ?`,
+    args: setaEtapaEm ? [...valores, agora, agora, id] : [...valores, agora, id],
+  });
+}
+
+async function cltOriginationListarAbertas() {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM clt_origination
+          WHERE etapa NOT IN (${CLT_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
+          ORDER BY updated_at ASC`,
+    args: CLT_ORIGINATION_ETAPAS_TERMINAIS,
+  });
+  return result.rows;
+}
+
+async function cltOriginationBuscarPorFlowToken(token) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM clt_origination WHERE flow_token = ?`, args: [token] });
+  return result.rows[0] || null;
+}
+
+async function cltOriginationReivindicar(id, etapaEsperada, etapaNova) {
+  await ready;
+  const result = await client.execute({
+    sql: `UPDATE clt_origination SET etapa = ?, updated_at = ? WHERE id = ? AND etapa = ?`,
+    args: [etapaNova, Date.now(), id, etapaEsperada],
+  });
+  return result.rowsAffected > 0;
+}
+
 // Agenda os contatos 2+ de um broadcast com intervalo — cada item já vem com seu
 // agendado_para calculado pelo chamador (server.js: agora + i * intervaloSegundos).
 async function broadcastAgendarLote(businessId, itens) {
@@ -1379,6 +1500,13 @@ module.exports = {
   fgtsOriginationAtualizar,
   fgtsOriginationReivindicar,
   fgtsOriginationListarAbertas,
+  cltOriginationCriarRascunho,
+  cltOriginationBuscarAberta,
+  cltOriginationBuscarPorId,
+  cltOriginationBuscarPorFlowToken,
+  cltOriginationAtualizar,
+  cltOriginationReivindicar,
+  cltOriginationListarAbertas,
   tentarMarcarMenuEnviado,
   setFluxoPasso,
   listarFluxosAguardando,
