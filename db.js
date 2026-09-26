@@ -143,6 +143,12 @@ const ready = (async () => {
     await client.execute(`ALTER TABLE conversations ADD COLUMN email TEXT`);
     await client.execute(`ALTER TABLE conversations ADD COLUMN contato_salvo_em INTEGER`);
   }
+  // Marca quando o lembrete "segue a gente no Instagram" (10h de silêncio, Felizcred/Cota
+  // Certa) já foi mandado pra essa conversa — só 1 vez, nunca de novo, mesmo que fique quieta
+  // outra vez depois.
+  if (!infoConversations.rows.some((r) => r.name === "instagram_lembrete_at")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN instagram_lembrete_at INTEGER`);
+  }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -689,6 +695,35 @@ async function marcarConversaLida(phone, businessNumberId) {
     sql: `UPDATE conversations SET last_read_at = ? WHERE phone = ? AND business_number_id = ?`,
     args: [Date.now(), phone, businessNumberId],
   });
+}
+
+// Conversas do Felizcred/Cota Certa (businessNumberIds) paradas há mais de `horasSilencio`
+// (last_message_at, qualquer direção) que ainda não receberam o lembrete de seguir no
+// Instagram — instagram_lembrete_at IS NULL garante que é só 1 vez por conversa pra sempre.
+async function listarParaLembreteInstagram(businessNumberIds, horasSilencio) {
+  await ready;
+  const limite = Date.now() - horasSilencio * 60 * 60 * 1000;
+  const placeholders = businessNumberIds.map(() => "?").join(",");
+  const result = await client.execute({
+    sql: `SELECT phone, business_number_id FROM conversations
+          WHERE business_number_id IN (${placeholders})
+            AND instagram_lembrete_at IS NULL
+            AND last_message_at IS NOT NULL AND last_message_at < ?`,
+    args: [...businessNumberIds, limite],
+  });
+  return result.rows;
+}
+
+// Atômico (só marca se ainda tava NULL) — evita 2 voltas do setInterval mandarem o lembrete 2x
+// pro mesmo contato.
+async function tentarMarcarInstagramLembreteEnviado(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `UPDATE conversations SET instagram_lembrete_at = ?
+          WHERE phone = ? AND business_number_id = ? AND instagram_lembrete_at IS NULL`,
+    args: [Date.now(), phone, businessNumberId],
+  });
+  return result.rowsAffected > 0;
 }
 
 async function updateStatusByWaId(waMessageId, status, errorMessage = null) {
@@ -1499,6 +1534,8 @@ module.exports = {
   recebeuTemplate,
   getMensagemPorWaId,
   apagarConversa,
+  listarParaLembreteInstagram,
+  tentarMarcarInstagramLembreteEnviado,
   fgtsOriginationCriar,
   fgtsOriginationBuscarAberta,
   fgtsOriginationBuscarPorId,

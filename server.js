@@ -5047,6 +5047,41 @@ setInterval(async () => {
   }
 }, 60 * 1000);
 
+// ─── LEMBRETE DE INSTAGRAM (10H DE SILÊNCIO) ────────────────────────────────
+// Felizcred e Cota Certa, só — pedido do usuário em 26/09/2026. Diferente do lembrete de fluxo
+// (que só olha quem está parado NUM PASSO específico) e da janela de 24h (só quem tem fluxo
+// aberto): esse aqui é por CONVERSA inteira, sem importar se o fluxo automático já terminou ou
+// foi pro atendimento humano — qualquer conversa quieta há 10h (nas duas direções) recebe,
+// 1 vez só pra sempre (ver instagram_lembrete_at).
+const HORAS_SILENCIO_LEMBRETE_INSTAGRAM = 10;
+const LEMBRETE_INSTAGRAM_POR_NUMERO = {
+  [FELIZCRED_PRINCIPAL_NUMBER_ID]:
+    "Enquanto isso, não deixa de nos seguir no Instagram e ativar as notificações — é lá que " +
+    "a gente avisa antes de todo mundo sobre novidades e condições especiais 😊\n\n" +
+    "📷 https://www.instagram.com/felizcred/\n🌐 https://www.felizcred.com.br",
+  [COTACERTA_NUMBER_ID]:
+    "Enquanto isso, não deixa de nos seguir no Instagram e ativar as notificações — é lá que " +
+    "a gente avisa antes de todo mundo sobre novidades e condições especiais 😊\n\n" +
+    "📷 https://www.instagram.com/cotacertaseguros/\n🌐 https://www.cotacertaseguros.com.br",
+};
+setInterval(async () => {
+  try {
+    const numeros = Object.keys(LEMBRETE_INSTAGRAM_POR_NUMERO);
+    const pendentes = await db.listarParaLembreteInstagram(numeros, HORAS_SILENCIO_LEMBRETE_INSTAGRAM);
+    for (const p of pendentes) {
+      if (!(await db.tentarMarcarInstagramLembreteEnviado(p.phone, p.business_number_id))) continue;
+      try {
+        await enviarRespostaAutomatica(p.business_number_id, p.phone, LEMBRETE_INSTAGRAM_POR_NUMERO[p.business_number_id]);
+        console.log(`📷 Lembrete de Instagram (10h) enviado para ${p.phone} (${p.business_number_id})`);
+      } catch (err) {
+        console.error("Erro ao enviar lembrete de Instagram:", err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no verificador de lembrete de Instagram:", err.message);
+  }
+}, 5 * 60 * 1000);
+
 // ─── AGENDADOR DE REELS EM MASSA (Publique IV) ──────────────────────────────
 // A cada minuto, checa (no horário de Brasília) se bateu um dos horários do dia — se sim,
 // e ainda não postou nesse horário hoje, publica o próximo vídeo pendente (Instagram +
