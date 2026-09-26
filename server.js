@@ -986,9 +986,6 @@ async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
   await confirmarDadosRecebidos(de, businessNumberId, corpo, "FINANC");
 }
 
-// Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
-// verdade na mensagem — qualquer outra coisa só reseta o relógio do lembrete, sem confirmar
-// nada errado (mesmo cuidado do handlerCapturaDadosClt, ver comentário lá em cima).
 const FGTSORIG_TEXTO_SEM_OFERTA = {
   autorizacao:
     "Não encontrei oferta disponível agora — provavelmente falta autorizar a J17 no app Meu " +
@@ -1017,8 +1014,10 @@ async function processarEtapaAbrindo(row) {
     await enviarRespostaAutomatica(
       row.business_number_id,
       row.phone,
-      `Simulação pronta! 🎉 Você tem *R$ ${oferta.net_amount.toFixed(2)}* liberado, em ` +
-        `${oferta.installments?.length || 0}x de R$ ${parcela ? parcela.toFixed(2) : "-"}, taxa de ` +
+      // Number(...) antes do toFixed — se a API mandar o valor como string (não documentado com
+      // certeza), toFixed direto quebraria e travaria a linha em 'abrindo' pra sempre.
+      `Simulação pronta! 🎉 Você tem *R$ ${Number(oferta.net_amount).toFixed(2)}* liberado, em ` +
+        `${oferta.installments?.length || 0}x de R$ ${parcela ? Number(parcela).toFixed(2) : "-"}, taxa de ` +
         `${oferta.monthly_interest_rate}% ao mês. Quer contratar?`,
       [
         { id: "fgtsorig_contratar", title: "QUERO CONTRATAR" },
@@ -1034,6 +1033,17 @@ async function processarEtapaAbrindo(row) {
   } else if (status.status === "NO_OFFERS" || status.status === "EXPIRED") {
     const completa = await unnotech.consultarSolicitacaoCompleta(row.application_id);
     await finalizarSemOferta(row, completa);
+  } else if (Date.now() - Number(row.created_at) > FGTSORIG_PRAZO_OFERTA_MS) {
+    // Achado na revisão final: sem limite de tempo, uma cotação presa num status desconhecido
+    // (nem OFFERS_AVAILABLE, nem NO_OFFERS/EXPIRED) ficava sendo consultada a cada 30s pra
+    // sempre, sem nunca avisar o cliente nem escalar. Cotação normal é rápida — passado o mesmo
+    // prazo da validade da oferta (1h30 de folga), trata como falha técnica.
+    await db.fgtsOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de cotação travada (linha #${row.id}):`, err.message);
+    }
   } else {
     // Ainda QUOTING (ou outro estado intermediário) — só atualiza o status guardado, o
     // verificador tenta de novo no próximo ciclo.
@@ -1042,7 +1052,13 @@ async function processarEtapaAbrindo(row) {
 }
 
 async function finalizarSemOferta(row, completa) {
+  // Prioriza o motivo da PRÓPRIA J17 (é o único banco que importa aqui) — achado na revisão
+  // final: pegava o motivo de qualquer cotação/oferta, então uma recusa de outro banco na
+  // mesma cotação podia classificar a mensagem errado. Só cai pra "qualquer uma" se a J17
+  // especificamente não tiver motivo registrado.
   const motivoTexto =
+    completa.quotes?.find((q) => q.source === "J17" && q.reason)?.reason ||
+    completa.offers?.find((o) => o.source === "J17" && o.rejection_reason)?.rejection_reason?.message ||
     completa.quotes?.find((q) => q.reason)?.reason ||
     completa.offers?.find((o) => o.rejection_reason)?.rejection_reason?.message ||
     "";
@@ -1052,18 +1068,54 @@ async function finalizarSemOferta(row, completa) {
   await db.setFluxoPasso(row.phone, row.business_number_id, null);
 }
 
-// Ponto de entrada único pras 3 origens que coletam CPF pra FGTS (menu padrão, Instagram — que
-// converge pro mesmo handlerCapturaDadosFgts —, e o fluxo do anúncio). Se já existir uma
-// solicitação aberta pra esse contato, não abre outra — só confirma que já está em andamento.
+// Ponto de entrada único pras origens de FGTS que JÁ chamam essa função: o menu padrão
+// (handlerCapturaDadosFgts) e o fluxo do anúncio (handlerFgtsAnuncioCapturaCpf). O Instagram
+// NÃO converge aqui — achado na revisão final, corrigindo uma suposição errada da spec/plano: o
+// DM do Instagram roda em processarEntryInstagram, um caminho totalmente separado, que só manda
+// "dados recebidos" (INSTAGRAM_DADOS_RECEBIDOS_MESSAGE) e nunca chama iniciarOriginacaoFgts —
+// e nem poderia hoje sem mudança de produto, já que WhatsApp Flow (o formulário) não existe no
+// Instagram. Quem pede FGTS pelo Instagram ainda cai no atendimento manual de sempre. Se já
+// existir uma solicitação aberta pra esse contato (nas 2 origens que chamam isto), não abre
+// outra — só confirma que já está em andamento.
+// Oferta da Unnotech vale por 1h (ver spec) — dá folga até 1h30 antes de considerar uma
+// solicitação parada em "oferta_apresentada"/"formulario" como abandonada de vez.
+const FGTSORIG_PRAZO_OFERTA_MS = 90 * 60 * 1000;
+// 'enviando_kyc' entra aqui também como rede de segurança: se o servidor cair bem no meio do
+// processamento da submissão do Flow (reivindicado mas nunca terminou), essa etapa nunca é
+// revisitada pelo verificador — sem isso, a linha ficaria travada aqui pra sempre.
+const FGTSORIG_ETAPAS_COM_PRAZO = ["oferta_apresentada", "formulario", "enviando_kyc"];
+
 async function iniciarOriginacaoFgts(de, businessNumberId, cpf) {
-  const existente = await db.fgtsOriginationBuscarAberta(de, businessNumberId);
-  if (existente) {
+  if (!unnotech.cpfValido(cpf)) {
+    // Achado na revisão final: REGEX_CPF só confere formato (11 dígitos), não dígito
+    // verificador — sem essa checagem, um número de celular de 11 dígitos digitado por engano
+    // abria solicitação de verdade na Unnotech, gastando cota (100/dia) à toa.
     await enviarRespostaAutomatica(
       businessNumberId,
       de,
-      "Você já tem uma simulação em andamento — já já eu te aviso por aqui assim que tiver novidade. 😊"
+      "Esse CPF não parece válido — confere os números e manda de novo, por favor. 😊"
     );
     return;
+  }
+  const existente = await db.fgtsOriginationBuscarAberta(de, businessNumberId);
+  if (existente) {
+    const expirada =
+      FGTSORIG_ETAPAS_COM_PRAZO.includes(existente.etapa) &&
+      Date.now() - Number(existente.updated_at) > FGTSORIG_PRAZO_OFERTA_MS;
+    if (!expirada) {
+      await enviarRespostaAutomatica(
+        businessNumberId,
+        de,
+        "Você já tem uma simulação em andamento — já já eu te aviso por aqui assim que tiver novidade. 😊"
+      );
+      return;
+    }
+    // Achado na revisão final: sem isso, quem ignorasse a oferta ou abandonasse o formulário
+    // ficava bloqueado PRA SEMPRE (a checagem acima nunca deixava simular de novo). Não trava
+    // 'aguardando_assinatura'/'aguardando_pagamento' — esses legitimamente levam dias, e ali a
+    // mensagem "já em andamento" é a resposta certa, não uma trava indevida.
+    await db.fgtsOriginationAtualizar(existente.id, { etapa: "sem_oferta" });
+    await db.setFluxoPasso(de, businessNumberId, null);
   }
   await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Já estou consultando seu FGTS, isso leva só um minutinho ⏳");
   try {
@@ -1080,9 +1132,13 @@ async function iniciarOriginacaoFgts(de, businessNumberId, cpf) {
 // linha de fgts_origination, pra saber a qual solicitação a submissão pertence quando ela voltar
 // (ver processarSubmissaoFormularioFgts).
 async function enviarFormularioFgts(de, businessNumberId, row) {
+  // Token aleatório (não o id sequencial) — achado na revisão final, ver comentário da migração
+  // de flow_token em db.js.
+  const flowToken = crypto.randomUUID();
+  await db.fgtsOriginationAtualizar(row.id, { flow_token: flowToken });
   await wa.sendFlow(businessNumberId, de, {
     flowId: process.env.FGTS_FLOW_ID,
-    flowToken: `fgtsorig_${row.id}`,
+    flowToken,
     bodyText: "Show! Só preciso de mais alguns dados pra fechar a contratação. Toca no botão abaixo:",
     ctaText: "Preencher dados",
     screenId: "DADOS_PESSOAIS",
@@ -1098,8 +1154,9 @@ async function processarEtapaAguardandoAssinatura(row) {
     await db.fgtsOriginationAtualizar(row.id, { status_unnotech: status.status });
     return;
   }
-  const jaTinhaProposta = Boolean(row.proposal_uuid);
-  if (!jaTinhaProposta) {
+  // proposal_uuid muda a cada nova tentativa de contratação (ex.: depois de um requote por
+  // oferta expirada) — sempre atualiza, não só na primeira vez que aparece.
+  if (row.proposal_uuid !== status.proposal_uuid) {
     await db.fgtsOriginationAtualizar(row.id, { proposal_uuid: status.proposal_uuid, status_unnotech: status.status });
   }
   if (status.status === "SIGNED" || status.status === "ENDORSED") {
@@ -1112,17 +1169,29 @@ async function processarEtapaAguardandoAssinatura(row) {
     return;
   }
   if (["CONTRACT_REJECTED", "FAILED", "REJECTED", "CANCELLED"].includes(status.status)) {
-    await enviarRespostaAutomatica(
-      row.business_number_id,
-      row.phone,
-      "Tivemos um problema pra finalizar essa contratação. Vou te colocar com um atendente pra ver o que aconteceu."
-    );
-    await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    // Estado no banco primeiro — mesmo cuidado do processarSubmissaoFormularioFgts: se o envio
+    // falhar, a linha não pode ficar presa nessa etapa pro verificador tentar de novo a cada 30s
+    // pra sempre.
     await db.fgtsOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Tivemos um problema pra finalizar essa contratação. Vou te colocar com um atendente pra ver o que aconteceu."
+      );
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente da recusa de contrato (linha #${row.id}):`, err.message);
+    }
     return;
   }
+  // Trava própria (coluna link_assinatura_enviado_em), não "já tinha proposal_uuid" — o
+  // proposal_uuid costuma aparecer antes do signature_link (geração assíncrona), então a trava
+  // antiga quase sempre dava como "já mandou" num tick em que o link ainda nem existia, e o
+  // cliente nunca recebia o botão de assinar (achado na revisão final).
+  if (row.link_assinatura_enviado_em) return;
   const proposta = await unnotech.consultarProposta(status.proposal_uuid);
-  if (proposta.signature_link && !jaTinhaProposta) {
+  if (proposta.signature_link) {
     await enviarRespostaAutomatica(
       row.business_number_id,
       row.phone,
@@ -1135,6 +1204,7 @@ async function processarEtapaAguardandoAssinatura(row) {
       buttonText: "Assinar contrato",
       url: proposta.signature_link,
     });
+    await db.fgtsOriginationAtualizar(row.id, { link_assinatura_enviado_em: Date.now() });
   }
 }
 
@@ -1144,39 +1214,99 @@ async function processarEtapaAguardandoPagamento(row) {
     await enviarRespostaAutomatica(row.business_number_id, row.phone, "O valor já caiu! 💰 Qualquer coisa, é só me chamar.");
     await db.fgtsOriginationAtualizar(row.id, { etapa: "concluido", status_unnotech: status.status });
     await db.setFluxoPasso(row.phone, row.business_number_id, null);
+  } else if (["FAILED", "REJECTED", "CANCELLED"].includes(status.status)) {
+    // Achado na revisão final: essa etapa não tinha ramo nenhum de falha — uma averbação que dá
+    // errado depois de assinado (existe, na prática) ficaria consultando pra sempre sem nunca
+    // avisar o cliente nem escalar pra humano.
+    await db.fgtsOriginationAtualizar(row.id, { etapa: "erro", status_unnotech: status.status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Tivemos um problema depois da assinatura do seu contrato. Vou te colocar com um atendente pra resolver."
+      );
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de falha pós-assinatura (linha #${row.id}):`, err.message);
+    }
   } else {
     await db.fgtsOriginationAtualizar(row.id, { status_unnotech: status.status });
   }
 }
 
-async function processarSubmissaoFormularioFgts(originationId, dados) {
-  const row = await db.fgtsOriginationBuscarPorId(originationId);
-  if (!row || row.etapa !== "formulario") return; // submissão órfã/duplicada, ignora
-  const kyc = unnotech.montarPayloadKyc(row.cpf, dados);
-  await unnotech.enviarKyc(row.application_id, kyc);
-  const idempotencyKey = crypto.randomUUID();
-  try {
-    await unnotech.aceitarOferta(row.application_id, row.offer_id, idempotencyKey);
-  } catch (err) {
-    if (err.codigo === "OFFER_EXPIRED") {
-      await unnotech.requotar(row.application_id, crypto.randomUUID());
-      await enviarRespostaAutomatica(
-        row.business_number_id,
-        row.phone,
-        "A oferta expirou enquanto você preenchia — já busquei uma nova simulação, só um instante..."
-      );
-      await db.fgtsOriginationAtualizar(row.id, { etapa: "abrindo", offer_id: null, idempotency_key_atual: idempotencyKey });
-      return;
-    }
-    throw err;
+async function processarSubmissaoFormularioFgts(flowToken, de, businessNumberId, dados) {
+  if (!flowToken) return;
+  const row = await db.fgtsOriginationBuscarPorFlowToken(flowToken);
+  if (!row) return; // token desconhecido/reaproveitado, ignora
+  // Confere que quem mandou a submissão é o mesmo contato da linha — achado na revisão final:
+  // o /webhook não valida assinatura da Meta, então sem essa checagem um POST forjado (mesmo
+  // com um flow_token válido roubado de outra conversa) podia trocar os dados bancários de
+  // outra pessoa. Não é proteção contra tudo (ainda depende do token não vazar), mas fecha o
+  // caso óbvio de usar o flow_token de um contato pra submeter em nome de outro.
+  if (row.phone !== de || row.business_number_id !== businessNumberId) {
+    console.error(`Submissão de Flow FGTS com remetente divergente da linha #${row.id} (esperado ${row.phone}, veio ${de}) — ignorada.`);
+    return;
   }
-  await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
-  await db.fgtsOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", idempotency_key_atual: idempotencyKey });
+  // Reivindicação atômica: só quem conseguir mudar a etapa de 'formulario' pra 'enviando_kyc'
+  // segue — evita processar a MESMA submissão duas vezes se a Meta reentregar o webhook (achado
+  // na revisão final; a checagem antiga só lia a etapa, sem travar contra corrida).
+  const reivindicou = await db.fgtsOriginationReivindicar(row.id, "formulario", "enviando_kyc");
+  if (!reivindicou) return; // já em processamento (ou já processado) por outra entrega do webhook
+  // Tudo daqui pra baixo cai no catch de fora em qualquer falha técnica (KYC recusado, erro de
+  // rede, 5xx) — achado na revisão final: antes só logava e o cliente ficava esperando pra
+  // sempre, sem ninguém olhar de novo pra essa linha (o verificador só cobre 'abrindo',
+  // 'aguardando_assinatura', 'aguardando_pagamento', nunca 'formulario'/'enviando_kyc').
+  try {
+    const kyc = unnotech.montarPayloadKyc(row.cpf, dados);
+    await unnotech.enviarKyc(row.application_id, kyc);
+    const idempotencyKey = crypto.randomUUID();
+    try {
+      await unnotech.aceitarOferta(row.application_id, row.offer_id, idempotencyKey);
+    } catch (err) {
+      // Formato exato do código de erro não confirmado ainda (item em aberto da spec) — casa
+      // tanto por `err.codigo` quanto pelo texto da mensagem, pra não perder a detecção se a
+      // Unnotech devolver num formato diferente do esperado.
+      const expirou = err.codigo === "OFFER_EXPIRED" || /OFFER_EXPIRED/.test(err.message || "");
+      if (expirou) {
+        await unnotech.requotar(row.application_id, crypto.randomUUID());
+        await enviarRespostaAutomatica(
+          row.business_number_id,
+          row.phone,
+          "A oferta expirou enquanto você preenchia — já busquei uma nova simulação, só um instante..."
+        );
+        await db.fgtsOriginationAtualizar(row.id, { etapa: "abrindo", offer_id: null, idempotency_key_atual: idempotencyKey });
+        return;
+      }
+      throw err;
+    }
+    await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
+    await db.fgtsOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", idempotency_key_atual: idempotencyKey });
+    // Fim da coleta de dados — daqui em diante o acompanhamento é só pelo verificador (etapa da
+    // linha), não pela conversa; limpa o fluxo_passo pra não ficar preso em "fgtsorig_formulario"
+    // (achado na revisão final: senão o lembrete de formulário abandonado dispararia errado
+    // durante a espera de assinatura/pagamento).
+    await db.setFluxoPasso(row.phone, row.business_number_id, null);
+  } catch (err) {
+    console.error(`Erro ao processar formulário FGTS (linha #${row.id}):`, err.message);
+    // Estado no banco primeiro, tentativa de aviso ao cliente depois — achado testando local:
+    // se o envio de confirmarEncaminhamentoHumano também falhar (rede fora, por exemplo), sem
+    // essa ordem a linha nunca chegava a virar 'erro' e ficava presa em 'enviando_kyc'.
+    await db.fgtsOriginationAtualizar(row.id, { etapa: "erro" });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente do encaminhamento (linha #${row.id}):`, err2.message);
+    }
+  }
 }
 
 async function handlerFgtsOrigContratar(de, businessNumberId) {
   const row = await db.fgtsOriginationBuscarAberta(de, businessNumberId);
-  if (!row) return; // sem solicitação aberta, ignora clique órfão
+  // Botão fica clicável no histórico da conversa pra sempre — achado na revisão final: sem
+  // checar a etapa, um clique tardio num "QUERO CONTRATAR" antigo (enquanto o pedido já estava
+  // assinando ou aguardando pagamento) voltava a linha pra "formulario" e o verificador parava
+  // de acompanhar assinatura/pagamento. Só reage se ainda estiver mesmo esperando essa decisão.
+  if (!row || row.etapa !== "oferta_apresentada") return;
   await enviarFormularioFgts(de, businessNumberId, row);
   await db.fgtsOriginationAtualizar(row.id, { etapa: "formulario" });
   await db.setFluxoPasso(de, businessNumberId, "fgtsorig_formulario");
@@ -1184,11 +1314,15 @@ async function handlerFgtsOrigContratar(de, businessNumberId) {
 
 async function handlerFgtsOrigAgoraNao(de, businessNumberId) {
   const row = await db.fgtsOriginationBuscarAberta(de, businessNumberId);
+  if (row && row.etapa !== "oferta_apresentada") return; // mesmo cuidado do handler acima
   await enviarRespostaAutomatica(businessNumberId, de, "Sem problemas! 😊 Fico à disposição se mudar de ideia.");
   await db.setFluxoPasso(de, businessNumberId, null);
   if (row) await db.fgtsOriginationAtualizar(row.id, { etapa: "sem_oferta" });
 }
 
+// Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
+// verdade na mensagem — qualquer outra coisa só reseta o relógio do lembrete, sem confirmar
+// nada errado (mesmo cuidado do handlerCapturaDadosClt, ver comentário lá em cima).
 async function handlerCapturaDadosFgts(de, businessNumberId, corpo) {
   const cpf = (corpo.match(REGEX_CPF) || [])[0]?.replace(/\D/g, "");
   if (!cpf) {
@@ -2424,15 +2558,21 @@ async function processarEntry(entry) {
         } else if (tipo === "interactive" && msg.interactive?.nfm_reply) {
           // Submissão de um WhatsApp Flow (formulário nativo) — é como a Meta manda a resposta
           // de um Flow ESTÁTICO, sem endpoint, direto nesse webhook normal (diferente do Flow
-          // com endpoint da Task 13, que responde por outro caminho). O flow_token carrega o id
-          // da linha de fgts_origination (ver enviarFormularioFgts).
-          const dados = JSON.parse(msg.interactive.nfm_reply.response_json);
-          const flowToken = msg.interactive.nfm_reply.flow_token || "";
-          const originationId = Number(flowToken.replace("fgtsorig_", ""));
+          // com endpoint da Task 13, que responde por outro caminho). flow_token vem DENTRO do
+          // response_json, não é campo irmão de nfm_reply (achado na revisão final: lendo do
+          // lugar errado, toda submissão de Flow era descartada em silêncio). É um token
+          // aleatório (não mais o id sequencial da linha) — busca por ele, não por número.
+          let dados;
+          try {
+            dados = JSON.parse(msg.interactive.nfm_reply.response_json);
+          } catch (err) {
+            console.error("Erro ao interpretar resposta do Flow (JSON inválido):", err.message);
+            dados = null;
+          }
           await db.insertMessage({ ...base, type: "button", body: "[formulário FGTS preenchido]" });
-          if (originationId) {
+          if (dados) {
             try {
-              await processarSubmissaoFormularioFgts(originationId, dados);
+              await processarSubmissaoFormularioFgts(String(dados.flow_token || ""), de, businessNumberId, dados);
             } catch (err) {
               console.error("Erro ao processar formulário FGTS:", err.message);
             }
@@ -2822,21 +2962,41 @@ const server = http.createServer(async (req, res) => {
     // protocolo de Flow), não o navegador do painel. Ver flow-crypto.js.
     if (req.method === "POST" && path_ === "/webhook/flow-data") {
       const body = await parseBody(req);
-      const { request, aesKey, iv } = flowCrypto.decrypt(body.encrypted_flow_data, body.encrypted_aes_key, body.initial_vector);
+      // Descriptografia falhou (chave errada/corrompida) — Meta espera 421 especificamente
+      // aqui, não 500, pra saber que precisa buscar a chave pública de novo (achado na revisão
+      // final: sem esse try, isso ia parar no catch genérico do servidor, devolvendo 500).
+      let decrypted;
+      try {
+        decrypted = flowCrypto.decrypt(body.encrypted_flow_data, body.encrypted_aes_key, body.initial_vector);
+      } catch (err) {
+        console.error("Falha ao descriptografar requisição do Flow:", err.message);
+        return send(res, 421, "Failed to decrypt");
+      }
+      const { request, aesKey, iv } = decrypted;
       let respostaPayload;
       if (request.action === "ping") {
         respostaPayload = { data: { status: "active" } };
-      } else if (request.action === "data_exchange" && request.screen === "ENDERECO" && request.data?.cep) {
+      } else if (request.action === "data_exchange" && request.screen === "ENDERECO" && /^\d{8}$/.test(String(request.data?.cep || "").replace(/\D/g, ""))) {
         const cepLimpo = String(request.data.cep).replace(/\D/g, "");
         try {
           const viaCepResp = await new Promise((resolve, reject) => {
-            https
+            const reqViaCep = https
               .get(`https://viacep.com.br/ws/${cepLimpo}/json/`, (r) => {
                 let buf = "";
                 r.on("data", (c) => (buf += c));
-                r.on("end", () => resolve(JSON.parse(buf)));
+                r.on("end", () => {
+                  // JSON.parse aqui dentro (callback de evento, fora da pilha síncrona da
+                  // Promise) derrubava o processo inteiro se a resposta não fosse JSON válido —
+                  // achado na revisão final. try/catch + reject em vez de deixar escapar.
+                  try {
+                    resolve(JSON.parse(buf));
+                  } catch (err) {
+                    reject(err);
+                  }
+                });
               })
               .on("error", reject);
+            reqViaCep.setTimeout(8000, () => reqViaCep.destroy(new Error("Timeout ao consultar ViaCEP")));
           });
           respostaPayload = {
             screen: "ENDERECO",
@@ -2848,6 +3008,7 @@ const server = http.createServer(async (req, res) => {
             },
           };
         } catch (err) {
+          console.error("Falha ao consultar ViaCEP:", err.message);
           respostaPayload = { screen: "ENDERECO", data: { rua: "", bairro: "", cidade: "", uf: "" } };
         }
       } else {
@@ -4130,7 +4291,17 @@ setInterval(async () => {
 // A cada 30s: consulta o status de cada solicitação aberta e avança a conversa quando o estado
 // mudar de um jeito que importa. Todo o estado fica no banco (fgts_origination), não em
 // memória — sobrevive a redeploy/reinício no meio de uma solicitação.
+//
+// Trava simples (booleano em memória, não claim no banco tipo broadcast_agendado) — achado na
+// revisão final: sem isso, se um tick demorar mais que 30s (várias linhas, API lenta), o próximo
+// tick processa as MESMAS linhas de novo e manda mensagem duplicada pro cliente ("Simulação
+// pronta"/"Contrato assinado" 2x). Um único processo Render, então um booleano já resolve —
+// não precisa de claim distribuído como a fila de broadcast (que também é lida por outros
+// pontos de entrada, essa aqui só por esse setInterval).
+let verificandoFgtsOrigination = false;
 setInterval(async () => {
+  if (verificandoFgtsOrigination) return;
+  verificandoFgtsOrigination = true;
   try {
     const abertas = await db.fgtsOriginationListarAbertas();
     for (const row of abertas) {
@@ -4144,6 +4315,8 @@ setInterval(async () => {
     }
   } catch (err) {
     console.error("Erro no verificador de originação FGTS:", err.message);
+  } finally {
+    verificandoFgtsOrigination = false;
   }
 }, 30 * 1000);
 

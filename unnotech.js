@@ -30,6 +30,10 @@ function unnotechRequest(method, path, { body, accessToken, idempotencyKey, exte
       }
     );
     req.on("error", reject);
+    // Sem timeout, um socket travado prende o tick do verificador indefinidamente (achado na
+    // revisão final) — 15s é generoso pra uma chamada de API, curto o bastante pra não travar o
+    // verificador de 30 em 30s.
+    req.setTimeout(15000, () => req.destroy(new Error("Timeout ao chamar a Unnotech")));
     if (payload) req.write(payload);
     req.end();
   });
@@ -38,12 +42,12 @@ function unnotechRequest(method, path, { body, accessToken, idempotencyKey, exte
 // Cache em memória — renovado só quando falta menos de 1 minuto pro expires_in, nunca um token
 // por requisição (pedido explícito da doc: "Reutilize o mesmo token até o expires_in").
 let tokenCache = { accessToken: null, expiraEm: 0 };
+// Coalesce chamadas concorrentes durante a renovação — achado na revisão final: sem isso, N
+// chamadas simultâneas no exato momento em que o token expira cada uma buscava o seu próprio
+// token novo (a Unnotech aceita, mas é desperdício e foge do "reutilize o mesmo token" da doc).
+let tokenBuscaEmAndamento = null;
 
-async function getAccessToken() {
-  const agora = Date.now();
-  if (tokenCache.accessToken && agora < tokenCache.expiraEm - 60_000) {
-    return tokenCache.accessToken;
-  }
+async function buscarNovoToken() {
   const clientId = process.env.UNNOTECH_CLIENT_ID;
   const clientSecret = process.env.UNNOTECH_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
@@ -53,14 +57,43 @@ async function getAccessToken() {
     body: { client_id: clientId, client_secret: clientSecret },
   });
   if (status >= 400) throw new Error(`Falha ao autenticar na Unnotech: ${JSON.stringify(body)}`);
-  tokenCache = { accessToken: body.access_token, expiraEm: agora + body.expires_in * 1000 };
+  tokenCache = { accessToken: body.access_token, expiraEm: Date.now() + body.expires_in * 1000 };
   return tokenCache.accessToken;
 }
 
-async function criarSolicitacao(cpf, idempotencyKey) {
+async function getAccessToken() {
+  if (tokenCache.accessToken && Date.now() < tokenCache.expiraEm - 60_000) {
+    return tokenCache.accessToken;
+  }
+  if (!tokenBuscaEmAndamento) {
+    tokenBuscaEmAndamento = buscarNovoToken().finally(() => {
+      tokenBuscaEmAndamento = null;
+    });
+  }
+  return tokenBuscaEmAndamento;
+}
+
+// Invalida o cache — usado quando a própria API responde 401 no meio de uma chamada (token
+// pode ter sido revogado antes do prazo), pra forçar uma renovação de verdade na próxima
+// tentativa em vez de devolver o mesmo token já recusado.
+function invalidarToken() {
+  tokenCache = { accessToken: null, expiraEm: 0 };
+}
+
+// Wrapper usado por toda função de domínio abaixo: pega o token, chama, e se vier 401 renova o
+// token 1x e tenta de novo (achado na revisão final: "401 persistente após 1 retry de token" era
+// só uma frase no comentário da spec, nunca implementada de verdade).
+async function chamarAutenticado(method, path, extras = {}) {
   const accessToken = await getAccessToken();
-  const { status, body } = await unnotechRequest("POST", "/api/v1/fgts/applications", {
-    accessToken,
+  const primeira = await unnotechRequest(method, path, { ...extras, accessToken });
+  if (primeira.status !== 401) return primeira;
+  invalidarToken();
+  const novoToken = await getAccessToken();
+  return unnotechRequest(method, path, { ...extras, accessToken: novoToken });
+}
+
+async function criarSolicitacao(cpf, idempotencyKey) {
+  const { status, body } = await chamarAutenticado("POST", "/api/v1/fgts/applications", {
     idempotencyKey,
     body: { customer: { cpf } },
   });
@@ -70,10 +103,7 @@ async function criarSolicitacao(cpf, idempotencyKey) {
 
 // Versão otimizada (sem quotes/offers no corpo) — usada pelo polling frequente do verificador.
 async function consultarStatus(applicationId) {
-  const accessToken = await getAccessToken();
-  const { status, body } = await unnotechRequest("GET", `/api/v1/fgts/applications/${applicationId}/status`, {
-    accessToken,
-  });
+  const { status, body } = await chamarAutenticado("GET", `/api/v1/fgts/applications/${applicationId}/status`);
   if (status >= 400) throw new Error(`Falha ao consultar status: ${JSON.stringify(body)}`);
   return body;
 }
@@ -81,22 +111,35 @@ async function consultarStatus(applicationId) {
 // Recurso completo, com quotes[]/offers[] — usada só quando precisamos ler o motivo de recusa
 // ou os detalhes de uma oferta específica (o /status não traz isso).
 async function consultarSolicitacaoCompleta(applicationId) {
-  const accessToken = await getAccessToken();
-  const { status, body } = await unnotechRequest("GET", `/api/v1/fgts/applications/${applicationId}`, {
-    accessToken,
-  });
+  const { status, body } = await chamarAutenticado("GET", `/api/v1/fgts/applications/${applicationId}`);
   if (status >= 400) throw new Error(`Falha ao consultar solicitação: ${JSON.stringify(body)}`);
   return body;
 }
 
 async function requotar(applicationId, idempotencyKey) {
-  const accessToken = await getAccessToken();
-  const { status, body } = await unnotechRequest("POST", `/api/v1/fgts/applications/${applicationId}/requote`, {
-    accessToken,
+  const { status, body } = await chamarAutenticado("POST", `/api/v1/fgts/applications/${applicationId}/requote`, {
     idempotencyKey,
   });
   if (status >= 400) throw new Error(`Falha ao repetir cotação: ${JSON.stringify(body)}`);
   return body;
+}
+
+// Valida os 2 dígitos verificadores do CPF (algoritmo padrão) — achado na revisão final:
+// REGEX_CPF (server.js) só confere 11 dígitos no formato certo, então qualquer sequência de 11
+// dígitos (até um número de celular) abria solicitação de verdade na Unnotech, gastando cota
+// (100/dia) à toa. Só usada antes de chamar criarSolicitacao, não mexe no resto dos fluxos que
+// usam REGEX_CPF pra outros produtos (CLT, garantia, financiamento...).
+function cpfValido(cpf) {
+  const c = String(cpf || "").replace(/\D/g, "");
+  if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false; // 11 dígitos iguais não é CPF real
+  const digitos = c.split("").map(Number);
+  const calcularDigito = (fatorInicial) => {
+    let soma = 0;
+    for (let i = 0; i < fatorInicial - 1; i++) soma += digitos[i] * (fatorInicial - i);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  return calcularDigito(10) === digitos[9] && calcularDigito(11) === digitos[10];
 }
 
 // Só a tabela J17 (ÔNIX) interessa — pedido explícito do usuário: se vier oferta de outro
@@ -148,6 +191,17 @@ const MAPA_TIPO_CONTA = {
 // nomes dos campos do formulário (mesmos nomes usados no flow_json da Task 8). `cpf` é o que já
 // temos desde a simulação (não vem do formulário) — usado como chave PIX quando for o caso, já
 // que a Unnotech só aceita PIX = CPF do próprio tomador.
+// DatePicker do WhatsApp Flow (versão < 5.0, é o nosso caso, "3.1") devolve epoch em
+// milissegundos como string, não "YYYY-MM-DD" — achado na revisão final. Converte só quando o
+// valor for puramente numérico (já vem formatado do jeito certo, deixa passar sem mexer).
+function normalizarDataFlow(valor) {
+  const v = String(valor || "");
+  if (!/^\d+$/.test(v)) return v;
+  const d = new Date(Number(v));
+  if (Number.isNaN(d.getTime())) return v;
+  return d.toISOString().slice(0, 10);
+}
+
 function montarPayloadKyc(cpf, dados) {
   const bank =
     dados.forma_desembolso === "PIX"
@@ -163,8 +217,8 @@ function montarPayloadKyc(cpf, dados) {
         };
   return {
     name: dados.nome,
-    birth_date: dados.data_nascimento,
-    phone: dados.celular,
+    birth_date: normalizarDataFlow(dados.data_nascimento),
+    phone: String(dados.celular || "").replace(/\D/g, ""),
     email: dados.email,
     gender: dados.genero,
     civil_status: dados.estado_civil,
@@ -174,7 +228,7 @@ function montarPayloadKyc(cpf, dados) {
     rg_organ: dados.rg_orgao,
     rg_uf: dados.rg_uf,
     address: {
-      zip_code: dados.cep,
+      zip_code: String(dados.cep || "").replace(/\D/g, ""),
       uf: dados.uf,
       city: dados.cidade,
       district: dados.bairro,
@@ -189,9 +243,7 @@ function montarPayloadKyc(cpf, dados) {
 // Upsert — a doc confirma que não exige Idempotency-Key aqui (só as rotas de abertura/aceite
 // exigem).
 async function enviarKyc(applicationId, kyc) {
-  const accessToken = await getAccessToken();
-  const { status, body } = await unnotechRequest("POST", `/api/v1/fgts/applications/${applicationId}/kyc`, {
-    accessToken,
+  const { status, body } = await chamarAutenticado("POST", `/api/v1/fgts/applications/${applicationId}/kyc`, {
     body: kyc,
   });
   if (status >= 400) throw new Error(`Falha ao enviar KYC: ${JSON.stringify(body)}`);
@@ -199,11 +251,10 @@ async function enviarKyc(applicationId, kyc) {
 }
 
 async function aceitarOferta(applicationId, offerId, idempotencyKey) {
-  const accessToken = await getAccessToken();
-  const { status, body } = await unnotechRequest(
+  const { status, body } = await chamarAutenticado(
     "POST",
     `/api/v1/fgts/applications/${applicationId}/offers/${offerId}/accept`,
-    { accessToken, idempotencyKey }
+    { idempotencyKey }
   );
   if (status >= 400) {
     const err = new Error(`Falha ao aceitar oferta: ${JSON.stringify(body)}`);
@@ -214,8 +265,7 @@ async function aceitarOferta(applicationId, offerId, idempotencyKey) {
 }
 
 async function consultarProposta(proposalUuid) {
-  const accessToken = await getAccessToken();
-  const { status, body } = await unnotechRequest("GET", `/api/v1/proposals/${proposalUuid}`, { accessToken });
+  const { status, body } = await chamarAutenticado("GET", `/api/v1/proposals/${proposalUuid}`);
   if (status >= 400) throw new Error(`Falha ao consultar proposta: ${JSON.stringify(body)}`);
   return body.data;
 }
@@ -227,6 +277,7 @@ module.exports = {
   consultarStatus,
   consultarSolicitacaoCompleta,
   requotar,
+  cpfValido,
   filtrarOfertaJ17,
   classificarRecusa,
   BANCOS_COMPE,

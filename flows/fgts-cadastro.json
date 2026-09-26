@@ -48,7 +48,20 @@
               { "type": "TextInput", "name": "nome_mae", "label": "Nome completo da mãe", "required": true },
               {
                 "type": "Footer", "label": "Continuar",
-                "on-click-action": { "name": "navigate", "next": { "type": "screen", "name": "DOCUMENTO" }, "payload": {} }
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": { "type": "screen", "name": "DOCUMENTO" },
+                  "payload": {
+                    "nome": "${form.nome}",
+                    "data_nascimento": "${form.data_nascimento}",
+                    "genero": "${form.genero}",
+                    "email": "${form.email}",
+                    "celular": "${form.celular}",
+                    "estado_civil": "${form.estado_civil}",
+                    "escolaridade": "${form.escolaridade}",
+                    "nome_mae": "${form.nome_mae}"
+                  }
+                }
               }
             ]
           }
@@ -58,6 +71,16 @@
     {
       "id": "DOCUMENTO",
       "title": "Documento (RG)",
+      "data": {
+        "nome": { "type": "string" },
+        "data_nascimento": { "type": "string" },
+        "genero": { "type": "string" },
+        "email": { "type": "string" },
+        "celular": { "type": "string" },
+        "estado_civil": { "type": "string" },
+        "escolaridade": { "type": "string" },
+        "nome_mae": { "type": "string" }
+      },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
@@ -91,7 +114,23 @@
               },
               {
                 "type": "Footer", "label": "Continuar",
-                "on-click-action": { "name": "navigate", "next": { "type": "screen", "name": "ENDERECO" }, "payload": {} }
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": { "type": "screen", "name": "ENDERECO" },
+                  "payload": {
+                    "nome": "${data.nome}",
+                    "data_nascimento": "${data.data_nascimento}",
+                    "genero": "${data.genero}",
+                    "email": "${data.email}",
+                    "celular": "${data.celular}",
+                    "estado_civil": "${data.estado_civil}",
+                    "escolaridade": "${data.escolaridade}",
+                    "nome_mae": "${data.nome_mae}",
+                    "rg_numero": "${form.rg_numero}",
+                    "rg_orgao": "${form.rg_orgao}",
+                    "rg_uf": "${form.rg_uf}"
+                  }
+                }
               }
             ]
           }
@@ -101,6 +140,19 @@
     {
       "id": "ENDERECO",
       "title": "Endereço",
+      "data": {
+        "nome": { "type": "string" },
+        "data_nascimento": { "type": "string" },
+        "genero": { "type": "string" },
+        "email": { "type": "string" },
+        "celular": { "type": "string" },
+        "estado_civil": { "type": "string" },
+        "escolaridade": { "type": "string" },
+        "nome_mae": { "type": "string" },
+        "rg_numero": { "type": "string" },
+        "rg_orgao": { "type": "string" },
+        "rg_uf": { "type": "string" }
+      },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
@@ -129,7 +181,30 @@
               { "type": "TextInput", "name": "complemento", "label": "Complemento (opcional)", "required": false },
               {
                 "type": "Footer", "label": "Continuar",
-                "on-click-action": { "name": "navigate", "next": { "type": "screen", "name": "DESEMBOLSO" }, "payload": {} }
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": { "type": "screen", "name": "DESEMBOLSO" },
+                  "payload": {
+                    "nome": "${data.nome}",
+                    "data_nascimento": "${data.data_nascimento}",
+                    "genero": "${data.genero}",
+                    "email": "${data.email}",
+                    "celular": "${data.celular}",
+                    "estado_civil": "${data.estado_civil}",
+                    "escolaridade": "${data.escolaridade}",
+                    "nome_mae": "${data.nome_mae}",
+                    "rg_numero": "${data.rg_numero}",
+                    "rg_orgao": "${data.rg_orgao}",
+                    "rg_uf": "${data.rg_uf}",
+                    "cep": "${form.cep}",
+                    "rua": "${form.rua}",
+                    "bairro": "${form.bairro}",
+                    "cidade": "${form.cidade}",
+                    "uf": "${form.uf}",
+                    "numero": "${form.numero}",
+                    "complemento": "${form.complemento}"
+                  }
+                }
               }
             ]
           }
@@ -140,6 +215,26 @@
       "id": "DESEMBOLSO",
       "title": "Como receber",
       "terminal": true,
+      "data": {
+        "nome": { "type": "string" },
+        "data_nascimento": { "type": "string" },
+        "genero": { "type": "string" },
+        "email": { "type": "string" },
+        "celular": { "type": "string" },
+        "estado_civil": { "type": "string" },
+        "escolaridade": { "type": "string" },
+        "nome_mae": { "type": "string" },
+        "rg_numero": { "type": "string" },
+        "rg_orgao": { "type": "string" },
+        "rg_uf": { "type": "string" },
+        "cep": { "type": "string" },
+        "rua": { "type": "string" },
+        "bairro": { "type": "string" },
+        "cidade": { "type": "string" },
+        "uf": { "type": "string" },
+        "numero": { "type": "string" },
+        "complemento": { "type": "string" }
+      },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
@@ -190,7 +285,35 @@
               { "type": "TextInput", "name": "digito_conta", "label": "Dígito da conta", "required": false, "visible": "${form.forma_desembolso} == 'CONTA'" },
               {
                 "type": "Footer", "label": "Enviar",
-                "on-click-action": { "name": "complete", "payload": {} }
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "nome": "${data.nome}",
+                    "data_nascimento": "${data.data_nascimento}",
+                    "genero": "${data.genero}",
+                    "email": "${data.email}",
+                    "celular": "${data.celular}",
+                    "estado_civil": "${data.estado_civil}",
+                    "escolaridade": "${data.escolaridade}",
+                    "nome_mae": "${data.nome_mae}",
+                    "rg_numero": "${data.rg_numero}",
+                    "rg_orgao": "${data.rg_orgao}",
+                    "rg_uf": "${data.rg_uf}",
+                    "cep": "${data.cep}",
+                    "rua": "${data.rua}",
+                    "bairro": "${data.bairro}",
+                    "cidade": "${data.cidade}",
+                    "uf": "${data.uf}",
+                    "numero": "${data.numero}",
+                    "complemento": "${data.complemento}",
+                    "forma_desembolso": "${form.forma_desembolso}",
+                    "banco": "${form.banco}",
+                    "tipo_conta": "${form.tipo_conta}",
+                    "agencia": "${form.agencia}",
+                    "conta": "${form.conta}",
+                    "digito_conta": "${form.digito_conta}"
+                  }
+                }
               }
             ]
           }

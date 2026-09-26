@@ -326,6 +326,23 @@ const ready = (async () => {
   await client.execute(
     `CREATE INDEX IF NOT EXISTS idx_fgts_origination_phone ON fgts_origination(phone, business_number_id)`
   );
+  const infoFgtsOrigination = await client.execute(`PRAGMA table_info(fgts_origination)`);
+  if (!infoFgtsOrigination.rows.some((r) => r.name === "link_assinatura_enviado_em")) {
+    // Achado na revisão final: usar só "já tinha proposal_uuid salvo" como trava de "só manda o
+    // link 1 vez" tem um bug — o proposal_uuid costuma aparecer ANTES do signature_link (a
+    // geração do link é assíncrona), então na maioria dos ciclos o link nunca era mandado
+    // (a trava já dava como "enviado" no tick em que só o proposal_uuid apareceu). Coluna própria,
+    // marcada só depois do envio de verdade ter sido bem-sucedido.
+    await client.execute(`ALTER TABLE fgts_origination ADD COLUMN link_assinatura_enviado_em INTEGER`);
+  }
+  if (!infoFgtsOrigination.rows.some((r) => r.name === "flow_token")) {
+    // Token aleatório pro WhatsApp Flow, não o id sequencial da linha — achado na revisão
+    // final: "fgtsorig_<id>" é adivinhável, e nada checava se quem mandou a submissão do Flow
+    // era o mesmo contato da linha, então um POST forjado no webhook (que hoje não valida
+    // assinatura da Meta) podia trocar os dados bancários de outra pessoa.
+    await client.execute(`ALTER TABLE fgts_origination ADD COLUMN flow_token TEXT`);
+    await client.execute(`CREATE INDEX IF NOT EXISTS idx_fgts_origination_flow_token ON fgts_origination(flow_token)`);
+  }
 
   // Mescla duplicatas causadas pelo "9º dígito" do celular brasileiro (mesmo contato virando
   // duas conversas — uma com 5X99XXXXXXXX, outra com 5X9XXXXXXXX — dependendo de qual formato
@@ -1211,6 +1228,24 @@ async function fgtsOriginationListarAbertas() {
   return result.rows;
 }
 
+async function fgtsOriginationBuscarPorFlowToken(token) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM fgts_origination WHERE flow_token = ?`, args: [token] });
+  return result.rows[0] || null;
+}
+
+// Atômico: só quem lê a linha exatamente na `etapaEsperada` consegue mudar pra `etapaNova` —
+// evita processar a MESMA submissão de Flow duas vezes se a Meta reentregar o webhook (mesmo
+// espírito do claim de broadcastProximoDevido).
+async function fgtsOriginationReivindicar(id, etapaEsperada, etapaNova) {
+  await ready;
+  const result = await client.execute({
+    sql: `UPDATE fgts_origination SET etapa = ?, updated_at = ? WHERE id = ? AND etapa = ?`,
+    args: [etapaNova, Date.now(), id, etapaEsperada],
+  });
+  return result.rowsAffected > 0;
+}
+
 // Agenda os contatos 2+ de um broadcast com intervalo — cada item já vem com seu
 // agendado_para calculado pelo chamador (server.js: agora + i * intervaloSegundos).
 async function broadcastAgendarLote(businessId, itens) {
@@ -1311,7 +1346,9 @@ module.exports = {
   fgtsOriginationCriar,
   fgtsOriginationBuscarAberta,
   fgtsOriginationBuscarPorId,
+  fgtsOriginationBuscarPorFlowToken,
   fgtsOriginationAtualizar,
+  fgtsOriginationReivindicar,
   fgtsOriginationListarAbertas,
   tentarMarcarMenuEnviado,
   setFluxoPasso,

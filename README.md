@@ -657,11 +657,16 @@ silêncio do passo `fgts_cpf`. `FLUXO_FGTS_ANUNCIO` (seção acima) já nasceu c
 
 ### Originação automática de FGTS via Unnotech (25/09/2026)
 
-Depois que o CPF é capturado (pelas 3 entradas acima), o pedido passa a ser processado de
-verdade — simulação, formulário de dados (WhatsApp Flow), aceite da oferta, assinatura e
-acompanhamento até o pagamento, sem humano no meio. Ver a spec completa em
-`docs/superpowers/specs/2026-09-25-fgts-unnotech-design.md` e o plano de implementação em
-`docs/superpowers/plans/2026-09-25-fgts-unnotech.md`.
+Depois que o CPF é capturado — **só pelo menu padrão e pelo fluxo do anúncio**, os 2 pontos de
+entrada que chamam `iniciarOriginacaoFgts` — o pedido passa a ser processado de verdade:
+simulação, formulário de dados (WhatsApp Flow), aceite da oferta, assinatura e acompanhamento
+até o pagamento, sem humano no meio. **O Instagram fica de fora** (correção feita na revisão
+final: a spec original assumia, errado, que o DM do Instagram convergia pro mesmo lugar — na
+prática é um caminho totalmente separado, `processarEntryInstagram`, que continua só mandando
+"dados recebidos" pro atendimento manual; WhatsApp Flow também não existe como recurso dentro do
+Instagram, então unificar isso exigiria uma solução diferente, não só reaproveitar código). Ver
+a spec completa em `docs/superpowers/specs/2026-09-25-fgts-unnotech-design.md` e o plano de
+implementação em `docs/superpowers/plans/2026-09-25-fgts-unnotech.md`.
 
 **Módulo `unnotech.js`** — cliente puro da API pública da Unnotech (parceiro
 `LEV INTERMEDIACAO DE NEGOCIOS LTDA`, tabela comercial **J17/ÔNIX** — qualquer oferta de outro
