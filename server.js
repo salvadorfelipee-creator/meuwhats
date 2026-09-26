@@ -794,8 +794,8 @@ const FLUXO_BOTOES = {
   fgtsorig_contratar: handlerFgtsOrigContratar,
   fgtsorig_agora_nao: handlerFgtsOrigAgoraNao,
   // Botões da originação automática de consignado CLT (ver bloco CLT_ORIGINATION_ATIVO acima).
-  cltorig_parcela: handlerCltOrigParcela,
-  cltorig_liquido: handlerCltOrigLiquido,
+  cltorig_escolher_opcao: handlerCltOrigEscolherOpcao,
+  cltorig_parcela_mais_baixa: handlerCltOrigParcelaMaisBaixa,
   cltorig_contratar: handlerCltOrigContratar,
   cltorig_agora_nao: handlerCltOrigAgoraNao,
   fluxo_gerente: {
@@ -1404,9 +1404,10 @@ const CLTORIG_ETAPAS_COM_PRAZO_CURTO = [
   "aguardando_email",
   "abrindo_solicitacao",
   "escolhendo_vinculo",
-  "escolhendo_valor",
-  "aguardando_valor",
   "simulando_pendente",
+  "apresentando_prazos",
+  "escolhendo_prazo",
+  "aguardando_valor",
   "oferta_apresentada",
   "formulario",
   "enviando_kyc",
@@ -1433,7 +1434,8 @@ const CLTORIG_PRAZO_MARGEM_MS = 45 * 60 * 1000;
 // fluxo_passo, então a próxima mensagem da pessoa podia cair no lugar errado.
 const CLTORIG_ETAPA_REENTRADA = {
   escolhendo_vinculo: { texto: "Ainda esperando você escolher o vínculo na lista que te mandei ali acima 😊", passo: null },
-  escolhendo_valor: { texto: "Ainda esperando você escolher entre parcela ou valor líquido nos botões que te mandei ali acima 😊", passo: null },
+  apresentando_prazos: { texto: "Ainda esperando você escolher uma opção ou pedir uma parcela mais baixa, nos botões que te mandei ali acima 😊", passo: null },
+  escolhendo_prazo: { texto: "Ainda esperando você escolher o prazo na lista que te mandei ali acima 😊", passo: null },
   aguardando_valor: { texto: "Ainda esperando você me mandar o valor — pode mandar só o número? 😊", passo: "cltorig_valor" },
   oferta_apresentada: { texto: "Já te mandei sua oferta ali acima — toca em QUERO CONTRATAR ou AGORA NÃO 😊", passo: null },
   formulario: { texto: "Ainda esperando você preencher o formulário que te mandei ali acima 😊", passo: null },
@@ -1571,10 +1573,9 @@ async function handlerCltOrigCapturaEmail(de, businessNumberId, corpo) {
       businessNumberId,
       de,
       consentUrl
-        ? `Pra continuar, você precisa assinar o termo de autorização (é só 1 vez, vale pra todas as ` +
-            `instituições parceiras). Toque no link e assine:\n${consentUrl}\n\nAssim que você assinar, eu ` +
-            `continuo automaticamente por aqui — pode levar alguns minutinhos. 😊`
-        : "Pra continuar, você precisa assinar o termo de autorização — já já eu te mando o link. 😊"
+        ? `Para verificar a disponibilidade é preciso autorizar a consulta. Clique no link abaixo para fazer ` +
+            `a autorização:\n${consentUrl}\n\nAssim que autorizar, eu continuo automaticamente por aqui. 😊`
+        : "Para verificar a disponibilidade é preciso autorizar a consulta — já já eu te mando o link. 😊"
     );
     await db.setFluxoPasso(de, businessNumberId, null);
   } catch (err) {
@@ -1610,27 +1611,37 @@ async function processarEtapaCltAguardandoAutorizacao(row) {
   await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
 }
 
-// Depois de escolher/receber o vínculo (1 só ou escolhido numa lista), pergunta parcela x valor
-// líquido — mostra a margem disponível na mesma mensagem, ajuda o cliente a já pensar num número.
-// Estado no banco ANTES de enviar (achado na revisão final, mesmo padrão de finalizarCltSemOferta).
+// Depois de escolher/receber o vínculo (1 só ou escolhido numa lista), já simula automaticamente
+// no valor MÁXIMO de parcela permitido (a margem inteira) — pedido do usuário: não pergunta mais
+// "parcela ou valor líquido" antes, o cliente já vê de cara o que cabe no salário dele, com a
+// opção de pedir um valor mais baixo depois (ver processarEtapaCltSimulando/
+// handlerCltOrigParcelaMaisBaixa). Reivindicação atômica a partir da etapa de ORIGEM (que varia:
+// 'consultando_margem' quando só tem 1 vínculo, 'escolhendo_vinculo' quando veio de uma lista) —
+// mesmo cuidado contra reentrega de webhook que os outros passos automáticos já têm.
 async function prosseguirComVinculoClt(row, vinculo) {
+  const margem = Number(vinculo.available_margin || 0);
+  if (margem <= 0) {
+    await finalizarCltSemOferta(row, "sem_margem");
+    return;
+  }
+  const reivindicou = await db.cltOriginationReivindicar(row.id, row.etapa, "simulando_pendente");
+  if (!reivindicou) return;
   await db.cltOriginationAtualizar(row.id, {
     employment_id: vinculo.employment_id,
-    margem_disponivel: vinculo.available_margin ?? null,
-    etapa: "escolhendo_valor",
+    margem_disponivel: margem,
   });
   try {
-    await enviarRespostaAutomatica(
-      row.business_number_id,
-      row.phone,
-      `Sua margem disponível é de R$ ${Number(vinculo.available_margin || 0).toFixed(2)} por mês. Como você prefere simular?`,
-      [
-        { id: "cltorig_parcela", title: "VALOR DA PARCELA" },
-        { id: "cltorig_liquido", title: "VALOR QUE RECEBO" },
-      ]
-    );
+    const idempotencyKey = crypto.randomUUID();
+    await unnotech.simularClt(row.application_id, { employmentId: vinculo.employment_id, basis: "INSTALLMENT", valor: margem }, idempotencyKey);
+    await db.cltOriginationAtualizar(row.id, { basis: "INSTALLMENT", valor_desejado: margem, etapa: "simulando", idempotency_key_atual: idempotencyKey });
   } catch (err) {
-    console.error(`Erro ao mandar pergunta de base de simulação CLT (linha #${row.id}):`, err.message);
+    console.error(`Erro ao simular CLT no valor máximo (linha #${row.id}):`, err.message);
+    await db.cltOriginationAtualizar(row.id, { etapa: "erro" });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente (linha CLT #${row.id}):`, err2.message);
+    }
   }
 }
 
@@ -1722,24 +1733,14 @@ async function handlerCltOrigEscolherVinculo(de, businessNumberId, employmentId)
   await prosseguirComVinculoClt(row, vinculo);
 }
 
-async function handlerCltOrigEscolherBasis(de, businessNumberId, basis) {
+// Pedido do cliente (ao vivo, sem digitar valor ainda) pra pagar menos que o máximo — só
+// pergunta o número, a simulação de verdade acontece em handlerCltOrigCapturaValor.
+async function handlerCltOrigParcelaMaisBaixa(de, businessNumberId) {
   const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
-  if (!row || row.etapa !== "escolhendo_valor") return;
-  await db.cltOriginationAtualizar(row.id, { basis, etapa: "aguardando_valor" });
-  await enviarRespostaAutomatica(
-    businessNumberId,
-    de,
-    basis === "INSTALLMENT"
-      ? "Quanto você quer pagar de parcela por mês? Me manda só o número (ex.: 300)."
-      : "Quanto você quer receber? Me manda só o número (ex.: 3000)."
-  );
+  if (!row || row.etapa !== "apresentando_prazos") return;
+  await db.cltOriginationAtualizar(row.id, { etapa: "aguardando_valor" });
+  await enviarRespostaAutomatica(businessNumberId, de, "Quanto você quer pagar de parcela por mês? Me manda só o número (ex.: 300).");
   await db.setFluxoPasso(de, businessNumberId, "cltorig_valor");
-}
-async function handlerCltOrigParcela(de, businessNumberId) {
-  await handlerCltOrigEscolherBasis(de, businessNumberId, "INSTALLMENT");
-}
-async function handlerCltOrigLiquido(de, businessNumberId) {
-  await handlerCltOrigEscolherBasis(de, businessNumberId, "NET_AMOUNT");
 }
 
 async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
@@ -1754,7 +1755,7 @@ async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
   }
   const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
   if (!row || row.etapa !== "aguardando_valor") return;
-  if (row.basis === "INSTALLMENT" && row.margem_disponivel && valor > Number(row.margem_disponivel)) {
+  if (row.margem_disponivel && valor > Number(row.margem_disponivel)) {
     await enviarRespostaAutomatica(
       businessNumberId,
       de,
@@ -1771,7 +1772,7 @@ async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
   await enviarRespostaAutomatica(businessNumberId, de, "Simulando... isso leva só um minutinho ⏳");
   try {
     const idempotencyKey = crypto.randomUUID();
-    await unnotech.simularClt(row.application_id, { employmentId: row.employment_id, basis: row.basis, valor }, idempotencyKey);
+    await unnotech.simularClt(row.application_id, { employmentId: row.employment_id, basis: "INSTALLMENT", valor }, idempotencyKey);
     await db.cltOriginationAtualizar(row.id, { valor_desejado: valor, etapa: "simulando", idempotency_key_atual: idempotencyKey });
     await db.setFluxoPasso(de, businessNumberId, null);
   } catch (err) {
@@ -1790,18 +1791,27 @@ async function handlerCltOrigCapturaValor(de, businessNumberId, corpo) {
   }
 }
 
-async function processarEtapaCltSimulando(row) {
-  const status = await unnotech.consultarStatusClt(row.application_id);
-  // Achado na revisão final: reagir a OFFERS_AVAILABLE sem checar quotes_pending podia ler um
-  // menu PARCIAL (a primeira bancarizadora respondeu, as outras ainda estão cotando) — a doc é
-  // clara que essa etapa espera quotes_pending chegar a 0.
-  if (status.status === "OFFERS_AVAILABLE" && Number(status.quotes_pending || 0) === 0) {
-    const completa = await unnotech.consultarSolicitacaoCompletaClt(row.application_id);
-    const oferta = unnotech.escolherMelhorOferta(completa.offers);
-    if (!oferta) {
-      await finalizarCltSemOferta(row, "desconhecido");
-      return;
-    }
+// Mantém só a MELHOR oferta (a primeira, já que offers[] vem ordenada por net_amount desc — ver
+// unnotech.escolherMelhorOferta) por prazo distinto — pra parcela fixa, cada bancarizadora/tabela
+// pode topar um número de parcelas diferente, e o cliente escolhe entre elas (pedido do usuário:
+// mostrar "12x/24x/36x" em vez de só a melhor condição isolada). Ordenado do prazo mais curto pro
+// mais longo — ordem de leitura natural, não a ordem de "melhor oferta" da API.
+function ofertasPorPrazoClt(offers) {
+  const vistos = new Set();
+  const unicas = [];
+  for (const o of offers || []) {
+    if (o.status !== "AVAILABLE") continue;
+    if (vistos.has(o.installment_count)) continue;
+    vistos.add(o.installment_count);
+    unicas.push(o);
+  }
+  return unicas.sort((a, b) => Number(a.installment_count) - Number(b.installment_count));
+}
+
+// Confirmação final de UMA oferta específica (a única do menu, ou a que o cliente escolheu na
+// lista de prazos) — mesma mensagem/botões de sempre, reaproveitada pelos 2 caminhos.
+async function apresentarOfertaEscolhidaClt(row, oferta) {
+  try {
     await enviarRespostaAutomatica(
       row.business_number_id,
       row.phone,
@@ -1813,14 +1823,63 @@ async function processarEtapaCltSimulando(row) {
         { id: "cltorig_agora_nao", title: "AGORA NÃO" },
       ]
     );
-    await db.cltOriginationAtualizar(row.id, {
-      etapa: "oferta_apresentada",
-      offer_id: oferta.offer_id,
-      offers_cache: JSON.stringify(completa.offers || []),
-      tentativas_offer_ids: JSON.stringify([]),
-      status_unnotech: status.status,
-    });
-    await db.setFluxoPasso(row.phone, row.business_number_id, "cltorig_oferta_apresentada");
+  } catch (err) {
+    console.error(`Erro ao apresentar oferta CLT escolhida (linha #${row.id}):`, err.message);
+  }
+  await db.cltOriginationAtualizar(row.id, {
+    etapa: "oferta_apresentada",
+    offer_id: oferta.offer_id,
+    tentativas_offer_ids: JSON.stringify([]),
+  });
+  await db.setFluxoPasso(row.phone, row.business_number_id, "cltorig_oferta_apresentada");
+}
+
+async function processarEtapaCltSimulando(row) {
+  const status = await unnotech.consultarStatusClt(row.application_id);
+  // Achado na revisão final: reagir a OFFERS_AVAILABLE sem checar quotes_pending podia ler um
+  // menu PARCIAL (a primeira bancarizadora respondeu, as outras ainda estão cotando) — a doc é
+  // clara que essa etapa espera quotes_pending chegar a 0.
+  if (status.status === "OFFERS_AVAILABLE" && Number(status.quotes_pending || 0) === 0) {
+    const completa = await unnotech.consultarSolicitacaoCompletaClt(row.application_id);
+    const porPrazo = ofertasPorPrazoClt(completa.offers);
+    if (!porPrazo.length) {
+      await finalizarCltSemOferta(row, "desconhecido");
+      return;
+    }
+    await db.cltOriginationAtualizar(row.id, { offers_cache: JSON.stringify(completa.offers || []), status_unnotech: status.status });
+    if (porPrazo.length === 1) {
+      await apresentarOfertaEscolhidaClt(row, porPrazo[0]);
+      return;
+    }
+    // Mais de um prazo aprovado — pedido do usuário: primeiro uma mensagem informativa com o
+    // "cardápio" (sem botão), depois a explicação de desembolso/primeiro desconto, só então a
+    // pergunta com os botões de ação.
+    const ehPrimeiraSimulacao = Number(row.valor_desejado || 0) >= Number(row.margem_disponivel || 0);
+    try {
+      const linhas = porPrazo.map((o) => `${o.installment_count}x de R$ ${Number(o.net_amount).toFixed(2)}`).join("\n");
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, `Tenho aprovado pra você:\n${linhas}`);
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Esse valor é liberado em até 40 minutos na sua conta, via PIX. O primeiro desconto só acontece " +
+          "depois de 60 dias, direto no seu salário."
+      );
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        ehPrimeiraSimulacao
+          ? `Sua parcela máxima permitida é de R$ ${Number(row.margem_disponivel).toFixed(2)} por mês. Você quer ` +
+              "contratar com uma dessas opções ou prefere simular um valor de parcela mais baixo?"
+          : "Você quer contratar com uma dessas opções ou prefere simular um valor ainda mais baixo?",
+        [
+          { id: "cltorig_escolher_opcao", title: "ESCOLHER UMA OPÇÃO" },
+          { id: "cltorig_parcela_mais_baixa", title: "PARCELA MAIS BAIXA" },
+        ]
+      );
+    } catch (err) {
+      console.error(`Erro ao apresentar cardápio de prazos CLT (linha #${row.id}):`, err.message);
+    }
+    await db.cltOriginationAtualizar(row.id, { etapa: "apresentando_prazos" });
   } else if (status.status === "NO_OFFERS" || status.status === "EXPIRED") {
     await finalizarCltSemOferta(row, "desconhecido");
   } else if (Date.now() - Number(row.etapa_em || row.created_at) > CLTORIG_PRAZO_MS) {
@@ -1833,6 +1892,50 @@ async function processarEtapaCltSimulando(row) {
   } else {
     await db.cltOriginationAtualizar(row.id, { status_unnotech: status.status });
   }
+}
+
+// Clique em "ESCOLHER UMA OPÇÃO" — manda a lista dos prazos já calculados (do offers_cache,
+// sem chamar a Unnotech de novo).
+async function handlerCltOrigEscolherOpcao(de, businessNumberId) {
+  const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "apresentando_prazos") return;
+  let ofertas = [];
+  try {
+    ofertas = JSON.parse(row.offers_cache || "[]");
+  } catch {
+    ofertas = [];
+  }
+  const porPrazo = ofertasPorPrazoClt(ofertas);
+  if (!porPrazo.length) return; // não deveria acontecer (só chega aqui com >=2 prazos), rede de segurança
+  await db.cltOriginationAtualizar(row.id, { etapa: "escolhendo_prazo" });
+  try {
+    await enviarRespostaAutomatica(businessNumberId, de, "Qual prazo você quer?", null, {
+      botao: "Escolher prazo",
+      opcoes: porPrazo.map((o) => ({
+        id: `cltorig_prazo_${o.offer_id}`,
+        title: `${o.installment_count}x de R$ ${Number(o.installment_amount).toFixed(2)}`,
+        description: `Você recebe R$ ${Number(o.net_amount).toFixed(2)}`,
+      })),
+    });
+  } catch (err) {
+    console.error(`Erro ao mandar lista de prazos CLT (linha #${row.id}):`, err.message);
+  }
+}
+
+// Clique numa linha da lista de prazos — id dinâmico ("cltorig_prazo_<offer_id>"), por isso não
+// é um botão estático em FLUXO_BOTOES (mesmo padrão de cltorig_vinculo_*, ver despacho no webhook).
+async function handlerCltOrigEscolherPrazo(de, businessNumberId, offerId) {
+  const row = await db.cltOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "escolhendo_prazo") return;
+  let ofertas = [];
+  try {
+    ofertas = JSON.parse(row.offers_cache || "[]");
+  } catch {
+    ofertas = [];
+  }
+  const oferta = ofertas.find((o) => o.offer_id === offerId);
+  if (!oferta) return;
+  await apresentarOfertaEscolhidaClt(row, oferta);
 }
 
 async function handlerCltOrigContratar(de, businessNumberId) {
@@ -3399,6 +3502,16 @@ async function processarEntry(entry) {
             await handlerCltOrigEscolherVinculo(de, businessNumberId, reply.id.slice("cltorig_vinculo_".length));
           } catch (err) {
             console.error("Erro ao processar escolha de vínculo CLT:", err.message);
+          }
+        } else if (tipo === "interactive" && (msg.interactive?.list_reply?.id || "").startsWith("cltorig_prazo_")) {
+          // Escolha de prazo no "cardápio" de ofertas (ver handlerCltOrigEscolherOpcao) — id
+          // dinâmico por oferta, mesmo padrão de cltorig_vinculo_ acima.
+          const reply = msg.interactive.list_reply;
+          await db.insertMessage({ ...base, type: "button", body: reply.title || "[prazo escolhido]" });
+          try {
+            await handlerCltOrigEscolherPrazo(de, businessNumberId, reply.id.slice("cltorig_prazo_".length));
+          } catch (err) {
+            console.error("Erro ao processar escolha de prazo CLT:", err.message);
           }
         } else if (tipo === "interactive") {
           // Clique em um botão do fluxo automático (mensagens interativas)
@@ -5200,10 +5313,11 @@ setInterval(async () => {
         else if (row.etapa === "simulando") await processarEtapaCltSimulando(row);
         else if (row.etapa === "aguardando_assinatura") await processarEtapaCltAguardandoAssinatura(row);
         else if (row.etapa === "aguardando_pagamento") await processarEtapaCltAguardandoPagamento(row);
-        // 'aguardando_email', 'escolhendo_vinculo', 'escolhendo_valor', 'aguardando_valor',
-        // 'oferta_apresentada', 'formulario' e 'enviando_kyc' esperam uma ação do cliente (ou já
-        // foram reivindicadas por processarSubmissaoFormularioClt) — o verificador não tem nada
-        // a fazer nelas, só o prazo de handlerCltOrigCapturaCpf/webhook cuida de destravar.
+        // 'aguardando_email', 'escolhendo_vinculo', 'apresentando_prazos', 'escolhendo_prazo',
+        // 'aguardando_valor', 'oferta_apresentada', 'formulario' e 'enviando_kyc' esperam uma
+        // ação do cliente (ou já foram reivindicadas por processarSubmissaoFormularioClt) — o
+        // verificador não tem nada a fazer nelas, só o prazo de handlerCltOrigCapturaCpf/webhook
+        // cuida de destravar.
       } catch (err) {
         console.error(`Erro ao processar originação CLT #${row.id} (etapa ${row.etapa}):`, err.message);
       }

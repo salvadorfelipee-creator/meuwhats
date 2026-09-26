@@ -167,6 +167,42 @@ cliente pode não ser avisado automaticamente numa etapa que demorou muito — m
 silenciosamente por muito tempo, porque cada etapa afetada agora tem um teto de tempo (72h pra
 autorização, 5 dias pra assinatura/pagamento) que escala pro atendimento humano.
 
+## Redesenho da apresentação de valores — 27/09/2026 (pedido direto do usuário)
+
+O usuário revisou a simulação visual do fluxo (WhatsApp mockup) e pediu uma mudança na forma
+como o valor é apresentado, substituindo a pergunta inicial "parcela ou valor líquido":
+
+- **Não pergunta mais nada antes de simular.** Assim que o vínculo é conhecido (1 só, ou
+  escolhido numa lista), simula automaticamente com `basis: "INSTALLMENT"` no valor MÁXIMO
+  (a margem inteira) — o cliente já vê de cara o que cabe no salário dele.
+- **A API já devolve várias ofertas por prazo diferente pra uma parcela fixa** ("a plataforma
+  oferta uma condição por prazo viável em cada tabela elegível", conforme o guia da Unnotech) —
+  aproveitado pra montar um "cardápio" de prazos (12x/24x/36x, ou quantos vierem), sem precisar
+  de simulações extras.
+- 3 mensagens em sequência quando há mais de 1 prazo: (1) lista informativa "Tenho aprovado pra
+  você: ..." com o valor liberado por prazo; (2) explicação fixa de desembolso (PIX em até 40min,
+  primeiro desconto só depois de 60 dias); (3) pergunta com 2 botões — "ESCOLHER UMA OPÇÃO"
+  (mostra os prazos numa lista do WhatsApp pra escolher) ou "PARCELA MAIS BAIXA" (pede um valor de
+  parcela menor e simula de novo, reentrando no mesmo fluxo). Se só vier 1 prazo, pula direto pra
+  confirmação (não faz sentido apresentar cardápio de 1 item só).
+- Escolher um prazo (ou já cair direto quando só tem 1) leva ao MESMO passo de confirmação que já
+  existia ("Simulação pronta!... Quer contratar?"), sem duplicar nada do restante do fluxo
+  (formulário, assinatura, pagamento continuam exatamente iguais).
+
+**Ruling — o valor de cada linha do cardápio é o `net_amount` (valor liberado), não a
+parcela.** A doc não documenta literalmente esse formato de apresentação (é uma composição
+nossa sobre os dados que a API já devolve), mas como a parcela pedida é fixa (a margem máxima)
+em todas as ofertas do cardápio, a variável que muda de prazo pra prazo é o valor liberado —
+faz sentido mostrar exatamente essa diferença ("mais prazo = mais dinheiro, mesma parcela").
+**Custo se errado:** troca de rótulo (net_amount por installment_amount) é uma linha, sem
+impacto em nenhum outro lugar do código.
+
+**Ruling — dedupe por prazo mantém só a melhor oferta de cada `installment_count`, descartando
+qualquer outra do mesmo prazo.** `offers[]` já vem ordenada pela Unnotech (net_amount desc), então
+pegar a primeira ocorrência de cada prazo distinto já é pegar a melhor por definição, sem
+precisar comparar de novo. **Custo se errado:** nenhum, é a mesma garantia que `escolherMelhorOferta`
+já usa em outros lugares do código.
+
 **Ruling — chamar `capturarContatoEBoasVindas` (contato no Google + e-mail de boas-vindas) no
 fluxo automático fica de fora, precisa de decisão do usuário.** O fluxo manual
 (`confirmarDadosRecebidos`) já dispara isso ao reconhecer um e-mail em texto livre; o fluxo
