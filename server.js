@@ -468,6 +468,21 @@ async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes, 
   });
 }
 
+// Quando um template de campanha (broadcast frio — "Olá, boa tarde" etc.) chega como 'failed'
+// (às vezes bem depois do envio parecer ok, ver processarEntry), apaga a conversa se a pessoa
+// nunca respondeu nada: não é uma conversa de verdade, é lixo de número inválido/inexistente
+// sujando o histórico do painel — pedido do usuário em 26/09/2026. Nunca mexe numa conversa que
+// já teve troca de verdade (checa last_inbound_at antes) nem numa mensagem que não era template
+// (ex.: falha de entrega no meio de um atendimento normal continua só marcada, não apaga nada).
+async function limparBroadcastNuncaRespondido(waMessageId, businessNumberId) {
+  const msg = await db.getMensagemPorWaId(waMessageId);
+  if (!msg || msg.type !== "template" || msg.direction !== "out") return;
+  const conversa = await db.getConversation(msg.phone, businessNumberId);
+  if (conversa?.last_inbound_at) return;
+  await db.apagarConversa(msg.phone, businessNumberId);
+  console.log(`🧹 Conversa apagada (template não entregue, nunca respondida): ${msg.phone} / ${businessNumberId}`);
+}
+
 // Registra um evento do funil de qualificação pro painel (aba Funil) — nunca deixa o erro
 // derrubar o fluxo de atendimento de verdade, só loga (mesmo espírito do markAsRead).
 function logFunil(businessNumberId, phone, etapa) {
@@ -2659,6 +2674,13 @@ async function processarEntry(entry) {
           ? `${erro.title || erro.code}${erro.error_data?.details ? " — " + erro.error_data.details : ""}`
           : null;
         await db.updateStatusByWaId(status.id, status.status, erroTexto);
+        // 'failed' pode chegar bem depois do envio parecer ok (ver limparBroadcastNuncaRespondido)
+        // — roda em segundo plano, nunca atrasa nem quebra o processamento do webhook.
+        if (status.status === "failed") {
+          limparBroadcastNuncaRespondido(status.id, businessNumberId).catch((err) =>
+            console.error("Erro ao limpar conversa de broadcast não entregue:", err.message)
+          );
+        }
         console.log(
           `✅ Status: ${status.status} — para ${status.recipient_id}` + (erroTexto ? ` (motivo: ${erroTexto})` : "")
         );

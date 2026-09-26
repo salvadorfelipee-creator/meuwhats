@@ -659,6 +659,33 @@ async function updateStatusByWaId(waMessageId, status, errorMessage = null) {
   });
 }
 
+// Usado só quando um status 'failed' chega (ver processarEntry) pra decidir se a conversa pode
+// ser apagada: precisa saber se ERA um template de campanha (não conta resposta de fluxo normal).
+async function getMensagemPorWaId(waMessageId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT phone, business_number_id, type, direction FROM messages WHERE wa_message_id = ? ORDER BY id DESC LIMIT 1`,
+    args: [waMessageId],
+  });
+  return result.rows[0] || null;
+}
+
+// Apaga uma conversa inteira (mensagens + o registro em conversations) — só chamado quando um
+// template de campanha (broadcast frio) chega como 'failed' e a pessoa nunca respondeu nada:
+// não é uma conversa de verdade, é lixo de número inválido/inexistente sujando o histórico do
+// painel. Quem chama já garante essa checagem antes (ver limparBroadcastNuncaRespondido).
+async function apagarConversa(phone, businessNumberId) {
+  await ready;
+  await client.execute({
+    sql: `DELETE FROM messages WHERE phone = ? AND business_number_id = ?`,
+    args: [phone, businessNumberId],
+  });
+  await client.execute({
+    sql: `DELETE FROM conversations WHERE phone = ? AND business_number_id = ?`,
+    args: [phone, businessNumberId],
+  });
+}
+
 // incluirFinalizadas=false (padrão) exclui status='resolvido' — tanto da lista visível do
 // painel quanto da checagem automática de 5s (ver /painel/api/inbox), que é a maior parte do
 // consumo de leitura do banco. Uma conversa finalizada só reaparece aqui se o cliente
@@ -1343,6 +1370,8 @@ module.exports = {
   getUltimaMensagemRecebida,
   jaRecebeuTemplateRecente,
   recebeuTemplate,
+  getMensagemPorWaId,
+  apagarConversa,
   fgtsOriginationCriar,
   fgtsOriginationBuscarAberta,
   fgtsOriginationBuscarPorId,
