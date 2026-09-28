@@ -24,7 +24,6 @@ import {
   MessageCircle,
   CalendarDays,
   Send,
-  Clapperboard,
   Menu,
   ChevronUp,
   AtSign as InstagramIcon,
@@ -35,11 +34,12 @@ import {
 
 export type Screen = "chats" | "agenda" | "publicar" | "reels" | "funil"
 
+// "reels" fica fora do menu por enquanto (edição em massa parada) — a rota em
+// App.tsx continua existindo, só reativar aqui quando voltar a usar.
 const NAV_ITEMS: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
   { id: "chats", title: "Conversas", icon: MessageCircle },
   { id: "agenda", title: "Agenda", icon: CalendarDays },
   { id: "publicar", title: "Publicar", icon: Send },
-  { id: "reels", title: "Reels", icon: Clapperboard },
   { id: "funil", title: "Funil", icon: Filter },
 ]
 
