@@ -499,7 +499,7 @@ export function ChatsPage() {
                         <span className="truncate underline">{m.body || "Documento"}</span>
                       </a>
                     )}
-                    {m.type !== "document" && m.body}
+                    {(m.type !== "document" || !m.media_path) && m.body}
                     {m.status === "failed" && (
                       <div className="text-[11px] mt-1 text-red-200 flex items-start gap-1">
                         <span>⚠️</span>
