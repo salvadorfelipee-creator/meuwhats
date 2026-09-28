@@ -680,7 +680,7 @@ async function criarTag(businessNumberId, nome, cor) {
     sql: `INSERT INTO tags (business_number_id, nome, cor, created_at) VALUES (?, ?, ?, ?)`,
     args: [businessNumberId, nome.trim(), cor, Date.now()],
   });
-  return result.lastInsertRowid;
+  return Number(result.lastInsertRowid); // vem como BigInt do driver — JSON.stringify não serializa BigInt
 }
 
 async function apagarTag(businessNumberId, tagId) {
