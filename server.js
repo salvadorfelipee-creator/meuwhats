@@ -244,6 +244,13 @@ const EXT_BY_MIME = {
   "video/mp4": "mp4",
   "video/3gpp": "3gp",
   "application/pdf": "pdf",
+  "text/plain": "txt",
+  "application/msword": "doc",
+  "application/vnd.ms-excel": "xls",
+  "application/vnd.ms-powerpoint": "ppt",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
 };
 
 // Caminho inverso de EXT_BY_MIME — usado por quem SERVE o arquivo de volta (GET /media/... e
@@ -264,6 +271,13 @@ const MIME_BY_EXT = {
   mp4: "video/mp4",
   "3gp": "video/3gpp",
   pdf: "application/pdf",
+  txt: "text/plain",
+  doc: "application/msword",
+  xls: "application/vnd.ms-excel",
+  ppt: "application/vnd.ms-powerpoint",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
 function mimeDoArquivo(nomeArquivo) {
@@ -359,6 +373,18 @@ function salvarAudioPublicar(dataUrl) {
   const match = /^data:(audio\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || "");
   if (!match) throw new Error("Formato de áudio inválido");
   const ext = EXT_BY_MIME[match[1]] || "ogg";
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  fs.writeFileSync(path.join(PUBLICAR_MEDIA_DIR, filename), Buffer.from(match[2], "base64"));
+  return filename;
+}
+
+// Igual a salvarVideoPublicar, mas documento (PDF, planilha, etc.) — usado pelo anexo de
+// documento no reply do painel. Diferente dos outros, aceita qualquer mime type (não só um
+// prefixo fixo tipo "image/"), já que documento cobre formatos bem variados.
+function salvarDocumentoPublicar(dataUrl) {
+  const match = /^data:([a-zA-Z0-9.+/-]+);base64,(.+)$/.exec(dataUrl || "");
+  if (!match) throw new Error("Formato de documento inválido");
+  const ext = EXT_BY_MIME[match[1]] || "bin";
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   fs.writeFileSync(path.join(PUBLICAR_MEDIA_DIR, filename), Buffer.from(match[2], "base64"));
   return filename;
@@ -3558,7 +3584,7 @@ async function processarEntry(entry) {
             await db.insertMessage({
               ...base,
               type: tipo,
-              body: media.caption || null,
+              body: media.caption || media.filename || null,
               media_path: `/media/${filename}`,
               media_mime: mimeType,
             });
@@ -4211,9 +4237,9 @@ const server = http.createServer(async (req, res) => {
     }
 
     // POST /painel/api/conversations/:businessId/:phone/reply — responder uma conversa.
-    // Aceita texto puro OU imagemBase64 OU videoBase64 (com ou sem legenda em `text`) — mesmo
-    // mecanismo de upload/URL pública do Publique IV (salvarImagemPublicar/salvarVideoPublicar
-    // + /publicar-media/).
+    // Aceita texto puro OU imagemBase64/videoBase64/audioBase64/documentBase64 (com ou sem
+    // legenda em `text`) — mesmo mecanismo de upload/URL pública do Publique IV
+    // (salvarImagemPublicar/salvarVideoPublicar/... + /publicar-media/).
     const matchReply = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/reply$/);
     if (req.method === "POST" && matchReply) {
       if (!requireAuth(req, res)) return;
@@ -4222,10 +4248,12 @@ const server = http.createServer(async (req, res) => {
       const phone = businessId === "instagram" ? phoneParam : normalizarTelefoneBR(phoneParam);
       const body = await parseBody(req);
       const texto = (body.text || "").trim();
-      if (!texto && !body.imagemBase64 && !body.videoBase64 && !body.audioBase64) return send(res, 400, { error: "Mensagem vazia" });
+      if (!texto && !body.imagemBase64 && !body.videoBase64 && !body.audioBase64 && !body.documentBase64) {
+        return send(res, 400, { error: "Mensagem vazia" });
+      }
 
       if (businessId === "instagram") {
-        if (body.imagemBase64 || body.videoBase64 || body.audioBase64) {
+        if (body.imagemBase64 || body.videoBase64 || body.audioBase64 || body.documentBase64) {
           return send(res, 400, { error: "Envio de mídia pelo Instagram ainda não é suportado — responda por texto." });
         }
         let resultIg;
@@ -4241,6 +4269,7 @@ const server = http.createServer(async (req, res) => {
       let imagemUrl = null;
       let videoUrl = null;
       let audioUrl = null;
+      let documentUrl = null;
       if (body.imagemBase64) {
         try {
           const filename = salvarImagemPublicar(body.imagemBase64);
@@ -4262,6 +4291,13 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
           return send(res, 400, { error: err.message });
         }
+      } else if (body.documentBase64) {
+        try {
+          const filename = salvarDocumentoPublicar(body.documentBase64);
+          documentUrl = `https://${req.headers.host}/publicar-media/${filename}`;
+        } catch (err) {
+          return send(res, 400, { error: err.message });
+        }
       }
 
       let result;
@@ -4272,6 +4308,8 @@ const server = http.createServer(async (req, res) => {
           ? await wa.sendVideo(businessId, phone, videoUrl, texto || undefined)
           : audioUrl
           ? await wa.sendAudio(businessId, phone, audioUrl)
+          : documentUrl
+          ? await wa.sendDocument(businessId, phone, documentUrl, body.documentNome || undefined, texto || undefined)
           : await wa.sendText(businessId, phone, texto);
       } catch (err) {
         return send(res, 502, { error: `Falha ao enviar pelo WhatsApp: ${err.message}` });
@@ -4285,9 +4323,9 @@ const server = http.createServer(async (req, res) => {
         phone,
         business_number_id: businessId,
         direction: "out",
-        type: imagemUrl ? "image" : videoUrl ? "video" : audioUrl ? "audio" : "text",
-        body: texto || null,
-        media_path: imagemUrl || videoUrl || audioUrl,
+        type: imagemUrl ? "image" : videoUrl ? "video" : audioUrl ? "audio" : documentUrl ? "document" : "text",
+        body: texto || (documentUrl ? body.documentNome : null) || null,
+        media_path: imagemUrl || videoUrl || audioUrl || documentUrl,
         wa_message_id: waId,
         status: "sent",
         created_at: now,

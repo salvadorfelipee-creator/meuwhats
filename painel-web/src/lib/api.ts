@@ -233,10 +233,15 @@ export const api = {
     URL.revokeObjectURL(url)
   },
 
-  reply: (businessId: string, phone: string, text: string, imagemBase64?: string, videoBase64?: string, audioBase64?: string) =>
+  reply: (
+    businessId: string,
+    phone: string,
+    text: string,
+    midia?: { imagemBase64?: string; videoBase64?: string; audioBase64?: string; documentBase64?: string; documentNome?: string },
+  ) =>
     request<{ ok: true }>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/reply`,
-      { method: "POST", body: JSON.stringify({ text, imagemBase64, videoBase64, audioBase64 }) },
+      { method: "POST", body: JSON.stringify({ text, ...midia }) },
     ),
 
   reabrirFluxo: (businessId: string, phone: string) =>

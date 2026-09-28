@@ -128,6 +128,33 @@ async function sendAudio(fromPhoneNumberId, to, audioUrl) {
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+// Igual a sendImage, mas documento (PDF, planilha, etc.) — mesmo mecanismo de URL pública.
+// `filename` é opcional e é o nome que aparece pro cliente no WhatsApp (sem ele, a Meta usa
+// um nome genérico baseado na URL).
+async function sendDocument(fromPhoneNumberId, to, documentUrl, filename, caption) {
+  garantirNaoBloqueado(to);
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        to,
+        type: "document",
+        document: {
+          link: documentUrl,
+          ...(filename ? { filename } : {}),
+          ...(caption ? { caption } : {}),
+        },
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao enviar documento: ${JSON.stringify(json)}`);
+  return json; // { messages: [{ id: "wamid..." }], ... }
+}
+
 async function sendButtons(fromPhoneNumberId, to, bodyText, buttons) {
   // buttons: [{ id, title }] — a API aceita no máximo 3 botões, título com até 20 caracteres
   garantirNaoBloqueado(to);
@@ -427,6 +454,7 @@ module.exports = {
   sendImage,
   sendVideo,
   sendAudio,
+  sendDocument,
   sendButtons,
   sendList,
   sendCtaUrl,

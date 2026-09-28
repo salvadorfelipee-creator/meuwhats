@@ -53,6 +53,7 @@ import {
   AtSign as InstagramIcon,
   Download,
   CircleCheck,
+  FileText,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -224,8 +225,10 @@ export function ChatsPage() {
 
   async function enviarMidia(file: File) {
     if (!current || !selected) return
+    const ehImagem = file.type.startsWith("image/")
     const ehVideo = file.type.startsWith("video/")
     const ehAudio = file.type.startsWith("audio/")
+    const ehDocumento = !ehImagem && !ehVideo && !ehAudio
     const base64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result as string)
@@ -234,19 +237,18 @@ export function ChatsPage() {
     })
     setEnviando(true)
     try {
-      await api.reply(
-        current.id,
-        selected,
-        texto.trim(),
-        !ehVideo && !ehAudio ? base64 : undefined,
-        ehVideo ? base64 : undefined,
-        ehAudio ? base64 : undefined,
-      )
+      await api.reply(current.id, selected, texto.trim(), {
+        imagemBase64: ehImagem ? base64 : undefined,
+        videoBase64: ehVideo ? base64 : undefined,
+        audioBase64: ehAudio ? base64 : undefined,
+        documentBase64: ehDocumento ? base64 : undefined,
+        documentNome: ehDocumento ? file.name : undefined,
+      })
       setTexto("")
       carregarMensagens()
       carregarConversas()
     } catch (err) {
-      alert(err instanceof Error ? err.message : `Erro ao enviar ${ehVideo ? "vídeo" : "imagem"}`)
+      alert(err instanceof Error ? err.message : "Erro ao enviar arquivo")
     } finally {
       setEnviando(false)
     }
@@ -486,7 +488,18 @@ export function ChatsPage() {
                     {m.type === "audio" && m.media_path && (
                       <audio src={m.media_path} controls className="mb-1 max-w-[280px] w-full" />
                     )}
-                    {m.body}
+                    {m.type === "document" && m.media_path && (
+                      <a
+                        href={m.media_path}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-2 mb-1 rounded bg-black/10 px-3 py-2 hover:bg-black/20"
+                      >
+                        <FileText className="h-5 w-5 shrink-0" />
+                        <span className="truncate underline">{m.body || "Documento"}</span>
+                      </a>
+                    )}
+                    {m.type !== "document" && m.body}
                     {m.status === "failed" && (
                       <div className="text-[11px] mt-1 text-red-200 flex items-start gap-1">
                         <span>⚠️</span>
@@ -527,7 +540,7 @@ export function ChatsPage() {
               <label>
                 <input
                   type="file"
-                  accept="image/*,video/*,audio/*"
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
