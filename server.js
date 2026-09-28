@@ -241,6 +241,10 @@ const EXT_BY_MIME = {
   "audio/mpeg": "mp3",
   "audio/amr": "amr",
   "audio/mp4": "m4a",
+  // webm só aparece se o navegador não conseguiu gravar audio/ogg;codecs=opus (ver gravação de
+  // áudio no painel) — o WhatsApp não aceita webm como nota de voz, mas ao menos salva com a
+  // extensão certa em vez de mentir "ogg" num arquivo que não é (o antigo fallback genérico).
+  "audio/webm": "webm",
   "video/mp4": "mp4",
   "video/3gpp": "3gp",
   "application/pdf": "pdf",
@@ -268,6 +272,7 @@ const MIME_BY_EXT = {
   mp3: "audio/mpeg",
   amr: "audio/amr",
   m4a: "audio/mp4",
+  webm: "audio/webm",
   mp4: "video/mp4",
   "3gp": "video/3gpp",
   pdf: "application/pdf",

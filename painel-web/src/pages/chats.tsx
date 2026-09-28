@@ -17,6 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { CardDescription, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { SidebarTrigger } from "@/components/blocks/sidebar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,6 +55,9 @@ import {
   Download,
   CircleCheck,
   FileText,
+  Mic,
+  X,
+  ChevronUp,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -79,6 +83,59 @@ function formatTime(ts: number | null) {
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
 }
 
+// "Visto" = a última vez que uma mensagem NOSSA foi marcada como lida pelo WhatsApp
+// (conversations.last_seen_at, ver db.js). NÃO é presença/online — a API do WhatsApp não
+// entrega isso pra nenhuma empresa. Só existe quando já mandamos alguma mensagem e ela foi lida.
+const VISTO_RECENTE_MS = 10 * 60 * 1000 // até 10min: considera "visto recentemente" (bolinha verde)
+
+function formatVisto(ts: number | null | undefined): string | null {
+  if (!ts) return null
+  const diffMs = Date.now() - ts
+  const min = Math.floor(diffMs / 60000)
+  if (min < 1) return "Visto agora há pouco"
+  if (min < 60) return `Visto há ${min} min`
+  const horas = Math.floor(min / 60)
+  if (horas < 24) return `Visto há ${horas}h`
+  const dias = Math.floor(horas / 24)
+  if (dias === 1) return "Visto ontem"
+  return `Visto há ${dias} dias`
+}
+
+function vistoRecentemente(ts: number | null | undefined): boolean {
+  return !!ts && Date.now() - ts < VISTO_RECENTE_MS
+}
+
+// Divide o texto em pedaços marcando as ocorrências de `termo` (sem diferenciar
+// maiúscula/minúscula) — usado pela busca dentro da conversa, pra destacar o trecho batido.
+function destacarTexto(texto: string, termo: string) {
+  if (!termo.trim()) return texto
+  const termoNorm = termo.trim()
+  const partes = texto.split(new RegExp(`(${termoNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi"))
+  if (partes.length === 1) return texto
+  return partes.map((parte, i) =>
+    parte.toLowerCase() === termoNorm.toLowerCase() ? (
+      <mark key={i} className="bg-yellow-300 text-black rounded-sm">
+        {parte}
+      </mark>
+    ) : (
+      <React.Fragment key={i}>{parte}</React.Fragment>
+    )
+  )
+}
+
+function formatGravacao(segundos: number): string {
+  const m = Math.floor(segundos / 60)
+  const s = segundos % 60
+  return `${m}:${s.toString().padStart(2, "0")}`
+}
+
+// Formatos que o WhatsApp aceita de verdade como nota de voz (link-based audio send) — Opus
+// dentro de um container Ogg é o único que os apps do WhatsApp tocam com a carinha de áudio
+// gravado; qualquer outra coisa (ex: webm, quando o navegador não suporta gravar ogg) ainda é
+// enviada, mas cai como anexo de áudio genérico em vez de nota de voz.
+const AUDIO_MIME_PREFERIDO = "audio/ogg;codecs=opus"
+const AUDIO_MIME_FALLBACK = "audio/webm;codecs=opus"
+
 export function ChatsPage() {
   const { channels, current, setCurrent } = useChannel()
   const {
@@ -102,6 +159,18 @@ export function ChatsPage() {
   const [broadcastOpen, setBroadcastOpen] = React.useState(false)
   const [mostrarFinalizadas, setMostrarFinalizadas] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
+
+  // Gravação de áudio (nota de voz real, pelo microfone do navegador)
+  const [gravando, setGravando] = React.useState(false)
+  const [gravacaoSegundos, setGravacaoSegundos] = React.useState(0)
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null)
+  const audioChunksRef = React.useRef<Blob[]>([])
+  const streamRef = React.useRef<MediaStream | null>(null)
+
+  // Busca dentro da conversa aberta (filtra `messages`, que já está carregado)
+  const [buscaAberta, setBuscaAberta] = React.useState(false)
+  const [buscaTexto, setBuscaTexto] = React.useState("")
+  const [buscaIndex, setBuscaIndex] = React.useState(0)
 
   React.useEffect(() => {
     api.respostasProntas().then(setRespostas).catch(() => {})
@@ -195,6 +264,21 @@ export function ChatsPage() {
     nearBottomRef.current = true
   }, [selected])
 
+  // Trocar de conversa com uma gravação em andamento cancela ela — nunca envia um áudio
+  // gravado enquanto se falava com uma pessoa pra outra conversa por engano.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.ondataavailable = null
+      mediaRecorderRef.current.stop()
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+      audioChunksRef.current = []
+      setGravando(false)
+      setGravacaoSegundos(0)
+    }
+  }, [selected])
+
   React.useEffect(() => {
     if (nearBottomRef.current) {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
@@ -254,6 +338,124 @@ export function ChatsPage() {
     }
   }
 
+  // Solta o microfone se a página fechar/trocar de tela com uma gravação em andamento —
+  // sem isso o navegador ficaria com o mic "ligado" (indicador do sistema) sem motivo.
+  React.useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    }
+  }, [])
+
+  // Timer da gravação em andamento — só conta enquanto `gravando` é true.
+  React.useEffect(() => {
+    if (!gravando) return
+    const id = setInterval(() => setGravacaoSegundos((s) => s + 1), 1000)
+    return () => clearInterval(id)
+  }, [gravando])
+
+  function pararStream() {
+    streamRef.current?.getTracks().forEach((t) => t.stop())
+    streamRef.current = null
+    mediaRecorderRef.current = null
+  }
+
+  async function iniciarGravacao() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert("Este navegador não suporta gravação de áudio.")
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+      const mimeType = MediaRecorder.isTypeSupported(AUDIO_MIME_PREFERIDO)
+        ? AUDIO_MIME_PREFERIDO
+        : MediaRecorder.isTypeSupported(AUDIO_MIME_FALLBACK)
+        ? AUDIO_MIME_FALLBACK
+        : ""
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      audioChunksRef.current = []
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data)
+      }
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setGravacaoSegundos(0)
+      setGravando(true)
+    } catch (err) {
+      alert(
+        err instanceof Error && err.name === "NotAllowedError"
+          ? "Permissão de microfone negada. Autorize o navegador a usar o microfone pra gravar áudio."
+          : "Não consegui acessar o microfone."
+      )
+    }
+  }
+
+  function cancelarGravacao() {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== "inactive") {
+      recorder.ondataavailable = null
+      recorder.stop()
+    }
+    pararStream()
+    audioChunksRef.current = []
+    setGravando(false)
+    setGravacaoSegundos(0)
+  }
+
+  function pararGravacaoEEnviar() {
+    const recorder = mediaRecorderRef.current
+    if (!recorder || recorder.state === "inactive") return
+    recorder.onstop = () => {
+      const mimeType = recorder.mimeType || AUDIO_MIME_FALLBACK
+      const blob = new Blob(audioChunksRef.current, { type: mimeType })
+      audioChunksRef.current = []
+      pararStream()
+      setGravando(false)
+      setGravacaoSegundos(0)
+      const ext = mimeType.includes("ogg") ? "ogg" : "webm"
+      const file = new File([blob], `audio-${Date.now()}.${ext}`, { type: mimeType })
+      enviarMidia(file)
+    }
+    recorder.stop()
+  }
+
+  // Mensagens que batem com a busca da conversa aberta — recalcula só quando o texto ou as
+  // mensagens mudam (evita refazer o filtro a cada render por causa do polling de 5s).
+  const mensagensEncontradas = React.useMemo(() => {
+    if (!buscaTexto.trim()) return []
+    const termo = buscaTexto.trim().toLowerCase()
+    return messages.filter((m) => m.body?.toLowerCase().includes(termo)).map((m) => m.id)
+  }, [buscaTexto, messages])
+
+  React.useEffect(() => {
+    setBuscaIndex(0)
+  }, [buscaTexto])
+
+  React.useEffect(() => {
+    if (!buscaAberta) {
+      setBuscaTexto("")
+      setBuscaIndex(0)
+    }
+  }, [buscaAberta])
+
+  function irParaResultado(indice: number) {
+    const id = mensagensEncontradas[indice]
+    if (id == null) return
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" })
+  }
+
+  function navegarBusca(delta: 1 | -1) {
+    if (mensagensEncontradas.length === 0) return
+    const proximo = (buscaIndex + delta + mensagensEncontradas.length) % mensagensEncontradas.length
+    setBuscaIndex(proximo)
+    irParaResultado(proximo)
+  }
+
+  React.useEffect(() => {
+    if (mensagensEncontradas.length > 0) irParaResultado(buscaIndex)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mensagensEncontradas.length > 0 ? mensagensEncontradas[0] : null])
+
   async function mudarStatus(status: "novo" | "andamento" | "resolvido") {
     if (!current || !selected) return
     await api.setStatus(current.id, selected, status)
@@ -278,7 +480,9 @@ export function ChatsPage() {
       <div className="w-[340px] shrink-0">
         <div className="flex flex-col h-screen border-r">
           <div className="h-14 px-3 flex items-center justify-between border-b shrink-0">
-            <DropdownMenu>
+            <div className="flex items-center gap-1">
+              <SidebarTrigger />
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="text-left rounded-md px-1 -mx-1 py-0.5 hover:bg-accent flex items-center gap-1">
                   <div>
@@ -309,7 +513,8 @@ export function ChatsPage() {
                     </DropdownMenuItem>
                   ))}
               </DropdownMenuContent>
-            </DropdownMenu>
+              </DropdownMenu>
+            </div>
             <div className="flex items-center">
               {notifPermission !== "unsupported" && (
                 <Button
@@ -379,9 +584,17 @@ export function ChatsPage() {
                 }`}
               >
                 <div className="flex flex-row gap-3 items-start">
-                  <Avatar className="size-10 shrink-0">
-                    <AvatarFallback>{initials(c.name, c.phone)}</AvatarFallback>
-                  </Avatar>
+                  <div className="relative shrink-0">
+                    <Avatar className="size-10">
+                      <AvatarFallback>{initials(c.name, c.phone)}</AvatarFallback>
+                    </Avatar>
+                    {vistoRecentemente(c.last_seen_at) && (
+                      <span
+                        title={formatVisto(c.last_seen_at) || undefined}
+                        className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background"
+                      />
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <CardTitle className="truncate text-sm">{c.name || c.phone}</CardTitle>
@@ -425,9 +638,19 @@ export function ChatsPage() {
               </Avatar>
               <div className="min-w-0">
                 <CardTitle className="text-sm truncate">{conversaAtual.name || conversaAtual.phone}</CardTitle>
-                <CardDescription className="truncate">{conversaAtual.phone}</CardDescription>
+                <CardDescription className="truncate">
+                  {formatVisto(conversaAtual.last_seen_at) || conversaAtual.phone}
+                </CardDescription>
               </div>
               <div className="flex-grow flex justify-end gap-2 items-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  title="Buscar nesta conversa"
+                  onClick={() => setBuscaAberta((v) => !v)}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
                 {conversaAtual.status !== "resolvido" && (
                   <Button variant="outline" size="sm" onClick={() => mudarStatus("resolvido")}>
                     <CircleCheck className="h-4 w-4 mr-1" />
@@ -462,16 +685,66 @@ export function ChatsPage() {
               </div>
             </div>
 
+            {buscaAberta && (
+              <div className="h-12 border-b flex items-center gap-2 px-4 shrink-0 bg-muted/40">
+                <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                <Input
+                  autoFocus
+                  placeholder="Buscar nesta conversa"
+                  className="h-8"
+                  value={buscaTexto}
+                  onChange={(e) => setBuscaTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") navegarBusca(e.shiftKey ? -1 : 1)
+                    if (e.key === "Escape") setBuscaAberta(false)
+                  }}
+                />
+                <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+                  {buscaTexto.trim()
+                    ? mensagensEncontradas.length > 0
+                      ? `${buscaIndex + 1}/${mensagensEncontradas.length}`
+                      : "0/0"
+                    : ""}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  disabled={mensagensEncontradas.length === 0}
+                  onClick={() => navegarBusca(-1)}
+                  title="Resultado anterior"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  disabled={mensagensEncontradas.length === 0}
+                  onClick={() => navegarBusca(1)}
+                  title="Próximo resultado"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setBuscaAberta(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
             {/* Mensagens */}
             <div ref={scrollRef} onScroll={handleScrollMensagens} className="flex-1 overflow-y-auto px-4 py-3">
               <div className="flex flex-col gap-2">
                 {messages.map((m) => (
                   <div
                     key={m.id}
+                    id={`msg-${m.id}`}
                     className={`max-w-[70%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${
                       m.direction === "out"
                         ? "bg-primary text-primary-foreground self-end"
                         : "bg-secondary text-secondary-foreground self-start"
+                    } ${
+                      mensagensEncontradas[buscaIndex] === m.id ? "ring-2 ring-yellow-400 ring-offset-1" : ""
                     }`}
                   >
                     {m.type === "image" && m.media_path && (
@@ -499,7 +772,8 @@ export function ChatsPage() {
                         <span className="truncate underline">{m.body || "Documento"}</span>
                       </a>
                     )}
-                    {(m.type !== "document" || !m.media_path) && m.body}
+                    {(m.type !== "document" || !m.media_path) &&
+                      (m.body && buscaTexto.trim() ? destacarTexto(m.body, buscaTexto) : m.body)}
                     {m.status === "failed" && (
                       <div className="text-[11px] mt-1 text-red-200 flex items-start gap-1">
                         <span>⚠️</span>
@@ -516,62 +790,84 @@ export function ChatsPage() {
             </div>
 
             {/* Composer */}
-            <div className="flex items-end gap-1 p-2 border-t shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <Smile className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
-                  <DropdownMenuLabel>Respostas prontas</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {respostas.length === 0 && (
-                    <DropdownMenuItem disabled>Nenhuma cadastrada</DropdownMenuItem>
-                  )}
-                  {respostas.map((r) => (
-                    <DropdownMenuItem key={r.id} onClick={() => setTexto(r.texto)}>
-                      {r.atalho}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {gravando ? (
+              <div className="flex items-center gap-3 p-2 border-t shrink-0">
+                <Button variant="ghost" size="icon" onClick={cancelarGravacao} title="Cancelar gravação">
+                  <X className="h-4 w-4" />
+                </Button>
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                </span>
+                <span className="text-sm tabular-nums flex-1">{formatGravacao(gravacaoSegundos)}</span>
+                <Button size="icon" onClick={pararGravacaoEEnviar} title="Enviar áudio">
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-end gap-1 p-2 border-t shrink-0">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <Smile className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+                    <DropdownMenuLabel>Respostas prontas</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {respostas.length === 0 && (
+                      <DropdownMenuItem disabled>Nenhuma cadastrada</DropdownMenuItem>
+                    )}
+                    {respostas.map((r) => (
+                      <DropdownMenuItem key={r.id} onClick={() => setTexto(r.texto)}>
+                        {r.atalho}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
-              <label>
-                <input
-                  type="file"
-                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) enviarMidia(file)
-                    e.target.value = ""
+                <label>
+                  <input
+                    type="file"
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) enviarMidia(file)
+                      e.target.value = ""
+                    }}
+                  />
+                  <Button variant="ghost" size="icon" asChild>
+                    <span>
+                      <Paperclip className="h-4 w-4" />
+                    </span>
+                  </Button>
+                </label>
+
+                <Textarea
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  placeholder="Digite uma mensagem"
+                  className="min-h-9 flex-1 resize-none"
+                  rows={1}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault()
+                      enviar()
+                    }
                   }}
                 />
-                <Button variant="ghost" size="icon" asChild>
-                  <span>
-                    <Paperclip className="h-4 w-4" />
-                  </span>
-                </Button>
-              </label>
-
-              <Textarea
-                value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                placeholder="Digite uma mensagem"
-                className="min-h-9 flex-1 resize-none"
-                rows={1}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault()
-                    enviar()
-                  }
-                }}
-              />
-              <Button size="icon" onClick={enviar} disabled={enviando || !texto.trim()}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
+                {texto.trim() ? (
+                  <Button size="icon" onClick={enviar} disabled={enviando}>
+                    <Send className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button size="icon" variant="ghost" onClick={iniciarGravacao} disabled={enviando} title="Gravar áudio">
+                    <Mic className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

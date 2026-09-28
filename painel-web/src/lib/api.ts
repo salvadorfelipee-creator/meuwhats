@@ -20,6 +20,7 @@ export type Conversation = {
   channel?: "whatsapp" | "instagram"
   last_inbound_at?: number | null
   last_read_at?: number | null
+  last_seen_at?: number | null
   nao_lida?: boolean | number
 }
 

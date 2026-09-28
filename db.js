@@ -135,6 +135,13 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "last_read_at")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN last_read_at INTEGER`);
   }
+  // last_seen_at = última vez que uma mensagem NOSSA (direction='out') virou status 'read' —
+  // é o mais perto de "visto por último" que a API do WhatsApp permite saber (não existe
+  // presença/online real pra nenhuma empresa, é limitação da própria Meta). Atualizado em
+  // updateStatusByWaId. Usado só como indicativo no painel, nunca como "está online agora".
+  if (!infoConversations.rows.some((r) => r.name === "last_seen_at")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN last_seen_at INTEGER`);
+  }
   // email + contato_salvo_em: capturados quando o funil automático recebe o e-mail do cliente
   // (ver confirmarDadosRecebidos em server.js) — contato_salvo_em marca que já tentamos criar
   // o contato no Google/mandar o e-mail de boas-vindas, pra não duplicar se a pessoa passar por
@@ -732,6 +739,17 @@ async function updateStatusByWaId(waMessageId, status, errorMessage = null) {
     sql: `UPDATE messages SET status = ?, error_message = COALESCE(?, error_message) WHERE wa_message_id = ?`,
     args: [status, errorMessage, waMessageId],
   });
+  // status 'read' numa mensagem NOSSA = o cliente abriu o WhatsApp e viu — grava em
+  // conversations.last_seen_at pro painel mostrar "visto às ..." (ver comentário na migração).
+  if (status === "read") {
+    const msg = await getMensagemPorWaId(waMessageId);
+    if (msg && msg.direction === "out") {
+      await client.execute({
+        sql: `UPDATE conversations SET last_seen_at = ? WHERE phone = ? AND business_number_id = ?`,
+        args: [Date.now(), msg.phone, msg.business_number_id],
+      });
+    }
+  }
 }
 
 // Usado só quando um status 'failed' chega (ver processarEntry) pra decidir se a conversa pode
