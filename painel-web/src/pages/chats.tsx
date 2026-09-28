@@ -568,6 +568,7 @@ export function ChatsPage() {
                 Nenhuma conversa ainda.
               </p>
             )}
+            <div className="flex flex-col gap-1 p-2">
             {listaFiltrada.map((c) => {
               const naoLida = current ? unreadConversations.has(`${current.id}|${c.phone}`) : false
               return (
@@ -577,33 +578,35 @@ export function ChatsPage() {
                   setSelected(c.phone)
                   if (current) markConversationSeen(current.id, c.phone)
                 }}
-                className={`px-3 w-full py-2.5 hover:bg-secondary cursor-pointer text-left border-b border-border/50 border-l-4 ${
+                className={`w-full p-3 rounded-lg cursor-pointer text-left transition-colors ${
                   naoLida
-                    ? "animate-pulse bg-red-50 dark:bg-red-950/40 border-l-red-500"
-                    : `border-l-transparent ${selected === c.phone ? "bg-secondary" : ""}`
+                    ? "animate-pulse bg-red-50 dark:bg-red-950/40"
+                    : selected === c.phone
+                    ? "bg-accent"
+                    : "hover:bg-accent/50"
                 }`}
               >
-                <div className="flex flex-row gap-3 items-start">
+                <div className="flex flex-row gap-3 items-center">
                   <div className="relative shrink-0">
-                    <Avatar className="size-10">
+                    <Avatar className="size-12">
                       <AvatarFallback>{initials(c.name, c.phone)}</AvatarFallback>
                     </Avatar>
                     {vistoRecentemente(c.last_seen_at) && (
                       <span
                         title={formatVisto(c.last_seen_at) || undefined}
-                        className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-green-500 border-2 border-background"
+                        className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-background"
                       />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="truncate text-sm">{c.name || c.phone}</CardTitle>
+                      <CardTitle className="truncate text-sm min-w-0 flex-1">{c.name || c.phone}</CardTitle>
                       <span className="text-[10px] text-muted-foreground shrink-0">
                         {formatTime(c.last_message_at)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-0.5">
-                      <CardDescription className="truncate">
+                      <CardDescription className="truncate min-w-0 flex-1">
                         {c.last_direction === "out" ? "Você: " : ""}
                         {c.last_body || "—"}
                       </CardDescription>
@@ -618,6 +621,7 @@ export function ChatsPage() {
               </button>
               )
             })}
+            </div>
           </ScrollArea>
         </div>
       </div>
@@ -769,7 +773,7 @@ export function ChatsPage() {
                         className="flex items-center gap-2 mb-1 rounded bg-black/10 px-3 py-2 hover:bg-black/20"
                       >
                         <FileText className="h-5 w-5 shrink-0" />
-                        <span className="truncate underline">{m.body || "Documento"}</span>
+                        <span className="truncate underline min-w-0 flex-1">{m.body || "Documento"}</span>
                       </a>
                     )}
                     {(m.type !== "document" || !m.media_path) &&
@@ -1163,7 +1167,7 @@ function BroadcastDialog({
               <ul className="text-xs border rounded-md divide-y max-h-32 overflow-y-auto">
                 {fila.map((item) => (
                   <li key={item.id} className="flex items-center justify-between gap-2 px-2 py-1.5">
-                    <span className="truncate">
+                    <span className="truncate min-w-0 flex-1">
                       {item.name ? `${item.name} · ` : ""}
                       {item.phone} — {formatTime(item.agendado_para)}
                     </span>
