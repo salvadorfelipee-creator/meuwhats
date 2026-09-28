@@ -14,7 +14,15 @@ const ScrollArea = React.forwardRef<
     className={cn("relative overflow-hidden", className)}
     {...props}
   >
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+    {/*
+      Radix envolve `children` num div interno com `display:table` (pra medir o conteúdo e
+      calcular o tamanho da barra de rolagem) — isso ignora a largura do container pai e faz
+      qualquer `truncate`/`min-w-0` lá dentro não funcionar (o texto cresce pro tamanho natural
+      em vez de encolher, e só é cortado sem "..." pelo overflow:hidden bem mais adiante).
+      `[&>div]:!block` força esse div interno de volta pra `display:block`, que respeita a
+      largura do Viewport normalmente.
+    */}
+    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] [&>div]:!block">
       {children}
     </ScrollAreaPrimitive.Viewport>
     <ScrollBar />
