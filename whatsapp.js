@@ -107,6 +107,27 @@ async function sendVideo(fromPhoneNumberId, to, videoUrl, caption) {
   return json; // { messages: [{ id: "wamid..." }], ... }
 }
 
+// Igual a sendImage, mas áudio — mesmo mecanismo de URL pública (WhatsApp busca o link).
+async function sendAudio(fromPhoneNumberId, to, audioUrl) {
+  garantirNaoBloqueado(to);
+  const { status, buffer } = await graphRequest(
+    "POST",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${fromPhoneNumberId}/messages`,
+    {
+      body: {
+        messaging_product: "whatsapp",
+        to,
+        type: "audio",
+        audio: { link: audioUrl },
+      },
+    }
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao enviar áudio: ${JSON.stringify(json)}`);
+  return json; // { messages: [{ id: "wamid..." }], ... }
+}
+
 async function sendButtons(fromPhoneNumberId, to, bodyText, buttons) {
   // buttons: [{ id, title }] — a API aceita no máximo 3 botões, título com até 20 caracteres
   garantirNaoBloqueado(to);
@@ -405,6 +426,7 @@ module.exports = {
   sendText,
   sendImage,
   sendVideo,
+  sendAudio,
   sendButtons,
   sendList,
   sendCtaUrl,

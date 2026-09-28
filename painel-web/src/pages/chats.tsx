@@ -225,6 +225,7 @@ export function ChatsPage() {
   async function enviarMidia(file: File) {
     if (!current || !selected) return
     const ehVideo = file.type.startsWith("video/")
+    const ehAudio = file.type.startsWith("audio/")
     const base64 = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result as string)
@@ -233,7 +234,14 @@ export function ChatsPage() {
     })
     setEnviando(true)
     try {
-      await api.reply(current.id, selected, texto.trim(), ehVideo ? undefined : base64, ehVideo ? base64 : undefined)
+      await api.reply(
+        current.id,
+        selected,
+        texto.trim(),
+        !ehVideo && !ehAudio ? base64 : undefined,
+        ehVideo ? base64 : undefined,
+        ehAudio ? base64 : undefined,
+      )
       setTexto("")
       carregarMensagens()
       carregarConversas()
@@ -475,6 +483,9 @@ export function ChatsPage() {
                     {m.type === "video" && m.media_path && (
                       <video src={m.media_path} controls className="rounded mb-1 max-w-[280px] max-h-[360px] w-auto h-auto" />
                     )}
+                    {m.type === "audio" && m.media_path && (
+                      <audio src={m.media_path} controls className="mb-1 max-w-[280px] w-full" />
+                    )}
                     {m.body}
                     {m.status === "failed" && (
                       <div className="text-[11px] mt-1 text-red-200 flex items-start gap-1">
@@ -516,7 +527,7 @@ export function ChatsPage() {
               <label>
                 <input
                   type="file"
-                  accept="image/*,video/*"
+                  accept="image/*,video/*,audio/*"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
