@@ -120,7 +120,7 @@ export function AppSidebar({
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" className="w-[--radix-popper-anchor-width] min-w-56">
+              <DropdownMenuContent side="top" className="w-[var(--radix-popper-anchor-width)] min-w-56">
                 <DropdownMenuLabel>WhatsApp</DropdownMenuLabel>
                 {channels
                   .filter((c) => c.kind === "whatsapp")
