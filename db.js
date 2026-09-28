@@ -156,6 +156,46 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "instagram_lembrete_at")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN instagram_lembrete_at INTEGER`);
   }
+  // resolvido_em = timestamp de quando o status virou 'resolvido' pela ÚLTIMA vez (ver
+  // atualizarStatusConversa) — sem isso não dava pra medir "tempo até resolver" no Analytics,
+  // só o status atual, sem saber quando ele mudou.
+  if (!infoConversations.rows.some((r) => r.name === "resolvido_em")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN resolvido_em INTEGER`);
+  }
+  // pipeline_estagio = etapa atual da conversa no funil de atendimento/vendas (texto livre,
+  // ver PIPELINE_ESTAGIOS no painel) — separado do `status` (que é só novo/andamento/resolvido).
+  // Só usado hoje no número principal da Felizcred (ver ANALYTICS_BUSINESS_ID em server.js).
+  if (!infoConversations.rows.some((r) => r.name === "pipeline_estagio")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN pipeline_estagio TEXT`);
+  }
+
+  const infoMessagesOrigem = await client.execute(`PRAGMA table_info(messages)`);
+  // origem = 'humano' só na mensagem que sai pelo reply do painel (ver POST .../reply em
+  // server.js) — todo o resto (fluxo automático, templates de campanha) fica com origem NULL.
+  // É o que permite medir "tempo até resposta humana" no Analytics sem confundir com a
+  // resposta instantânea do bot.
+  if (!infoMessagesOrigem.rows.some((r) => r.name === "origem")) {
+    await client.execute(`ALTER TABLE messages ADD COLUMN origem TEXT`);
+  }
+
+  // Tags (etiquetas) — livres, criadas pelo time, várias por conversa. Só usadas hoje no
+  // número principal da Felizcred, mas a tabela já é multi-canal (business_number_id) pra
+  // não precisar migrar de novo se decidirmos usar em outro número depois.
+  await client.execute(`CREATE TABLE IF NOT EXISTS tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_number_id TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    cor TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE TABLE IF NOT EXISTS conversation_tags (
+    business_number_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    tag_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (business_number_id, phone, tag_id)
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_conversation_tags_tag ON conversation_tags(tag_id)`);
 
   await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -604,10 +644,86 @@ const STATUS_VALIDOS = ["novo", "andamento", "resolvido"];
 async function atualizarStatusConversa(phone, businessNumberId, status) {
   await ready;
   if (!STATUS_VALIDOS.includes(status)) throw new Error(`Status inválido: ${status}`);
+  if (status === "resolvido") {
+    await client.execute({
+      sql: `UPDATE conversations SET status = ?, resolvido_em = ? WHERE phone = ? AND business_number_id = ?`,
+      args: [status, Date.now(), phone, businessNumberId],
+    });
+  } else {
+    await client.execute({
+      sql: `UPDATE conversations SET status = ? WHERE phone = ? AND business_number_id = ?`,
+      args: [status, phone, businessNumberId],
+    });
+  }
+}
+
+async function atualizarPipelineConversa(phone, businessNumberId, estagio) {
+  await ready;
   await client.execute({
-    sql: `UPDATE conversations SET status = ? WHERE phone = ? AND business_number_id = ?`,
-    args: [status, phone, businessNumberId],
+    sql: `UPDATE conversations SET pipeline_estagio = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [estagio || null, phone, businessNumberId],
   });
+}
+
+async function listarTags(businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM tags WHERE business_number_id = ? ORDER BY nome COLLATE NOCASE`,
+    args: [businessNumberId],
+  });
+  return result.rows;
+}
+
+async function criarTag(businessNumberId, nome, cor) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO tags (business_number_id, nome, cor, created_at) VALUES (?, ?, ?, ?)`,
+    args: [businessNumberId, nome.trim(), cor, Date.now()],
+  });
+  return result.lastInsertRowid;
+}
+
+async function apagarTag(businessNumberId, tagId) {
+  await ready;
+  await client.execute({
+    sql: `DELETE FROM conversation_tags WHERE business_number_id = ? AND tag_id = ?`,
+    args: [businessNumberId, tagId],
+  });
+  await client.execute({
+    sql: `DELETE FROM tags WHERE business_number_id = ? AND id = ?`,
+    args: [businessNumberId, tagId],
+  });
+}
+
+async function adicionarTagConversa(businessNumberId, phone, tagId) {
+  await ready;
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO conversation_tags (business_number_id, phone, tag_id, created_at) VALUES (?, ?, ?, ?)`,
+    args: [businessNumberId, phone, tagId, Date.now()],
+  });
+}
+
+async function removerTagConversa(businessNumberId, phone, tagId) {
+  await ready;
+  await client.execute({
+    sql: `DELETE FROM conversation_tags WHERE business_number_id = ? AND phone = ? AND tag_id = ?`,
+    args: [businessNumberId, phone, tagId],
+  });
+}
+
+// Tags de UMA conversa (usado no painel de detalhes do contato).
+async function tagsDaConversa(businessNumberId, phone) {
+  await ready;
+  const result = await client.execute({
+    sql: `
+      SELECT t.* FROM tags t
+      JOIN conversation_tags ct ON ct.tag_id = t.id
+      WHERE ct.business_number_id = ? AND ct.phone = ?
+      ORDER BY t.nome COLLATE NOCASE
+    `,
+    args: [businessNumberId, phone],
+  });
+  return result.rows;
 }
 
 async function atualizarNotaConversa(phone, businessNumberId, nota) {
@@ -668,12 +784,13 @@ async function insertMessage(msg) {
     media_mime = null,
     status = null,
     wa_message_id = null,
+    origem = null,
     created_at,
   } = msg;
   const result = await client.execute({
-    sql: `INSERT INTO messages (phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, created_at],
+    sql: `INSERT INTO messages (phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, origem, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, origem, created_at],
   });
   if (direction === "in") {
     // Marca a hora da mensagem DO CLIENTE, separado de last_message_at (que conta qualquer
@@ -796,17 +913,26 @@ async function listConversations(businessNumberId, { incluirFinalizadas = false 
         lm.type AS last_type,
         lm.body AS last_body,
         lm.direction AS last_direction,
-        (c.last_inbound_at IS NOT NULL AND (c.last_read_at IS NULL OR c.last_inbound_at > c.last_read_at)) AS nao_lida
+        (c.last_inbound_at IS NOT NULL AND (c.last_read_at IS NULL OR c.last_inbound_at > c.last_read_at)) AS nao_lida,
+        tg.tags_json AS tags_json
       FROM conversations c
       LEFT JOIN messages lm ON lm.id = (
         SELECT m.id FROM messages m
         WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id
         ORDER BY m.created_at DESC LIMIT 1
       )
+      LEFT JOIN (
+        SELECT ct.business_number_id, ct.phone,
+          '[' || GROUP_CONCAT('{"id":' || t.id || ',"nome":"' || REPLACE(t.nome, '"', '\\"') || '","cor":"' || t.cor || '"}') || ']' AS tags_json
+        FROM conversation_tags ct
+        JOIN tags t ON t.id = ct.tag_id
+        WHERE ct.business_number_id = ?
+        GROUP BY ct.business_number_id, ct.phone
+      ) tg ON tg.business_number_id = c.business_number_id AND tg.phone = c.phone
       WHERE c.business_number_id = ? ${incluirFinalizadas ? "" : "AND c.status != 'resolvido'"}
       ORDER BY c.last_message_at DESC
     `,
-    args: [businessNumberId],
+    args: [businessNumberId, businessNumberId],
   });
   return result.rows;
 }
@@ -1544,6 +1670,129 @@ async function broadcastCancelar(id) {
   return result.rowsAffected > 0;
 }
 
+// Ajusta pro fuso de Brasília (UTC-3, sem horário de verão hoje em dia) antes de agrupar por
+// dia — sem isso, mensagem de madrugada/fim de dia migra pro dia errado no gráfico (mesmo bug
+// de fuso já visto no agendador do Publique IV).
+const TZ_BRASIL_OFFSET_SEGUNDOS = 3 * 60 * 60;
+
+// Painel de métricas do Analytics — só chamado pro número principal da Felizcred hoje (ver
+// ANALYTICS_BUSINESS_ID em server.js), mas a função em si é genérica por business_number_id.
+// `desde`/`ate` em milissegundos (epoch). Cada consulta é independente (sem transação) — é
+// leitura, não tem risco de inconsistência entre elas que importe pra uma tela de métricas.
+async function analyticsResumo(businessNumberId, desde, ate) {
+  await ready;
+
+  const totalConversasQ = await client.execute({
+    sql: `SELECT COUNT(DISTINCT phone) AS total FROM messages WHERE business_number_id = ? AND created_at BETWEEN ? AND ?`,
+    args: [businessNumberId, desde, ate],
+  });
+
+  const novasConversasQ = await client.execute({
+    sql: `
+      SELECT COUNT(*) AS total FROM (
+        SELECT phone, MIN(created_at) AS primeira FROM messages
+        WHERE business_number_id = ? GROUP BY phone
+      ) WHERE primeira BETWEEN ? AND ?
+    `,
+    args: [businessNumberId, desde, ate],
+  });
+
+  const resolvidasQ = await client.execute({
+    sql: `SELECT COUNT(*) AS total FROM conversations WHERE business_number_id = ? AND status = 'resolvido' AND resolvido_em BETWEEN ? AND ?`,
+    args: [businessNumberId, desde, ate],
+  });
+
+  const tempoRespostaHumanaQ = await client.execute({
+    sql: `
+      SELECT AVG(resp.diff) AS media, COUNT(*) AS amostras FROM (
+        SELECT m_in.phone, MIN(m_out.created_at) - m_in.primeira_in AS diff
+        FROM (
+          SELECT phone, MIN(created_at) AS primeira_in FROM messages
+          WHERE business_number_id = ? AND direction = 'in' AND created_at BETWEEN ? AND ?
+          GROUP BY phone
+        ) m_in
+        JOIN messages m_out
+          ON m_out.phone = m_in.phone AND m_out.business_number_id = ?
+          AND m_out.direction = 'out' AND m_out.origem = 'humano'
+          AND m_out.created_at > m_in.primeira_in
+        GROUP BY m_in.phone, m_in.primeira_in
+      ) resp
+    `,
+    args: [businessNumberId, desde, ate, businessNumberId],
+  });
+
+  const tempoResolucaoQ = await client.execute({
+    sql: `
+      SELECT AVG(c.resolvido_em - pm.primeira) AS media, COUNT(*) AS amostras
+      FROM conversations c
+      JOIN (SELECT phone, MIN(created_at) AS primeira FROM messages WHERE business_number_id = ? GROUP BY phone) pm
+        ON pm.phone = c.phone
+      WHERE c.business_number_id = ? AND c.status = 'resolvido' AND c.resolvido_em BETWEEN ? AND ?
+    `,
+    args: [businessNumberId, businessNumberId, desde, ate],
+  });
+
+  const porStatusQ = await client.execute({
+    sql: `SELECT status, COUNT(*) AS total FROM conversations WHERE business_number_id = ? GROUP BY status`,
+    args: [businessNumberId],
+  });
+
+  const porTagQ = await client.execute({
+    sql: `
+      SELECT t.id, t.nome, t.cor, COUNT(*) AS total
+      FROM conversation_tags ct
+      JOIN tags t ON t.id = ct.tag_id
+      WHERE ct.business_number_id = ?
+      GROUP BY t.id ORDER BY total DESC
+    `,
+    args: [businessNumberId],
+  });
+
+  const porEstagioQ = await client.execute({
+    sql: `
+      SELECT pipeline_estagio AS estagio, COUNT(*) AS total FROM conversations
+      WHERE business_number_id = ? AND pipeline_estagio IS NOT NULL
+      GROUP BY pipeline_estagio
+    `,
+    args: [businessNumberId],
+  });
+
+  const porDiaQ = await client.execute({
+    sql: `
+      SELECT strftime('%Y-%m-%d', (created_at / 1000) - ${TZ_BRASIL_OFFSET_SEGUNDOS}, 'unixepoch') AS dia,
+        COUNT(*) AS mensagens, COUNT(DISTINCT phone) AS conversas
+      FROM messages
+      WHERE business_number_id = ? AND created_at BETWEEN ? AND ?
+      GROUP BY dia ORDER BY dia
+    `,
+    args: [businessNumberId, desde, ate],
+  });
+
+  const porDirecaoQ = await client.execute({
+    sql: `SELECT direction, COUNT(*) AS total FROM messages WHERE business_number_id = ? AND created_at BETWEEN ? AND ? GROUP BY direction`,
+    args: [businessNumberId, desde, ate],
+  });
+
+  const totalConversas = totalConversasQ.rows[0]?.total || 0;
+  const resolvidas = resolvidasQ.rows[0]?.total || 0;
+
+  return {
+    totalConversas,
+    novasConversas: novasConversasQ.rows[0]?.total || 0,
+    conversasResolvidas: resolvidas,
+    taxaResolucao: totalConversas > 0 ? resolvidas / totalConversas : null,
+    tempoMedioRespostaHumanaMs: tempoRespostaHumanaQ.rows[0]?.media ?? null,
+    amostrasRespostaHumana: tempoRespostaHumanaQ.rows[0]?.amostras || 0,
+    tempoMedioResolucaoMs: tempoResolucaoQ.rows[0]?.media ?? null,
+    amostrasResolucao: tempoResolucaoQ.rows[0]?.amostras || 0,
+    porStatus: porStatusQ.rows,
+    porTag: porTagQ.rows,
+    porEstagio: porEstagioQ.rows,
+    porDia: porDiaQ.rows,
+    porDirecao: porDirecaoQ.rows,
+  };
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -1609,6 +1858,14 @@ module.exports = {
   googleConfigSet,
   marcarContatoSalvo,
   atualizarStatusConversa,
+  atualizarPipelineConversa,
+  listarTags,
+  criarTag,
+  apagarTag,
+  adicionarTagConversa,
+  removerTagConversa,
+  tagsDaConversa,
+  analyticsResumo,
   atualizarNotaConversa,
   buscarMensagens,
   respostasProntasListar,

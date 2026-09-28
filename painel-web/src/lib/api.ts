@@ -22,6 +22,50 @@ export type Conversation = {
   last_read_at?: number | null
   last_seen_at?: number | null
   nao_lida?: boolean | number
+  resolvido_em?: number | null
+  pipeline_estagio?: string | null
+  tags_json?: string | null
+}
+
+export type Tag = { id: number; business_number_id: string; nome: string; cor: string; created_at: number }
+
+// Etapas fixas do pipeline de atendimento/vendas — hoje só usadas no número principal da
+// Felizcred (ver ANALYTICS_BUSINESS_ID em chats.tsx/analytics.tsx). Cada conversa guarda o
+// `id` de uma etapa em `pipeline_estagio` (texto livre no banco, mas só estes valores aparecem
+// no seletor do painel).
+export const PIPELINE_ESTAGIOS = [
+  { id: "novo_lead", nome: "Novo lead", cor: "#64748b" },
+  { id: "qualificacao", nome: "Em qualificação", cor: "#2563eb" },
+  { id: "documentos", nome: "Documentos enviados", cor: "#7c3aed" },
+  { id: "analise", nome: "Em análise", cor: "#d97706" },
+  { id: "aprovado", nome: "Aprovado", cor: "#16a34a" },
+  { id: "perdido", nome: "Perdido", cor: "#dc2626" },
+] as const
+
+export type PipelineEstagioId = (typeof PIPELINE_ESTAGIOS)[number]["id"]
+
+// Analytics/tags/pipeline hoje só existem pro número principal da Felizcred — identificado
+// pelo label (não por ID fixo, que já mudou antes numa migração de WABA). Usado tanto pela
+// tela de Analytics quanto pelo chat (pra saber quando mostrar o seletor de tags/etapa).
+export const CANAL_ANALYTICS_LABEL = "Felizcred (principal)"
+
+export type AnalyticsResumo = {
+  totalConversas: number
+  novasConversas: number
+  conversasResolvidas: number
+  taxaResolucao: number | null
+  tempoMedioRespostaHumanaMs: number | null
+  amostrasRespostaHumana: number
+  tempoMedioResolucaoMs: number | null
+  amostrasResolucao: number
+  porStatus: { status: string; total: number }[]
+  porTag: { id: number; nome: string; cor: string; total: number }[]
+  porEstagio: { estagio: string; total: number }[]
+  porDia: { dia: string; mensagens: number; conversas: number }[]
+  porDirecao: { direction: "in" | "out"; total: number }[]
+  dias: number
+  desde: number
+  ate: number
 }
 
 export type Message = {
@@ -421,6 +465,43 @@ export const api = {
 
   // ── Funil de qualificação ──────────────────────────────────────────────────
   funilResumo: (dias = 7) => request<FunilResponse>(`/painel/api/funil?dias=${dias}`),
+
+  // ── Pipeline e tags (só usado hoje no número principal da Felizcred) ────────
+  setPipeline: (businessId: string, phone: string, estagio: string | null) =>
+    request<{ ok: true }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/pipeline`,
+      { method: "PATCH", body: JSON.stringify({ estagio }) },
+    ),
+
+  tagsDaConversa: (businessId: string, phone: string) =>
+    request<Tag[]>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/tags`),
+
+  adicionarTagConversa: (businessId: string, phone: string, tagId: number) =>
+    request<{ ok: true }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/tags`,
+      { method: "POST", body: JSON.stringify({ tagId }) },
+    ),
+
+  removerTagConversa: (businessId: string, phone: string, tagId: number) =>
+    request<{ ok: true }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/tags/${tagId}`,
+      { method: "DELETE" },
+    ),
+
+  tags: (businessId: string) => request<Tag[]>(`/painel/api/tags/${encodeURIComponent(businessId)}`),
+
+  criarTag: (businessId: string, nome: string, cor: string) =>
+    request<{ id: number }>(`/painel/api/tags/${encodeURIComponent(businessId)}`, {
+      method: "POST",
+      body: JSON.stringify({ nome, cor }),
+    }),
+
+  apagarTag: (businessId: string, tagId: number) =>
+    request<{ ok: true }>(`/painel/api/tags/${encodeURIComponent(businessId)}/${tagId}`, { method: "DELETE" }),
+
+  // ── Analytics (só o número principal da Felizcred, ver chats.tsx/analytics.tsx) ─────────
+  analytics: (businessId: string, dias: number) =>
+    request<AnalyticsResumo>(`/painel/api/analytics/${encodeURIComponent(businessId)}?dias=${dias}`),
 }
 
 export { ApiError }

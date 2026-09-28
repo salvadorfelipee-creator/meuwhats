@@ -9,6 +9,9 @@ import {
   type TemplateInfo,
   type BroadcastResult,
   type BroadcastFilaItem,
+  type Tag,
+  PIPELINE_ESTAGIOS,
+  CANAL_ANALYTICS_LABEL,
 } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -887,6 +890,7 @@ export function ChatsPage() {
               key={conversaAtual.phone}
               conversation={conversaAtual}
               businessId={current.id}
+              mostrarPipelineTags={current.label === CANAL_ANALYTICS_LABEL}
               onSaved={carregarConversas}
             />
           )}
@@ -901,16 +905,51 @@ export function ChatsPage() {
 function ContactDetails({
   conversation,
   businessId,
+  mostrarPipelineTags,
   onSaved,
 }: {
   conversation: Conversation
   businessId: string
+  mostrarPipelineTags: boolean
   onSaved: () => void
 }) {
   const [nota, setNota] = React.useState(conversation.nota || "")
   const [salvando, setSalvando] = React.useState(false)
   const [reabrindo, setReabrindo] = React.useState(false)
   const [reabrirMsg, setReabrirMsg] = React.useState<string | null>(null)
+
+  const [todasTags, setTodasTags] = React.useState<Tag[]>([])
+  const [tagsConversa, setTagsConversa] = React.useState<Tag[]>([])
+  const [estagio, setEstagio] = React.useState(conversation.pipeline_estagio || "")
+  const [salvandoEstagio, setSalvandoEstagio] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!mostrarPipelineTags) return
+    api.tags(businessId).then(setTodasTags).catch(() => {})
+    api.tagsDaConversa(businessId, conversation.phone).then(setTagsConversa).catch(() => {})
+  }, [mostrarPipelineTags, businessId, conversation.phone])
+
+  async function alternarTag(tag: Tag) {
+    const jaTem = tagsConversa.some((t) => t.id === tag.id)
+    if (jaTem) {
+      setTagsConversa((prev) => prev.filter((t) => t.id !== tag.id))
+      await api.removerTagConversa(businessId, conversation.phone, tag.id)
+    } else {
+      setTagsConversa((prev) => [...prev, tag])
+      await api.adicionarTagConversa(businessId, conversation.phone, tag.id)
+    }
+  }
+
+  async function mudarEstagio(novoEstagio: string) {
+    setEstagio(novoEstagio)
+    setSalvandoEstagio(true)
+    try {
+      await api.setPipeline(businessId, conversation.phone, novoEstagio || null)
+      onSaved()
+    } finally {
+      setSalvandoEstagio(false)
+    }
+  }
 
   async function salvar() {
     setSalvando(true)
@@ -953,6 +992,52 @@ function ContactDetails({
           </p>
           {reabrirMsg && <p className="text-xs mt-1">{reabrirMsg}</p>}
         </div>
+      )}
+      {mostrarPipelineTags && (
+        <>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Etapa do pipeline</label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm disabled:opacity-50"
+              value={estagio}
+              disabled={salvandoEstagio}
+              onChange={(e) => mudarEstagio(e.target.value)}
+            >
+              <option value="">Sem etapa definida</option>
+              {PIPELINE_ESTAGIOS.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Tags</label>
+            {todasTags.length === 0 ? (
+              <p className="text-xs text-muted-foreground">
+                Nenhuma tag criada ainda — crie em Analytics → Gerenciar tags.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {todasTags.map((tag) => {
+                  const ativa = tagsConversa.some((t) => t.id === tag.id)
+                  return (
+                    <button
+                      key={tag.id}
+                      onClick={() => alternarTag(tag)}
+                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                        ativa ? "text-white border-transparent" : "text-muted-foreground border-border hover:bg-accent"
+                      }`}
+                      style={ativa ? { background: tag.cor } : undefined}
+                    >
+                      {tag.nome}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </>
       )}
       <div>
         <label className="text-sm font-medium mb-1 block">Nota interna</label>

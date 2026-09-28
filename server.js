@@ -4333,6 +4333,10 @@ const server = http.createServer(async (req, res) => {
         media_path: imagemUrl || videoUrl || audioUrl || documentUrl,
         wa_message_id: waId,
         status: "sent",
+        // origem 'humano' = veio do reply do painel (uma pessoa digitou) — usado pra medir
+        // "tempo até resposta humana" no Analytics, sem confundir com resposta automática do
+        // fluxo (ver comentário na migração de messages.origem em db.js).
+        origem: "humano",
         created_at: now,
       });
       return send(res, 200, { ok: true });
@@ -4379,6 +4383,75 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       await db.atualizarNotaConversa(decodeURIComponent(matchNota[2]), decodeURIComponent(matchNota[1]), body.nota || "");
       return send(res, 200, { ok: true });
+    }
+
+    // PATCH /painel/api/conversations/:businessId/:phone/pipeline — etapa da conversa no
+    // funil de atendimento/vendas (ver PIPELINE_ESTAGIOS no painel-web)
+    const matchPipeline = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/pipeline$/);
+    if (req.method === "PATCH" && matchPipeline) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await db.atualizarPipelineConversa(decodeURIComponent(matchPipeline[2]), decodeURIComponent(matchPipeline[1]), body.estagio || null);
+      return send(res, 200, { ok: true });
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/tags — tags dessa conversa
+    const matchTagsConversa = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/tags$/);
+    if (req.method === "GET" && matchTagsConversa) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.tagsDaConversa(decodeURIComponent(matchTagsConversa[1]), decodeURIComponent(matchTagsConversa[2])));
+    }
+    // POST /painel/api/conversations/:businessId/:phone/tags — adiciona uma tag { tagId }
+    if (req.method === "POST" && matchTagsConversa) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.tagId) return send(res, 400, { error: "tagId obrigatório" });
+      await db.adicionarTagConversa(decodeURIComponent(matchTagsConversa[1]), decodeURIComponent(matchTagsConversa[2]), body.tagId);
+      return send(res, 200, { ok: true });
+    }
+    // DELETE /painel/api/conversations/:businessId/:phone/tags/:tagId — remove uma tag
+    const matchTagsConversaRemover = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/tags\/(\d+)$/);
+    if (req.method === "DELETE" && matchTagsConversaRemover) {
+      if (!requireAuth(req, res)) return;
+      await db.removerTagConversa(
+        decodeURIComponent(matchTagsConversaRemover[1]),
+        decodeURIComponent(matchTagsConversaRemover[2]),
+        Number(matchTagsConversaRemover[3])
+      );
+      return send(res, 200, { ok: true });
+    }
+
+    // GET /painel/api/tags/:businessId — lista as tags cadastradas
+    const matchTags = path_.match(/^\/painel\/api\/tags\/([^/]+)$/);
+    if (req.method === "GET" && matchTags) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.listarTags(decodeURIComponent(matchTags[1])));
+    }
+    // POST /painel/api/tags/:businessId — cria tag { nome, cor }
+    if (req.method === "POST" && matchTags) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.nome || !body.nome.trim()) return send(res, 400, { error: "Nome da tag é obrigatório" });
+      const id = await db.criarTag(decodeURIComponent(matchTags[1]), body.nome, body.cor || "#64748b");
+      return send(res, 200, { id });
+    }
+    // DELETE /painel/api/tags/:businessId/:tagId
+    const matchTagApagar = path_.match(/^\/painel\/api\/tags\/([^/]+)\/(\d+)$/);
+    if (req.method === "DELETE" && matchTagApagar) {
+      if (!requireAuth(req, res)) return;
+      await db.apagarTag(decodeURIComponent(matchTagApagar[1]), Number(matchTagApagar[2]));
+      return send(res, 200, { ok: true });
+    }
+
+    // GET /painel/api/analytics/:businessId?dias=7 — métricas de atendimento (ver db.analyticsResumo)
+    const matchAnalytics = path_.match(/^\/painel\/api\/analytics\/([^/]+)$/);
+    if (req.method === "GET" && matchAnalytics) {
+      if (!requireAuth(req, res)) return;
+      const dias = Math.max(1, Math.min(365, Number(url.searchParams.get("dias")) || 30));
+      const ate = Date.now();
+      const desde = ate - dias * 24 * 60 * 60 * 1000;
+      const dados = await db.analyticsResumo(decodeURIComponent(matchAnalytics[1]), desde, ate);
+      return send(res, 200, { ...dados, dias, desde, ate });
     }
 
     // GET /painel/api/conversations/:businessId/buscar?q=... — busca texto dentro das mensagens
