@@ -1799,17 +1799,31 @@ async function analyticsResumo(businessNumberId, desde, ate) {
 // payment-eligibility na memória).
 async function whatsappFalhasRecentes(businessNumberId, desdeMs) {
   await ready;
-  const r = await client.execute({
-    sql: `
-      SELECT error_message, COUNT(*) AS total, COUNT(DISTINCT phone) AS contatos,
-        MAX(created_at) AS ultima
-      FROM messages
-      WHERE business_number_id = ? AND direction = 'out' AND status = 'failed' AND created_at >= ?
-      GROUP BY error_message ORDER BY total DESC
-    `,
-    args: [businessNumberId, desdeMs],
-  });
-  return r.rows;
+  const [agrupado, detalhe] = await Promise.all([
+    client.execute({
+      sql: `
+        SELECT error_message, COUNT(*) AS total, COUNT(DISTINCT phone) AS contatos,
+          MAX(created_at) AS ultima
+        FROM messages
+        WHERE business_number_id = ? AND direction = 'out' AND status = 'failed' AND created_at >= ?
+        GROUP BY error_message ORDER BY total DESC
+      `,
+      args: [businessNumberId, desdeMs],
+    }),
+    // por mensagem: dá pra ver se a falha é sempre logo na 1a resposta a um contato novo
+    // (sinal de WABA ainda em "aquecimento") ou espalhada em contatos já conhecidos.
+    client.execute({
+      sql: `
+        SELECT m.phone, m.type, m.created_at, m.error_message,
+          (SELECT MIN(created_at) FROM messages m2 WHERE m2.phone = m.phone AND m2.business_number_id = m.business_number_id) AS primeira_msg_geral
+        FROM messages m
+        WHERE m.business_number_id = ? AND m.direction = 'out' AND m.status = 'failed' AND m.created_at >= ?
+        ORDER BY m.created_at DESC LIMIT 30
+      `,
+      args: [businessNumberId, desdeMs],
+    }),
+  ]);
+  return { agrupado: agrupado.rows, detalhe: detalhe.rows };
 }
 
 module.exports = {

@@ -4758,7 +4758,7 @@ const server = http.createServer(async (req, res) => {
           wa.checarNumero(phoneNumberId),
           db.whatsappFalhasRecentes(phoneNumberId, Date.now() - 7 * 24 * 60 * 60 * 1000),
         ]);
-        return send(res, 200, { numero, falhasUltimos7Dias: falhas });
+        return send(res, 200, { numero, falhas7dias: falhas.agrupado, detalheFalhas7dias: falhas.detalhe });
       } catch (err) {
         return send(res, 500, { error: err.message });
       }
