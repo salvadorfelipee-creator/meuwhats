@@ -25,9 +25,36 @@ export type Conversation = {
   resolvido_em?: number | null
   pipeline_estagio?: string | null
   tags_json?: string | null
+  email?: string | null
 }
 
 export type Tag = { id: number; business_number_id: string; nome: string; cor: string; created_at: number }
+
+export type EmailTemplate = { id: number; business_id: string; nome: string; assunto: string; corpo_html: string; created_at: number }
+
+export type EmailAgendado = {
+  id: number
+  destinatario_email: string
+  destinatario_nome: string | null
+  agendado_para: number
+  template_nome: string
+}
+
+export type Retorno = {
+  id: number
+  business_id: string
+  phone: string
+  tipo: string
+  data_agendada: number
+  canal: "whatsapp" | "email" | "ambos"
+  whatsapp_template: string | null
+  whatsapp_language: string | null
+  email_template_id: number | null
+  status: string
+  erro: string | null
+  enviado_em: number | null
+  created_at: number
+}
 
 // Etapas fixas do pipeline de atendimento/vendas — hoje só usadas no número principal da
 // Felizcred (ver ANALYTICS_BUSINESS_ID em chats.tsx/analytics.tsx). Cada conversa guarda o
@@ -505,6 +532,43 @@ export const api = {
 
   // ── IA (conector MCP — ver ia.tsx) ────────────────────────────────────────────────────────
   mcpInfo: () => request<{ configurado: boolean; url?: string }>("/painel/api/mcp-info"),
+
+  // ── E-mail (Brevo) — templates, campanha, fila, avulso (ver email.tsx) ──────────────────
+  emailTemplates: (businessId: string) => request<EmailTemplate[]>(`/painel/api/email-templates/${encodeURIComponent(businessId)}`),
+  criarEmailTemplate: (businessId: string, nome: string, assunto: string, corpoHtml: string) =>
+    request<{ id: number }>(`/painel/api/email-templates/${encodeURIComponent(businessId)}`, {
+      method: "POST",
+      body: JSON.stringify({ nome, assunto, corpoHtml }),
+    }),
+  apagarEmailTemplate: (businessId: string, templateId: number) =>
+    request<{ ok: true }>(`/painel/api/email-templates/${encodeURIComponent(businessId)}/${templateId}`, { method: "DELETE" }),
+  agendarEmailCampanha: (businessId: string, templateId: number, contacts: { email: string; nome?: string; agendadoPara: number }[]) =>
+    request<{ agendados: number }>(`/painel/api/email-campanha/${encodeURIComponent(businessId)}`, {
+      method: "POST",
+      body: JSON.stringify({ templateId, contacts }),
+    }),
+  emailFila: (businessId: string) => request<EmailAgendado[]>(`/painel/api/email-fila/${encodeURIComponent(businessId)}`),
+  cancelarEmailFila: (id: number) => request<{ ok: true }>(`/painel/api/email-fila/item/${id}`, { method: "DELETE" }),
+  enviarEmailAvulso: (businessId: string, phone: string, templateId: number) =>
+    request<{ ok: true }>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/email-avulso`, {
+      method: "POST",
+      body: JSON.stringify({ templateId }),
+    }),
+
+  // ── Retornos (lembrete por conversa — WhatsApp e/ou e-mail) ──────────────────────────────
+  criarRetorno: (
+    businessId: string,
+    phone: string,
+    dados: { tipo?: string; dataAgendada: number; canal: "whatsapp" | "email" | "ambos"; whatsappTemplate?: string; whatsappLanguage?: string; emailTemplateId?: number },
+  ) =>
+    request<{ id: number }>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/retorno`, {
+      method: "POST",
+      body: JSON.stringify(dados),
+    }),
+  retornosDaConversa: (businessId: string, phone: string) =>
+    request<Retorno[]>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/retornos`),
+  retornosDoNegocio: (businessId: string) => request<Retorno[]>(`/painel/api/retornos/${encodeURIComponent(businessId)}`),
+  cancelarRetorno: (id: number) => request<{ ok: true }>(`/painel/api/retornos/item/${id}`, { method: "DELETE" }),
 }
 
 export { ApiError }

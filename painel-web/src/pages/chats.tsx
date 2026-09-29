@@ -10,6 +10,8 @@ import {
   type BroadcastResult,
   type BroadcastFilaItem,
   type Tag,
+  type EmailTemplate,
+  type Retorno,
   PIPELINE_ESTAGIOS,
   CANAL_ANALYTICS_LABEL,
 } from "@/lib/api"
@@ -35,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Sheet,
@@ -61,6 +64,9 @@ import {
   Mic,
   X,
   ChevronUp,
+  Mail,
+  CalendarClock,
+  Trash2,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -902,6 +908,144 @@ export function ChatsPage() {
   )
 }
 
+// Dialog de "agendar retorno" (lembrete por conversa — WhatsApp e/ou e-mail, ver README seção
+// Retornos). Busca templates aprovados de WhatsApp e templates de e-mail só quando abre, pra
+// não pesar toda vez que o painel de detalhes da conversa é montado.
+function AgendarRetornoDialog({
+  businessId,
+  conversation,
+  onCreated,
+}: {
+  businessId: string
+  conversation: Conversation
+  onCreated: () => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const [canal, setCanal] = React.useState<"whatsapp" | "email" | "ambos">("whatsapp")
+  const [dataHora, setDataHora] = React.useState("")
+  const [tipo, setTipo] = React.useState("retorno")
+  const [waTemplates, setWaTemplates] = React.useState<TemplateInfo[]>([])
+  const [waTemplateNome, setWaTemplateNome] = React.useState("")
+  const [emailTemplates, setEmailTemplates] = React.useState<EmailTemplate[]>([])
+  const [emailTemplateId, setEmailTemplateId] = React.useState<number | null>(null)
+  const [salvando, setSalvando] = React.useState(false)
+  const [erro, setErro] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (!open) return
+    api.templates(businessId).then((r) => setWaTemplates(r.templates)).catch(() => {})
+    api.emailTemplates(businessId).then(setEmailTemplates).catch(() => {})
+  }, [open, businessId])
+
+  async function criar() {
+    if (!dataHora) return setErro("Escolha data e hora")
+    if ((canal === "whatsapp" || canal === "ambos") && !waTemplateNome) return setErro("Escolha o template de WhatsApp")
+    if ((canal === "email" || canal === "ambos") && !emailTemplateId) return setErro("Escolha o template de e-mail")
+    if ((canal === "email" || canal === "ambos") && !conversation.email) {
+      return setErro("Essa conversa não tem e-mail salvo — use só WhatsApp ou capture o e-mail antes.")
+    }
+    setErro(null)
+    setSalvando(true)
+    try {
+      await api.criarRetorno(businessId, conversation.phone, {
+        tipo,
+        dataAgendada: new Date(dataHora).getTime(),
+        canal,
+        whatsappTemplate: canal !== "email" ? waTemplateNome : undefined,
+        emailTemplateId: canal !== "whatsapp" ? emailTemplateId ?? undefined : undefined,
+      })
+      setOpen(false)
+      setDataHora("")
+      onCreated()
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao agendar")
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="gap-1.5">
+          <CalendarClock className="h-3.5 w-3.5" />
+          Agendar retorno
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Agendar retorno</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Tipo</label>
+            <Input value={tipo} onChange={(e) => setTipo(e.target.value)} placeholder="retorno, aniversario, reuniao..." />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Data e hora</label>
+            <Input type="datetime-local" value={dataHora} onChange={(e) => setDataHora(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Canal</label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              value={canal}
+              onChange={(e) => setCanal(e.target.value as typeof canal)}
+            >
+              <option value="whatsapp">WhatsApp</option>
+              <option value="email">E-mail</option>
+              <option value="ambos">Os dois</option>
+            </select>
+          </div>
+          {(canal === "whatsapp" || canal === "ambos") && (
+            <div>
+              <label className="text-sm font-medium mb-1 block">Template WhatsApp</label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                value={waTemplateNome}
+                onChange={(e) => setWaTemplateNome(e.target.value)}
+              >
+                <option value="">Selecione</option>
+                {waTemplates.map((t) => (
+                  <option key={t.name} value={t.name}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {(canal === "email" || canal === "ambos") && (
+            <div>
+              <label className="text-sm font-medium mb-1 block">Template e-mail</label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                value={emailTemplateId ?? ""}
+                onChange={(e) => setEmailTemplateId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Selecione</option>
+                {emailTemplates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nome}
+                  </option>
+                ))}
+              </select>
+              {!conversation.email && (
+                <p className="text-xs text-muted-foreground mt-1">Essa conversa ainda não tem e-mail salvo.</p>
+              )}
+            </div>
+          )}
+          {erro && <p className="text-sm text-destructive">{erro}</p>}
+        </div>
+        <DialogFooter>
+          <Button onClick={criar} disabled={salvando}>
+            {salvando ? "Agendando..." : "Agendar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function ContactDetails({
   conversation,
   businessId,
@@ -923,11 +1067,26 @@ function ContactDetails({
   const [estagio, setEstagio] = React.useState(conversation.pipeline_estagio || "")
   const [salvandoEstagio, setSalvandoEstagio] = React.useState(false)
 
+  const [retornos, setRetornos] = React.useState<Retorno[]>([])
+  const carregarRetornos = React.useCallback(() => {
+    if (businessId === "instagram") return
+    api.retornosDaConversa(businessId, conversation.phone).then(setRetornos).catch(() => {})
+  }, [businessId, conversation.phone])
+
   React.useEffect(() => {
     if (!mostrarPipelineTags) return
     api.tags(businessId).then(setTodasTags).catch(() => {})
     api.tagsDaConversa(businessId, conversation.phone).then(setTagsConversa).catch(() => {})
   }, [mostrarPipelineTags, businessId, conversation.phone])
+
+  React.useEffect(() => {
+    carregarRetornos()
+  }, [carregarRetornos])
+
+  async function cancelarRetorno(id: number) {
+    await api.cancelarRetorno(id)
+    carregarRetornos()
+  }
 
   async function alternarTag(tag: Tag) {
     const jaTem = tagsConversa.some((t) => t.id === tag.id)
@@ -1038,6 +1197,39 @@ function ContactDetails({
             )}
           </div>
         </>
+      )}
+      {businessId !== "instagram" && (
+        <div>
+          <label className="text-sm font-medium mb-1 block">Retornos agendados</label>
+          {conversation.email && (
+            <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
+              <Mail className="h-3 w-3" /> {conversation.email}
+            </p>
+          )}
+          {retornos.length > 0 && (
+            <div className="flex flex-col gap-1.5 mb-2">
+              {retornos.map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg border p-2 text-xs">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
+                      {r.tipo} · {r.canal}
+                    </p>
+                    <p className="text-muted-foreground">
+                      {new Date(r.data_agendada).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      {r.status !== "pending" ? ` · ${r.status}` : ""}
+                    </p>
+                  </div>
+                  {r.status === "pending" && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => cancelarRetorno(r.id)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <AgendarRetornoDialog businessId={businessId} conversation={conversation} onCreated={carregarRetornos} />
+        </div>
       )}
       <div>
         <label className="text-sm font-medium mb-1 block">Nota interna</label>

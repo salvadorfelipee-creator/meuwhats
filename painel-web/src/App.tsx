@@ -12,6 +12,7 @@ import { ReelsPage } from "@/pages/reels"
 import { FunilPage } from "@/pages/funil"
 import { AnalyticsPage } from "@/pages/analytics"
 import { IaPage } from "@/pages/ia"
+import { EmailPage } from "@/pages/email"
 
 function Shell() {
   const [screen, setScreen] = React.useState<Screen>("chats")
@@ -27,6 +28,7 @@ function Shell() {
         {screen === "funil" && <FunilPage />}
         {screen === "analytics" && <AnalyticsPage />}
         {screen === "ia" && <IaPage />}
+        {screen === "email" && <EmailPage />}
       </SidebarInset>
     </SidebarProvider>
   )
