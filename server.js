@@ -3357,7 +3357,55 @@ async function getFluxo(businessNumberId, phone, fluxoPassoAtual) {
     if (String(fluxoPassoAtual || "").startsWith("fgtsad_")) return FLUXO_FGTS_ANUNCIO;
     if (await db.recebeuTemplate(phone, businessNumberId, "amigo_indicou")) return FLUXO_AMIGO_INDICOU;
   }
-  return FLUXOS_POR_NUMERO[businessNumberId] || FLUXO_FELIZCRED;
+  if (FLUXOS_POR_NUMERO[businessNumberId]) return FLUXOS_POR_NUMERO[businessNumberId];
+  // Número sem fluxo fixo escrito em código (ex.: número novo de um cliente) — tenta o motor
+  // de fluxo dinâmico (dado no banco, criado via ferramentas MCP — ver mcp.js/README). Não
+  // muda NADA pros números já listados acima, de propósito: zero risco pro que já roda.
+  const fluxoDinamico = await db.fluxoDinamicoAtivo(businessNumberId);
+  if (fluxoDinamico) return montarFluxoDinamico(fluxoDinamico);
+  return FLUXO_FELIZCRED;
+}
+
+// ─── Motor de fluxo dinâmico ─────────────────────────────────────────────────────────────
+// "Anda" pelo grafo salvo no banco a partir de um nó: nó 'acao' executa o efeito (tag/etapa
+// do pipeline) e segue direto pro próximo nó sem parar; nó 'mensagem' manda o texto (+ botões,
+// se tiver) e PÁRA ali, esperando resposta — mesmo padrão de qualquer fluxo fixo do sistema.
+async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
+  const no = await db.fluxoNoObter(noId);
+  if (!no) return;
+
+  if (no.tipo === "acao") {
+    if (no.acao_tipo === "tag") await db.adicionarTagConversa(businessNumberId, de, Number(no.acao_valor));
+    else if (no.acao_tipo === "pipeline") await db.atualizarPipelineConversa(de, businessNumberId, no.acao_valor);
+    if (no.proximo_no_id) return avancarNoFluxoDinamico(no.proximo_no_id, de, businessNumberId, fluxoId);
+    await db.setFluxoPasso(de, businessNumberId, null);
+    return;
+  }
+
+  const opcoes = await db.fluxoOpcoesDoNo(noId);
+  const botoes = opcoes.length ? opcoes.map((o) => ({ id: o.botao_id, title: o.botao_titulo })) : undefined;
+  await enviarRespostaAutomatica(businessNumberId, de, no.texto || "", botoes);
+  await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
+  await db.setFluxoPasso(de, businessNumberId, `fluxo_dinamico_${noId}`);
+}
+
+// Monta um objeto de fluxo compatível com o resto do dispatcher (mesma forma de FLUXO_CIAHOT
+// etc: aoIniciar + fluxoBotoes) a partir do grafo salvo no banco — assim o resto do código
+// (dispararInicioFluxo, clique de botão) não precisa saber que esse fluxo é dinâmico.
+async function montarFluxoDinamico(fluxoRow) {
+  const todasOpcoes = await db.fluxoOpcoesDoFluxo(fluxoRow.id);
+  const fluxoBotoes = {};
+  for (const opcao of todasOpcoes) {
+    fluxoBotoes[opcao.botao_id] = (de, businessNumberId) =>
+      avancarNoFluxoDinamico(opcao.proximo_no_id, de, businessNumberId, fluxoRow.id);
+  }
+  return {
+    aoIniciar: (de, businessNumberId) => avancarNoFluxoDinamico(fluxoRow.no_inicial_id, de, businessNumberId, fluxoRow.id),
+    fluxoBotoes,
+    lembreteMinutos: {}, // sem "espera"/lembrete de inatividade ainda — gap conhecido, ver README
+    lembreteTextos: {},
+    lembreteHandlers: {},
+  };
 }
 
 // Ponto de entrada padrão de um fluxo: por padrão manda o menu inicial na hora (função

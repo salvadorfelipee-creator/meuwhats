@@ -249,6 +249,137 @@ const TOOLS = [
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   },
   {
+    name: "fluxo_criar",
+    title: "Criar um fluxo de conversa novo (vazio, inativo)",
+    description:
+      "Cria um fluxo de conversa novo pra um número, ainda vazio e INATIVO — o número continua " +
+      "usando o fluxo padrão até você montar os nós (fluxo_no_criar) e ativar (fluxo_ativar). " +
+      "Só funciona em números que ainda não têm um fluxo fixo escrito no código do sistema.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        nome: { type: "string", description: "nome só pra identificar o fluxo, ex. 'Boas-vindas clínica'" },
+      },
+      required: ["business_id", "nome"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "fluxo_no_criar",
+    title: "Criar um nó dentro de um fluxo (mensagem ou ação)",
+    description:
+      "Cria um passo (nó) dentro de um fluxo. Tipo 'mensagem': manda um texto e PÁRA esperando " +
+      "resposta (adicione botões depois com fluxo_opcao_adicionar). Tipo 'acao': não manda " +
+      "mensagem nenhuma, só executa um efeito (adicionar tag ou mudar etapa do pipeline) e " +
+      "segue direto pro próximo nó (proximo_no_id) — útil pra marcar automaticamente sem a " +
+      "pessoa perceber. IMPORTANTE: ainda não existe nó de 'esperar X minutos' — só dá pra " +
+      "avançar por clique em botão.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        fluxo_id: { type: "number" },
+        tipo: { type: "string", enum: ["mensagem", "acao"] },
+        texto: { type: "string", description: "obrigatório se tipo=mensagem" },
+        acao_tipo: { type: "string", enum: ["tag", "pipeline"], description: "obrigatório se tipo=acao" },
+        acao_valor: {
+          type: "string",
+          description: "se acao_tipo=tag: id numérico da tag (como texto). se acao_tipo=pipeline: id da etapa, ex. 'novo_lead'",
+        },
+        proximo_no_id: { type: "number", description: "só faz sentido em nó tipo 'acao' (mensagem usa fluxo_opcao_adicionar)" },
+      },
+      required: ["fluxo_id", "tipo"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "fluxo_definir_no_inicial",
+    title: "Definir qual nó é o primeiro do fluxo",
+    description: "Define qual nó dispara quando a conversa começa (primeiro contato, ou a pessoa manda 'menu').",
+    inputSchema: {
+      type: "object",
+      properties: { fluxo_id: { type: "number" }, no_id: { type: "number" } },
+      required: ["fluxo_id", "no_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "fluxo_opcao_adicionar",
+    title: "Adicionar um botão a um nó de mensagem",
+    description:
+      "Adiciona um botão de resposta rápida a um nó tipo 'mensagem', levando a outro nó quando clicado. " +
+      "Limite de 3 botões por mensagem (regra do WhatsApp) — pra mais opções, use uma pergunta em texto " +
+      "livre em vez de botão (esta ferramenta não suporta captura de texto livre ainda).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        no_id: { type: "number", description: "nó tipo 'mensagem' que vai receber o botão" },
+        botao_id: { type: "string", description: "id curto e único, ex. 'sim', 'nao', 'agendar'" },
+        botao_titulo: { type: "string", description: "texto do botão, máx. 20 caracteres" },
+        proximo_no_id: { type: "number", description: "nó pra onde vai ao clicar" },
+      },
+      required: ["no_id", "botao_id", "botao_titulo", "proximo_no_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "fluxo_ativar",
+    title: "Ativar um fluxo (passa a valer pro número de verdade)",
+    description:
+      "Ativa este fluxo — desativa automaticamente qualquer outro fluxo dinâmico do mesmo número " +
+      "(só um ativo por vez). A partir daqui, conversas novas nesse número passam a usar este fluxo. " +
+      "Confira o grafo inteiro com fluxo_obter_grafo antes de ativar.",
+    inputSchema: {
+      type: "object",
+      properties: { fluxo_id: { type: "number" }, business_id: { type: "string" } },
+      required: ["fluxo_id", "business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "fluxo_desativar",
+    title: "Desativar um fluxo (volta pro atendimento padrão)",
+    description: "Desativa o fluxo — o número volta a usar o atendimento padrão do sistema até outro fluxo ser ativado.",
+    inputSchema: {
+      type: "object",
+      properties: { fluxo_id: { type: "number" } },
+      required: ["fluxo_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "fluxo_listar",
+    title: "Listar os fluxos de um número",
+    description: "Lista todos os fluxos dinâmicos já criados pra um número (ativos e inativos).",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" } },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "fluxo_obter_grafo",
+    title: "Ver o fluxo inteiro (todos os nós e botões)",
+    description:
+      "Retorna o fluxo completo — todo nó, seu texto/ação, e todos os botões com pra onde cada um leva. " +
+      "Use isto pra revisar antes de ativar, ou pra entender um fluxo já existente antes de editar.",
+    inputSchema: {
+      type: "object",
+      properties: { fluxo_id: { type: "number" } },
+      required: ["fluxo_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
     name: "ads_atualizar_status",
     title: "Pausar ou ativar campanha/conjunto/anúncio",
     description:
@@ -393,6 +524,70 @@ async function chamarFerramenta(nome, args, ctx) {
         campanhas.map(async (c) => ({ ...c, insights: await ctx.ads.obterInsights(c.id).catch(() => null) }))
       );
       return textoFerramenta({ campanhas: comInsights });
+    }
+
+    case "fluxo_criar": {
+      const fluxoId = await ctx.db.fluxoDinamicoCriar(a.business_id, a.nome);
+      return textoFerramenta({ fluxo_id: fluxoId });
+    }
+
+    case "fluxo_no_criar": {
+      if (a.tipo === "mensagem" && !a.texto) return erroFerramenta("Nó tipo 'mensagem' precisa de 'texto'.");
+      if (a.tipo === "acao" && !a.acao_tipo) return erroFerramenta("Nó tipo 'acao' precisa de 'acao_tipo' ('tag' ou 'pipeline').");
+      const noId = await ctx.db.fluxoNoCriar({
+        fluxoId: a.fluxo_id,
+        tipo: a.tipo,
+        texto: a.texto,
+        acaoTipo: a.acao_tipo,
+        acaoValor: a.acao_valor,
+        proximoNoId: a.proximo_no_id,
+      });
+      return textoFerramenta({ no_id: noId });
+    }
+
+    case "fluxo_definir_no_inicial": {
+      await ctx.db.fluxoDinamicoDefinirNoInicial(a.fluxo_id, a.no_id);
+      return textoFerramenta({ ok: true });
+    }
+
+    case "fluxo_opcao_adicionar": {
+      if ((a.botao_titulo || "").length > 20) return erroFerramenta("botao_titulo passa de 20 caracteres (limite do WhatsApp).");
+      const opcaoId = await ctx.db.fluxoOpcaoAdicionar({
+        noId: a.no_id,
+        botaoId: a.botao_id,
+        botaoTitulo: a.botao_titulo,
+        proximoNoId: a.proximo_no_id,
+      });
+      return textoFerramenta({ opcao_id: opcaoId });
+    }
+
+    case "fluxo_ativar": {
+      await ctx.db.fluxoDinamicoAtivar(a.fluxo_id, a.business_id);
+      return textoFerramenta({ ok: true });
+    }
+
+    case "fluxo_desativar": {
+      await ctx.db.fluxoDinamicoDesativar(a.fluxo_id);
+      return textoFerramenta({ ok: true });
+    }
+
+    case "fluxo_listar": {
+      const fluxos = await ctx.db.fluxoDinamicoListar(a.business_id);
+      return textoFerramenta({ fluxos });
+    }
+
+    case "fluxo_obter_grafo": {
+      const [nos, opcoes] = await Promise.all([
+        ctx.db.fluxoNosDoFluxo(a.fluxo_id),
+        ctx.db.fluxoOpcoesDoFluxo(a.fluxo_id),
+      ]);
+      const opcoesPorNo = {};
+      for (const o of opcoes) {
+        (opcoesPorNo[o.no_id] = opcoesPorNo[o.no_id] || []).push(o);
+      }
+      return textoFerramenta({
+        nos: nos.map((no) => ({ ...no, opcoes: opcoesPorNo[no.id] || [] })),
+      });
     }
 
     case "ads_atualizar_status": {

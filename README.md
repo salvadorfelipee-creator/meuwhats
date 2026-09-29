@@ -1076,9 +1076,23 @@ Ferramentas hoje (`mcp.js`, lista completa em `TOOLS`): `painel_listar_canais`,
 anúncio sai **sempre `PAUSED`** — ativar (`ads_atualizar_status`) é a única que liga gasto de
 verdade, de propósito separada das demais.
 
-**Não construído ainda**: editar o texto do fluxo automático do WhatsApp por IA — as mensagens
-do fluxo (Felipe, Ciahot, etc.) continuam fixas no código (`server.js`), não são dado editável
-no banco. Precisaria virar dado antes de dar pra IA mexer nisso.
+### Motor de fluxo dinâmico (2026-09-29) — criar fluxo novo por IA, sem código
+
+Os fluxos fixos (Felipe, Ciahot, CLT etc.) **continuam exatamente como estavam** — escritos
+em código, intocados, zero risco. O que existe agora é um motor **paralelo**, só pra número
+que ainda **não tem** fluxo fixo escrito (ex.: um número novo de cliente): o fluxo vira dado
+no banco (tabelas `fluxos_dinamicos`, `fluxo_nos`, `fluxo_opcoes`), e `getFluxo` (`server.js`)
+monta um adaptador compatível com o resto do dispatcher só quando não acha fluxo fixo pra
+aquele `business_id`.
+
+Ferramentas MCP: `fluxo_criar`, `fluxo_no_criar` (tipo `mensagem` ou `acao`: tag/pipeline),
+`fluxo_definir_no_inicial`, `fluxo_opcao_adicionar` (botão, máx. 3 por mensagem), `fluxo_ativar`
+(só 1 ativo por número), `fluxo_desativar`, `fluxo_listar`, `fluxo_obter_grafo`.
+
+**Gaps conhecidos do V1**: sem nó de "esperar X minutos" (só avança por clique de botão, sem
+lembrete de inatividade); sem captura de texto livre (só botão); editar o texto de um fluxo
+FIXO (Felipe/Ciahot/CLT) continua exigindo migrar aquele fluxo especificamente pra esse motor
+— não foi feito pra nenhum dos fluxos existentes, só serve pra número novo.
 
 ---
 

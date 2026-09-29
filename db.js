@@ -197,6 +197,62 @@ const ready = (async () => {
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_conversation_tags_tag ON conversation_tags(tag_id)`);
 
+  // Motor de fluxo dinâmico (dado no banco, não código) — usado só por número que NÃO tem
+  // fluxo fixo escrito em server.js (ver getFluxo). V1: nó 'mensagem' (com botões via
+  // fluxo_opcoes) e 'acao' (tag/pipeline); gatilho por palavra-chave ou primeiro contato.
+  // SEM 'espera'/lembrete de inatividade ainda (gap conhecido, ver README).
+  await client.execute(`CREATE TABLE IF NOT EXISTS fluxos_dinamicos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    ativo INTEGER NOT NULL DEFAULT 0,
+    no_inicial_id INTEGER,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_fluxos_dinamicos_business ON fluxos_dinamicos(business_id, ativo)`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS fluxo_nos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fluxo_id INTEGER NOT NULL,
+    tipo TEXT NOT NULL,
+    texto TEXT,
+    acao_tipo TEXT,
+    acao_valor TEXT,
+    proximo_no_id INTEGER,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_fluxo_nos_fluxo ON fluxo_nos(fluxo_id)`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS fluxo_opcoes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    no_id INTEGER NOT NULL,
+    botao_id TEXT NOT NULL,
+    botao_titulo TEXT NOT NULL,
+    proximo_no_id INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_fluxo_opcoes_no ON fluxo_opcoes(no_id)`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS fluxo_gatilhos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    valor TEXT,
+    fluxo_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_fluxo_gatilhos_business ON fluxo_gatilhos(business_id)`);
+
+  // Onde cada contato está dentro de um fluxo dinâmico — separado do `conversations.fluxo_passo`
+  // legado (esse continua sendo string livre, usado pelos fluxos fixos).
+  await client.execute(`CREATE TABLE IF NOT EXISTS fluxo_estado_contato (
+    business_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    fluxo_id INTEGER NOT NULL,
+    no_atual_id INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (business_id, phone)
+  )`);
+
   await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     atalho TEXT NOT NULL,
@@ -724,6 +780,134 @@ async function tagsDaConversa(businessNumberId, phone) {
     args: [businessNumberId, phone],
   });
   return result.rows;
+}
+
+// ─── Motor de fluxo dinâmico (ver mcp.js/getFluxo em server.js) ────────────────────────────
+async function fluxoDinamicoCriar(businessId, nome) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO fluxos_dinamicos (business_id, nome, ativo, created_at) VALUES (?, ?, 0, ?)`,
+    args: [businessId, nome, Date.now()],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+async function fluxoDinamicoAtivo(businessId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM fluxos_dinamicos WHERE business_id = ? AND ativo = 1 LIMIT 1`,
+    args: [businessId],
+  });
+  return result.rows[0] || null;
+}
+
+async function fluxoDinamicoListar(businessId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM fluxos_dinamicos WHERE business_id = ? ORDER BY created_at DESC`,
+    args: [businessId],
+  });
+  return result.rows;
+}
+
+async function fluxoDinamicoDefinirNoInicial(fluxoId, noId) {
+  await ready;
+  await client.execute({ sql: `UPDATE fluxos_dinamicos SET no_inicial_id = ? WHERE id = ?`, args: [noId, fluxoId] });
+}
+
+// Só um fluxo ativo por número por vez — ativar este desativa qualquer outro do mesmo negócio.
+async function fluxoDinamicoAtivar(fluxoId, businessId) {
+  await ready;
+  await client.execute({ sql: `UPDATE fluxos_dinamicos SET ativo = 0 WHERE business_id = ?`, args: [businessId] });
+  await client.execute({ sql: `UPDATE fluxos_dinamicos SET ativo = 1 WHERE id = ?`, args: [fluxoId] });
+}
+
+async function fluxoDinamicoDesativar(fluxoId) {
+  await ready;
+  await client.execute({ sql: `UPDATE fluxos_dinamicos SET ativo = 0 WHERE id = ?`, args: [fluxoId] });
+}
+
+async function fluxoNoCriar({ fluxoId, tipo, texto, acaoTipo, acaoValor, proximoNoId }) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO fluxo_nos (fluxo_id, tipo, texto, acao_tipo, acao_valor, proximo_no_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    args: [fluxoId, tipo, texto || null, acaoTipo || null, acaoValor || null, proximoNoId || null, Date.now()],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+async function fluxoNosDoFluxo(fluxoId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM fluxo_nos WHERE fluxo_id = ? ORDER BY id ASC`, args: [fluxoId] });
+  return result.rows;
+}
+
+async function fluxoNoObter(noId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM fluxo_nos WHERE id = ?`, args: [noId] });
+  return result.rows[0] || null;
+}
+
+async function fluxoOpcaoAdicionar({ noId, botaoId, botaoTitulo, proximoNoId }) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO fluxo_opcoes (no_id, botao_id, botao_titulo, proximo_no_id) VALUES (?, ?, ?, ?)`,
+    args: [noId, botaoId, botaoTitulo, proximoNoId],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+async function fluxoOpcoesDoNo(noId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM fluxo_opcoes WHERE no_id = ?`, args: [noId] });
+  return result.rows;
+}
+
+// Todos os botões de TODOS os nós do fluxo, de uma vez — usado pra montar o roteador
+// fluxoBotoes inteiro num único carregamento (ver getFluxo em server.js).
+async function fluxoOpcoesDoFluxo(fluxoId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT fo.* FROM fluxo_opcoes fo JOIN fluxo_nos fn ON fn.id = fo.no_id WHERE fn.fluxo_id = ?`,
+    args: [fluxoId],
+  });
+  return result.rows;
+}
+
+async function fluxoGatilhoCriar({ businessId, tipo, valor, fluxoId }) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO fluxo_gatilhos (business_id, tipo, valor, fluxo_id, created_at) VALUES (?, ?, ?, ?, ?)`,
+    args: [businessId, tipo, valor || null, fluxoId, Date.now()],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+async function fluxoGatilhosDoNegocio(businessId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM fluxo_gatilhos WHERE business_id = ?`, args: [businessId] });
+  return result.rows;
+}
+
+async function fluxoEstadoContatoObter(businessId, phone) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM fluxo_estado_contato WHERE business_id = ? AND phone = ?`,
+    args: [businessId, phone],
+  });
+  return result.rows[0] || null;
+}
+
+async function fluxoEstadoContatoDefinir(businessId, phone, fluxoId, noId) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO fluxo_estado_contato (business_id, phone, fluxo_id, no_atual_id, updated_at)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT (business_id, phone) DO UPDATE SET fluxo_id = excluded.fluxo_id,
+            no_atual_id = excluded.no_atual_id, updated_at = excluded.updated_at`,
+    args: [businessId, phone, fluxoId, noId, Date.now()],
+  });
 }
 
 async function atualizarNotaConversa(phone, businessNumberId, nota) {
@@ -1827,6 +2011,22 @@ async function whatsappFalhasRecentes(businessNumberId, desdeMs) {
 }
 
 module.exports = {
+  fluxoDinamicoCriar,
+  fluxoDinamicoAtivo,
+  fluxoDinamicoListar,
+  fluxoDinamicoDefinirNoInicial,
+  fluxoDinamicoAtivar,
+  fluxoDinamicoDesativar,
+  fluxoNoCriar,
+  fluxoNosDoFluxo,
+  fluxoNoObter,
+  fluxoOpcaoAdicionar,
+  fluxoOpcoesDoNo,
+  fluxoOpcoesDoFluxo,
+  fluxoGatilhoCriar,
+  fluxoGatilhosDoNegocio,
+  fluxoEstadoContatoObter,
+  fluxoEstadoContatoDefinir,
   upsertConversation,
   getConversation,
   getUltimaMensagemRecebida,
