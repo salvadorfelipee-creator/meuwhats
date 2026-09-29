@@ -121,6 +121,26 @@ const TOOLS = [
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
+    name: "analytics_resumo",
+    title: "Métricas reais de atendimento de um número (conversas, tempo de resposta, etc.)",
+    description:
+      "Retorna métricas reais de um número num período: total de conversas, conversas novas, " +
+      "resolvidas, tempo médio de resposta humana, tempo médio de resolução, distribuição por " +
+      "status/tag/etapa do pipeline e volume por dia. Chame uma vez por número (ver " +
+      "painel_listar_canais) pra montar uma comparação entre vários números. NÃO inclui CSAT " +
+      "nem produtividade por atendente — isso ainda não é medido pelo sistema, não invente.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        dias: { type: "number", minimum: 1, maximum: 365, default: 30 },
+      },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
     name: "ads_pesquisar_publico",
     title: "Pesquisar cargo/interesse/localização pra segmentação de anúncio",
     description:
@@ -458,6 +478,14 @@ async function chamarFerramenta(nome, args, ctx) {
     case "agenda_listar_posts": {
       const posts = await ctx.agenda.listarRecentes(a.limite || 30);
       return textoFerramenta({ posts });
+    }
+
+    case "analytics_resumo": {
+      const dias = Math.max(1, Math.min(365, Number(a.dias) || 30));
+      const ate = Date.now();
+      const desde = ate - dias * 24 * 60 * 60 * 1000;
+      const dados = await ctx.db.analyticsResumo(a.business_id, desde, ate);
+      return textoFerramenta({ ...dados, dias, desde, ate });
     }
 
     case "ads_pesquisar_publico": {
