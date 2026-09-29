@@ -121,6 +121,149 @@ const TOOLS = [
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   },
   {
+    name: "email_listar_templates",
+    title: "Listar templates de e-mail",
+    description: "Lista os templates de e-mail (assunto + corpo) já criados pra um número/negócio.",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" } },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "email_criar_template",
+    title: "Criar template de e-mail",
+    description:
+      "Cria um template de e-mail (assunto + corpo em HTML). Use {{nome}} no assunto ou no corpo " +
+      "pra ser trocado automaticamente pelo nome do destinatário na hora de enviar.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        nome: { type: "string", description: "nome só pra identificar o template, ex. 'Aniversário'" },
+        assunto: { type: "string" },
+        corpo_html: { type: "string", description: "corpo do e-mail em HTML simples" },
+      },
+      required: ["business_id", "nome", "assunto", "corpo_html"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "email_agendar_campanha",
+    title: "Agendar campanha de e-mail em massa",
+    description:
+      "Agenda o envio de UM template de e-mail pra uma lista de destinatários, cada um com seu " +
+      "próprio horário. Mesma lógica da campanha de WhatsApp, mas por e-mail — não manda nada " +
+      "na hora, só agenda.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        template_id: { type: "number" },
+        contatos: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              email: { type: "string" },
+              nome: { type: "string" },
+              data_hora: { type: "string", description: "AAAA-MM-DDTHH:MM, horário de Brasília" },
+            },
+            required: ["email", "data_hora"],
+          },
+          minItems: 1,
+        },
+      },
+      required: ["business_id", "template_id", "contatos"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  },
+  {
+    name: "email_listar_pendentes",
+    title: "Listar e-mails agendados ainda não enviados",
+    description: "Lista a fila de e-mails agendados e ainda não enviados, pra um número/negócio.",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" } },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "email_enviar_avulso",
+    title: "Mandar e-mail avulso pro contato de uma conversa",
+    description:
+      "Manda um e-mail AGORA (não agendado) pro e-mail salvo de uma conversa específica, usando " +
+      "um template existente. Só funciona se a conversa já tiver e-mail salvo (verifique antes " +
+      "com painel_listar_canais/histórico — se não tiver, essa ferramenta retorna erro claro).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        phone: { type: "string" },
+        template_id: { type: "number" },
+      },
+      required: ["business_id", "phone", "template_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  },
+  {
+    name: "retorno_criar",
+    title: "Agendar um retorno/lembrete pra uma conversa (WhatsApp e/ou e-mail)",
+    description:
+      "Agenda um retorno futuro pra uma conversa específica — ex. 'falar de novo em 6 meses', " +
+      "'aniversário', 'lembrete de reunião'. canal='whatsapp' manda um template aprovado (exige " +
+      "whatsapp_template); canal='email' manda um template de e-mail pro e-mail salvo da conversa " +
+      "(exige email_template_id, e a conversa precisa ter e-mail salvo); canal='ambos' faz os dois " +
+      "no mesmo horário.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        phone: { type: "string" },
+        tipo: { type: "string", description: "rótulo livre, ex. 'retorno', 'aniversario', 'reuniao'", default: "retorno" },
+        data_hora: { type: "string", description: "AAAA-MM-DDTHH:MM, horário de Brasília" },
+        canal: { type: "string", enum: ["whatsapp", "email", "ambos"] },
+        whatsapp_template: { type: "string", description: "obrigatório se canal inclui whatsapp" },
+        whatsapp_language: { type: "string", default: "pt_BR" },
+        email_template_id: { type: "number", description: "obrigatório se canal inclui email" },
+      },
+      required: ["business_id", "phone", "data_hora", "canal"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  },
+  {
+    name: "retorno_listar",
+    title: "Listar retornos agendados e ainda não enviados",
+    description: "Lista todos os retornos pendentes de um número/negócio, ordenados por data — não filtra por conversa.",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" } },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "retorno_cancelar",
+    title: "Cancelar um retorno agendado",
+    description: "Cancela um retorno que ainda não foi enviado (pelo id retornado em retorno_criar ou retorno_listar).",
+    inputSchema: {
+      type: "object",
+      properties: { retorno_id: { type: "number" } },
+      required: ["retorno_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
     name: "analytics_resumo",
     title: "Métricas reais de atendimento de um número (conversas, tempo de resposta, etc.)",
     description:
@@ -497,6 +640,81 @@ async function chamarFerramenta(nome, args, ctx) {
     case "agenda_listar_posts": {
       const posts = await ctx.agenda.listarRecentes(a.limite || 30);
       return textoFerramenta({ posts });
+    }
+
+    case "email_listar_templates": {
+      const templates = await ctx.db.emailTemplatesListar(a.business_id);
+      return textoFerramenta({ templates });
+    }
+
+    case "email_criar_template": {
+      const id = await ctx.db.emailTemplateCriar({
+        businessId: a.business_id,
+        nome: a.nome,
+        assunto: a.assunto,
+        corpoHtml: a.corpo_html,
+      });
+      return textoFerramenta({ template_id: id });
+    }
+
+    case "email_agendar_campanha": {
+      if (!Array.isArray(a.contatos) || !a.contatos.length) return erroFerramenta("Informe ao menos um contato.");
+      const itens = a.contatos.map((c) => ({
+        email: c.email,
+        nome: c.nome || null,
+        templateId: a.template_id,
+        agendadoPara: ctx.agenda.timestampDeDataHora(c.data_hora),
+      }));
+      const agendados = await ctx.db.emailAgendarLote(a.business_id, itens);
+      return textoFerramenta({ agendados });
+    }
+
+    case "email_listar_pendentes": {
+      const fila = await ctx.db.emailListarPendentes(a.business_id);
+      return textoFerramenta({ fila });
+    }
+
+    case "email_enviar_avulso": {
+      const conversa = await ctx.db.getConversation(a.phone, a.business_id);
+      if (!conversa?.email) return erroFerramenta("Essa conversa não tem e-mail salvo.");
+      const template = await ctx.db.emailTemplateObter(a.template_id);
+      if (!template) return erroFerramenta(`Template ${a.template_id} não encontrado.`);
+      const nome = conversa.name || "Cliente";
+      const assunto = template.assunto.replace(/\{\{nome\}\}/g, nome);
+      const html = template.corpo_html.replace(/\{\{nome\}\}/g, nome);
+      await ctx.enviarEmail({ to: conversa.email, toNome: nome, subject: assunto, html });
+      return textoFerramenta({ ok: true });
+    }
+
+    case "retorno_criar": {
+      if ((a.canal === "whatsapp" || a.canal === "ambos") && !a.whatsapp_template) {
+        return erroFerramenta("canal inclui whatsapp — informe whatsapp_template.");
+      }
+      if ((a.canal === "email" || a.canal === "ambos") && !a.email_template_id) {
+        return erroFerramenta("canal inclui email — informe email_template_id.");
+      }
+      const id = await ctx.db.retornoCriar({
+        businessId: a.business_id,
+        phone: a.phone,
+        tipo: a.tipo || "retorno",
+        dataAgendada: ctx.agenda.timestampDeDataHora(a.data_hora),
+        canal: a.canal,
+        whatsappTemplate: a.whatsapp_template,
+        whatsappLanguage: a.whatsapp_language || "pt_BR",
+        emailTemplateId: a.email_template_id,
+      });
+      return textoFerramenta({ retorno_id: id });
+    }
+
+    case "retorno_listar": {
+      const retornos = await ctx.db.retornoListarPendentes(a.business_id);
+      return textoFerramenta({ retornos });
+    }
+
+    case "retorno_cancelar": {
+      const ok = await ctx.db.retornoCancelar(a.retorno_id);
+      if (!ok) return erroFerramenta("Não deu pra cancelar — já foi enviado ou já está sendo enviado agora.");
+      return textoFerramenta({ ok: true });
     }
 
     case "analytics_resumo": {

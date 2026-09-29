@@ -20,7 +20,7 @@ const unnotech = require("./unnotech");
 const flowCrypto = require("./flow-crypto");
 const google = require("./google");
 const mcp = require("./mcp");
-const { notificarLeadCotaCerta, enviarBoasVindasFelizcred } = require("./email");
+const { notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarEmail } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -934,6 +934,9 @@ async function capturarContatoEBoasVindas(de, businessNumberId, nome, email, pre
     console.error("Erro ao marcar contato salvo:", err.message);
     return; // sem marcar, melhor não tentar criar/enviar (evita duplicar numa corrida)
   }
+  // Salva na conversa (não só no Google Contacts) pra reusar depois em retorno/campanha de
+  // e-mail sem precisar pedir de novo — ver atualizarEmailConversa/retornos.
+  db.atualizarEmailConversa(de, businessNumberId, email).catch((err) => console.error("Erro ao salvar e-mail na conversa:", err.message));
   try {
     const nomeGoogle = prefixo && nome ? `${prefixo} - ${nome}` : prefixo ? prefixo : nome;
     await google.criarContato({ nome: nomeGoogle, telefone: de, email });
@@ -3986,6 +3989,7 @@ const server = http.createServer(async (req, res) => {
         resolverWabaDoNumero,
         normalizarTelefoneBR,
         enviarUmBroadcast,
+        enviarEmail,
       });
       if (resposta === null) return send(res, 202, "");
       return send(res, 200, resposta);
@@ -4710,6 +4714,136 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "DELETE" && matchBroadcastCancelar) {
       if (!requireAuth(req, res)) return;
       const ok = await db.broadcastCancelar(Number(matchBroadcastCancelar[1]));
+      if (!ok) return send(res, 409, { error: "Não deu pra cancelar — já foi enviado ou já está sendo enviado agora" });
+      return send(res, 200, { ok: true });
+    }
+
+    // ── E-mail (Brevo) — templates, campanha em massa, e-mail avulso de conversa ────────────
+    const matchEmailTemplates = path_.match(/^\/painel\/api\/email-templates\/([^/]+)$/);
+    if (req.method === "GET" && matchEmailTemplates) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.emailTemplatesListar(decodeURIComponent(matchEmailTemplates[1])));
+    }
+    if (req.method === "POST" && matchEmailTemplates) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.nome || !body.assunto || !body.corpoHtml) return send(res, 400, { error: "Informe nome, assunto e corpoHtml" });
+      const id = await db.emailTemplateCriar({
+        businessId: decodeURIComponent(matchEmailTemplates[1]),
+        nome: body.nome,
+        assunto: body.assunto,
+        corpoHtml: body.corpoHtml,
+      });
+      return send(res, 200, { id });
+    }
+
+    const matchEmailTemplateDel = path_.match(/^\/painel\/api\/email-templates\/([^/]+)\/(\d+)$/);
+    if (req.method === "DELETE" && matchEmailTemplateDel) {
+      if (!requireAuth(req, res)) return;
+      await db.emailTemplateApagar(Number(matchEmailTemplateDel[2]));
+      return send(res, 200, { ok: true });
+    }
+
+    // POST /painel/api/email-campanha/:businessId — agenda envio em massa de um template pra
+    // uma lista de contatos (body: { templateId, contacts: [{ email, nome, agendadoPara }] }).
+    const matchEmailCampanha = path_.match(/^\/painel\/api\/email-campanha\/([^/]+)$/);
+    if (req.method === "POST" && matchEmailCampanha) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchEmailCampanha[1]);
+      const body = await parseBody(req);
+      const itens = (Array.isArray(body.contacts) ? body.contacts : []).map((c) => ({
+        email: c.email,
+        nome: c.nome || null,
+        templateId: Number(body.templateId),
+        agendadoPara: Number(c.agendadoPara),
+      }));
+      if (!itens.length || itens.some((i) => !i.email || !i.templateId || !Number.isFinite(i.agendadoPara))) {
+        return send(res, 400, { error: "Cada contato precisa de email e agendadoPara (ms); informe templateId" });
+      }
+      const agendados = await db.emailAgendarLote(businessId, itens);
+      return send(res, 200, { agendados });
+    }
+
+    const matchEmailFila = path_.match(/^\/painel\/api\/email-fila\/([^/]+)$/);
+    if (req.method === "GET" && matchEmailFila) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.emailListarPendentes(decodeURIComponent(matchEmailFila[1])));
+    }
+
+    const matchEmailCancelar = path_.match(/^\/painel\/api\/email-fila\/item\/(\d+)$/);
+    if (req.method === "DELETE" && matchEmailCancelar) {
+      if (!requireAuth(req, res)) return;
+      const ok = await db.emailCancelar(Number(matchEmailCancelar[1]));
+      if (!ok) return send(res, 409, { error: "Não deu pra cancelar — já foi enviado ou já está sendo enviado agora" });
+      return send(res, 200, { ok: true });
+    }
+
+    // POST /painel/api/conversations/:businessId/:phone/email-avulso — manda um e-mail único
+    // (não agendado) pro e-mail salvo dessa conversa, usando um template existente.
+    const matchEmailAvulso = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/email-avulso$/);
+    if (req.method === "POST" && matchEmailAvulso) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchEmailAvulso[1]);
+      const phone = decodeURIComponent(matchEmailAvulso[2]);
+      const body = await parseBody(req);
+      try {
+        const conversa = await db.getConversation(phone, businessId);
+        if (!conversa?.email) return send(res, 400, { error: "Essa conversa não tem e-mail salvo" });
+        const template = await db.emailTemplateObter(Number(body.templateId));
+        if (!template) return send(res, 404, { error: "Template não encontrado" });
+        const nome = conversa.name || "Cliente";
+        const assunto = template.assunto.replace(/\{\{nome\}\}/g, nome);
+        const html = template.corpo_html.replace(/\{\{nome\}\}/g, nome);
+        await enviarEmail({ to: conversa.email, toNome: nome, subject: assunto, html });
+        return send(res, 200, { ok: true });
+      } catch (err) {
+        return send(res, 502, { error: err.message });
+      }
+    }
+
+    // ── Retornos (lembrete agendado por conversa — WhatsApp e/ou e-mail) ───────────────────
+    // POST /painel/api/conversations/:businessId/:phone/retorno — cria um retorno pra essa
+    // conversa (body: { tipo?, dataAgendada, canal, whatsappTemplate?, whatsappLanguage?, emailTemplateId? }).
+    const matchRetornoCriar = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/retorno$/);
+    if (req.method === "POST" && matchRetornoCriar) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchRetornoCriar[1]);
+      const phone = decodeURIComponent(matchRetornoCriar[2]);
+      const body = await parseBody(req);
+      if (!body.dataAgendada || !body.canal) return send(res, 400, { error: "Informe dataAgendada (ms) e canal" });
+      const id = await db.retornoCriar({
+        businessId,
+        phone,
+        tipo: body.tipo,
+        dataAgendada: Number(body.dataAgendada),
+        canal: body.canal,
+        whatsappTemplate: body.whatsappTemplate,
+        whatsappLanguage: body.whatsappLanguage,
+        emailTemplateId: body.emailTemplateId,
+      });
+      return send(res, 200, { id });
+    }
+
+    const matchRetornosConversa = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/retornos$/);
+    if (req.method === "GET" && matchRetornosConversa) {
+      if (!requireAuth(req, res)) return;
+      return send(
+        res,
+        200,
+        await db.retornoListarPorConversa(decodeURIComponent(matchRetornosConversa[1]), decodeURIComponent(matchRetornosConversa[2]))
+      );
+    }
+
+    const matchRetornosNegocio = path_.match(/^\/painel\/api\/retornos\/([^/]+)$/);
+    if (req.method === "GET" && matchRetornosNegocio) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.retornoListarPendentes(decodeURIComponent(matchRetornosNegocio[1])));
+    }
+
+    const matchRetornoCancelar = path_.match(/^\/painel\/api\/retornos\/item\/(\d+)$/);
+    if (req.method === "DELETE" && matchRetornoCancelar) {
+      if (!requireAuth(req, res)) return;
+      const ok = await db.retornoCancelar(Number(matchRetornoCancelar[1]));
       if (!ok) return send(res, 409, { error: "Não deu pra cancelar — já foi enviado ou já está sendo enviado agora" });
       return send(res, 200, { ok: true });
     }
@@ -5504,6 +5638,81 @@ setInterval(async () => {
     }
   } catch (err) {
     console.error("Erro no agendador de broadcast intercalado:", err.message);
+  }
+}, 20 * 1000);
+
+// ─── AGENDADOR DE CAMPANHA DE E-MAIL (Brevo) ────────────────────────────────
+// Mesmo desenho do broadcast de WhatsApp acima, só que pra emails_agendados. {{nome}} no
+// assunto/corpo do template é trocado pelo nome do destinatário (ou "Cliente" se não tiver).
+setInterval(async () => {
+  try {
+    for (let i = 0; i < 20; i++) {
+      const item = await db.emailProximoDevido();
+      if (!item) break;
+      try {
+        const template = await db.emailTemplateObter(item.template_id);
+        if (!template) throw new Error("template de e-mail não existe mais");
+        const nome = item.destinatario_nome || "Cliente";
+        const assunto = template.assunto.replace(/\{\{nome\}\}/g, nome);
+        const html = template.corpo_html.replace(/\{\{nome\}\}/g, nome);
+        await enviarEmail({ to: item.destinatario_email, toNome: nome, subject: assunto, html });
+        await db.emailMarcarEnviado(item.id);
+      } catch (err) {
+        await db.emailMarcarErro(item.id, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no agendador de campanha de e-mail:", err.message);
+  }
+}, 20 * 1000);
+
+// ─── AGENDADOR DE RETORNOS (lembrete por conversa — WhatsApp e/ou e-mail) ───────────────────
+// canal 'whatsapp': manda o template aprovado (mesma trava anti-reenvio de enviarUmBroadcast).
+// canal 'email': usa o e-mail salvo na conversa (ver atualizarEmailConversa) — se não tiver
+// e-mail salvo, marca erro em vez de falhar silenciosamente. 'ambos': tenta os dois; só marca
+// erro se AMBOS falharem (mesmo critério de "sucesso parcial conta como sucesso" já usado no
+// publicador da Agenda).
+setInterval(async () => {
+  try {
+    for (let i = 0; i < 20; i++) {
+      const item = await db.retornoProximoDevido();
+      if (!item) break;
+      const erros = [];
+      let algumSucesso = false;
+
+      if (item.canal === "whatsapp" || item.canal === "ambos") {
+        const conversa = await db.getConversation(item.phone, item.business_id);
+        const resultado = await enviarUmBroadcast(item.business_id, {
+          phone: item.phone,
+          name: conversa?.name,
+          template: item.whatsapp_template,
+          language: item.whatsapp_language,
+        });
+        if (resultado.ok) algumSucesso = true;
+        else erros.push(`whatsapp: ${resultado.error}`);
+      }
+
+      if (item.canal === "email" || item.canal === "ambos") {
+        try {
+          const conversa = await db.getConversation(item.phone, item.business_id);
+          if (!conversa?.email) throw new Error("conversa sem e-mail salvo");
+          const template = await db.emailTemplateObter(item.email_template_id);
+          if (!template) throw new Error("template de e-mail não existe mais");
+          const nome = conversa.name || "Cliente";
+          const assunto = template.assunto.replace(/\{\{nome\}\}/g, nome);
+          const html = template.corpo_html.replace(/\{\{nome\}\}/g, nome);
+          await enviarEmail({ to: conversa.email, toNome: nome, subject: assunto, html });
+          algumSucesso = true;
+        } catch (err) {
+          erros.push(`email: ${err.message}`);
+        }
+      }
+
+      if (algumSucesso) await db.retornoMarcarEnviado(item.id);
+      else await db.retornoMarcarErro(item.id, erros.join("; ") || "erro desconhecido");
+    }
+  } catch (err) {
+    console.error("Erro no agendador de retornos:", err.message);
   }
 }, 20 * 1000);
 

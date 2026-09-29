@@ -1072,9 +1072,28 @@ Ferramentas hoje (`mcp.js`, lista completa em `TOOLS`): `painel_listar_canais`,
 `agenda_publicar_post` (só texto/link, sem imagem ainda), `agenda_listar_posts`,
 `ads_pesquisar_publico`, `ads_estimar_publico`, `ads_criar_campanha`,
 `ads_criar_conjunto_anuncios`, `ads_criar_criativo_de_post_instagram`, `ads_criar_anuncio`,
-`ads_listar_campanhas`, `ads_atualizar_status`. Toda ferramenta de criar campanha/conjunto/
-anúncio sai **sempre `PAUSED`** — ativar (`ads_atualizar_status`) é a única que liga gasto de
-verdade, de propósito separada das demais.
+`ads_listar_campanhas`, `ads_atualizar_status`, `analytics_resumo`, `fluxo_criar`,
+`fluxo_no_criar`, `fluxo_definir_no_inicial`, `fluxo_opcao_adicionar`, `fluxo_ativar`,
+`fluxo_desativar`, `fluxo_listar`, `fluxo_obter_grafo`, `fluxo_apagar`,
+`email_listar_templates`, `email_criar_template`, `email_agendar_campanha`,
+`email_listar_pendentes`, `email_enviar_avulso`, `retorno_criar`, `retorno_listar`,
+`retorno_cancelar`. Toda ferramenta de criar campanha/conjunto/anúncio sai **sempre `PAUSED`**
+— ativar (`ads_atualizar_status`) é a única que liga gasto de verdade, de propósito separada
+das demais.
+
+### E-mail (Brevo) — templates, campanha em massa e retornos (2026-09-29)
+
+`email.js` já existia (2 e-mails automáticos fixos via Brevo). Virou também uma peça de
+marketing igual ao WhatsApp: `email_templates` (assunto+HTML, nosso banco — não depende de
+criar template dentro do painel do Brevo), `emails_agendados` (fila de campanha em massa,
+mesmo desenho do `broadcast_agendado`, processada por um `setInterval` próprio a cada 20s), e
+`conversations.email` (persistido a partir de `capturarContatoEBoasVindas`, reusado depois).
+
+**Retornos** (tabela `retornos`): lembrete agendado por conversa (ex.: "falar de novo em 6
+meses", aniversário, lembrete de reunião) — `canal` define o que dispara: `whatsapp` (template
+aprovado, mesma trava anti-reenvio do broadcast), `email` (via `email_templates`, exige e-mail
+salvo na conversa) ou `ambos`. Processado por outro `setInterval` próprio (20s); sucesso em
+pelo menos um canal já marca como enviado (mesmo critério de "sucesso parcial" da Agenda).
 
 ### Motor de fluxo dinâmico (2026-09-29) — criar fluxo novo por IA, sem código
 

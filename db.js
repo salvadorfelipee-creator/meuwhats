@@ -162,6 +162,12 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "resolvido_em")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN resolvido_em INTEGER`);
   }
+  // email do contato — capturado em alguns fluxos (ver capturarContatoEBoasVindas) mas até
+  // 2026-09-29 nunca era salvo na conversa, só usado na hora e descartado. Guardar aqui
+  // permite reusar pra retorno/campanha de e-mail sem pedir nome de novo.
+  if (!infoConversations.rows.some((r) => r.name === "email")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN email TEXT`);
+  }
   // pipeline_estagio = etapa atual da conversa no funil de atendimento/vendas (texto livre,
   // ver PIPELINE_ESTAGIOS no painel) — separado do `status` (que é só novo/andamento/resolvido).
   // Só usado hoje no número principal da Felizcred (ver ANALYTICS_BUSINESS_ID em server.js).
@@ -252,6 +258,57 @@ const ready = (async () => {
     updated_at INTEGER NOT NULL,
     PRIMARY KEY (business_id, phone)
   )`);
+
+  // Templates de e-mail (assunto + HTML) guardados no NOSSO banco — não dependemos do usuário
+  // criar template dentro do próprio painel do Brevo (que a gente só usa como motor de envio,
+  // via email.js/enviarEmail).
+  await client.execute(`CREATE TABLE IF NOT EXISTS email_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    assunto TEXT NOT NULL,
+    corpo_html TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
+
+  // Fila de campanha de e-mail em massa — mesmo desenho do broadcast_agendado (WhatsApp),
+  // processada por um setInterval próprio (ver server.js).
+  await client.execute(`CREATE TABLE IF NOT EXISTS emails_agendados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    destinatario_email TEXT NOT NULL,
+    destinatario_nome TEXT,
+    template_id INTEGER NOT NULL,
+    agendado_para INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    erro TEXT,
+    claimed_at INTEGER,
+    sent_at INTEGER,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_emails_agendados_status ON emails_agendados(status, agendado_para)`);
+
+  // Retorno/lembrete agendado por conversa (ex.: "voltar a falar em 6 meses", "aniversário",
+  // "lembrete de reunião") — canal define o que dispara: 'whatsapp' (exige template aprovado,
+  // fora da janela de 24h), 'email' (via email_templates) ou 'ambos'. Processado por um
+  // setInterval próprio, separado do broadcast/email em massa (é por conversa, não por lote).
+  await client.execute(`CREATE TABLE IF NOT EXISTS retornos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    tipo TEXT NOT NULL DEFAULT 'retorno',
+    data_agendada INTEGER NOT NULL,
+    canal TEXT NOT NULL DEFAULT 'whatsapp',
+    whatsapp_template TEXT,
+    whatsapp_language TEXT,
+    email_template_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    erro TEXT,
+    claimed_at INTEGER,
+    enviado_em INTEGER,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_retornos_status ON retornos(status, data_agendada)`);
 
   await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1877,6 +1934,183 @@ async function broadcastCancelar(id) {
   return result.rowsAffected > 0;
 }
 
+// ─── E-mail (Brevo) — templates, campanha em massa e persistência do e-mail do contato ─────
+async function atualizarEmailConversa(phone, businessNumberId, email) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET email = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [email || null, phone, businessNumberId],
+  });
+}
+
+async function emailTemplateCriar({ businessId, nome, assunto, corpoHtml }) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO email_templates (business_id, nome, assunto, corpo_html, created_at) VALUES (?, ?, ?, ?, ?)`,
+    args: [businessId, nome, assunto, corpoHtml, Date.now()],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+async function emailTemplatesListar(businessId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM email_templates WHERE business_id = ? ORDER BY nome COLLATE NOCASE`,
+    args: [businessId],
+  });
+  return result.rows;
+}
+
+async function emailTemplateObter(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM email_templates WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+async function emailTemplateApagar(id) {
+  await ready;
+  await client.execute({ sql: `DELETE FROM email_templates WHERE id = ?`, args: [id] });
+}
+
+async function emailAgendarLote(businessId, itens) {
+  await ready;
+  const agora = Date.now();
+  for (const item of itens) {
+    await client.execute({
+      sql: `INSERT INTO emails_agendados (business_id, destinatario_email, destinatario_nome, template_id, agendado_para, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [businessId, item.email, item.nome || null, item.templateId, item.agendadoPara, agora],
+    });
+  }
+  return itens.length;
+}
+
+// Mesma trava anti-corrida de broadcastProximoDevido/agendaProximoDevido — marca 'processing'
+// com claimed_at antes de mandar, pra dois ticks do setInterval não mandarem o mesmo e-mail
+// duas vezes se o envio anterior demorar mais que o intervalo do agendador.
+async function emailProximoDevido() {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `SELECT * FROM emails_agendados
+          WHERE (status = 'pending' AND agendado_para <= ?)
+             OR (status = 'processing' AND claimed_at <= ?)
+          ORDER BY agendado_para ASC LIMIT 1`,
+    args: [agora, agora - PROCESSING_ORFAO_MS],
+  });
+  const item = result.rows[0];
+  if (!item) return null;
+  const claim = await client.execute({
+    sql: `UPDATE emails_agendados SET status = 'processing', claimed_at = ? WHERE id = ? AND status = ?`,
+    args: [agora, item.id, item.status],
+  });
+  if (claim.rowsAffected === 0) return null;
+  return item;
+}
+
+async function emailMarcarEnviado(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE emails_agendados SET status = 'sent', sent_at = ? WHERE id = ?`, args: [Date.now(), id] });
+}
+
+async function emailMarcarErro(id, mensagem) {
+  await ready;
+  await client.execute({ sql: `UPDATE emails_agendados SET status = 'error', erro = ? WHERE id = ?`, args: [mensagem, id] });
+}
+
+async function emailListarPendentes(businessId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT ea.id, ea.destinatario_email, ea.destinatario_nome, ea.agendado_para, et.nome AS template_nome
+          FROM emails_agendados ea JOIN email_templates et ON et.id = ea.template_id
+          WHERE ea.business_id = ? AND ea.status = 'pending' ORDER BY ea.agendado_para ASC`,
+    args: [businessId],
+  });
+  return result.rows;
+}
+
+async function emailCancelar(id) {
+  await ready;
+  const result = await client.execute({ sql: `DELETE FROM emails_agendados WHERE id = ? AND status = 'pending'`, args: [id] });
+  return result.rowsAffected > 0;
+}
+
+// ─── Retornos (lembrete agendado por conversa — WhatsApp e/ou e-mail) ──────────────────────
+async function retornoCriar({ businessId, phone, tipo, dataAgendada, canal, whatsappTemplate, whatsappLanguage, emailTemplateId }) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO retornos
+            (business_id, phone, tipo, data_agendada, canal, whatsapp_template, whatsapp_language, email_template_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      businessId,
+      phone,
+      tipo || "retorno",
+      dataAgendada,
+      canal || "whatsapp",
+      whatsappTemplate || null,
+      whatsappLanguage || "pt_BR",
+      emailTemplateId || null,
+      Date.now(),
+    ],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+async function retornoProximoDevido() {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `SELECT * FROM retornos
+          WHERE (status = 'pending' AND data_agendada <= ?)
+             OR (status = 'processing' AND claimed_at <= ?)
+          ORDER BY data_agendada ASC LIMIT 1`,
+    args: [agora, agora - PROCESSING_ORFAO_MS],
+  });
+  const item = result.rows[0];
+  if (!item) return null;
+  const claim = await client.execute({
+    sql: `UPDATE retornos SET status = 'processing', claimed_at = ? WHERE id = ? AND status = ?`,
+    args: [agora, item.id, item.status],
+  });
+  if (claim.rowsAffected === 0) return null;
+  return item;
+}
+
+async function retornoMarcarEnviado(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE retornos SET status = 'sent', enviado_em = ? WHERE id = ?`, args: [Date.now(), id] });
+}
+
+async function retornoMarcarErro(id, mensagem) {
+  await ready;
+  await client.execute({ sql: `UPDATE retornos SET status = 'error', erro = ? WHERE id = ?`, args: [mensagem, id] });
+}
+
+async function retornoListarPendentes(businessId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM retornos WHERE business_id = ? AND status = 'pending' ORDER BY data_agendada ASC`,
+    args: [businessId],
+  });
+  return result.rows;
+}
+
+async function retornoListarPorConversa(businessId, phone) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM retornos WHERE business_id = ? AND phone = ? ORDER BY data_agendada ASC`,
+    args: [businessId, phone],
+  });
+  return result.rows;
+}
+
+async function retornoCancelar(id) {
+  await ready;
+  const result = await client.execute({ sql: `DELETE FROM retornos WHERE id = ? AND status = 'pending'`, args: [id] });
+  return result.rowsAffected > 0;
+}
+
 // Ajusta pro fuso de Brasília (UTC-3, sem horário de verão hoje em dia) antes de agrupar por
 // dia — sem isso, mensagem de madrugada/fim de dia migra pro dia errado no gráfico (mesmo bug
 // de fuso já visto no agendador do Publique IV).
@@ -2049,6 +2283,24 @@ module.exports = {
   fluxoDinamicoDesativar,
   fluxoDinamicoObter,
   fluxoDinamicoApagar,
+  atualizarEmailConversa,
+  emailTemplateCriar,
+  emailTemplatesListar,
+  emailTemplateObter,
+  emailTemplateApagar,
+  emailAgendarLote,
+  emailProximoDevido,
+  emailMarcarEnviado,
+  emailMarcarErro,
+  emailListarPendentes,
+  emailCancelar,
+  retornoCriar,
+  retornoProximoDevido,
+  retornoMarcarEnviado,
+  retornoMarcarErro,
+  retornoListarPendentes,
+  retornoListarPorConversa,
+  retornoCancelar,
   fluxoNoCriar,
   fluxoNosDoFluxo,
   fluxoNoObter,
