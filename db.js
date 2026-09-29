@@ -827,6 +827,29 @@ async function fluxoDinamicoDesativar(fluxoId) {
   await client.execute({ sql: `UPDATE fluxos_dinamicos SET ativo = 0 WHERE id = ?`, args: [fluxoId] });
 }
 
+async function fluxoDinamicoObter(fluxoId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM fluxos_dinamicos WHERE id = ?`, args: [fluxoId] });
+  return result.rows[0] || null;
+}
+
+// Apaga o fluxo inteiro (nós + botões, em cascata manual — sem FK/CASCADE configurado nessas
+// tabelas). Bloqueia se estiver ativo, pra não sumir de baixo do número que o usa sem querer —
+// precisa desativar primeiro (fluxo_desativar).
+async function fluxoDinamicoApagar(fluxoId) {
+  await ready;
+  const fluxo = await fluxoDinamicoObter(fluxoId);
+  if (!fluxo) return { ok: false, motivo: "não encontrado" };
+  if (fluxo.ativo) return { ok: false, motivo: "está ativo — desative antes de apagar" };
+  await client.execute({
+    sql: `DELETE FROM fluxo_opcoes WHERE no_id IN (SELECT id FROM fluxo_nos WHERE fluxo_id = ?)`,
+    args: [fluxoId],
+  });
+  await client.execute({ sql: `DELETE FROM fluxo_nos WHERE fluxo_id = ?`, args: [fluxoId] });
+  await client.execute({ sql: `DELETE FROM fluxos_dinamicos WHERE id = ?`, args: [fluxoId] });
+  return { ok: true };
+}
+
 async function fluxoNoCriar({ fluxoId, tipo, texto, acaoTipo, acaoValor, proximoNoId }) {
   await ready;
   const result = await client.execute({
@@ -1881,8 +1904,15 @@ async function analyticsResumo(businessNumberId, desde, ate) {
     args: [businessNumberId, desde, ate],
   });
 
+  // COALESCE com last_message_at: conversas marcadas 'resolvido' ANTES da coluna resolvido_em
+  // existir ficam com ela NULL pra sempre (nunca foi/será preenchida retroativamente) — sem o
+  // COALESCE, `NULL BETWEEN ? AND ?` é falso e essas conversas somem da contagem por período,
+  // mesmo aparecendo em porStatus (que conta status bruto, sem olhar data nenhuma). Achado
+  // 2026-09-29 num teste real via MCP: porStatus mostrava 1 resolvida, conversasResolvidas
+  // mostrava 0, pro mesmo período.
   const resolvidasQ = await client.execute({
-    sql: `SELECT COUNT(*) AS total FROM conversations WHERE business_number_id = ? AND status = 'resolvido' AND resolvido_em BETWEEN ? AND ?`,
+    sql: `SELECT COUNT(*) AS total FROM conversations
+          WHERE business_number_id = ? AND status = 'resolvido' AND COALESCE(resolvido_em, last_message_at) BETWEEN ? AND ?`,
     args: [businessNumberId, desde, ate],
   });
 
@@ -2017,6 +2047,8 @@ module.exports = {
   fluxoDinamicoDefinirNoInicial,
   fluxoDinamicoAtivar,
   fluxoDinamicoDesativar,
+  fluxoDinamicoObter,
+  fluxoDinamicoApagar,
   fluxoNoCriar,
   fluxoNosDoFluxo,
   fluxoNoObter,

@@ -146,7 +146,11 @@ const TOOLS = [
     description:
       "Pesquisa termos de segmentação na API de Marketing da Meta — use ANTES de criar um " +
       "conjunto de anúncios, pra achar o id certo de cargo/interesse/localização (não invente " +
-      "id, sempre pesquise primeiro).",
+      "id, sempre pesquise primeiro). O termo é comparado por proximidade, não por sentido — " +
+      "um produto/serviço (ex. 'consignado', 'FGTS') raramente existe como interesse direto no " +
+      "Meta, e a busca pode devolver resultado genérico sem relação nenhuma. Pra produto/serviço, " +
+      "pesquise o SETOR ou público-alvo (ex. 'aposentadoria', 'crédito', 'bancos') em vez do nome " +
+      "do produto; tipo='adworktitle' funciona melhor pra cargo/profissão.",
     inputSchema: {
       type: "object",
       properties: {
@@ -389,8 +393,9 @@ const TOOLS = [
     name: "fluxo_obter_grafo",
     title: "Ver o fluxo inteiro (todos os nós e botões)",
     description:
-      "Retorna o fluxo completo — todo nó, seu texto/ação, e todos os botões com pra onde cada um leva. " +
-      "Use isto pra revisar antes de ativar, ou pra entender um fluxo já existente antes de editar.",
+      "Retorna o fluxo completo — nome, se está ativo, qual nó é o inicial, todo nó (com texto/ação) " +
+      "e todos os botões com pra onde cada um leva. Use isto pra revisar antes de ativar, ou pra " +
+      "entender um fluxo já existente antes de editar.",
     inputSchema: {
       type: "object",
       properties: { fluxo_id: { type: "number" } },
@@ -398,6 +403,20 @@ const TOOLS = [
       additionalProperties: false,
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "fluxo_apagar",
+    title: "Apagar um fluxo (definitivo)",
+    description:
+      "Apaga um fluxo inteiro — nós e botões junto. Só funciona com o fluxo já DESATIVADO " +
+      "(fluxo_desativar primeiro). Sem volta, use pra limpar fluxo de teste que não serve mais.",
+    inputSchema: {
+      type: "object",
+      properties: { fluxo_id: { type: "number" } },
+      required: ["fluxo_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
   {
     name: "ads_atualizar_status",
@@ -605,17 +624,26 @@ async function chamarFerramenta(nome, args, ctx) {
     }
 
     case "fluxo_obter_grafo": {
-      const [nos, opcoes] = await Promise.all([
+      const [fluxo, nos, opcoes] = await Promise.all([
+        ctx.db.fluxoDinamicoObter(a.fluxo_id),
         ctx.db.fluxoNosDoFluxo(a.fluxo_id),
         ctx.db.fluxoOpcoesDoFluxo(a.fluxo_id),
       ]);
+      if (!fluxo) return erroFerramenta(`Fluxo ${a.fluxo_id} não encontrado.`);
       const opcoesPorNo = {};
       for (const o of opcoes) {
         (opcoesPorNo[o.no_id] = opcoesPorNo[o.no_id] || []).push(o);
       }
       return textoFerramenta({
+        fluxo,
         nos: nos.map((no) => ({ ...no, opcoes: opcoesPorNo[no.id] || [] })),
       });
+    }
+
+    case "fluxo_apagar": {
+      const resultado = await ctx.db.fluxoDinamicoApagar(a.fluxo_id);
+      if (!resultado.ok) return erroFerramenta(resultado.motivo);
+      return textoFerramenta({ ok: true });
     }
 
     case "ads_atualizar_status": {
