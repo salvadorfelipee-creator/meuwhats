@@ -118,6 +118,7 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `INSTAGRAM_WHATSAPP_NUMERO` | Número de WhatsApp (formato `55DDDNUMERO`, sem `+`/espaços) usado no link gerado quando o cliente escolhe uma opção do menu | `5547997059353` |
 | `META_ADS_ACCESS_TOKEN` | Token de acesso da API de Marketing (campanhas de anúncios) | — |
 | `META_AD_ACCOUNT_ID` | ID da conta de anúncios, formato `act_XXXXXXXXX`        | —                     |
+| `MCP_ACCESS_TOKEN` | Token que autentica o conector MCP (`/mcp/:token`, ver `mcp.js`) — sem essa variável, a rota fica desativada (404) | — |
 | `TELEGRAM_BOT_TOKEN` | Token do bot, gerado pelo @BotFather                        | —                     |
 | `TELEGRAM_WEBHOOK_SECRET` | Segredo opcional pra validar que o webhook vem do Telegram | — (sem validação) |
 | `TELEGRAM_START_MESSAGE` | Texto enviado ao receber `/start` (com botão de compartilhar contato) | (ver seção Telegram) |
@@ -1048,6 +1049,36 @@ comando — ela não deve ficar escrita aqui nem em nenhum arquivo do repositór
    formato quadrado 512-1024px), URL dos Termos de Serviço (`https://SEU_DOMINIO/termos`) e
    URL de exclusão de dados (`https://SEU_DOMINIO/privacidade`) — ambas estavam apontando por
    engano para facebook.com.
+
+---
+
+## IA conectada ao painel (conector MCP)
+
+Aba **IA** no menu do painel: mostra a URL de um conector MCP (`POST /mcp/:token`, módulo
+`mcp.js`) pra plugar no app oficial do Claude (claude.ai), inclusive **conta grátis** —
+Configurações → Conectores → Adicionar conector personalizado → colar a URL. Decisão tomada
+com o usuário 2026-09-29: **não é um chat embutido no painel** (isso exigiria a API paga do
+Claude) — a conversa acontece no app de verdade do Claude, que por trás chama as ferramentas do
+conector. Zero custo de API enquanto for esse desenho; só migraria pra chat embutido se um dia
+quiser pagar por isso.
+
+Implementado à mão (JSON-RPC 2.0 stateless), sem `@modelcontextprotocol/sdk`/Express/Zod, pra
+não trazer dependência nova — o protocolo é simples o bastante sem o SDK. Autenticação: token
+no próprio path da URL (`MCP_ACCESS_TOKEN` no Render), não header — claude.ai manda só a URL
+por padrão num conector customizado (OAuth é opcional, não obrigatório).
+
+Ferramentas hoje (`mcp.js`, lista completa em `TOOLS`): `painel_listar_canais`,
+`whatsapp_listar_templates`, `whatsapp_agendar_campanha`, `whatsapp_listar_campanha_pendente`,
+`agenda_publicar_post` (só texto/link, sem imagem ainda), `agenda_listar_posts`,
+`ads_pesquisar_publico`, `ads_estimar_publico`, `ads_criar_campanha`,
+`ads_criar_conjunto_anuncios`, `ads_criar_criativo_de_post_instagram`, `ads_criar_anuncio`,
+`ads_listar_campanhas`, `ads_atualizar_status`. Toda ferramenta de criar campanha/conjunto/
+anúncio sai **sempre `PAUSED`** — ativar (`ads_atualizar_status`) é a única que liga gasto de
+verdade, de propósito separada das demais.
+
+**Não construído ainda**: editar o texto do fluxo automático do WhatsApp por IA — as mensagens
+do fluxo (Felipe, Ciahot, etc.) continuam fixas no código (`server.js`), não são dado editável
+no banco. Precisaria virar dado antes de dar pra IA mexer nisso.
 
 ---
 

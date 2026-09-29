@@ -11,6 +11,7 @@ import { PublicarPage } from "@/pages/publicar"
 import { ReelsPage } from "@/pages/reels"
 import { FunilPage } from "@/pages/funil"
 import { AnalyticsPage } from "@/pages/analytics"
+import { IaPage } from "@/pages/ia"
 
 function Shell() {
   const [screen, setScreen] = React.useState<Screen>("chats")
@@ -25,6 +26,7 @@ function Shell() {
         {screen === "reels" && <ReelsPage />}
         {screen === "funil" && <FunilPage />}
         {screen === "analytics" && <AnalyticsPage />}
+        {screen === "ia" && <IaPage />}
       </SidebarInset>
     </SidebarProvider>
   )

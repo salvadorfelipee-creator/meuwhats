@@ -31,9 +31,10 @@ import {
   LogOut,
   Filter,
   BarChart3,
+  Sparkles,
 } from "lucide-react"
 
-export type Screen = "chats" | "agenda" | "publicar" | "reels" | "funil" | "analytics"
+export type Screen = "chats" | "agenda" | "publicar" | "reels" | "funil" | "analytics" | "ia"
 
 // "reels" fica fora do menu por enquanto (edição em massa parada) — a rota em
 // App.tsx continua existindo, só reativar aqui quando voltar a usar.
@@ -43,6 +44,7 @@ const NAV_ITEMS: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
   { id: "publicar", title: "Publicar", icon: Send },
   { id: "funil", title: "Funil", icon: Filter },
   { id: "analytics", title: "Analytics", icon: BarChart3 },
+  { id: "ia", title: "IA", icon: Sparkles },
 ]
 
 // Bolinha vermelha "tem mensagem nova" — usada tanto ao lado do nome do canal (dropdown

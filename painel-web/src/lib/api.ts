@@ -502,6 +502,9 @@ export const api = {
   // ── Analytics (só o número principal da Felizcred, ver chats.tsx/analytics.tsx) ─────────
   analytics: (businessId: string, dias: number) =>
     request<AnalyticsResumo>(`/painel/api/analytics/${encodeURIComponent(businessId)}?dias=${dias}`),
+
+  // ── IA (conector MCP — ver ia.tsx) ────────────────────────────────────────────────────────
+  mcpInfo: () => request<{ configurado: boolean; url?: string }>("/painel/api/mcp-info"),
 }
 
 export { ApiError }

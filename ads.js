@@ -201,6 +201,32 @@ async function obterInsights(objectId, { since, until } = {}) {
   return json.data?.[0] || null;
 }
 
+// Pesquisa de público (cargo/interesse/localização) — era só receita de curl no README,
+// vira função pra poder ser chamada por ferramenta (MCP) sem sair pro terminal.
+async function pesquisarPublico(termo, tipo = "adinterest") {
+  const json = await assertOk(
+    graphRequest("GET", `/${GRAPH_VERSION}/${AD_ACCOUNT_ID}/targetingsearch`, {
+      q: termo,
+      type: tipo,
+    }),
+    "Falha ao pesquisar público"
+  );
+  return json.data || [];
+}
+
+// Estima o tamanho do público antes de criar o conjunto de anúncios (evita conjunto com
+// público minúsculo/gigante demais — ver README, seção "O que aprendemos sobre público").
+async function estimarPublico(targetingSpec, optimizationGoal = "CONVERSATIONS") {
+  const json = await assertOk(
+    graphRequest("GET", `/${GRAPH_VERSION}/${AD_ACCOUNT_ID}/delivery_estimate`, {
+      optimization_goal: optimizationGoal,
+      targeting_spec: targetingSpec,
+    }),
+    "Falha ao estimar público"
+  );
+  return json.data?.[0] || null;
+}
+
 function atualizarStatus(objectId, status) {
   return assertOk(
     graphRequest("POST", `/${GRAPH_VERSION}/${objectId}`, { status }),
@@ -219,4 +245,6 @@ module.exports = {
   listarConjuntos,
   obterInsights,
   atualizarStatus,
+  pesquisarPublico,
+  estimarPublico,
 };

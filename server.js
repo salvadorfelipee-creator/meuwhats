@@ -19,6 +19,7 @@ const r2 = require("./r2");
 const unnotech = require("./unnotech");
 const flowCrypto = require("./flow-crypto");
 const google = require("./google");
+const mcp = require("./mcp");
 const { notificarLeadCotaCerta, enviarBoasVindasFelizcred } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
@@ -3917,6 +3918,31 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // POST /mcp/:token — servidor MCP (ver mcp.js) pra um Claude externo (conector customizado
+    // no claude.ai, inclusive conta grátis) chamar ações reais do painel: agendar campanha de
+    // WhatsApp, publicar na Agenda, criar/gerenciar campanha de anúncio. O token no PRÓPRIO path
+    // é a autenticação (claude.ai manda só a URL, sem header customizado, a não ser que se
+    // configure OAuth — token na URL é o jeito simples recomendado pra conector pessoal).
+    const matchMcp = path_.match(/^\/mcp\/([^/]+)$/);
+    if (req.method === "POST" && matchMcp) {
+      if (!process.env.MCP_ACCESS_TOKEN || matchMcp[1] !== process.env.MCP_ACCESS_TOKEN) {
+        return send(res, 404, "Not found");
+      }
+      const rpcBody = await parseBody(req);
+      const resposta = await mcp.handleRpc(rpcBody, {
+        db,
+        wa,
+        ads,
+        agenda,
+        PHONE_NUMBERS,
+        resolverWabaDoNumero,
+        normalizarTelefoneBR,
+        enviarUmBroadcast,
+      });
+      if (resposta === null) return send(res, 202, "");
+      return send(res, 200, resposta);
+    }
+
     // GET /webhook — verificação do Meta
     if (req.method === "GET" && path_ === "/webhook") {
       const mode = url.searchParams.get("hub.mode");
@@ -4144,6 +4170,19 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && path_ === "/painel/api/numbers") {
       if (!requireAuth(req, res)) return;
       return send(res, 200, PHONE_NUMBERS);
+    }
+
+    // GET /painel/api/mcp-info — URL do conector MCP pra colar no claude.ai (Configurações >
+    // Conectores). Monta a partir do host da própria requisição, não fixo, pra funcionar igual
+    // em qualquer domínio (inclusive um deploy separado de um cliente, no futuro). Atrás de
+    // requireAuth de propósito: o token não pode vazar pra quem não tem login do painel.
+    if (req.method === "GET" && path_ === "/painel/api/mcp-info") {
+      if (!requireAuth(req, res)) return;
+      if (!process.env.MCP_ACCESS_TOKEN) {
+        return send(res, 200, { configurado: false });
+      }
+      const url_ = `https://${req.headers.host}/mcp/${process.env.MCP_ACCESS_TOKEN}`;
+      return send(res, 200, { configurado: true, url: url_ });
     }
 
     // GET /painel/api/inbox — conversas de TODOS os canais juntas (cada número de WhatsApp

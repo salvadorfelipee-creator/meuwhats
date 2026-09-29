@@ -222,4 +222,5 @@ module.exports = {
   reenfileirar,
   limparAntigas,
   resumo: db.agendaResumo,
+  timestampDeDataHora,
 };
