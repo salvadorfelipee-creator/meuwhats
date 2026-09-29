@@ -1793,6 +1793,25 @@ async function analyticsResumo(businessNumberId, desde, ate) {
   };
 }
 
+// Usado pra diagnosticar "mensagem não entregue": agrupa as falhas recentes de um número por
+// texto de erro e conta contatos distintos afetados — se for 1 contato só, o problema é do
+// telefone dele; se forem vários, o problema é do número/WABA (ver feedback-whatsapp-business-
+// payment-eligibility na memória).
+async function whatsappFalhasRecentes(businessNumberId, desdeMs) {
+  await ready;
+  const r = await client.execute({
+    sql: `
+      SELECT error_message, COUNT(*) AS total, COUNT(DISTINCT phone) AS contatos,
+        MAX(created_at) AS ultima
+      FROM messages
+      WHERE business_number_id = ? AND direction = 'out' AND status = 'failed' AND created_at >= ?
+      GROUP BY error_message ORDER BY total DESC
+    `,
+    args: [businessNumberId, desdeMs],
+  });
+  return r.rows;
+}
+
 module.exports = {
   upsertConversation,
   getConversation,
@@ -1866,6 +1885,7 @@ module.exports = {
   removerTagConversa,
   tagsDaConversa,
   analyticsResumo,
+  whatsappFalhasRecentes,
   atualizarNotaConversa,
   buscarMensagens,
   respostasProntasListar,

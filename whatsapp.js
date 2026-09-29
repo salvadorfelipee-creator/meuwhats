@@ -352,6 +352,20 @@ async function listarWabasDoNegocio(businessId) {
   return [...parse(own), ...parse(client)];
 }
 
+// Saúde do número em si (não da conversa): status de conexão, quality rating e teto de
+// mensagens/dia. Usado pra diagnosticar "mensagem não entregue" quando o problema pode ser do
+// número inteiro (qualidade caída, limite de mensagens atingido) e não de um contato isolado.
+async function checarNumero(phoneNumberId) {
+  const { status, buffer } = await graphRequest(
+    "GET",
+    "graph.facebook.com",
+    `/${GRAPH_VERSION}/${phoneNumberId}?fields=id,display_phone_number,verified_name,status,code_verification_status,quality_rating,messaging_limit_tier,name_status`
+  );
+  const json = JSON.parse(buffer.toString("utf8") || "{}");
+  if (status >= 400) throw new Error(`Falha ao checar número: ${JSON.stringify(json)}`);
+  return json;
+}
+
 async function listarNumerosDaWaba(wabaId) {
   const { status, buffer } = await graphRequest(
     "GET",
@@ -465,6 +479,7 @@ module.exports = {
   inscreverWebhook,
   listarWabasDoNegocio,
   listarNumerosDaWaba,
+  checarNumero,
   listarTemplates,
   criarTemplateTexto,
   downloadMedia,

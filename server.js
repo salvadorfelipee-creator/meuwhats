@@ -4745,6 +4745,25 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // GET /painel/api/whatsapp/diagnostico/:phoneNumberId — diagnóstico de "mensagem não
+    // entregue": saúde do número (quality rating, limite de mensagens, status de conexão) na
+    // Meta + quantos contatos distintos falharam nos últimos 7 dias nesse número no nosso banco
+    // (1 contato só = problema do telefone dele; vários = problema do número/WABA).
+    const matchWhatsappDiagnostico = path_.match(/^\/painel\/api\/whatsapp\/diagnostico\/([^/]+)$/);
+    if (req.method === "GET" && matchWhatsappDiagnostico) {
+      if (!requireAuth(req, res)) return;
+      const phoneNumberId = matchWhatsappDiagnostico[1];
+      try {
+        const [numero, falhas] = await Promise.all([
+          wa.checarNumero(phoneNumberId),
+          db.whatsappFalhasRecentes(phoneNumberId, Date.now() - 7 * 24 * 60 * 60 * 1000),
+        ]);
+        return send(res, 200, { numero, falhasUltimos7Dias: falhas });
+      } catch (err) {
+        return send(res, 500, { error: err.message });
+      }
+    }
+
     // POST /painel/api/instagram/reset-boasvindas — limpa quem já recebeu boas-vindas (uso em testes)
     if (req.method === "POST" && path_ === "/painel/api/instagram/reset-boasvindas") {
       if (!requireAuth(req, res)) return;
