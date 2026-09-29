@@ -29,9 +29,7 @@ export function ChannelProvider({ children }: { children: React.ReactNode }) {
 
   const channels = React.useMemo<Channel[]>(
     () => [
-      ...numbers
-        .filter((n) => !n.label.toLowerCase().includes("ciahot"))
-        .map((n) => ({ id: n.id, label: n.label, kind: "whatsapp" as const })),
+      ...numbers.map((n) => ({ id: n.id, label: n.label, kind: "whatsapp" as const })),
       { id: "instagram", label: "Instagram", kind: "instagram" as const },
     ],
     [numbers],
