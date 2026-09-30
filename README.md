@@ -136,7 +136,7 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `R2_ENDPOINT` | Endpoint da conta no Cloudflare R2 (Reels em massa, imagens da Agenda e mídia recebida de clientes no painel — ver PUBLIQUE-IV.md) | — |
 | `R2_BUCKET` | Nome do bucket do R2 (vídeos a publicar, imagens da Agenda e fotos/áudios/vídeos que os clientes mandam no WhatsApp) | — |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` | Token de API do R2 (permissão Object Read & Write) | — |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Credencial OAuth do Google Cloud (People API — captura de contato do WhatsApp, ver CHAVES-LOCAL.md) | — |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Credencial OAuth do Google Cloud (People API + Calendar API — captura de contato do WhatsApp e agendamento de horário, ver CHAVES-LOCAL.md). **Não configurado em produção ainda (30/09/2026)** — ver "Agendamento de horário real via Google Agenda". | — |
 | `FELIZCRED_EMAIL_FROM` / `FELIZCRED_EMAIL_FROM_NOME` | Remetente do e-mail de boas-vindas da Felizcred (usa o mesmo `BREVO_API_KEY`) | `contato@felizcred.com.br` / "Felizcred" |
 | `PUBLIC_URL` | URL pública do servidor (usada pelo auto-ping e pra montar a URL do vídeo que o Instagram busca) | `https://meuwhats.onrender.com` |
 
@@ -1104,14 +1104,62 @@ no banco (tabelas `fluxos_dinamicos`, `fluxo_nos`, `fluxo_opcoes`), e `getFluxo`
 monta um adaptador compatível com o resto do dispatcher só quando não acha fluxo fixo pra
 aquele `business_id`.
 
-Ferramentas MCP: `fluxo_criar`, `fluxo_no_criar` (tipo `mensagem` ou `acao`: tag/pipeline),
-`fluxo_definir_no_inicial`, `fluxo_opcao_adicionar` (botão, máx. 3 por mensagem), `fluxo_ativar`
-(só 1 ativo por número), `fluxo_desativar`, `fluxo_listar`, `fluxo_obter_grafo`.
+Ferramentas MCP: `fluxo_criar`, `fluxo_no_criar` (tipo `mensagem`, `acao` [tag/pipeline] ou
+`horarios` — ver Google Agenda abaixo), `fluxo_definir_no_inicial`, `fluxo_opcao_adicionar`
+(botão, máx. 3 por mensagem), `fluxo_ativar`, `fluxo_desativar`, `fluxo_listar`,
+`fluxo_obter_grafo`, `fluxo_apagar`.
 
-**Gaps conhecidos do V1**: sem nó de "esperar X minutos" (só avança por clique de botão, sem
-lembrete de inatividade); sem captura de texto livre (só botão); editar o texto de um fluxo
-FIXO (Felipe/Ciahot/CLT) continua exigindo migrar aquele fluxo especificamente pra esse motor
-— não foi feito pra nenhum dos fluxos existentes, só serve pra número novo.
+**Gaps conhecidos do V1**: sem nó de "esperar X minutos" (só avança por clique de botão/item de
+lista, sem lembrete de inatividade); sem captura de texto livre (só botão/lista); editar o texto
+de um fluxo FIXO (Felipe/Ciahot/CLT) continua exigindo migrar aquele fluxo especificamente pra
+esse motor — não foi feito pra nenhum dos fluxos existentes, só serve pra número novo.
+
+#### Vários fluxos por número via gatilho de palavra-chave (2026-09-30)
+
+`fluxo_ativar` continua existindo (define o fluxo "padrão" de um número, pro 1º contato), mas
+agora um número pode ter **vários fluxos dinâmicos ao mesmo tempo**, cada um disparado por uma
+palavra-chave própria (ex.: "botox" → fluxo Botox, "ortodontia" → fluxo Ortodontia), sem precisar
+estar "ativo". Tabela `fluxo_gatilhos` (já existia, criada mas não usada até aqui — agora
+funciona de verdade). `getFluxo` ficou sticky: o contato continua no fluxo específico que ele
+entrou (via `fluxo_estado_contato`/nó salvo), não só no fluxo padrão do número — sem isso os
+botões da 2ª mensagem em diante não bateriam. Ferramentas MCP: `fluxo_gatilho_criar`,
+`fluxo_gatilho_listar`, `fluxo_gatilho_apagar`. 100% opt-in: número sem nenhuma linha em
+`fluxo_gatilhos` se comporta exatamente como antes.
+
+#### Agendamento de horário real via Google Agenda (2026-09-30)
+
+Nó `horarios` no fluxo dinâmico: manda os próximos horários livres (consulta `freebusy` de
+verdade, respeita o expediente configurado) como lista do WhatsApp; ao escolher, cria o evento
+na Google Agenda (`google.js`) e confirma pro cliente. Configuração por número (`agenda_calendar_configurar`
+— calendário, hora início/fim, duração do atendimento; padrão: `primary`, 9h-18h, 60min,
+seg-sex). Ferramentas MCP: `agenda_calendar_configurar`, `agenda_calendar_horarios_disponiveis`,
+`agenda_calendar_agendar`. Horário sempre calculado em horário de Brasília fixo (UTC-3, sem
+horário de verão — mesma convenção de `timestampDeDataHora` em `agenda.js`), independente do
+fuso do servidor.
+
+**Pré-requisito ainda pendente**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` não estão
+configurados no Render em produção (testado em 30/09/2026 — ferramenta retorna erro claro, não
+quebra nada, mas nenhuma chamada de Calendar funciona até isso ser resolvido). Precisa: 1) criar
+credencial OAuth no Google Cloud Console (mesmo projeto do Contacts, se já existir) com a
+Calendar API ativada; 2) colocar `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` nas env vars do
+Render; 3) abrir `/painel/api/google/autorizar` logado no painel (o `prompt=consent` força a
+tela de novo mesmo quem já autorizou só o escopo de Contacts antes).
+
+#### Tags e etapa de qualificação liberadas pra qualquer canal (2026-09-30)
+
+Antes só apareciam pro número principal da Felizcred (`CANAL_ANALYTICS_LABEL`, funil de
+empréstimo). Agora todo canal WhatsApp tem o seletor de tags/etapa na conversa — com uma lista
+de etapas **genérica** (`novo` / `em_atendimento` / `cliente` / `perdido`) quando não é a
+Felizcred, ver `pipelineEstagiosPara` em `painel-web/src/lib/api.ts`. Botão de gerenciar tags
+agora também aparece direto na conversa (`GerenciarTags`, reaproveitado de `analytics.tsx`), não
+só na aba Analytics.
+
+#### Backup de conversa por e-mail (2026-09-30)
+
+Botão "Backup por e-mail" na conversa (`POST /painel/api/conversations/:businessId/:phone/exportar-email`)
+manda o histórico inteiro em HTML pro e-mail de backup configurado (1 por canal, `GET/POST
+/painel/api/email-backup/:businessId`), via Brevo — complementa o botão "Exportar" já existente
+(baixa `.txt` no navegador). Existe pra não depender só do WhatsApp guardar o histórico.
 
 ---
 
