@@ -168,9 +168,10 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "email")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN email TEXT`);
   }
-  // pipeline_estagio = etapa atual da conversa no funil de atendimento/vendas (texto livre,
-  // ver PIPELINE_ESTAGIOS no painel) — separado do `status` (que é só novo/andamento/resolvido).
-  // Só usado hoje no número principal da Felizcred (ver ANALYTICS_BUSINESS_ID em server.js).
+  // pipeline_estagio = etapa atual da conversa no funil de atendimento/vendas (texto livre —
+  // Felizcred usa PIPELINE_ESTAGIOS no painel, qualquer outro canal usa a lista genérica
+  // PIPELINE_ESTAGIOS_GENERICO, ver pipelineEstagiosPara em painel-web) — separado do `status`
+  // (que é só novo/andamento/resolvido). Liberado pra todo canal em 30/09/2026.
   if (!infoConversations.rows.some((r) => r.name === "pipeline_estagio")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN pipeline_estagio TEXT`);
   }
@@ -2174,8 +2175,8 @@ async function retornoCancelar(id) {
 // de fuso já visto no agendador do Publique IV).
 const TZ_BRASIL_OFFSET_SEGUNDOS = 3 * 60 * 60;
 
-// Painel de métricas do Analytics — só chamado pro número principal da Felizcred hoje (ver
-// ANALYTICS_BUSINESS_ID em server.js), mas a função em si é genérica por business_number_id.
+// Painel de métricas do Analytics — genérica por business_number_id, liberada pra qualquer
+// canal no painel desde 30/09/2026 (antes só a Felizcred principal via CANAL_ANALYTICS_LABEL).
 // `desde`/`ate` em milissegundos (epoch). Cada consulta é independente (sem transação) — é
 // leitura, não tem risco de inconsistência entre elas que importe pra uma tela de métricas.
 async function analyticsResumo(businessNumberId, desde, ate) {

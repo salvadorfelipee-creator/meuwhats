@@ -1,6 +1,6 @@
 import * as React from "react"
 import { useChannel } from "@/lib/channel-context"
-import { api, type AnalyticsResumo, type Tag, PIPELINE_ESTAGIOS, CANAL_ANALYTICS_LABEL } from "@/lib/api"
+import { api, type AnalyticsResumo, type Tag, type Conversation, type Retorno, pipelineEstagiosPara } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -11,15 +11,11 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { MessagesSquare, UserPlus, CheckCircle2, Timer, Tag as TagIcon, Trash2, Plus } from "lucide-react"
+import { MessagesSquare, UserPlus, CheckCircle2, Timer, Tag as TagIcon, Trash2, Plus, Download } from "lucide-react"
 
 const PERIODOS = [7, 30, 90] as const
 
 const CORES_TAG = ["#64748b", "#2563eb", "#7c3aed", "#d97706", "#16a34a", "#dc2626", "#0891b2", "#db2777"]
-
-const PIPELINE_ESTAGIOS_MAP: Record<string, { nome: string; cor: string }> = Object.fromEntries(
-  PIPELINE_ESTAGIOS.map((e) => [e.id, e]),
-)
 
 function formatMs(ms: number | null): string {
   if (ms === null || Number.isNaN(ms)) return "—"
@@ -269,9 +265,212 @@ export function GerenciarTags({ businessId, tags, onChange }: { businessId: stri
   )
 }
 
+// Tabela de contatos (visão tipo CRM) — junta o que já existe espalhado por conversa (tags,
+// etapa, retorno agendado, nota) numa lista só, filtrável e exportável em CSV, pra dar pra tirar
+// um "relatório completo de atendimento" sem precisar abrir conversa por conversa.
+function TabelaContatos({ businessId, canalLabel }: { businessId: string; canalLabel: string }) {
+  const [contatos, setContatos] = React.useState<Conversation[]>([])
+  const [retornos, setRetornos] = React.useState<Retorno[]>([])
+  const [busca, setBusca] = React.useState("")
+  const [filtroTag, setFiltroTag] = React.useState("")
+  const [filtroEtapa, setFiltroEtapa] = React.useState("")
+  const [carregando, setCarregando] = React.useState(true)
+
+  const estagios = pipelineEstagiosPara(canalLabel)
+  const estagiosMap = React.useMemo(() => Object.fromEntries(estagios.map((e) => [e.id, e])), [estagios])
+
+  const carregar = React.useCallback(() => {
+    setCarregando(true)
+    Promise.all([api.conversations(businessId, { finalizadas: true }), api.retornosDoNegocio(businessId).catch(() => [])])
+      .then(([c, r]) => {
+        setContatos(c)
+        setRetornos(r)
+      })
+      .finally(() => setCarregando(false))
+  }, [businessId])
+
+  React.useEffect(() => {
+    carregar()
+  }, [carregar])
+
+  const proximoRetornoPorTelefone = React.useMemo(() => {
+    const mapa: Record<string, Retorno> = {}
+    for (const r of retornos) {
+      if (r.status !== "pending") continue
+      const atual = mapa[r.phone]
+      if (!atual || r.data_agendada < atual.data_agendada) mapa[r.phone] = r
+    }
+    return mapa
+  }, [retornos])
+
+  const contatosComExtras = React.useMemo(
+    () =>
+      contatos.map((c) => ({
+        ...c,
+        tags: c.tags_json ? (JSON.parse(c.tags_json) as { id: number; nome: string; cor: string }[]) : [],
+        retorno: proximoRetornoPorTelefone[c.phone] || null,
+      })),
+    [contatos, proximoRetornoPorTelefone],
+  )
+
+  const todasTags = React.useMemo(() => {
+    const mapa = new Map<number, { id: number; nome: string }>()
+    for (const c of contatosComExtras) for (const t of c.tags) mapa.set(t.id, t)
+    return [...mapa.values()]
+  }, [contatosComExtras])
+
+  const linhas = React.useMemo(
+    () =>
+      contatosComExtras.filter((c) => {
+        if (busca && !`${c.name || ""} ${c.phone}`.toLowerCase().includes(busca.toLowerCase())) return false
+        if (filtroTag && !c.tags.some((t) => String(t.id) === filtroTag)) return false
+        if (filtroEtapa && c.pipeline_estagio !== filtroEtapa) return false
+        return true
+      }),
+    [contatosComExtras, busca, filtroTag, filtroEtapa],
+  )
+
+  function exportarCsv() {
+    const linhasCsv = [
+      ["Nome", "Telefone", "Tags", "Etapa", "Proximo retorno", "Ultima mensagem", "Nota"],
+      ...linhas.map((c) => [
+        c.name || "",
+        c.phone,
+        c.tags.map((t) => t.nome).join("; "),
+        estagiosMap[c.pipeline_estagio || ""]?.nome || c.pipeline_estagio || "",
+        c.retorno ? new Date(c.retorno.data_agendada).toLocaleString("pt-BR") : "",
+        c.last_message_at ? new Date(c.last_message_at).toLocaleString("pt-BR") : "",
+        (c.nota || "").replace(/\n/g, " "),
+      ]),
+    ]
+    const csv = linhasCsv.map((linha) => linha.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n")
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `contatos-${businessId}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="rounded-xl border p-5">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+        <p className="font-medium">Contatos ({linhas.length})</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Input
+            placeholder="Buscar nome/telefone"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="h-8 w-44 text-xs"
+          />
+          <select
+            className="h-8 rounded-md border bg-background px-2 text-xs"
+            value={filtroTag}
+            onChange={(e) => setFiltroTag(e.target.value)}
+          >
+            <option value="">Todas as tags</option>
+            {todasTags.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nome}
+              </option>
+            ))}
+          </select>
+          <select
+            className="h-8 rounded-md border bg-background px-2 text-xs"
+            value={filtroEtapa}
+            onChange={(e) => setFiltroEtapa(e.target.value)}
+          >
+            <option value="">Todas as etapas</option>
+            {estagios.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" variant="outline" onClick={exportarCsv} className="gap-1.5 h-8">
+            <Download className="h-3.5 w-3.5" />
+            Exportar CSV
+          </Button>
+        </div>
+      </div>
+      <div className="max-h-[480px] overflow-y-auto">
+        <table className="w-full text-xs">
+          <thead className="sticky top-0 bg-background">
+            <tr className="text-left text-muted-foreground border-b">
+              <th className="py-2 pr-2">Nome</th>
+              <th className="py-2 pr-2">Telefone</th>
+              <th className="py-2 pr-2">Tags</th>
+              <th className="py-2 pr-2">Etapa</th>
+              <th className="py-2 pr-2">Próx. retorno</th>
+              <th className="py-2 pr-2">Última msg.</th>
+              <th className="py-2 pr-2">Nota</th>
+            </tr>
+          </thead>
+          <tbody>
+            {carregando && (
+              <tr>
+                <td colSpan={7} className="py-4 text-center text-muted-foreground">
+                  Carregando...
+                </td>
+              </tr>
+            )}
+            {!carregando && linhas.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-4 text-center text-muted-foreground">
+                  Nenhum contato encontrado.
+                </td>
+              </tr>
+            )}
+            {linhas.map((c) => {
+              const estagio = estagiosMap[c.pipeline_estagio || ""]
+              return (
+                <tr key={c.phone} className="border-b last:border-0">
+                  <td className="py-2 pr-2 font-medium">{c.name || "Sem nome"}</td>
+                  <td className="py-2 pr-2 text-muted-foreground">{c.phone}</td>
+                  <td className="py-2 pr-2">
+                    <div className="flex flex-wrap gap-1">
+                      {c.tags.map((t) => (
+                        <span
+                          key={t.id}
+                          className="px-1.5 py-0.5 rounded-full text-[10px] text-white"
+                          style={{ background: t.cor }}
+                        >
+                          {t.nome}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-2 pr-2">
+                    {estagio ? (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] text-white" style={{ background: estagio.cor }}>
+                        {estagio.nome}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="py-2 pr-2 text-muted-foreground">
+                    {c.retorno ? new Date(c.retorno.data_agendada).toLocaleDateString("pt-BR") : "—"}
+                  </td>
+                  <td className="py-2 pr-2 text-muted-foreground">
+                    {c.last_message_at ? new Date(c.last_message_at).toLocaleDateString("pt-BR") : "—"}
+                  </td>
+                  <td className="py-2 pr-2 text-muted-foreground truncate max-w-[180px]" title={c.nota || ""}>
+                    {c.nota || "—"}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export function AnalyticsPage() {
-  const { channels } = useChannel()
-  const canal = channels.find((c) => c.label === CANAL_ANALYTICS_LABEL)
+  const { current: canal } = useChannel()
   const [dias, setDias] = React.useState<(typeof PERIODOS)[number]>(30)
   const [dados, setDados] = React.useState<AnalyticsResumo | null>(null)
   const [tags, setTags] = React.useState<Tag[]>([])
@@ -287,20 +486,17 @@ export function AnalyticsPage() {
   }, [carregar])
 
   if (!canal) {
-    return (
-      <div className="h-screen flex items-center justify-center text-sm text-muted-foreground px-6 text-center">
-        Não encontrei o canal "{CANAL_ANALYTICS_LABEL}" na lista de números configurados.
-      </div>
-    )
+    return <div className="h-screen flex items-center justify-center text-sm text-muted-foreground">Carregando canal...</div>
   }
 
+  const estagiosMap = Object.fromEntries(pipelineEstagiosPara(canal.label).map((e) => [e.id, e]))
   const porStatusFmt = (dados?.porStatus || []).map((s) => ({
     label: { novo: "Novo", andamento: "Em andamento", resolvido: "Finalizada" }[s.status] || s.status,
     total: s.total,
   }))
   const porTagFmt = (dados?.porTag || []).map((t) => ({ label: t.nome, total: t.total, cor: t.cor }))
   const porEstagioFmt = (dados?.porEstagio || []).map((e) => {
-    const meta = PIPELINE_ESTAGIOS_MAP[e.estagio]
+    const meta = estagiosMap[e.estagio]
     return { label: meta?.nome || e.estagio, total: e.total, cor: meta?.cor }
   })
 
@@ -309,7 +505,7 @@ export function AnalyticsPage() {
       <div className="h-14 px-4 flex items-center justify-between border-b shrink-0 sticky top-0 bg-background z-10">
         <div>
           <p className="font-semibold text-sm">Analytics</p>
-          <p className="text-xs text-muted-foreground">{CANAL_ANALYTICS_LABEL}</p>
+          <p className="text-xs text-muted-foreground">{canal.label}</p>
         </div>
         <div className="flex items-center gap-2">
           <GerenciarTags businessId={canal.id} tags={tags} onChange={carregar} />
@@ -375,6 +571,8 @@ export function AnalyticsPage() {
             <BarraDistribuicao itens={porEstagioFmt} />
           </div>
         </div>
+
+        <TabelaContatos businessId={canal.id} canalLabel={canal.label} />
 
         <p className="text-xs text-muted-foreground pb-6">
           Tempo de resolução médio no período: {dados ? formatMs(dados.tempoMedioResolucaoMs) : "—"}
