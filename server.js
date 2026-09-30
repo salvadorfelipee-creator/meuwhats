@@ -4668,6 +4668,83 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // ── Campos personalizados (CRM) ─────────────────────────────────────────────────────────
+    // GET /painel/api/campos-personalizados/:businessId — lista os campos definidos pro negócio
+    const matchCampos = path_.match(/^\/painel\/api\/campos-personalizados\/([^/]+)$/);
+    if (req.method === "GET" && matchCampos) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.camposPersonalizadosListar(decodeURIComponent(matchCampos[1])));
+    }
+    // POST /painel/api/campos-personalizados/:businessId — cria campo { nome }
+    if (req.method === "POST" && matchCampos) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.nome) return send(res, 400, { error: "Informe nome" });
+      const id = await db.campoPersonalizadoCriar(decodeURIComponent(matchCampos[1]), body.nome);
+      return send(res, 200, { id });
+    }
+    // DELETE /painel/api/campos-personalizados/:businessId/:campoId
+    const matchCampoApagar = path_.match(/^\/painel\/api\/campos-personalizados\/([^/]+)\/(\d+)$/);
+    if (req.method === "DELETE" && matchCampoApagar) {
+      if (!requireAuth(req, res)) return;
+      await db.campoPersonalizadoApagar(Number(matchCampoApagar[2]));
+      return send(res, 200, { ok: true });
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/campos — todos os campos + valor dessa conversa
+    const matchCamposConversa = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/campos$/);
+    if (req.method === "GET" && matchCamposConversa) {
+      if (!requireAuth(req, res)) return;
+      return send(
+        res,
+        200,
+        await db.conversationCamposObter(decodeURIComponent(matchCamposConversa[1]), decodeURIComponent(matchCamposConversa[2]))
+      );
+    }
+    // POST /painel/api/conversations/:businessId/:phone/campos/:campoId — define o valor { valor }
+    const matchCampoValorDefinir = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/campos\/(\d+)$/);
+    if (req.method === "POST" && matchCampoValorDefinir) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await db.conversationCampoDefinir(
+        decodeURIComponent(matchCampoValorDefinir[1]),
+        decodeURIComponent(matchCampoValorDefinir[2]),
+        Number(matchCampoValorDefinir[3]),
+        body.valor ?? ""
+      );
+      return send(res, 200, { ok: true });
+    }
+
+    // ── Notas em lista (CRM) ────────────────────────────────────────────────────────────────
+    // GET /painel/api/conversations/:businessId/:phone/notas
+    const matchNotas = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/notas$/);
+    if (req.method === "GET" && matchNotas) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.notasDaConversa(decodeURIComponent(matchNotas[1]), decodeURIComponent(matchNotas[2])));
+    }
+    // POST /painel/api/conversations/:businessId/:phone/notas — adiciona nota { texto }
+    if (req.method === "POST" && matchNotas) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.texto?.trim()) return send(res, 400, { error: "Informe texto" });
+      const id = await db.notaAdicionar(decodeURIComponent(matchNotas[1]), decodeURIComponent(matchNotas[2]), body.texto.trim());
+      return send(res, 200, { id });
+    }
+    // DELETE /painel/api/notas/item/:id
+    const matchNotaApagar = path_.match(/^\/painel\/api\/notas\/item\/(\d+)$/);
+    if (req.method === "DELETE" && matchNotaApagar) {
+      if (!requireAuth(req, res)) return;
+      await db.notaApagar(Number(matchNotaApagar[1]));
+      return send(res, 200, { ok: true });
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/atividades — timeline (tag/etapa/campo/retorno)
+    const matchAtividades = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/atividades$/);
+    if (req.method === "GET" && matchAtividades) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.atividadesDaConversa(decodeURIComponent(matchAtividades[1]), decodeURIComponent(matchAtividades[2])));
+    }
+
     // GET /painel/api/analytics/:businessId?dias=7 — métricas de atendimento (ver db.analyticsResumo)
     const matchAnalytics = path_.match(/^\/painel\/api\/analytics\/([^/]+)$/);
     if (req.method === "GET" && matchAnalytics) {

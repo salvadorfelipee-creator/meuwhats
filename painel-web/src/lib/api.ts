@@ -30,6 +30,11 @@ export type Conversation = {
 
 export type Tag = { id: number; business_number_id: string; nome: string; cor: string; created_at: number }
 
+export type CampoPersonalizado = { id: number; business_id: string; nome: string; created_at: number }
+export type CampoValor = { campo_id: number; nome: string; valor: string | null }
+export type NotaConversa = { id: number; business_id: string; phone: string; texto: string; created_at: number }
+export type AtividadeConversa = { id: number; business_id: string; phone: string; tipo: string; descricao: string; created_at: number }
+
 export type EmailTemplate = { id: number; business_id: string; nome: string; assunto: string; corpo_html: string; created_at: number }
 
 export type EmailAgendado = {
@@ -598,6 +603,34 @@ export const api = {
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/exportar-email`,
       { method: "POST" }
     ),
+
+  // ── CRM: campos personalizados, notas em lista, timeline de atividades ───────────────────
+  camposPersonalizados: (businessId: string) =>
+    request<CampoPersonalizado[]>(`/painel/api/campos-personalizados/${encodeURIComponent(businessId)}`),
+  criarCampoPersonalizado: (businessId: string, nome: string) =>
+    request<{ id: number }>(`/painel/api/campos-personalizados/${encodeURIComponent(businessId)}`, {
+      method: "POST",
+      body: JSON.stringify({ nome }),
+    }),
+  apagarCampoPersonalizado: (businessId: string, campoId: number) =>
+    request<{ ok: true }>(`/painel/api/campos-personalizados/${encodeURIComponent(businessId)}/${campoId}`, { method: "DELETE" }),
+  camposDaConversa: (businessId: string, phone: string) =>
+    request<CampoValor[]>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/campos`),
+  definirCampoConversa: (businessId: string, phone: string, campoId: number, valor: string) =>
+    request<{ ok: true }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/campos/${campoId}`,
+      { method: "POST", body: JSON.stringify({ valor }) }
+    ),
+  notasDaConversa: (businessId: string, phone: string) =>
+    request<NotaConversa[]>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/notas`),
+  adicionarNota: (businessId: string, phone: string, texto: string) =>
+    request<{ id: number }>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/notas`, {
+      method: "POST",
+      body: JSON.stringify({ texto }),
+    }),
+  apagarNota: (id: number) => request<{ ok: true }>(`/painel/api/notas/item/${id}`, { method: "DELETE" }),
+  atividadesDaConversa: (businessId: string, phone: string) =>
+    request<AtividadeConversa[]>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/atividades`),
 }
 
 export { ApiError }

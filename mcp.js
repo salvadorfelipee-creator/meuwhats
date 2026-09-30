@@ -674,6 +674,75 @@ const TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   },
   {
+    name: "crm_campo_personalizado_criar",
+    title: "Criar um campo personalizado do CRM",
+    description:
+      "Cria um campo personalizado pro negócio (ex. 'Convênio', 'Procedimento de interesse', 'Data de nascimento') " +
+      "— depois disso ele aparece pra preencher em toda conversa desse número.",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" }, nome: { type: "string" } },
+      required: ["business_id", "nome"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "crm_campo_personalizado_listar",
+    title: "Listar campos personalizados do CRM",
+    description: "Lista os campos personalizados definidos pra esse número.",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" } },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "crm_contato_campo_definir",
+    title: "Preencher um campo personalizado de um contato",
+    description: "Define o valor de um campo personalizado (ver crm_campo_personalizado_listar pra saber os ids) pra um contato específico.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        phone: { type: "string" },
+        campo_id: { type: "number" },
+        valor: { type: "string" },
+      },
+      required: ["business_id", "phone", "campo_id", "valor"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "crm_contato_perfil",
+    title: "Ver o perfil completo de um contato (CRM)",
+    description:
+      "Devolve tudo que o CRM sabe sobre um contato: campos personalizados preenchidos, notas (histórico) e a " +
+      "linha do tempo de atividades (tag/etapa/campo/retorno) — use pra responder 'o que sabemos sobre esse cliente'.",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" }, phone: { type: "string" } },
+      required: ["business_id", "phone"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "crm_contato_nota_adicionar",
+    title: "Adicionar uma nota ao histórico do contato",
+    description: "Adiciona uma nota datada ao histórico do contato (diferente da 'nota interna' única — aqui fica um histórico completo).",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" }, phone: { type: "string" }, texto: { type: "string" } },
+      required: ["business_id", "phone", "texto"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
     name: "ads_atualizar_status",
     title: "Pausar ou ativar campanha/conjunto/anúncio",
     description:
@@ -1033,6 +1102,34 @@ async function chamarFerramenta(nome, args, ctx) {
       } catch (err) {
         return erroFerramenta(err.message);
       }
+    }
+
+    case "crm_campo_personalizado_criar": {
+      const id = await ctx.db.campoPersonalizadoCriar(a.business_id, a.nome);
+      return textoFerramenta({ campo_id: id });
+    }
+
+    case "crm_campo_personalizado_listar": {
+      return textoFerramenta({ campos: await ctx.db.camposPersonalizadosListar(a.business_id) });
+    }
+
+    case "crm_contato_campo_definir": {
+      await ctx.db.conversationCampoDefinir(a.business_id, a.phone, a.campo_id, a.valor);
+      return textoFerramenta({ ok: true });
+    }
+
+    case "crm_contato_perfil": {
+      const [campos, notas, atividades] = await Promise.all([
+        ctx.db.conversationCamposObter(a.business_id, a.phone),
+        ctx.db.notasDaConversa(a.business_id, a.phone),
+        ctx.db.atividadesDaConversa(a.business_id, a.phone),
+      ]);
+      return textoFerramenta({ campos, notas, atividades });
+    }
+
+    case "crm_contato_nota_adicionar": {
+      const id = await ctx.db.notaAdicionar(a.business_id, a.phone, a.texto);
+      return textoFerramenta({ nota_id: id });
     }
 
     case "ads_atualizar_status": {

@@ -204,6 +204,45 @@ const ready = (async () => {
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_conversation_tags_tag ON conversation_tags(tag_id)`);
 
+  // CRM do contato (30/09/2026) — campos personalizados (definidos por negócio, ex. "Convênio",
+  // "Procedimento de interesse"), notas em lista (timestamped, substitui depender só do campo
+  // único `conversations.nota`) e atividades (linha do tempo: tag/etapa/campo/retorno mudou,
+  // quando e o quê — mesmo espírito do "Timeline" do Octadesk).
+  await client.execute(`CREATE TABLE IF NOT EXISTS campos_personalizados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    nome TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS conversation_campos_valores (
+    business_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    campo_id INTEGER NOT NULL,
+    valor TEXT,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (business_id, phone, campo_id)
+  )`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS conversation_notas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_conversation_notas_conversa ON conversation_notas(business_id, phone, created_at)`);
+
+  await client.execute(`CREATE TABLE IF NOT EXISTS atividades_conversa (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    descricao TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_atividades_conversa_conversa ON atividades_conversa(business_id, phone, created_at)`);
+
   // Motor de fluxo dinâmico (dado no banco, não código) — usado só por número que NÃO tem
   // fluxo fixo escrito em server.js (ver getFluxo). V1: nó 'mensagem' (com botões via
   // fluxo_opcoes) e 'acao' (tag/pipeline); gatilho por palavra-chave ou primeiro contato.
@@ -791,11 +830,123 @@ async function atualizarStatusConversa(phone, businessNumberId, status) {
   }
 }
 
+// Registra 1 linha na timeline de atividades de uma conversa (CRM) — chamado de dentro das
+// próprias funções de mutação (tag/etapa/campo/retorno) pra nunca esquecer de logar não importa
+// se quem chamou foi uma rota REST ou uma ferramenta MCP. Nunca derruba a mutação principal se
+// o log falhar (é auxiliar, não crítico).
+async function atividadeRegistrar({ businessId, phone, tipo, descricao }) {
+  try {
+    await ready;
+    await client.execute({
+      sql: `INSERT INTO atividades_conversa (business_id, phone, tipo, descricao, created_at) VALUES (?, ?, ?, ?, ?)`,
+      args: [businessId, phone, tipo, descricao, Date.now()],
+    });
+  } catch (err) {
+    console.error("Erro ao registrar atividade:", err.message);
+  }
+}
+
+async function atividadesDaConversa(businessId, phone, limite = 50) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM atividades_conversa WHERE business_id = ? AND phone = ? ORDER BY created_at DESC LIMIT ?`,
+    args: [businessId, phone, limite],
+  });
+  return result.rows;
+}
+
+// ─── Campos personalizados (CRM) ──────────────────────────────────────────────────────────
+async function campoPersonalizadoCriar(businessId, nome) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO campos_personalizados (business_id, nome, created_at) VALUES (?, ?, ?)`,
+    args: [businessId, nome, Date.now()],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+async function camposPersonalizadosListar(businessId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM campos_personalizados WHERE business_id = ? ORDER BY created_at ASC`,
+    args: [businessId],
+  });
+  return result.rows;
+}
+
+async function campoPersonalizadoApagar(id) {
+  await ready;
+  await client.execute({ sql: `DELETE FROM conversation_campos_valores WHERE campo_id = ?`, args: [id] });
+  await client.execute({ sql: `DELETE FROM campos_personalizados WHERE id = ?`, args: [id] });
+}
+
+async function conversationCampoDefinir(businessId, phone, campoId, valor) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO conversation_campos_valores (business_id, phone, campo_id, valor, updated_at) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(business_id, phone, campo_id) DO UPDATE SET valor = excluded.valor, updated_at = excluded.updated_at`,
+    args: [businessId, phone, campoId, valor, Date.now()],
+  });
+  const campo = await client.execute({ sql: `SELECT nome FROM campos_personalizados WHERE id = ?`, args: [campoId] });
+  await atividadeRegistrar({
+    businessId,
+    phone,
+    tipo: "campo",
+    descricao: `"${campo.rows[0]?.nome || campoId}" definido como "${valor}"`,
+  });
+}
+
+// Todos os campos personalizados do negócio + o valor dessa conversa (se já tiver sido
+// preenchido) — pensado pra montar a lista inteira de campos no painel de detalhes de 1 vez.
+async function conversationCamposObter(businessId, phone) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT cp.id AS campo_id, cp.nome, cv.valor
+          FROM campos_personalizados cp
+          LEFT JOIN conversation_campos_valores cv
+            ON cv.campo_id = cp.id AND cv.business_id = cp.business_id AND cv.phone = ?
+          WHERE cp.business_id = ?
+          ORDER BY cp.created_at ASC`,
+    args: [phone, businessId],
+  });
+  return result.rows;
+}
+
+// ─── Notas em lista (CRM) — histórico, diferente do campo único `conversations.nota` legado ──
+async function notaAdicionar(businessId, phone, texto) {
+  await ready;
+  const result = await client.execute({
+    sql: `INSERT INTO conversation_notas (business_id, phone, texto, created_at) VALUES (?, ?, ?, ?)`,
+    args: [businessId, phone, texto, Date.now()],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+async function notasDaConversa(businessId, phone) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM conversation_notas WHERE business_id = ? AND phone = ? ORDER BY created_at DESC`,
+    args: [businessId, phone],
+  });
+  return result.rows;
+}
+
+async function notaApagar(id) {
+  await ready;
+  await client.execute({ sql: `DELETE FROM conversation_notas WHERE id = ?`, args: [id] });
+}
+
 async function atualizarPipelineConversa(phone, businessNumberId, estagio) {
   await ready;
   await client.execute({
     sql: `UPDATE conversations SET pipeline_estagio = ? WHERE phone = ? AND business_number_id = ?`,
     args: [estagio || null, phone, businessNumberId],
+  });
+  await atividadeRegistrar({
+    businessId: businessNumberId,
+    phone,
+    tipo: "etapa",
+    descricao: estagio ? `Etapa alterada para "${estagio}"` : "Etapa removida",
   });
 }
 
@@ -835,14 +986,18 @@ async function adicionarTagConversa(businessNumberId, phone, tagId) {
     sql: `INSERT OR IGNORE INTO conversation_tags (business_number_id, phone, tag_id, created_at) VALUES (?, ?, ?, ?)`,
     args: [businessNumberId, phone, tagId, Date.now()],
   });
+  const tag = await client.execute({ sql: `SELECT nome FROM tags WHERE id = ?`, args: [tagId] });
+  await atividadeRegistrar({ businessId: businessNumberId, phone, tipo: "tag_add", descricao: `Tag "${tag.rows[0]?.nome || tagId}" adicionada` });
 }
 
 async function removerTagConversa(businessNumberId, phone, tagId) {
   await ready;
+  const tag = await client.execute({ sql: `SELECT nome FROM tags WHERE id = ?`, args: [tagId] });
   await client.execute({
     sql: `DELETE FROM conversation_tags WHERE business_number_id = ? AND phone = ? AND tag_id = ?`,
     args: [businessNumberId, phone, tagId],
   });
+  await atividadeRegistrar({ businessId: businessNumberId, phone, tipo: "tag_remove", descricao: `Tag "${tag.rows[0]?.nome || tagId}" removida` });
 }
 
 // Tags de UMA conversa (usado no painel de detalhes do contato).
@@ -2113,6 +2268,12 @@ async function retornoCriar({ businessId, phone, tipo, dataAgendada, canal, what
       Date.now(),
     ],
   });
+  await atividadeRegistrar({
+    businessId,
+    phone,
+    tipo: "retorno",
+    descricao: `Retorno agendado (${canal || "whatsapp"}) para ${new Date(dataAgendada).toLocaleString("pt-BR")}`,
+  });
   return Number(result.lastInsertRowid);
 }
 
@@ -2437,6 +2598,15 @@ module.exports = {
   emailBackupDefinir,
   agendaCalendarioConfigObter,
   agendaCalendarioConfigDefinir,
+  atividadesDaConversa,
+  campoPersonalizadoCriar,
+  camposPersonalizadosListar,
+  campoPersonalizadoApagar,
+  conversationCampoDefinir,
+  conversationCamposObter,
+  notaAdicionar,
+  notasDaConversa,
+  notaApagar,
   marcarContatoSalvo,
   atualizarStatusConversa,
   atualizarPipelineConversa,

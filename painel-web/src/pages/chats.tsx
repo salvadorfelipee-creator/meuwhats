@@ -12,6 +12,10 @@ import {
   type Tag,
   type EmailTemplate,
   type Retorno,
+  type CampoPersonalizado,
+  type CampoValor,
+  type NotaConversa,
+  type AtividadeConversa,
   pipelineEstagiosPara,
 } from "@/lib/api"
 import { GerenciarTags } from "@/pages/analytics"
@@ -40,12 +44,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import {
   Search,
   Send,
   Paperclip,
@@ -67,6 +65,8 @@ import {
   Mail,
   CalendarClock,
   Trash2,
+  Settings,
+  Clock,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -164,7 +164,10 @@ export function ChatsPage() {
   const [texto, setTexto] = React.useState("")
   const [enviando, setEnviando] = React.useState(false)
   const [respostas, setRespostas] = React.useState<RespostaPronta[]>([])
-  const [detailsOpen, setDetailsOpen] = React.useState(false)
+  // Painel de detalhes do contato fica FIXO ao lado da conversa por padrão (pedido do usuário —
+  // antes era um Sheet que precisava clicar pra abrir toda vez); o ícone "i" só recolhe/expande
+  // pra quem quiser mais espaço pra tela de chat.
+  const [detailsOpen, setDetailsOpen] = React.useState(true)
   const [broadcastOpen, setBroadcastOpen] = React.useState(false)
   const [mostrarFinalizadas, setMostrarFinalizadas] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
@@ -692,7 +695,12 @@ export function ChatsPage() {
                 >
                   <Download className="h-4 w-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => setDetailsOpen(true)}>
+                <Button
+                  variant={detailsOpen ? "secondary" : "ghost"}
+                  size="icon"
+                  title={detailsOpen ? "Esconder painel do contato" : "Mostrar painel do contato"}
+                  onClick={() => setDetailsOpen((v) => !v)}
+                >
                   <Info className="h-4 w-4" />
                 </Button>
               </div>
@@ -885,13 +893,11 @@ export function ChatsPage() {
         )}
       </div>
 
-      {/* Detalhes do contato */}
-      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <SheetContent>
-          <SheetHeader>
-            <SheetTitle>Detalhes do contato</SheetTitle>
-          </SheetHeader>
-          {conversaAtual && (
+      {/* Painel de detalhes do contato — fixo ao lado da conversa (não é mais um Sheet) */}
+      {conversaAtual && detailsOpen && (
+        <div className="w-[340px] shrink-0 border-l h-screen overflow-y-auto">
+          <div className="px-4 py-4">
+            <p className="font-semibold text-sm mb-1">Detalhes do contato</p>
             <ContactDetails
               key={conversaAtual.phone}
               conversation={conversaAtual}
@@ -899,9 +905,9 @@ export function ChatsPage() {
               mostrarPipelineTags={current.id !== "instagram"}
               onSaved={carregarConversas}
             />
-          )}
-        </SheetContent>
-      </Sheet>
+          </div>
+        </div>
+      )}
 
       <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
     </div>
@@ -1120,6 +1126,250 @@ function ExportarConversaBotao({ businessId, phone }: { businessId: string; phon
   )
 }
 
+// Dialog pra criar/apagar campo personalizado (definição vale pro negócio inteiro, ex.
+// "Convênio", "Procedimento de interesse") — mesmo padrão do GerenciarTags.
+function GerenciarCamposPersonalizados({
+  businessId,
+  campos,
+  onChange,
+}: {
+  businessId: string
+  campos: CampoPersonalizado[]
+  onChange: () => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const [nome, setNome] = React.useState("")
+  const [salvando, setSalvando] = React.useState(false)
+
+  async function criar() {
+    if (!nome.trim()) return
+    setSalvando(true)
+    try {
+      await api.criarCampoPersonalizado(businessId, nome.trim())
+      setNome("")
+      onChange()
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function apagar(id: number) {
+    await api.apagarCampoPersonalizado(businessId, id)
+    onChange()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-6 w-6" title="Gerenciar campos personalizados">
+          <Settings className="h-3.5 w-3.5" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Campos personalizados</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2 max-h-52 overflow-y-auto">
+            {campos.length === 0 && <p className="text-sm text-muted-foreground">Nenhum campo criado ainda.</p>}
+            {campos.map((c) => (
+              <div key={c.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
+                <span className="text-sm">{c.nome}</span>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => apagar(c.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 border-t pt-4">
+            <Input
+              placeholder="Nome do campo, ex. Convênio"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && criar()}
+            />
+            <Button onClick={criar} disabled={salvando || !nome.trim()}>
+              Criar
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Campos personalizados desse contato — cada input salva sozinho ao sair do campo (blur) ou
+// Enter, sem botão "salvar" separado (menos fricção pra preencher vários campos seguidos).
+function CamposPersonalizadosSecao({ businessId, phone }: { businessId: string; phone: string }) {
+  const [campos, setCampos] = React.useState<CampoPersonalizado[]>([])
+  const [valores, setValores] = React.useState<CampoValor[]>([])
+  const [editando, setEditando] = React.useState<Record<number, string>>({})
+  const [salvandoId, setSalvandoId] = React.useState<number | null>(null)
+
+  const carregar = React.useCallback(() => {
+    api.camposPersonalizados(businessId).then(setCampos).catch(() => {})
+    api.camposDaConversa(businessId, phone).then(setValores).catch(() => {})
+  }, [businessId, phone])
+
+  React.useEffect(() => {
+    carregar()
+  }, [carregar])
+
+  async function salvarValor(campoId: number, valorAtual: string) {
+    const valor = editando[campoId] ?? valorAtual
+    if (valor === valorAtual) return
+    setSalvandoId(campoId)
+    try {
+      await api.definirCampoConversa(businessId, phone, campoId, valor)
+      carregar()
+    } finally {
+      setSalvandoId(null)
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-sm font-medium block">Campos personalizados</label>
+        <GerenciarCamposPersonalizados businessId={businessId} campos={campos} onChange={carregar} />
+      </div>
+      {campos.length === 0 && <p className="text-xs text-muted-foreground">Nenhum campo criado ainda.</p>}
+      <div className="flex flex-col gap-2">
+        {campos.map((c) => {
+          const valorAtual = valores.find((v) => v.campo_id === c.id)?.valor || ""
+          const valorEditado = editando[c.id] ?? valorAtual
+          return (
+            <div key={c.id}>
+              <label className="text-xs text-muted-foreground">{c.nome}</label>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  value={valorEditado}
+                  onChange={(e) => setEditando((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                  onBlur={() => salvarValor(c.id, valorAtual)}
+                  onKeyDown={(e) => e.key === "Enter" && salvarValor(c.id, valorAtual)}
+                  className="h-8 text-sm"
+                  placeholder="—"
+                />
+                {salvandoId === c.id && <span className="text-[10px] text-muted-foreground shrink-0">salvando</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// Histórico de notas — diferente da "Nota fixada" (campo único, sempre visível no topo): aqui é
+// uma lista datada, pra registrar cada contato/observação sem sobrescrever a anterior.
+function NotasSecao({ businessId, phone }: { businessId: string; phone: string }) {
+  const [notas, setNotas] = React.useState<NotaConversa[]>([])
+  const [texto, setTexto] = React.useState("")
+  const [salvando, setSalvando] = React.useState(false)
+
+  const carregar = React.useCallback(() => {
+    api.notasDaConversa(businessId, phone).then(setNotas).catch(() => {})
+  }, [businessId, phone])
+
+  React.useEffect(() => {
+    carregar()
+  }, [carregar])
+
+  async function adicionar() {
+    if (!texto.trim()) return
+    setSalvando(true)
+    try {
+      await api.adicionarNota(businessId, phone, texto.trim())
+      setTexto("")
+      carregar()
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  async function apagar(id: number) {
+    await api.apagarNota(id)
+    carregar()
+  }
+
+  return (
+    <div>
+      <label className="text-sm font-medium mb-1 block">Histórico de notas</label>
+      <div className="flex flex-col gap-1.5 mb-2">
+        <Textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          rows={2}
+          placeholder="Nova nota sobre esse contato..."
+          className="text-sm"
+        />
+        <Button size="sm" variant="outline" onClick={adicionar} disabled={salvando || !texto.trim()} className="w-fit">
+          {salvando ? "Salvando..." : "Adicionar nota"}
+        </Button>
+      </div>
+      {notas.length === 0 && <p className="text-xs text-muted-foreground">Nenhuma nota ainda.</p>}
+      <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+        {notas.map((n) => (
+          <div key={n.id} className="rounded-lg border p-2 text-xs">
+            <div className="flex items-start justify-between gap-2">
+              <p className="whitespace-pre-wrap flex-1">{n.texto}</p>
+              <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => apagar(n.id)}>
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+            <p className="text-muted-foreground mt-1">
+              {new Date(n.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const ATIVIDADE_ICONE: Record<string, string> = {
+  tag_add: "🏷️",
+  tag_remove: "🏷️",
+  etapa: "📶",
+  campo: "📝",
+  retorno: "⏰",
+}
+
+// Linha do tempo — auditoria de tudo que mudou nesse contato (tag/etapa/campo/retorno), com
+// data e hora, gerada automaticamente pelo backend (ver atividadeRegistrar em db.js). Só
+// leitura: não tem como editar/apagar um item daqui, é um log.
+function AtividadesSecao({ businessId, phone, refreshKey }: { businessId: string; phone: string; refreshKey: number }) {
+  const [atividades, setAtividades] = React.useState<AtividadeConversa[]>([])
+
+  React.useEffect(() => {
+    api.atividadesDaConversa(businessId, phone).then(setAtividades).catch(() => {})
+  }, [businessId, phone, refreshKey])
+
+  if (atividades.length === 0) return null
+
+  return (
+    <div>
+      <label className="text-sm font-medium mb-1 flex items-center gap-1.5">
+        <Clock className="h-3.5 w-3.5" />
+        Linha do tempo
+      </label>
+      <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+        {atividades.map((a) => (
+          <div key={a.id} className="text-xs flex items-start gap-1.5">
+            <span className="shrink-0">{ATIVIDADE_ICONE[a.tipo] || "•"}</span>
+            <div className="min-w-0">
+              <p className="truncate">{a.descricao}</p>
+              <p className="text-muted-foreground">
+                {new Date(a.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function ContactDetails({
   conversation,
   businessId,
@@ -1149,6 +1399,10 @@ function ContactDetails({
     api.tags(businessId).then(setTodasTags).catch(() => {})
   }, [mostrarPipelineTags, businessId])
 
+  // Incrementado a cada mutação (tag/etapa/retorno) pra forçar a Linha do Tempo a recarregar e
+  // mostrar a atividade que acabou de acontecer sem precisar trocar de conversa e voltar.
+  const [ativRefresh, setAtivRefresh] = React.useState(0)
+
   const [retornos, setRetornos] = React.useState<Retorno[]>([])
   const carregarRetornos = React.useCallback(() => {
     if (businessId === "instagram") return
@@ -1168,6 +1422,7 @@ function ContactDetails({
   async function cancelarRetorno(id: number) {
     await api.cancelarRetorno(id)
     carregarRetornos()
+    setAtivRefresh((v) => v + 1)
   }
 
   async function alternarTag(tag: Tag) {
@@ -1179,6 +1434,7 @@ function ContactDetails({
       setTagsConversa((prev) => [...prev, tag])
       await api.adicionarTagConversa(businessId, conversation.phone, tag.id)
     }
+    setAtivRefresh((v) => v + 1)
   }
 
   async function mudarEstagio(novoEstagio: string) {
@@ -1187,6 +1443,7 @@ function ContactDetails({
     try {
       await api.setPipeline(businessId, conversation.phone, novoEstagio || null)
       onSaved()
+      setAtivRefresh((v) => v + 1)
     } finally {
       setSalvandoEstagio(false)
     }
@@ -1282,6 +1539,7 @@ function ContactDetails({
           </div>
         </>
       )}
+      {businessId !== "instagram" && <CamposPersonalizadosSecao businessId={businessId} phone={conversation.phone} />}
       {businessId !== "instagram" && (
         <div>
           <label className="text-sm font-medium mb-1 block">Retornos agendados</label>
@@ -1312,12 +1570,22 @@ function ContactDetails({
               ))}
             </div>
           )}
-          <AgendarRetornoDialog businessId={businessId} conversation={conversation} onCreated={carregarRetornos} />
+          <AgendarRetornoDialog
+            businessId={businessId}
+            conversation={conversation}
+            onCreated={() => {
+              carregarRetornos()
+              setAtivRefresh((v) => v + 1)
+            }}
+          />
         </div>
       )}
+      {businessId !== "instagram" && <NotasSecao businessId={businessId} phone={conversation.phone} />}
+      {businessId !== "instagram" && <AtividadesSecao businessId={businessId} phone={conversation.phone} refreshKey={ativRefresh} />}
       <div>
-        <label className="text-sm font-medium mb-1 block">Nota interna</label>
-        <Textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={5} />
+        <label className="text-sm font-medium mb-1 block">Nota fixada</label>
+        <p className="text-xs text-muted-foreground mb-1">Um resumo curto sempre visível no topo — pra histórico completo, use as notas acima.</p>
+        <Textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={3} />
         <Button size="sm" className="mt-2" onClick={salvar} disabled={salvando}>
           {salvando ? "Salvando..." : "Salvar nota"}
         </Button>
