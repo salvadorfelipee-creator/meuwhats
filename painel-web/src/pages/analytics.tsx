@@ -469,11 +469,131 @@ function TabelaContatos({ businessId, canalLabel }: { businessId: string; canalL
   )
 }
 
+// Quadro Kanban — mesmo espírito do "Quadro de Conversas" do Octadesk: 1 coluna por etapa,
+// arrasta o card pra mudar a etapa (nativo, sem biblioteca de drag-and-drop nova). Otimista:
+// move o card na hora, só confirma com o servidor depois — sem isso o arrastar pareceria travado.
+function KanbanContatos({ businessId, canalLabel, onChanged }: { businessId: string; canalLabel: string; onChanged: () => void }) {
+  const [contatos, setContatos] = React.useState<Conversation[]>([])
+  const [carregando, setCarregando] = React.useState(true)
+  const [arrastando, setArrastando] = React.useState<string | null>(null)
+  const [sobreColuna, setSobreColuna] = React.useState<string | null>(null)
+
+  const estagios = pipelineEstagiosPara(canalLabel)
+  const colunas = React.useMemo(() => [{ id: "", nome: "Sem etapa", cor: "#94a3b8" }, ...estagios], [estagios])
+
+  const carregar = React.useCallback(() => {
+    setCarregando(true)
+    api
+      .conversations(businessId, { finalizadas: true })
+      .then(setContatos)
+      .finally(() => setCarregando(false))
+  }, [businessId])
+
+  React.useEffect(() => {
+    carregar()
+  }, [carregar])
+
+  const porEstagio = React.useMemo(() => {
+    const mapa: Record<string, Conversation[]> = {}
+    for (const col of colunas) mapa[col.id] = []
+    for (const c of contatos) {
+      const chave = c.pipeline_estagio && mapa[c.pipeline_estagio] ? c.pipeline_estagio : ""
+      mapa[chave].push(c)
+    }
+    return mapa
+  }, [contatos, colunas])
+
+  async function soltarEm(estagioId: string) {
+    if (!arrastando) return
+    const phone = arrastando
+    setArrastando(null)
+    setSobreColuna(null)
+    const anterior = contatos.find((c) => c.phone === phone)?.pipeline_estagio || null
+    if (anterior === (estagioId || null)) return
+    setContatos((prev) => prev.map((c) => (c.phone === phone ? { ...c, pipeline_estagio: estagioId || null } : c)))
+    try {
+      await api.setPipeline(businessId, phone, estagioId || null)
+      onChanged()
+    } catch {
+      setContatos((prev) => prev.map((c) => (c.phone === phone ? { ...c, pipeline_estagio: anterior } : c)))
+    }
+  }
+
+  if (carregando) {
+    return (
+      <div className="rounded-xl border p-5">
+        <p className="text-sm text-muted-foreground">Carregando quadro...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border p-5">
+      <p className="font-medium mb-3">Quadro (arraste os cartões entre as colunas)</p>
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {colunas.map((col) => (
+          <div
+            key={col.id}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setSobreColuna(col.id)
+            }}
+            onDragLeave={() => setSobreColuna((v) => (v === col.id ? null : v))}
+            onDrop={(e) => {
+              e.preventDefault()
+              soltarEm(col.id)
+            }}
+            className={`w-60 shrink-0 rounded-lg border flex flex-col transition-colors ${
+              sobreColuna === col.id ? "border-primary bg-primary/5" : ""
+            }`}
+          >
+            <div className="px-3 py-2 border-b flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: col.cor }} />
+              <span className="text-sm font-medium truncate">{col.nome}</span>
+              <span className="text-xs text-muted-foreground ml-auto">{(porEstagio[col.id] || []).length}</span>
+            </div>
+            <div className="flex flex-col gap-2 p-2 min-h-[80px] max-h-[520px] overflow-y-auto">
+              {(porEstagio[col.id] || []).map((c) => {
+                const tags = c.tags_json ? (JSON.parse(c.tags_json) as { id: number; nome: string; cor: string }[]) : []
+                return (
+                  <div
+                    key={c.phone}
+                    draggable
+                    onDragStart={() => setArrastando(c.phone)}
+                    onDragEnd={() => setArrastando(null)}
+                    className="rounded-lg border bg-card p-2.5 text-xs cursor-grab active:cursor-grabbing shadow-sm"
+                  >
+                    <p className="font-medium truncate">{c.name || "Sem nome"}</p>
+                    <p className="text-muted-foreground truncate">{c.phone}</p>
+                    {tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {tags.map((t) => (
+                          <span key={t.id} className="px-1.5 py-0.5 rounded-full text-[9px] text-white" style={{ background: t.cor }}>
+                            {t.nome}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+              {(porEstagio[col.id] || []).length === 0 && (
+                <p className="text-[11px] text-muted-foreground text-center py-4">Arraste um cartão aqui</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function AnalyticsPage() {
   const { current: canal } = useChannel()
   const [dias, setDias] = React.useState<(typeof PERIODOS)[number]>(30)
   const [dados, setDados] = React.useState<AnalyticsResumo | null>(null)
   const [tags, setTags] = React.useState<Tag[]>([])
+  const [visao, setVisao] = React.useState<"lista" | "kanban">("kanban")
 
   const carregar = React.useCallback(() => {
     if (!canal) return
@@ -572,7 +692,22 @@ export function AnalyticsPage() {
           </div>
         </div>
 
-        <TabelaContatos businessId={canal.id} canalLabel={canal.label} />
+        <div className="flex items-center justify-between">
+          <p className="font-medium">CRM de contatos</p>
+          <div className="flex gap-1">
+            <Button size="sm" variant={visao === "kanban" ? "default" : "outline"} onClick={() => setVisao("kanban")}>
+              Kanban
+            </Button>
+            <Button size="sm" variant={visao === "lista" ? "default" : "outline"} onClick={() => setVisao("lista")}>
+              Lista
+            </Button>
+          </div>
+        </div>
+        {visao === "kanban" ? (
+          <KanbanContatos businessId={canal.id} canalLabel={canal.label} onChanged={carregar} />
+        ) : (
+          <TabelaContatos businessId={canal.id} canalLabel={canal.label} />
+        )}
 
         <p className="text-xs text-muted-foreground pb-6">
           Tempo de resolução médio no período: {dados ? formatMs(dados.tempoMedioResolucaoMs) : "—"}
