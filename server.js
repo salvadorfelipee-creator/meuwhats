@@ -189,10 +189,21 @@ async function resolverWabaDoNumero(businessNumberId) {
 // nada do fluxo automático de resposta que vem depois.
 const DIAS_BLOQUEIO_REENVIO_TEMPLATE = 30;
 
+// Troca {{nome}}/{{data}} dentro de UM parâmetro de template — usado quando o chamador passa
+// `params` customizado (ex.: template de aniversário com 2+ variáveis) em vez de confiar no
+// preenchimento automático de 1 variável só (nome, comportamento antigo abaixo).
+function resolverTokenParametro(texto, nome) {
+  const agoraBrt = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const dataFmt = `${String(agoraBrt.getUTCDate()).padStart(2, "0")}/${String(agoraBrt.getUTCMonth() + 1).padStart(2, "0")}`;
+  return String(texto).replace(/\{\{nome\}\}/g, nome || "Cliente").replace(/\{\{data\}\}/g, dataFmt);
+}
+
 // Envia 1 mensagem de template de broadcast e grava na conversa — usado tanto pelo envio
 // imediato (POST /painel/api/broadcast) quanto pelo agendador de envios intercalados (ver
 // setInterval do broadcast_agendado, mais abaixo). Retorna { ok, error }, nunca lança.
-async function enviarUmBroadcast(businessId, { phone, name, template, language, bodyPreview }) {
+// `params` (opcional): lista de textos, 1 por variável {{1}},{{2}}... do template, cada um
+// podendo usar os tokens {{nome}}/{{data}} — sem isso, mantém o padrão antigo (só {{1}}=nome).
+async function enviarUmBroadcast(businessId, { phone, name, template, language, bodyPreview, params }) {
   const telefoneLimpo = normalizarTelefoneBR(phone);
   const nome = (name || "").trim();
   if (!telefoneLimpo) return { ok: false, error: "telefone inválido" };
@@ -203,7 +214,12 @@ async function enviarUmBroadcast(businessId, { phone, name, template, language, 
     };
   }
   try {
-    const components = nome ? [{ type: "body", parameters: [{ type: "text", text: nome }] }] : undefined;
+    const components =
+      params && params.length
+        ? [{ type: "body", parameters: params.map((p) => ({ type: "text", text: resolverTokenParametro(p, nome) })) }]
+        : nome
+        ? [{ type: "body", parameters: [{ type: "text", text: nome }] }]
+        : undefined;
     const result = await wa.sendTemplate(businessId, telefoneLimpo, template, language || "pt_BR", components);
     const waId = result.messages?.[0]?.id || null;
     const now = Date.now();
@@ -3355,6 +3371,17 @@ function escolherVarianteCampanhaCLT(phone) {
 // processarEntry, que já buscou a conversa), evita uma consulta a mais. Passo começando com
 // "fgtsad_" manda pro fluxo do anúncio de FGTS (sticky por passo salvo, não por template).
 async function getFluxo(businessNumberId, phone, fluxoPassoAtual) {
+  // Retorno/campanha em massa com um fluxo CONECTADO (ver retornos.fluxo_id/broadcast_agendado.fluxo_id
+  // e "Conectar a um fluxo" no painel) — a PRÓXIMA resposta do contato, seja qual for o texto,
+  // deve cair nesse fluxo específico, não no padrão do número (que pode nem ser dinâmico — vale
+  // pra qualquer número, Felizcred/Cota Certa/Ciahot incluso). Checado ANTES de tudo, de
+  // propósito. O disparo de verdade acontece via o mecanismo já existente de "conversa inativa
+  // → manda o fluxo" (ver processarEntry) — aqui só resolve QUAL fluxo usar.
+  if (String(fluxoPassoAtual || "").startsWith("aguardando_fluxo_")) {
+    const fluxoId = Number(fluxoPassoAtual.slice("aguardando_fluxo_".length));
+    const fluxoAguardado = await db.fluxoDinamicoObter(fluxoId);
+    if (fluxoAguardado) return montarFluxoDinamico(fluxoAguardado);
+  }
   if (businessNumberId === CAMPANHA_CLT_NUMBER_ID) return escolherVarianteCampanhaCLT(phone);
   if (businessNumberId === FELIZCRED_PRINCIPAL_NUMBER_ID) {
     if (String(fluxoPassoAtual || "").startsWith("fgtsad_")) return FLUXO_FGTS_ANUNCIO;
@@ -4849,19 +4876,25 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchBroadcast[1]);
       const body = await parseBody(req);
-      const { template, language, contacts, bodyPreview, intervalSeconds } = body;
+      const { template, language, contacts, bodyPreview, intervalSeconds, fluxoId } = body;
       if (!template || !Array.isArray(contacts) || !contacts.length) {
         return send(res, 400, { error: "Informe o template e ao menos um contato" });
       }
       const intervalo = Math.max(Number(intervalSeconds) || 0, 0);
 
+      // Fluxo conectado (opcional): assim que CADA contato responder o template (qualquer
+      // resposta), cai nesse fluxo em vez do padrão do número — ver getFluxo "aguardando_fluxo_".
+      async function marcarFluxoSeConectado(phone) {
+        if (!fluxoId) return;
+        await db.setFluxoPasso(normalizarTelefoneBR(phone), businessId, `aguardando_fluxo_${fluxoId}`);
+      }
+
       if (!intervalo) {
         const resultados = [];
         for (const contato of contacts) {
-          resultados.push({
-            phone: contato.phone || "",
-            ...(await enviarUmBroadcast(businessId, { ...contato, template, language, bodyPreview })),
-          });
+          const resultado = await enviarUmBroadcast(businessId, { ...contato, template, language, bodyPreview });
+          if (resultado.ok) await marcarFluxoSeConectado(contato.phone);
+          resultados.push({ phone: contato.phone || "", ...resultado });
           await new Promise((r) => setTimeout(r, 350));
         }
         return send(res, 200, { resultados });
@@ -4870,9 +4903,9 @@ const server = http.createServer(async (req, res) => {
       // Com intervalo: o 1º sai já (mesma experiência de sempre — confirma na hora que
       // funcionou), o resto agenda.
       const [primeiro, ...resto] = contacts;
-      const resultados = [
-        { phone: primeiro.phone || "", ...(await enviarUmBroadcast(businessId, { ...primeiro, template, language, bodyPreview })) },
-      ];
+      const resultadoPrimeiro = await enviarUmBroadcast(businessId, { ...primeiro, template, language, bodyPreview });
+      if (resultadoPrimeiro.ok) await marcarFluxoSeConectado(primeiro.phone);
+      const resultados = [{ phone: primeiro.phone || "", ...resultadoPrimeiro }];
       const agora = Date.now();
       const itensAgendados = resto.map((contato, i) => ({
         phone: normalizarTelefoneBR(contato.phone),
@@ -4882,7 +4915,7 @@ const server = http.createServer(async (req, res) => {
         bodyPreview: bodyPreview || null,
         agendadoPara: agora + (i + 1) * intervalo * 1000,
       }));
-      const agendados = itensAgendados.length ? await db.broadcastAgendarLote(businessId, itensAgendados) : 0;
+      const agendados = itensAgendados.length ? await db.broadcastAgendarLote(businessId, itensAgendados, fluxoId) : 0;
       return send(res, 200, { resultados, agendados, intervalSeconds: intervalo });
     }
 
@@ -5030,9 +5063,20 @@ const server = http.createServer(async (req, res) => {
         canal: body.canal,
         whatsappTemplate: body.whatsappTemplate,
         whatsappLanguage: body.whatsappLanguage,
+        whatsappParams: Array.isArray(body.whatsappParams) ? body.whatsappParams : undefined,
+        fluxoId: body.fluxoId,
         emailTemplateId: body.emailTemplateId,
       });
       return send(res, 200, { id });
+    }
+
+    // GET /painel/api/fluxos/:businessId — fluxos dinâmicos desse número (id/nome/ativo), só
+    // pra alimentar o seletor "Conectar a um fluxo" no painel (gerenciar os nós continua sendo
+    // só via MCP).
+    const matchFluxosListar = path_.match(/^\/painel\/api\/fluxos\/([^/]+)$/);
+    if (req.method === "GET" && matchFluxosListar) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.fluxoDinamicoListar(decodeURIComponent(matchFluxosListar[1])));
     }
 
     const matchRetornosConversa = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/retornos$/);
@@ -5889,8 +5933,10 @@ setInterval(async () => {
         language: item.language,
         bodyPreview: item.body_preview,
       });
-      if (resultado.ok) await db.broadcastMarcarEnviado(item.id);
-      else await db.broadcastMarcarErro(item.id, resultado.error || "erro desconhecido");
+      if (resultado.ok) {
+        await db.broadcastMarcarEnviado(item.id);
+        if (item.fluxo_id) await db.setFluxoPasso(item.phone, item.business_id, `aguardando_fluxo_${item.fluxo_id}`);
+      } else await db.broadcastMarcarErro(item.id, resultado.error || "erro desconhecido");
     }
   } catch (err) {
     console.error("Erro no agendador de broadcast intercalado:", err.message);
@@ -5943,9 +5989,14 @@ setInterval(async () => {
           name: conversa?.name,
           template: item.whatsapp_template,
           language: item.whatsapp_language,
+          params: item.whatsapp_params ? JSON.parse(item.whatsapp_params) : undefined,
         });
-        if (resultado.ok) algumSucesso = true;
-        else erros.push(`whatsapp: ${resultado.error}`);
+        if (resultado.ok) {
+          algumSucesso = true;
+          // Fluxo conectado (ver "Conectar a um fluxo" no painel) — a próxima resposta do
+          // contato, seja qual for, dispara esse fluxo em vez do padrão do número.
+          if (item.fluxo_id) await db.setFluxoPasso(item.phone, item.business_id, `aguardando_fluxo_${item.fluxo_id}`);
+        } else erros.push(`whatsapp: ${resultado.error}`);
       }
 
       if (item.canal === "email" || item.canal === "ambos") {

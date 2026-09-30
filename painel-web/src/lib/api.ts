@@ -34,6 +34,7 @@ export type CampoPersonalizado = { id: number; business_id: string; nome: string
 export type CampoValor = { campo_id: number; nome: string; valor: string | null }
 export type NotaConversa = { id: number; business_id: string; phone: string; texto: string; created_at: number }
 export type AtividadeConversa = { id: number; business_id: string; phone: string; tipo: string; descricao: string; created_at: number }
+export type FluxoDinamico = { id: number; business_id: string; nome: string; ativo: number; no_inicial_id: number | null; created_at: number }
 
 export type EmailTemplate = { id: number; business_id: string; nome: string; assunto: string; corpo_html: string; created_at: number }
 
@@ -382,6 +383,7 @@ export const api = {
       contacts: BroadcastContact[]
       bodyPreview?: string
       intervalSeconds?: number
+      fluxoId?: number
     },
   ) =>
     request<{ resultados: BroadcastResult[]; agendados?: number; intervalSeconds?: number }>(
@@ -580,12 +582,24 @@ export const api = {
   criarRetorno: (
     businessId: string,
     phone: string,
-    dados: { tipo?: string; dataAgendada: number; canal: "whatsapp" | "email" | "ambos"; whatsappTemplate?: string; whatsappLanguage?: string; emailTemplateId?: number },
+    dados: {
+      tipo?: string
+      dataAgendada: number
+      canal: "whatsapp" | "email" | "ambos"
+      whatsappTemplate?: string
+      whatsappLanguage?: string
+      whatsappParams?: string[]
+      fluxoId?: number
+      emailTemplateId?: number
+    },
   ) =>
     request<{ id: number }>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/retorno`, {
       method: "POST",
       body: JSON.stringify(dados),
     }),
+
+  // ── Fluxos dinâmicos (só leitura no painel — criar/editar nó continua via MCP) ───────────
+  fluxos: (businessId: string) => request<FluxoDinamico[]>(`/painel/api/fluxos/${encodeURIComponent(businessId)}`),
   retornosDaConversa: (businessId: string, phone: string) =>
     request<Retorno[]>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/retornos`),
   retornosDoNegocio: (businessId: string) => request<Retorno[]>(`/painel/api/retornos/${encodeURIComponent(businessId)}`),

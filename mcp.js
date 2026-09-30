@@ -221,7 +221,13 @@ const TOOLS = [
       "'aniversário', 'lembrete de reunião'. canal='whatsapp' manda um template aprovado (exige " +
       "whatsapp_template); canal='email' manda um template de e-mail pro e-mail salvo da conversa " +
       "(exige email_template_id, e a conversa precisa ter e-mail salvo); canal='ambos' faz os dois " +
-      "no mesmo horário.",
+      "no mesmo horário. whatsapp_params preenche as variáveis {{1}},{{2}}... do template NA ORDEM " +
+      "(cada item pode usar os tokens {{nome}} e {{data}}, resolvidos na hora do envio) — sem " +
+      "informar, só preenche {{1}} com o nome salvo da conversa (comportamento antigo). fluxo_id " +
+      "conecta esse retorno a um fluxo dinâmico (ver fluxo_criar/fluxo_listar): a PRÓXIMA resposta " +
+      "do contato, seja qual for o texto, dispara esse fluxo — use pra campanha de venda/retorno " +
+      "'solto' onde o template é só um gancho (ex. 'Bom dia!') e a conversa de verdade acontece no " +
+      "fluxo, em vez de cair no atendimento padrão do número.",
     inputSchema: {
       type: "object",
       properties: {
@@ -232,6 +238,12 @@ const TOOLS = [
         canal: { type: "string", enum: ["whatsapp", "email", "ambos"] },
         whatsapp_template: { type: "string", description: "obrigatório se canal inclui whatsapp" },
         whatsapp_language: { type: "string", default: "pt_BR" },
+        whatsapp_params: {
+          type: "array",
+          items: { type: "string" },
+          description: "1 item por variável {{1}},{{2}}... do template, na ordem — pode usar {{nome}}/{{data}}",
+        },
+        fluxo_id: { type: "number", description: "fluxo dinâmico a disparar na próxima resposta do contato (opcional)" },
         email_template_id: { type: "number", description: "obrigatório se canal inclui email" },
       },
       required: ["business_id", "phone", "data_hora", "canal"],
@@ -882,6 +894,8 @@ async function chamarFerramenta(nome, args, ctx) {
         canal: a.canal,
         whatsappTemplate: a.whatsapp_template,
         whatsappLanguage: a.whatsapp_language || "pt_BR",
+        whatsappParams: Array.isArray(a.whatsapp_params) ? a.whatsapp_params : undefined,
+        fluxoId: a.fluxo_id,
         emailTemplateId: a.email_template_id,
       });
       return textoFerramenta({ retorno_id: id });

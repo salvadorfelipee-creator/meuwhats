@@ -16,6 +16,7 @@ import {
   type CampoValor,
   type NotaConversa,
   type AtividadeConversa,
+  type FluxoDinamico,
   pipelineEstagiosPara,
 } from "@/lib/api"
 import { GerenciarTags } from "@/pages/analytics"
@@ -932,8 +933,11 @@ function AgendarRetornoDialog({
   const [tipo, setTipo] = React.useState("retorno")
   const [waTemplates, setWaTemplates] = React.useState<TemplateInfo[]>([])
   const [waTemplateNome, setWaTemplateNome] = React.useState("")
+  const [waParamsTexto, setWaParamsTexto] = React.useState("")
   const [emailTemplates, setEmailTemplates] = React.useState<EmailTemplate[]>([])
   const [emailTemplateId, setEmailTemplateId] = React.useState<number | null>(null)
+  const [fluxos, setFluxos] = React.useState<FluxoDinamico[]>([])
+  const [fluxoId, setFluxoId] = React.useState<number | null>(null)
   const [salvando, setSalvando] = React.useState(false)
   const [erro, setErro] = React.useState<string | null>(null)
 
@@ -941,6 +945,7 @@ function AgendarRetornoDialog({
     if (!open) return
     api.templates(businessId).then((r) => setWaTemplates(r.templates)).catch(() => {})
     api.emailTemplates(businessId).then(setEmailTemplates).catch(() => {})
+    api.fluxos(businessId).then(setFluxos).catch(() => {})
   }, [open, businessId])
 
   async function criar() {
@@ -952,12 +957,18 @@ function AgendarRetornoDialog({
     }
     setErro(null)
     setSalvando(true)
+    const params = waParamsTexto
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
     try {
       await api.criarRetorno(businessId, conversation.phone, {
         tipo,
         dataAgendada: new Date(dataHora).getTime(),
         canal,
         whatsappTemplate: canal !== "email" ? waTemplateNome : undefined,
+        whatsappParams: canal !== "email" && params.length ? params : undefined,
+        fluxoId: fluxoId ?? undefined,
         emailTemplateId: canal !== "whatsapp" ? emailTemplateId ?? undefined : undefined,
       })
       setOpen(false)
@@ -1018,6 +1029,23 @@ function AgendarRetornoDialog({
                   </option>
                 ))}
               </select>
+              {waTemplateNome && (
+                <div className="mt-2">
+                  <label className="text-xs text-muted-foreground mb-1 block">
+                    Parâmetros do template (opcional) — 1 por linha, na ordem das variáveis {"{{1}}"}, {"{{2}}"}...
+                  </label>
+                  <Textarea
+                    value={waParamsTexto}
+                    onChange={(e) => setWaParamsTexto(e.target.value)}
+                    rows={2}
+                    placeholder={"{{nome}}\n{{data}}"}
+                    className="text-xs font-mono"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Vazio = só preenche a 1ª variável com o nome salvo do contato. Tokens disponíveis: {"{{nome}}"} e {"{{data}}"}.
+                  </p>
+                </div>
+              )}
             </div>
           )}
           {(canal === "email" || canal === "ambos") && (
@@ -1038,6 +1066,27 @@ function AgendarRetornoDialog({
               {!conversation.email && (
                 <p className="text-xs text-muted-foreground mt-1">Essa conversa ainda não tem e-mail salvo.</p>
               )}
+            </div>
+          )}
+          {(canal === "whatsapp" || canal === "ambos") && (
+            <div>
+              <label className="text-sm font-medium mb-1 block">Conectar a um fluxo (opcional)</label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                value={fluxoId ?? ""}
+                onChange={(e) => setFluxoId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">Nenhum — cai no atendimento padrão do número</option>
+                {fluxos.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome}
+                    {f.ativo ? " (ativo)" : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Assim que o contato responder (qualquer coisa), a conversa entra nesse fluxo em vez do padrão do número.
+              </p>
             </div>
           )}
           {erro && <p className="text-sm text-destructive">{erro}</p>}
@@ -1617,6 +1666,8 @@ function BroadcastDialog({
   const [contatos, setContatos] = React.useState("")
   const [intervaloMin, setIntervaloMin] = React.useState("0")
   const [intervaloSeg, setIntervaloSeg] = React.useState("0")
+  const [fluxos, setFluxos] = React.useState<FluxoDinamico[]>([])
+  const [fluxoId, setFluxoId] = React.useState<number | null>(null)
   const [enviando, setEnviando] = React.useState(false)
   const [resumo, setResumo] = React.useState<string | null>(null)
   const [falhas, setFalhas] = React.useState<BroadcastResult[]>([])
@@ -1635,6 +1686,12 @@ function BroadcastDialog({
     if (!open || !contaId) return
     carregarFila()
   }, [open, contaId, carregarFila])
+
+  React.useEffect(() => {
+    if (!open || !contaId) return
+    setFluxoId(null)
+    api.fluxos(contaId).then(setFluxos).catch(() => {})
+  }, [open, contaId])
 
   async function cancelarItem(id: number) {
     try {
@@ -1685,6 +1742,7 @@ function BroadcastDialog({
         language: templateSelecionado?.language || "pt_BR",
         contacts,
         intervalSeconds: intervalSeconds > 0 ? intervalSeconds : undefined,
+        fluxoId: fluxoId ?? undefined,
       })
       const ok = resultados.filter((r) => r.ok).length
       const partes = [`${ok} enviada(s) agora.`]
@@ -1788,6 +1846,26 @@ function BroadcastDialog({
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               O 1º contato sai na hora; os demais ficam agendados nesse intervalo, mesmo se você fechar o painel.
+            </p>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Conectar a um fluxo (opcional)</label>
+            <select
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              value={fluxoId ?? ""}
+              onChange={(e) => setFluxoId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">Nenhum — cai no atendimento padrão do número</option>
+              {fluxos.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome}
+                  {f.ativo ? " (ativo)" : ""}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Assim que cada contato responder (qualquer coisa), a conversa entra nesse fluxo em vez do padrão do número — ex.:
+              template "Bom dia!" como gancho e a conversa de verdade acontece no fluxo.
             </p>
           </div>
           {fila.length > 0 && (

@@ -350,6 +350,20 @@ const ready = (async () => {
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_retornos_status ON retornos(status, data_agendada)`);
 
+  // whatsapp_params = lista JSON de parâmetros do template, na ordem das variáveis {{1}},
+  // {{2}}... do Meta (ex. ["{{nome}}", "{{data}}"]) — sem isso só dava pra preencher {{1}} com
+  // o nome do contato (comportamento antigo de enviarUmBroadcast, mantido como padrão se
+  // whatsapp_params vier vazio). fluxo_id = fluxo dinâmico que deve começar assim que o
+  // contato responder esse retorno (qualquer resposta, não só palavra-chave — ver getFluxo
+  // "aguardando_fluxo_"), pra retorno de venda/campanha "solta" tipo ManyChat.
+  const infoRetornos = await client.execute(`PRAGMA table_info(retornos)`);
+  if (!infoRetornos.rows.some((r) => r.name === "whatsapp_params")) {
+    await client.execute(`ALTER TABLE retornos ADD COLUMN whatsapp_params TEXT`);
+  }
+  if (!infoRetornos.rows.some((r) => r.name === "fluxo_id")) {
+    await client.execute(`ALTER TABLE retornos ADD COLUMN fluxo_id INTEGER`);
+  }
+
   await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     atalho TEXT NOT NULL,
@@ -528,6 +542,14 @@ const ready = (async () => {
     created_at INTEGER NOT NULL
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_broadcast_agendado_status ON broadcast_agendado(status, agendado_para)`);
+
+  // fluxo_id = mesmo conceito do retornos.fluxo_id (ver acima) — aplicado a campanha em massa:
+  // quando alguém responde o template da campanha, cai direto nesse fluxo em vez do padrão do
+  // número.
+  const infoBroadcastAgendado = await client.execute(`PRAGMA table_info(broadcast_agendado)`);
+  if (!infoBroadcastAgendado.rows.some((r) => r.name === "fluxo_id")) {
+    await client.execute(`ALTER TABLE broadcast_agendado ADD COLUMN fluxo_id INTEGER`);
+  }
 
   // Uma linha por solicitação de FGTS em andamento na Unnotech (ver PROJETO de originação
   // automática de FGTS) — etapa controla onde a conversa está, status_unnotech guarda o último
@@ -2059,15 +2081,25 @@ async function cltOriginationReivindicar(id, etapaEsperada, etapaNova) {
 
 // Agenda os contatos 2+ de um broadcast com intervalo — cada item já vem com seu
 // agendado_para calculado pelo chamador (server.js: agora + i * intervaloSegundos).
-async function broadcastAgendarLote(businessId, itens) {
+async function broadcastAgendarLote(businessId, itens, fluxoId) {
   await ready;
   const agora = Date.now();
   for (const item of itens) {
     await client.execute({
       sql: `INSERT INTO broadcast_agendado
-              (business_id, phone, name, template, language, body_preview, agendado_para, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [businessId, item.phone, item.name || null, item.template, item.language, item.bodyPreview || null, item.agendadoPara, agora],
+              (business_id, phone, name, template, language, body_preview, agendado_para, fluxo_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        businessId,
+        item.phone,
+        item.name || null,
+        item.template,
+        item.language,
+        item.bodyPreview || null,
+        item.agendadoPara,
+        fluxoId || null,
+        agora,
+      ],
     });
   }
   return itens.length;
@@ -2250,12 +2282,23 @@ async function emailCancelar(id) {
 }
 
 // ─── Retornos (lembrete agendado por conversa — WhatsApp e/ou e-mail) ──────────────────────
-async function retornoCriar({ businessId, phone, tipo, dataAgendada, canal, whatsappTemplate, whatsappLanguage, emailTemplateId }) {
+async function retornoCriar({
+  businessId,
+  phone,
+  tipo,
+  dataAgendada,
+  canal,
+  whatsappTemplate,
+  whatsappLanguage,
+  whatsappParams,
+  fluxoId,
+  emailTemplateId,
+}) {
   await ready;
   const result = await client.execute({
     sql: `INSERT INTO retornos
-            (business_id, phone, tipo, data_agendada, canal, whatsapp_template, whatsapp_language, email_template_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (business_id, phone, tipo, data_agendada, canal, whatsapp_template, whatsapp_language, whatsapp_params, fluxo_id, email_template_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       businessId,
       phone,
@@ -2264,6 +2307,8 @@ async function retornoCriar({ businessId, phone, tipo, dataAgendada, canal, what
       canal || "whatsapp",
       whatsappTemplate || null,
       whatsappLanguage || "pt_BR",
+      whatsappParams && whatsappParams.length ? JSON.stringify(whatsappParams) : null,
+      fluxoId || null,
       emailTemplateId || null,
       Date.now(),
     ],

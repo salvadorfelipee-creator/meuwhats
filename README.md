@@ -1126,6 +1126,31 @@ botões da 2ª mensagem em diante não bateriam. Ferramentas MCP: `fluxo_gatilho
 `fluxo_gatilho_listar`, `fluxo_gatilho_apagar`. 100% opt-in: número sem nenhuma linha em
 `fluxo_gatilhos` se comporta exatamente como antes.
 
+#### Retorno/campanha conectada a um fluxo + variáveis do template (30/09/2026)
+
+Dois problemas reais que o usuário trouxe sobre `retornos`/campanha em massa:
+
+1. **Variáveis do template** (ex. aniversário com nome + data): `enviarUmBroadcast` já
+   preenchia `{{1}}` sozinho com o nome salvo da conversa (comportamento antigo, continua
+   valendo se nada for informado). Agora aceita `whatsapp_params`/`whatsappParams` — 1 item por
+   variável `{{1}}`,`{{2}}`... na ordem, cada item podendo usar os tokens `{{nome}}` e `{{data}}`
+   (resolvidos na hora do envio, ver `resolverTokenParametro`).
+2. **"Retorno solto" que precisa virar conversa de verdade** (ex. template só "Bom dia!" pra
+   reabrir a janela de 24h, e a resposta do cliente deveria cair num fluxo, não no atendimento
+   padrão — mesmo espírito do ManyChat ao conectar um broadcast a um Flow): `retornos.fluxo_id`
+   e `broadcast_agendado.fluxo_id` (opcional). Ao enviar com sucesso, marca
+   `fluxo_passo = "aguardando_fluxo_<id>"` na conversa; `getFluxo` resolve esse fluxo ANTES de
+   qualquer outra coisa (vale pra número com fluxo fixo também, não só dinâmico). O disparo em
+   si reaproveita o mecanismo já existente de "conversa inativa → manda o fluxo" — zero código
+   novo de dispatch, só ensinar `getFluxo` a reconhecer a sentinela. Funciona porque um retorno
+   só é enviado depois de 24h+ sem resposta (é o motivo de precisar de template), então a
+   próxima mensagem do contato sempre bate esse gatilho de inatividade.
+
+Exposto em: diálogo "Agendar retorno" (conversa) e "Envio em massa" (campanha) no painel — campo
+"Parâmetros do template" e seletor "Conectar a um fluxo"; `GET /painel/api/fluxos/:businessId`
+(novo, só leitura — criar/editar nó continua via MCP); ferramenta MCP `retorno_criar` ganhou
+`whatsapp_params`/`fluxo_id`.
+
 #### Agendamento de horário real via Google Agenda (2026-09-30)
 
 Nó `horarios` no fluxo dinâmico: manda os próximos horários livres (consulta `freebusy` de
