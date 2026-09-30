@@ -400,6 +400,18 @@ const ready = (async () => {
     updated_at INTEGER NOT NULL
   )`);
 
+  // Expediente usado pelo agendamento de horário via Google Agenda (ver google.js
+  // horariosDisponiveis/criarEvento e nó 'horarios' do fluxo dinâmico) — 1 por negócio (cada
+  // número pode ter sua própria agenda/expediente, ex. 1 profissional por número).
+  await client.execute(`CREATE TABLE IF NOT EXISTS agenda_calendario_config (
+    business_id TEXT PRIMARY KEY,
+    calendario_id TEXT NOT NULL DEFAULT 'primary',
+    hora_inicio INTEGER NOT NULL DEFAULT 9,
+    hora_fim INTEGER NOT NULL DEFAULT 18,
+    duracao_minutos INTEGER NOT NULL DEFAULT 60,
+    updated_at INTEGER NOT NULL
+  )`);
+
   // Agenda de publicações (Publique IV → posts de texto/imagem multi-rede, agendados pelo
   // usuário um a um, cada um com seu próprio dia+hora — diferente da fila de Reels, aqui não
   // tem "piloto automático": todo item tem agendado_para definido na criação.
@@ -1521,6 +1533,24 @@ async function emailBackupDefinir(businessId, email) {
   });
 }
 
+async function agendaCalendarioConfigObter(businessId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM agenda_calendario_config WHERE business_id = ?`, args: [businessId] });
+  return result.rows[0] || null;
+}
+
+async function agendaCalendarioConfigDefinir(businessId, { calendarioId = "primary", horaInicio = 9, horaFim = 18, duracaoMinutos = 60 }) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO agenda_calendario_config (business_id, calendario_id, hora_inicio, hora_fim, duracao_minutos, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(business_id) DO UPDATE SET
+            calendario_id = excluded.calendario_id, hora_inicio = excluded.hora_inicio,
+            hora_fim = excluded.hora_fim, duracao_minutos = excluded.duracao_minutos, updated_at = excluded.updated_at`,
+    args: [businessId, calendarioId, horaInicio, horaFim, duracaoMinutos, Date.now()],
+  });
+}
+
 // Marca que já tentamos criar o contato (Google) e mandar o e-mail de boas-vindas (Brevo) pra
 // essa conversa — chamado antes das chamadas externas em capturarContatoEBoasVindas (server.js)
 // pra não duplicar se a pessoa completar outro funil depois.
@@ -2404,6 +2434,8 @@ module.exports = {
   googleConfigSet,
   emailBackupObter,
   emailBackupDefinir,
+  agendaCalendarioConfigObter,
+  agendaCalendarioConfigDefinir,
   marcarContatoSalvo,
   atualizarStatusConversa,
   atualizarPipelineConversa,

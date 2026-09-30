@@ -441,20 +441,24 @@ const TOOLS = [
       "resposta (adicione botões depois com fluxo_opcao_adicionar). Tipo 'acao': não manda " +
       "mensagem nenhuma, só executa um efeito (adicionar tag ou mudar etapa do pipeline) e " +
       "segue direto pro próximo nó (proximo_no_id) — útil pra marcar automaticamente sem a " +
-      "pessoa perceber. IMPORTANTE: ainda não existe nó de 'esperar X minutos' — só dá pra " +
-      "avançar por clique em botão.",
+      "pessoa perceber. Tipo 'horarios': consulta o Google Agenda de verdade (configure antes " +
+      "com agenda_calendar_configurar) e manda os próximos horários livres como uma lista pro " +
+      "cliente escolher; ao escolher, AGENDA DE VERDADE no Google Agenda e segue pro " +
+      "proximo_no_id (opcional). 'texto' em 'horarios' é a mensagem antes da lista (opcional, " +
+      "tem um padrão). IMPORTANTE: ainda não existe nó de 'esperar X minutos' — só dá pra " +
+      "avançar por clique em botão/item da lista.",
     inputSchema: {
       type: "object",
       properties: {
         fluxo_id: { type: "number" },
-        tipo: { type: "string", enum: ["mensagem", "acao"] },
-        texto: { type: "string", description: "obrigatório se tipo=mensagem" },
+        tipo: { type: "string", enum: ["mensagem", "acao", "horarios"] },
+        texto: { type: "string", description: "obrigatório se tipo=mensagem; opcional se tipo=horarios" },
         acao_tipo: { type: "string", enum: ["tag", "pipeline"], description: "obrigatório se tipo=acao" },
         acao_valor: {
           type: "string",
           description: "se acao_tipo=tag: id numérico da tag (como texto). se acao_tipo=pipeline: id da etapa, ex. 'novo_lead'",
         },
-        proximo_no_id: { type: "number", description: "só faz sentido em nó tipo 'acao' (mensagem usa fluxo_opcao_adicionar)" },
+        proximo_no_id: { type: "number", description: "nó tipo 'acao' ou 'horarios' (mensagem usa fluxo_opcao_adicionar)" },
       },
       required: ["fluxo_id", "tipo"],
       additionalProperties: false,
@@ -607,6 +611,69 @@ const TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   },
   {
+    name: "agenda_calendar_configurar",
+    title: "Configurar expediente do Google Agenda pra um número",
+    description:
+      "Define qual agenda do Google e qual expediente (dias úteis seg-sex, hora de início/fim, duração do " +
+      "atendimento) usar quando esse número oferecer horário pro cliente escolher. Sem configurar, usa o " +
+      "padrão: agenda 'primary', 9h-18h, atendimentos de 60min. Precisa da conta Google já autorizada com o " +
+      "escopo de Calendar (ver /painel/api/google/autorizar) — sem isso as outras ferramentas de agenda falham.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        calendario_id: { type: "string", description: "id da agenda no Google Calendar, ex. 'primary' ou um e-mail de agenda compartilhada" },
+        hora_inicio: { type: "number", description: "hora de início do expediente, 0-23" },
+        hora_fim: { type: "number", description: "hora de fim do expediente, 0-23" },
+        duracao_minutos: { type: "number", description: "duração de cada atendimento em minutos" },
+      },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "agenda_calendar_horarios_disponiveis",
+    title: "Ver próximos horários livres na agenda",
+    description:
+      "Consulta o Google Agenda de verdade (freebusy) e devolve os próximos horários realmente livres, " +
+      "dentro do expediente configurado (ver agenda_calendar_configurar). Use antes de oferecer horário pro " +
+      "cliente — nunca invente horário sem checar aqui primeiro.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        dias_a_frente: { type: "number", description: "quantos dias pra frente olhar, padrão 14" },
+        max_resultados: { type: "number", description: "quantos horários devolver, padrão 10" },
+      },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  },
+  {
+    name: "agenda_calendar_agendar",
+    title: "Criar o evento na agenda (agendar de verdade)",
+    description:
+      "Cria o evento na Google Agenda pro horário escolhido — use um horário que veio de " +
+      "agenda_calendar_horarios_disponiveis (mesmo inicio_iso/fim_iso), pra não marcar em cima de outro " +
+      "compromisso. Isto AGENDA DE VERDADE, não é rascunho.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        titulo: { type: "string", description: "ex. 'Consulta - Maria Silva'" },
+        descricao: { type: "string" },
+        inicio_iso: { type: "string", description: "data/hora ISO 8601, ex. '2026-10-05T14:00:00-03:00'" },
+        fim_iso: { type: "string" },
+        attendee_email: { type: "string", description: "opcional — convida o cliente por e-mail se ele tiver passado um" },
+      },
+      required: ["business_id", "titulo", "inicio_iso", "fim_iso"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  },
+  {
     name: "ads_atualizar_status",
     title: "Pausar ou ativar campanha/conjunto/anúncio",
     description:
@@ -634,7 +701,7 @@ function textoFerramenta(objeto) {
   return { content: [{ type: "text", text: JSON.stringify(objeto, null, 2) }], structuredContent: objeto };
 }
 
-// ctx = { db, wa, ads, agenda, PHONE_NUMBERS, resolverWabaDoNumero, normalizarTelefoneBR, enviarUmBroadcast }
+// ctx = { db, wa, ads, agenda, google, PHONE_NUMBERS, resolverWabaDoNumero, normalizarTelefoneBR, enviarUmBroadcast, enviarEmail }
 async function chamarFerramenta(nome, args, ctx) {
   const a = args || {};
   switch (nome) {
@@ -922,6 +989,50 @@ async function chamarFerramenta(nome, args, ctx) {
     case "fluxo_gatilho_apagar": {
       await ctx.db.fluxoGatilhoApagar(a.gatilho_id);
       return textoFerramenta({ ok: true });
+    }
+
+    case "agenda_calendar_configurar": {
+      await ctx.db.agendaCalendarioConfigDefinir(a.business_id, {
+        calendarioId: a.calendario_id,
+        horaInicio: a.hora_inicio,
+        horaFim: a.hora_fim,
+        duracaoMinutos: a.duracao_minutos,
+      });
+      return textoFerramenta({ ok: true });
+    }
+
+    case "agenda_calendar_horarios_disponiveis": {
+      const config = await ctx.db.agendaCalendarioConfigObter(a.business_id);
+      try {
+        const slots = await ctx.google.horariosDisponiveis({
+          calendarioId: config?.calendario_id,
+          horaInicio: config?.hora_inicio,
+          horaFim: config?.hora_fim,
+          duracaoMinutos: config?.duracao_minutos,
+          diasAFrente: a.dias_a_frente,
+          maxResultados: a.max_resultados,
+        });
+        return textoFerramenta({ horarios: slots });
+      } catch (err) {
+        return erroFerramenta(`${err.message} — provavelmente falta autorizar o Google com o escopo de Calendar (reautorize em /painel/api/google/autorizar).`);
+      }
+    }
+
+    case "agenda_calendar_agendar": {
+      const config = await ctx.db.agendaCalendarioConfigObter(a.business_id);
+      try {
+        const evento = await ctx.google.criarEvento({
+          calendarioId: config?.calendario_id,
+          titulo: a.titulo,
+          descricao: a.descricao,
+          inicioISO: a.inicio_iso,
+          fimISO: a.fim_iso,
+          attendeeEmail: a.attendee_email,
+        });
+        return textoFerramenta({ ok: true, evento_id: evento.id, link: evento.htmlLink });
+      } catch (err) {
+        return erroFerramenta(err.message);
+      }
     }
 
     case "ads_atualizar_status": {

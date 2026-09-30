@@ -3395,11 +3395,99 @@ async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
     return;
   }
 
+  if (no.tipo === "horarios") {
+    const config = await db.agendaCalendarioConfigObter(businessNumberId);
+    let slots = [];
+    try {
+      slots = await google.horariosDisponiveis({
+        calendarioId: config?.calendario_id,
+        horaInicio: config?.hora_inicio,
+        horaFim: config?.hora_fim,
+        duracaoMinutos: config?.duracao_minutos,
+      });
+    } catch (err) {
+      console.error("Erro ao buscar horários do Google Agenda:", err.message);
+    }
+    if (!slots.length) {
+      await enviarRespostaAutomatica(
+        businessNumberId,
+        de,
+        "No momento não encontrei horário disponível na agenda — um atendente vai te ajudar a marcar. 🙏"
+      );
+      await db.setFluxoPasso(de, businessNumberId, null);
+      return;
+    }
+    const opcoesHorario = slots.map((s) => ({ id: `hor_${noId}_${s.inicio}`, title: formatarSlotBrt(s.inicio) }));
+    await enviarRespostaAutomatica(businessNumberId, de, no.texto || "Escolha um dos horários disponíveis:", undefined, {
+      botao: "Ver horários",
+      opcoes: opcoesHorario,
+    });
+    await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
+    await db.setFluxoPasso(de, businessNumberId, `fluxo_dinamico_${noId}`);
+    return;
+  }
+
   const opcoes = await db.fluxoOpcoesDoNo(noId);
   const botoes = opcoes.length ? opcoes.map((o) => ({ id: o.botao_id, title: o.botao_titulo })) : undefined;
   await enviarRespostaAutomatica(businessNumberId, de, no.texto || "", botoes);
   await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
   await db.setFluxoPasso(de, businessNumberId, `fluxo_dinamico_${noId}`);
+}
+
+// Formata um horário ISO (UTC) igual está gravado no evento/slot como "Seg 05/10 14:00" em
+// horário de Brasília — cabe no limite de 24 caracteres de título de linha do WhatsApp. Inverso
+// do +3 de timestampDeDataHora (agenda.js): aqui subtrai 3h do UTC pra voltar a Brasília.
+function formatarSlotBrt(iso) {
+  const brt = new Date(new Date(iso).getTime() - 3 * 60 * 60 * 1000);
+  const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const dd = String(brt.getUTCDate()).padStart(2, "0");
+  const mm = String(brt.getUTCMonth() + 1).padStart(2, "0");
+  const hh = String(brt.getUTCHours()).padStart(2, "0");
+  const mi = String(brt.getUTCMinutes()).padStart(2, "0");
+  return `${dias[brt.getUTCDay()]} ${dd}/${mm} ${hh}:${mi}`;
+}
+
+// Reply de um nó 'horarios' (id "hor_<noId>_<inicioISO>") — cria o evento de verdade na Google
+// Agenda pro horário escolhido, confirma pro cliente e segue pro próximo nó do fluxo (se tiver).
+async function confirmarEscolhaDeHorario(replyId, de, businessNumberId, conversaAnterior, nomeContato) {
+  const m = replyId.match(/^hor_(\d+)_(.+)$/);
+  if (!m) return;
+  const noId = Number(m[1]);
+  const inicioISO = m[2];
+  const no = await db.fluxoNoObter(noId);
+  if (!no) return;
+  const config = await db.agendaCalendarioConfigObter(businessNumberId);
+  const duracaoMinutos = config?.duracao_minutos || 60;
+  const fimISO = new Date(new Date(inicioISO).getTime() + duracaoMinutos * 60 * 1000).toISOString();
+  const nome = conversaAnterior?.name || nomeContato || de;
+  try {
+    await google.criarEvento({
+      calendarioId: config?.calendario_id,
+      titulo: `Consulta - ${nome}`,
+      descricao: `Agendado pelo WhatsApp (${de}).`,
+      inicioISO,
+      fimISO,
+      attendeeEmail: conversaAnterior?.email || undefined,
+    });
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      `Prontinho! ✅ Agendado para ${formatarSlotBrt(inicioISO)} (horário de Brasília). Qualquer coisa, é só chamar por aqui.`
+    );
+  } catch (err) {
+    console.error("Erro ao criar evento na Google Agenda:", err.message);
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      "Não consegui confirmar esse horário agora — um atendente vai te ajudar a marcar por aqui mesmo. 🙏"
+    );
+    return;
+  }
+  if (no.proximo_no_id) {
+    await avancarNoFluxoDinamico(no.proximo_no_id, de, businessNumberId, no.fluxo_id);
+  } else {
+    await db.setFluxoPasso(de, businessNumberId, null);
+  }
 }
 
 // Monta um objeto de fluxo compatível com o resto do dispatcher (mesma forma de FLUXO_CIAHOT
@@ -3639,6 +3727,17 @@ async function processarEntry(entry) {
             await handlerCltOrigEscolherPrazo(de, businessNumberId, reply.id.slice("cltorig_prazo_".length));
           } catch (err) {
             console.error("Erro ao processar escolha de prazo CLT:", err.message);
+          }
+        } else if (tipo === "interactive" && (msg.interactive?.list_reply?.id || "").startsWith("hor_")) {
+          // Escolha de horário oferecido por um nó 'horarios' do fluxo dinâmico (ver
+          // avancarNoFluxoDinamico) — id dinâmico (não vem de fluxo_opcoes, é gerado na hora a
+          // partir do Google Agenda), por isso trata separado do resto dos botões/listas.
+          const reply = msg.interactive.list_reply;
+          await db.insertMessage({ ...base, type: "button", body: reply.title || "[horário escolhido]" });
+          try {
+            await confirmarEscolhaDeHorario(reply.id, de, businessNumberId, conversaAnterior, nome);
+          } catch (err) {
+            console.error("Erro ao confirmar horário escolhido:", err.message);
           }
         } else if (tipo === "interactive") {
           // Clique em um botão do fluxo automático (mensagens interativas)
@@ -4019,6 +4118,7 @@ const server = http.createServer(async (req, res) => {
         wa,
         ads,
         agenda,
+        google,
         PHONE_NUMBERS,
         resolverWabaDoNumero,
         normalizarTelefoneBR,
