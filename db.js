@@ -392,6 +392,14 @@ const ready = (async () => {
     valor TEXT
   )`);
 
+  // E-mail que recebe o backup/exportação de conversa (botão "Exportar" no painel) — 1 por
+  // negócio, configurado 1x e reusado depois, pra não precisar digitar toda vez.
+  await client.execute(`CREATE TABLE IF NOT EXISTS email_backup_config (
+    business_id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`);
+
   // Agenda de publicações (Publique IV → posts de texto/imagem multi-rede, agendados pelo
   // usuário um a um, cada um com seu próprio dia+hora — diferente da fila de Reels, aqui não
   // tem "piloto automático": todo item tem agendado_para definido na criação.
@@ -970,6 +978,11 @@ async function fluxoGatilhosDoNegocio(businessId) {
   return result.rows;
 }
 
+async function fluxoGatilhoApagar(id) {
+  await ready;
+  await client.execute({ sql: `DELETE FROM fluxo_gatilhos WHERE id = ?`, args: [id] });
+}
+
 async function fluxoEstadoContatoObter(businessId, phone) {
   await ready;
   const result = await client.execute({
@@ -1490,6 +1503,21 @@ async function googleConfigSet(chave, valor) {
     sql: `INSERT INTO google_config (chave, valor) VALUES (?, ?)
           ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor`,
     args: [chave, valor],
+  });
+}
+
+async function emailBackupObter(businessId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT email FROM email_backup_config WHERE business_id = ?`, args: [businessId] });
+  return result.rows[0]?.email ?? null;
+}
+
+async function emailBackupDefinir(businessId, email) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO email_backup_config (business_id, email, updated_at) VALUES (?, ?, ?)
+          ON CONFLICT(business_id) DO UPDATE SET email = excluded.email, updated_at = excluded.updated_at`,
+    args: [businessId, email, Date.now()],
   });
 }
 
@@ -2309,6 +2337,7 @@ module.exports = {
   fluxoOpcoesDoFluxo,
   fluxoGatilhoCriar,
   fluxoGatilhosDoNegocio,
+  fluxoGatilhoApagar,
   fluxoEstadoContatoObter,
   fluxoEstadoContatoDefinir,
   upsertConversation,
@@ -2373,6 +2402,8 @@ module.exports = {
   reelsConfigSet,
   googleConfigGet,
   googleConfigSet,
+  emailBackupObter,
+  emailBackupDefinir,
   marcarContatoSalvo,
   atualizarStatusConversa,
   atualizarPipelineConversa,

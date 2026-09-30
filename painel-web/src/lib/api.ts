@@ -71,6 +71,22 @@ export const PIPELINE_ESTAGIOS = [
 
 export type PipelineEstagioId = (typeof PIPELINE_ESTAGIOS)[number]["id"]
 
+// Qualificação genérica — usada em qualquer canal que não seja o funil de empréstimo da
+// Felizcred (ver pipelineEstagiosPara abaixo). Cobre o caso simples "é novo, já foi atendido ou
+// já é cliente" pedido pra outros negócios (ex. clínica), sem depender de usuário por atendente.
+export const PIPELINE_ESTAGIOS_GENERICO = [
+  { id: "novo", nome: "Novo contato", cor: "#64748b" },
+  { id: "em_atendimento", nome: "Em atendimento", cor: "#2563eb" },
+  { id: "cliente", nome: "Já é cliente", cor: "#16a34a" },
+  { id: "perdido", nome: "Perdido/não interessado", cor: "#dc2626" },
+] as const
+
+// Cada canal pode ter sua própria lista de etapas — hoje só a Felizcred tem uma lista própria
+// (funil de empréstimo); qualquer outro canal usa a genérica acima.
+export function pipelineEstagiosPara(label: string | undefined) {
+  return label === CANAL_ANALYTICS_LABEL ? PIPELINE_ESTAGIOS : PIPELINE_ESTAGIOS_GENERICO
+}
+
 // Analytics/tags/pipeline hoje só existem pro número principal da Felizcred — identificado
 // pelo label (não por ID fixo, que já mudou antes numa migração de WABA). Usado tanto pela
 // tela de Analytics quanto pelo chat (pra saber quando mostrar o seletor de tags/etapa).
@@ -569,6 +585,19 @@ export const api = {
     request<Retorno[]>(`/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/retornos`),
   retornosDoNegocio: (businessId: string) => request<Retorno[]>(`/painel/api/retornos/${encodeURIComponent(businessId)}`),
   cancelarRetorno: (id: number) => request<{ ok: true }>(`/painel/api/retornos/item/${id}`, { method: "DELETE" }),
+
+  // ── Backup/exportação de conversa por e-mail ──────────────────────────────────────────────
+  emailBackup: (businessId: string) => request<{ email: string | null }>(`/painel/api/email-backup/${encodeURIComponent(businessId)}`),
+  definirEmailBackup: (businessId: string, email: string) =>
+    request<{ ok: true }>(`/painel/api/email-backup/${encodeURIComponent(businessId)}`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  enviarBackupConversaPorEmail: (businessId: string, phone: string) =>
+    request<{ ok: true; enviadoPara: string }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/exportar-email`,
+      { method: "POST" }
+    ),
 }
 
 export { ApiError }

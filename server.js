@@ -3364,6 +3364,16 @@ async function getFluxo(businessNumberId, phone, fluxoPassoAtual) {
   // Número sem fluxo fixo escrito em código (ex.: número novo de um cliente) — tenta o motor
   // de fluxo dinâmico (dado no banco, criado via ferramentas MCP — ver mcp.js/README). Não
   // muda NADA pros números já listados acima, de propósito: zero risco pro que já roda.
+  // Contato "preso" num fluxo dinâmico específico (não necessariamente o único "ativo=1" do
+  // negócio — pode ter entrado nele por gatilho de palavra-chave, ver bateuGatilhoDeFluxoDinamico)
+  // continua NELE, nunca no fluxo padrão — sem isso, os botões da 2ª mensagem em diante não
+  // batiam (fluxoBotoes só tem os ids do fluxo que foi montado aqui).
+  if (String(fluxoPassoAtual || "").startsWith("fluxo_dinamico_")) {
+    const noId = Number(fluxoPassoAtual.slice("fluxo_dinamico_".length));
+    const no = await db.fluxoNoObter(noId);
+    const fluxoDoContato = no && (await db.fluxoDinamicoObter(no.fluxo_id));
+    if (fluxoDoContato) return montarFluxoDinamico(fluxoDoContato);
+  }
   const fluxoDinamico = await db.fluxoDinamicoAtivo(businessNumberId);
   if (fluxoDinamico) return montarFluxoDinamico(fluxoDinamico);
   return FLUXO_FELIZCRED;
@@ -3409,6 +3419,28 @@ async function montarFluxoDinamico(fluxoRow) {
     lembreteTextos: {},
     lembreteHandlers: {},
   };
+}
+
+// Roteamento de fluxo dinâmico por palavra-chave (ver fluxo_gatilhos/README) — permite ter
+// VÁRIOS fluxos dinâmicos por número (um por assunto/produto/origem), cada um disparado quando
+// a pessoa manda o texto exato do gatilho, em vez de só um único fluxo "ativo" por número.
+// 100% opt-in: só age quando existe alguma linha em fluxo_gatilhos pra esse negócio (criada via
+// ferramenta MCP fluxo_gatilho_criar) — sem isso, não muda nada pra nenhum número existente.
+async function bateuGatilhoDeFluxoDinamico(businessNumberId, corpo, de) {
+  try {
+    const gatilhos = await db.fluxoGatilhosDoNegocio(businessNumberId);
+    const gatilho = gatilhos.find(
+      (g) => g.tipo === "palavra_chave" && g.valor && normalizarTexto(g.valor) === normalizarTexto(corpo)
+    );
+    if (!gatilho) return false;
+    const fluxoAlvo = await db.fluxoDinamicoObter(gatilho.fluxo_id);
+    if (!fluxoAlvo) return false;
+    await dispararInicioFluxo(await montarFluxoDinamico(fluxoAlvo), de, businessNumberId);
+    return true;
+  } catch (err) {
+    console.error("Erro ao checar gatilho de fluxo dinâmico:", err.message);
+    return false;
+  }
 }
 
 // Ponto de entrada padrão de um fluxo: por padrão manda o menu inicial na hora (função
@@ -3489,6 +3521,8 @@ async function processarEntry(entry) {
             } catch (err) {
               console.error("Erro ao reabrir menu inicial:", err.message);
             }
+          } else if (await bateuGatilhoDeFluxoDinamico(businessNumberId, corpo, de)) {
+            mensagemJaTratada = true;
           } else if (fluxo === FLUXO_FELIZCRED && ["fgts", "saque"].includes(normalizarTexto(corpo))) {
             // "fgts"/"saque" funciona como atalho a qualquer momento (mesmo espírito do "menu"
             // acima) — antes só funcionava DEPOIS do menu completo já ter sido mandado (checado
@@ -4846,6 +4880,51 @@ const server = http.createServer(async (req, res) => {
       const ok = await db.retornoCancelar(Number(matchRetornoCancelar[1]));
       if (!ok) return send(res, 409, { error: "Não deu pra cancelar — já foi enviado ou já está sendo enviado agora" });
       return send(res, 200, { ok: true });
+    }
+
+    // ── Backup/exportação de conversa por e-mail ───────────────────────────────────────────
+    // GET/POST /painel/api/email-backup/:businessId — e-mail que recebe a exportação (1 por
+    // negócio, configurado 1x no painel e reusado depois).
+    const matchEmailBackup = path_.match(/^\/painel\/api\/email-backup\/([^/]+)$/);
+    if (req.method === "GET" && matchEmailBackup) {
+      if (!requireAuth(req, res)) return;
+      const email = await db.emailBackupObter(decodeURIComponent(matchEmailBackup[1]));
+      return send(res, 200, { email });
+    }
+    if (req.method === "POST" && matchEmailBackup) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.email) return send(res, 400, { error: "Informe email" });
+      await db.emailBackupDefinir(decodeURIComponent(matchEmailBackup[1]), body.email);
+      return send(res, 200, { ok: true });
+    }
+
+    // POST /painel/api/conversations/:businessId/:phone/exportar-email — manda o histórico
+    // inteiro dessa conversa por e-mail pro endereço de backup configurado acima. Complementa o
+    // /exportar (GET, baixa .txt no navegador) — esse aqui manda por e-mail em vez de baixar.
+    const matchExportarEmail = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/exportar-email$/);
+    if (req.method === "POST" && matchExportarEmail) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchExportarEmail[1]);
+      const phone = decodeURIComponent(matchExportarEmail[2]);
+      try {
+        const destino = await db.emailBackupObter(businessId);
+        if (!destino) return send(res, 400, { error: "Configure um e-mail de backup pra esse canal antes de exportar." });
+        const conversa = await db.getConversation(phone, businessId);
+        const mensagens = await db.listMessages(phone, businessId);
+        const nomeContato = conversa?.name || phone;
+        const linhas = mensagens.map((m) => {
+          const quando = new Date(m.created_at).toLocaleString("pt-BR");
+          const quem = m.direction === "in" ? nomeContato : m.origem === "humano" ? "Atendente" : "Automático";
+          const corpo = (m.body || `[${m.type}]`).replace(/</g, "&lt;").replace(/\n/g, "<br>");
+          return `<p style="margin:0 0 10px"><strong>${quem}</strong> <span style="color:#888">${quando}</span><br>${corpo}</p>`;
+        });
+        const html = `<h2>Conversa com ${nomeContato} (${phone})</h2>${linhas.join("") || "<p>Sem mensagens.</p>"}`;
+        await enviarEmail({ to: destino, subject: `Backup de conversa — ${nomeContato}`, html });
+        return send(res, 200, { ok: true, enviadoPara: destino });
+      } catch (err) {
+        return send(res, 502, { error: err.message });
+      }
     }
 
     // POST /painel/api/registrar-numero/:businessId — registro único de um número novo na

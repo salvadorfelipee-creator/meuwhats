@@ -562,6 +562,51 @@ const TOOLS = [
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   },
   {
+    name: "fluxo_gatilho_criar",
+    title: "Criar um gatilho de palavra-chave pra um fluxo",
+    description:
+      "Faz um fluxo dinâmico ser disparado quando a pessoa manda um texto específico (ex.: 'botox', " +
+      "'ortodontia'), mesmo sem ele estar 'ativo' — assim um número pode ter VÁRIOS fluxos, um por " +
+      "assunto/produto, cada um com sua própria palavra-chave, em vez de só um fluxo padrão por vez. " +
+      "O texto do cliente precisa bater EXATO com 'valor' (sem diferenciar maiúscula/minúscula/acento) " +
+      "pra disparar — mesma regra da palavra-chave 'menu'. Não precisa ativar o fluxo pra isso funcionar.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        business_id: { type: "string" },
+        valor: { type: "string", description: "palavra-chave exata que o cliente digita, ex. 'botox'" },
+        fluxo_id: { type: "number", description: "fluxo que deve começar quando bater essa palavra-chave" },
+      },
+      required: ["business_id", "valor", "fluxo_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: "fluxo_gatilho_listar",
+    title: "Listar os gatilhos de palavra-chave de um número",
+    description: "Lista todos os gatilhos de palavra-chave cadastrados pra um número, com o fluxo que cada um dispara.",
+    inputSchema: {
+      type: "object",
+      properties: { business_id: { type: "string" } },
+      required: ["business_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  },
+  {
+    name: "fluxo_gatilho_apagar",
+    title: "Apagar um gatilho de palavra-chave",
+    description: "Remove um gatilho — a palavra-chave deixa de disparar o fluxo (o fluxo em si continua existindo).",
+    inputSchema: {
+      type: "object",
+      properties: { gatilho_id: { type: "number" } },
+      required: ["gatilho_id"],
+      additionalProperties: false,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  },
+  {
     name: "ads_atualizar_status",
     title: "Pausar ou ativar campanha/conjunto/anúncio",
     description:
@@ -861,6 +906,21 @@ async function chamarFerramenta(nome, args, ctx) {
     case "fluxo_apagar": {
       const resultado = await ctx.db.fluxoDinamicoApagar(a.fluxo_id);
       if (!resultado.ok) return erroFerramenta(resultado.motivo);
+      return textoFerramenta({ ok: true });
+    }
+
+    case "fluxo_gatilho_criar": {
+      const id = await ctx.db.fluxoGatilhoCriar({ businessId: a.business_id, tipo: "palavra_chave", valor: a.valor, fluxoId: a.fluxo_id });
+      return textoFerramenta({ gatilho_id: id });
+    }
+
+    case "fluxo_gatilho_listar": {
+      const gatilhos = await ctx.db.fluxoGatilhosDoNegocio(a.business_id);
+      return textoFerramenta({ gatilhos });
+    }
+
+    case "fluxo_gatilho_apagar": {
+      await ctx.db.fluxoGatilhoApagar(a.gatilho_id);
       return textoFerramenta({ ok: true });
     }
 

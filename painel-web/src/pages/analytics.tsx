@@ -187,7 +187,7 @@ function GraficoArea({ dados }: { dados: { dia: string; conversas: number }[] })
   )
 }
 
-function GerenciarTags({ businessId, tags, onChange }: { businessId: string; tags: Tag[]; onChange: () => void }) {
+export function GerenciarTags({ businessId, tags, onChange }: { businessId: string; tags: Tag[]; onChange: () => void }) {
   const [open, setOpen] = React.useState(false)
   const [nome, setNome] = React.useState("")
   const [cor, setCor] = React.useState(CORES_TAG[0])

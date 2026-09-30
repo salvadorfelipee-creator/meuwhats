@@ -12,9 +12,9 @@ import {
   type Tag,
   type EmailTemplate,
   type Retorno,
-  PIPELINE_ESTAGIOS,
-  CANAL_ANALYTICS_LABEL,
+  pipelineEstagiosPara,
 } from "@/lib/api"
+import { GerenciarTags } from "@/pages/analytics"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -896,7 +896,7 @@ export function ChatsPage() {
               key={conversaAtual.phone}
               conversation={conversaAtual}
               businessId={current.id}
-              mostrarPipelineTags={current.label === CANAL_ANALYTICS_LABEL}
+              mostrarPipelineTags={current.id !== "instagram"}
               onSaved={carregarConversas}
             />
           )}
@@ -1046,6 +1046,80 @@ function AgendarRetornoDialog({
   )
 }
 
+// Manda o histórico da conversa por e-mail (backup). Na 1ª vez em cada canal pede o e-mail de
+// destino e salva; das próximas em diante é só clicar (ver GET/POST /painel/api/email-backup).
+function ExportarConversaBotao({ businessId, phone }: { businessId: string; phone: string }) {
+  const [emailBackup, setEmailBackup] = React.useState<string | null | undefined>(undefined)
+  const [emailDigitado, setEmailDigitado] = React.useState("")
+  const [enviando, setEnviando] = React.useState(false)
+  const [msg, setMsg] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    setMsg(null)
+    api.emailBackup(businessId).then((r) => setEmailBackup(r.email)).catch(() => setEmailBackup(null))
+  }, [businessId])
+
+  async function configurarEExportar() {
+    if (!emailDigitado.trim()) return
+    setEnviando(true)
+    try {
+      await api.definirEmailBackup(businessId, emailDigitado.trim())
+      setEmailBackup(emailDigitado.trim())
+      const r = await api.enviarBackupConversaPorEmail(businessId, phone)
+      setMsg(`Enviado para ${r.enviadoPara} ✅`)
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Erro ao exportar")
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  async function exportar() {
+    setEnviando(true)
+    setMsg(null)
+    try {
+      const r = await api.enviarBackupConversaPorEmail(businessId, phone)
+      setMsg(`Enviado para ${r.enviadoPara} ✅`)
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Erro ao exportar")
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  if (emailBackup === undefined) return null
+
+  if (!emailBackup) {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs text-muted-foreground">Configure o e-mail de backup deste canal (só 1x):</p>
+        <div className="flex gap-1.5">
+          <Input
+            placeholder="backup@seudominio.com"
+            value={emailDigitado}
+            onChange={(e) => setEmailDigitado(e.target.value)}
+            className="h-8 text-xs"
+          />
+          <Button size="sm" variant="outline" onClick={configurarEExportar} disabled={enviando || !emailDigitado.trim()}>
+            Salvar e exportar
+          </Button>
+        </div>
+        {msg && <p className="text-xs">{msg}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <Button size="sm" variant="outline" onClick={exportar} disabled={enviando} className="w-fit gap-1.5">
+        <Mail className="h-3.5 w-3.5" />
+        {enviando ? "Enviando..." : "Backup por e-mail"}
+      </Button>
+      {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
+    </div>
+  )
+}
+
 function ContactDetails({
   conversation,
   businessId,
@@ -1057,6 +1131,9 @@ function ContactDetails({
   mostrarPipelineTags: boolean
   onSaved: () => void
 }) {
+  const { current } = useChannel()
+  const estagios = pipelineEstagiosPara(current?.label)
+
   const [nota, setNota] = React.useState(conversation.nota || "")
   const [salvando, setSalvando] = React.useState(false)
   const [reabrindo, setReabrindo] = React.useState(false)
@@ -1067,6 +1144,11 @@ function ContactDetails({
   const [estagio, setEstagio] = React.useState(conversation.pipeline_estagio || "")
   const [salvandoEstagio, setSalvandoEstagio] = React.useState(false)
 
+  const carregarTags = React.useCallback(() => {
+    if (!mostrarPipelineTags) return
+    api.tags(businessId).then(setTodasTags).catch(() => {})
+  }, [mostrarPipelineTags, businessId])
+
   const [retornos, setRetornos] = React.useState<Retorno[]>([])
   const carregarRetornos = React.useCallback(() => {
     if (businessId === "instagram") return
@@ -1074,10 +1156,10 @@ function ContactDetails({
   }, [businessId, conversation.phone])
 
   React.useEffect(() => {
+    carregarTags()
     if (!mostrarPipelineTags) return
-    api.tags(businessId).then(setTodasTags).catch(() => {})
     api.tagsDaConversa(businessId, conversation.phone).then(setTagsConversa).catch(() => {})
-  }, [mostrarPipelineTags, businessId, conversation.phone])
+  }, [mostrarPipelineTags, businessId, conversation.phone, carregarTags])
 
   React.useEffect(() => {
     carregarRetornos()
@@ -1141,6 +1223,7 @@ function ContactDetails({
         <p className="text-sm font-medium">{conversation.name || "Sem nome"}</p>
         <p className="text-sm text-muted-foreground">{conversation.phone}</p>
       </div>
+      {businessId !== "instagram" && <ExportarConversaBotao businessId={businessId} phone={conversation.phone} />}
       {businessId !== "instagram" && (
         <div>
           <Button size="sm" variant="outline" onClick={reabrirFluxo} disabled={reabrindo}>
@@ -1163,7 +1246,7 @@ function ContactDetails({
               onChange={(e) => mudarEstagio(e.target.value)}
             >
               <option value="">Sem etapa definida</option>
-              {PIPELINE_ESTAGIOS.map((e) => (
+              {estagios.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.nome}
                 </option>
@@ -1171,11 +1254,12 @@ function ContactDetails({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Tags</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-medium block">Tags</label>
+              <GerenciarTags businessId={businessId} tags={todasTags} onChange={carregarTags} />
+            </div>
             {todasTags.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                Nenhuma tag criada ainda — crie em Analytics → Gerenciar tags.
-              </p>
+              <p className="text-xs text-muted-foreground">Nenhuma tag criada ainda.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {todasTags.map((tag) => {
