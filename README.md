@@ -738,11 +738,19 @@ pré-existente de migração que essa sessão corrigiu de quebra).
 `server.js` está `false`. A entrada fica no botão "Simulação" do fluxo `FLUXO_CAMPANHA_CLT`
 (número Campanha CLT) — que por sua vez **também está arquivado hoje** (esse número roda a
 campanha ativa de Indicação FGTS → horas extras no lugar). São 2 decisões separadas de
-propósito: ligar a automação não reativa sozinho o pitch de CLT nesse número. **Para ativar de
-verdade**, depois de ter uma chave de produção:
-1. Configure `NOVOSAQUE_API_KEY` (e `NOVOSAQUE_BASE_HOST` se for produção, não sandbox).
-2. Publique `flows/novosaque-clt-cadastro.json` no WhatsApp Manager → Flows e configure
-   `NOVOSAQUE_FLOW_ID`.
+propósito: ligar a automação não reativa sozinho o pitch de CLT nesse número.
+
+O WhatsApp Flow já está **publicado** (01/10/2026) na WABA da Campanha CLT (`1430846515482269`),
+nome "Novo Saque - Cadastro CLT", `NOVOSAQUE_FLOW_ID=1120560537215917`. No JSON publicado, a
+visibilidade condicional de campo (`visible` com comparação `${form.x} == 'y'`) não passou na
+validação da versão 7.3 do schema (erro "Expected property 'visible' to be of type 'boolean'") —
+em vez de decifrar a sintaxe nova, os campos de PIX e de conta bancária ficaram todos visíveis
+ao mesmo tempo na tela "Como receber" (ambos opcionais, sem quebrar o envio); é só uma questão de
+UX, não bloqueia nada. `flows/novosaque-clt-cadastro.json` no repo já reflete essa versão
+publicada (version 7.3, com `__example__` em cada campo de `data`, sem `init-value` em Dropdown).
+**Para ativar de verdade**, depois de ter uma chave de produção:
+1. Configure `NOVOSAQUE_API_KEY` (e `NOVOSAQUE_BASE_HOST` se for produção, não sandbox) no Render.
+2. `NOVOSAQUE_FLOW_ID=1120560537215917` (já publicado, só falta configurar a env var no Render).
 3. Troque `NOVOSAQUE_ORIGINATION_ATIVO` para `true` em `server.js`.
 4. Decida separadamente se quer reativar `FLUXO_CAMPANHA_CLT` (reatribuir
    `FLUXOS_POR_NUMERO`/a checagem de `CAMPANHA_CLT_NUMBER_ID` em `getFluxo`) ou conectar essa

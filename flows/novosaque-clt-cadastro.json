@@ -1,5 +1,5 @@
 {
-  "version": "3.1",
+  "version": "7.3",
   "screens": [
     {
       "id": "DADOS_PESSOAIS",
@@ -11,23 +11,63 @@
             "type": "Form",
             "name": "form_dados",
             "children": [
-              { "type": "TextInput", "name": "nome", "label": "Nome completo", "required": true },
-              { "type": "DatePicker", "name": "data_nascimento", "label": "Data de nascimento", "required": true },
               {
-                "type": "Dropdown", "name": "genero", "label": "Gênero", "required": true,
+                "type": "TextInput",
+                "name": "nome",
+                "label": "Nome completo",
+                "required": true
+              },
+              {
+                "type": "DatePicker",
+                "name": "data_nascimento",
+                "label": "Data de nascimento",
+                "required": true
+              },
+              {
+                "type": "Dropdown",
+                "name": "genero",
+                "label": "Gênero",
+                "required": true,
                 "data-source": [
-                  { "id": "M", "title": "Masculino" },
-                  { "id": "F", "title": "Feminino" }
+                  {
+                    "id": "M",
+                    "title": "Masculino"
+                  },
+                  {
+                    "id": "F",
+                    "title": "Feminino"
+                  }
                 ]
               },
-              { "type": "TextInput", "name": "profissao", "label": "Profissão", "required": true },
-              { "type": "TextInput", "name": "email", "label": "E-mail", "input-type": "email", "required": true },
-              { "type": "TextInput", "name": "celular", "label": "Celular (DDD + número)", "input-type": "phone", "required": true },
               {
-                "type": "Footer", "label": "Continuar",
+                "type": "TextInput",
+                "name": "profissao",
+                "label": "Profissão",
+                "required": true
+              },
+              {
+                "type": "TextInput",
+                "name": "email",
+                "label": "E-mail",
+                "input-type": "email",
+                "required": true
+              },
+              {
+                "type": "TextInput",
+                "name": "celular",
+                "label": "Celular com DDD",
+                "input-type": "phone",
+                "required": true
+              },
+              {
+                "type": "Footer",
+                "label": "Continuar",
                 "on-click-action": {
                   "name": "navigate",
-                  "next": { "type": "screen", "name": "ENDERECO" },
+                  "next": {
+                    "type": "screen",
+                    "name": "ENDERECO"
+                  },
                   "payload": {
                     "nome": "${form.nome}",
                     "data_nascimento": "${form.data_nascimento}",
@@ -47,43 +87,193 @@
       "id": "ENDERECO",
       "title": "Endereço",
       "data": {
-        "nome": { "type": "string" },
-        "data_nascimento": { "type": "string" },
-        "genero": { "type": "string" },
-        "profissao": { "type": "string" },
-        "email": { "type": "string" },
-        "celular": { "type": "string" }
+        "nome": {
+          "type": "string",
+          "__example__": "Maria da Silva"
+        },
+        "data_nascimento": {
+          "type": "string",
+          "__example__": "1990-01-01"
+        },
+        "genero": {
+          "type": "string",
+          "__example__": "F"
+        },
+        "profissao": {
+          "type": "string",
+          "__example__": "Vendedora"
+        },
+        "email": {
+          "type": "string",
+          "__example__": "maria@exemplo.com"
+        },
+        "celular": {
+          "type": "string",
+          "__example__": "47999998888"
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
-            "type": "Form", "name": "form_endereco",
+            "type": "Form",
+            "name": "form_endereco",
             "children": [
-              { "type": "TextInput", "name": "cep", "label": "CEP", "required": true },
-              { "type": "TextInput", "name": "rua", "label": "Rua/Logradouro", "required": true },
-              { "type": "TextInput", "name": "numero", "label": "Número", "required": true },
-              { "type": "TextInput", "name": "bairro", "label": "Bairro", "required": true },
-              { "type": "TextInput", "name": "cidade", "label": "Cidade", "required": true },
               {
-                "type": "Dropdown", "name": "uf", "label": "Estado", "required": true,
+                "type": "TextInput",
+                "name": "cep",
+                "label": "CEP",
+                "required": true
+              },
+              {
+                "type": "TextInput",
+                "name": "rua",
+                "label": "Rua/Logradouro",
+                "required": true
+              },
+              {
+                "type": "TextInput",
+                "name": "numero",
+                "label": "Número",
+                "required": true
+              },
+              {
+                "type": "TextInput",
+                "name": "bairro",
+                "label": "Bairro",
+                "required": true
+              },
+              {
+                "type": "TextInput",
+                "name": "cidade",
+                "label": "Cidade",
+                "required": true
+              },
+              {
+                "type": "Dropdown",
+                "name": "uf",
+                "label": "Estado",
+                "required": true,
                 "data-source": [
-                  { "id": "AC", "title": "AC" }, { "id": "AL", "title": "AL" }, { "id": "AM", "title": "AM" },
-                  { "id": "AP", "title": "AP" }, { "id": "BA", "title": "BA" }, { "id": "CE", "title": "CE" },
-                  { "id": "DF", "title": "DF" }, { "id": "ES", "title": "ES" }, { "id": "GO", "title": "GO" },
-                  { "id": "MA", "title": "MA" }, { "id": "MG", "title": "MG" }, { "id": "MS", "title": "MS" },
-                  { "id": "MT", "title": "MT" }, { "id": "PA", "title": "PA" }, { "id": "PB", "title": "PB" },
-                  { "id": "PE", "title": "PE" }, { "id": "PI", "title": "PI" }, { "id": "PR", "title": "PR" },
-                  { "id": "RJ", "title": "RJ" }, { "id": "RN", "title": "RN" }, { "id": "RO", "title": "RO" },
-                  { "id": "RR", "title": "RR" }, { "id": "RS", "title": "RS" }, { "id": "SC", "title": "SC" },
-                  { "id": "SE", "title": "SE" }, { "id": "SP", "title": "SP" }, { "id": "TO", "title": "TO" }
+                  {
+                    "id": "AC",
+                    "title": "AC"
+                  },
+                  {
+                    "id": "AL",
+                    "title": "AL"
+                  },
+                  {
+                    "id": "AM",
+                    "title": "AM"
+                  },
+                  {
+                    "id": "AP",
+                    "title": "AP"
+                  },
+                  {
+                    "id": "BA",
+                    "title": "BA"
+                  },
+                  {
+                    "id": "CE",
+                    "title": "CE"
+                  },
+                  {
+                    "id": "DF",
+                    "title": "DF"
+                  },
+                  {
+                    "id": "ES",
+                    "title": "ES"
+                  },
+                  {
+                    "id": "GO",
+                    "title": "GO"
+                  },
+                  {
+                    "id": "MA",
+                    "title": "MA"
+                  },
+                  {
+                    "id": "MG",
+                    "title": "MG"
+                  },
+                  {
+                    "id": "MS",
+                    "title": "MS"
+                  },
+                  {
+                    "id": "MT",
+                    "title": "MT"
+                  },
+                  {
+                    "id": "PA",
+                    "title": "PA"
+                  },
+                  {
+                    "id": "PB",
+                    "title": "PB"
+                  },
+                  {
+                    "id": "PE",
+                    "title": "PE"
+                  },
+                  {
+                    "id": "PI",
+                    "title": "PI"
+                  },
+                  {
+                    "id": "PR",
+                    "title": "PR"
+                  },
+                  {
+                    "id": "RJ",
+                    "title": "RJ"
+                  },
+                  {
+                    "id": "RN",
+                    "title": "RN"
+                  },
+                  {
+                    "id": "RO",
+                    "title": "RO"
+                  },
+                  {
+                    "id": "RR",
+                    "title": "RR"
+                  },
+                  {
+                    "id": "RS",
+                    "title": "RS"
+                  },
+                  {
+                    "id": "SC",
+                    "title": "SC"
+                  },
+                  {
+                    "id": "SE",
+                    "title": "SE"
+                  },
+                  {
+                    "id": "SP",
+                    "title": "SP"
+                  },
+                  {
+                    "id": "TO",
+                    "title": "TO"
+                  }
                 ]
               },
               {
-                "type": "Footer", "label": "Continuar",
+                "type": "Footer",
+                "label": "Continuar",
                 "on-click-action": {
                   "name": "navigate",
-                  "next": { "type": "screen", "name": "DESEMBOLSO" },
+                  "next": {
+                    "type": "screen",
+                    "name": "DESEMBOLSO"
+                  },
                   "payload": {
                     "nome": "${data.nome}",
                     "data_nascimento": "${data.data_nascimento}",
@@ -110,86 +300,235 @@
       "title": "Como receber",
       "terminal": true,
       "data": {
-        "nome": { "type": "string" },
-        "data_nascimento": { "type": "string" },
-        "genero": { "type": "string" },
-        "profissao": { "type": "string" },
-        "email": { "type": "string" },
-        "celular": { "type": "string" },
-        "cep": { "type": "string" },
-        "rua": { "type": "string" },
-        "numero": { "type": "string" },
-        "bairro": { "type": "string" },
-        "cidade": { "type": "string" },
-        "uf": { "type": "string" }
+        "nome": {
+          "type": "string",
+          "__example__": "Maria da Silva"
+        },
+        "data_nascimento": {
+          "type": "string",
+          "__example__": "1990-01-01"
+        },
+        "genero": {
+          "type": "string",
+          "__example__": "F"
+        },
+        "profissao": {
+          "type": "string",
+          "__example__": "Vendedora"
+        },
+        "email": {
+          "type": "string",
+          "__example__": "maria@exemplo.com"
+        },
+        "celular": {
+          "type": "string",
+          "__example__": "47999998888"
+        },
+        "cep": {
+          "type": "string",
+          "__example__": "88000000"
+        },
+        "rua": {
+          "type": "string",
+          "__example__": "Rua Exemplo"
+        },
+        "numero": {
+          "type": "string",
+          "__example__": "100"
+        },
+        "bairro": {
+          "type": "string",
+          "__example__": "Centro"
+        },
+        "cidade": {
+          "type": "string",
+          "__example__": "Camboriu"
+        },
+        "uf": {
+          "type": "string",
+          "__example__": "SC"
+        }
       },
       "layout": {
         "type": "SingleColumnLayout",
         "children": [
           {
-            "type": "Form", "name": "form_desembolso",
+            "type": "Form",
+            "name": "form_desembolso",
             "children": [
               {
-                "type": "RadioButtonsGroup", "name": "forma_desembolso", "label": "Como você quer receber o valor?",
+                "type": "RadioButtonsGroup",
+                "name": "forma_desembolso",
+                "label": "Como você quer receber o valor?",
                 "required": true,
                 "data-source": [
-                  { "id": "PIX", "title": "PIX" },
-                  { "id": "CONTA", "title": "Conta bancária" }
+                  {
+                    "id": "PIX",
+                    "title": "PIX"
+                  },
+                  {
+                    "id": "CONTA",
+                    "title": "Conta bancária"
+                  }
                 ]
               },
               {
-                "type": "Dropdown", "name": "pix_tipo", "label": "Tipo de chave PIX", "required": false,
-                "visible": "${form.forma_desembolso} == 'PIX'",
-                "init-value": "CPF (o meu)",
+                "type": "Dropdown",
+                "name": "pix_tipo",
+                "label": "Tipo de chave PIX",
+                "required": false,
                 "data-source": [
-                  { "id": "CPF (o meu)", "title": "CPF (o meu)" },
-                  { "id": "E-mail", "title": "E-mail" },
-                  { "id": "Telefone", "title": "Telefone" },
-                  { "id": "Chave aleatória", "title": "Chave aleatória" }
+                  {
+                    "id": "CPF (o meu)",
+                    "title": "CPF (o meu)"
+                  },
+                  {
+                    "id": "E-mail",
+                    "title": "E-mail"
+                  },
+                  {
+                    "id": "Telefone",
+                    "title": "Telefone"
+                  },
+                  {
+                    "id": "Chave aleatória",
+                    "title": "Chave aleatória"
+                  }
                 ]
               },
               {
-                "type": "TextInput", "name": "pix_chave", "label": "Chave PIX", "required": false,
-                "visible": "${form.forma_desembolso} == 'PIX' && ${form.pix_tipo} != 'CPF (o meu)'"
+                "type": "TextInput",
+                "name": "pix_chave",
+                "label": "Chave PIX",
+                "required": false
               },
               {
-                "type": "Dropdown", "name": "banco", "label": "Banco", "required": false,
-                "visible": "${form.forma_desembolso} == 'CONTA'",
+                "type": "Dropdown",
+                "name": "banco",
+                "label": "Banco",
+                "required": false,
                 "data-source": [
-                  { "id": "Banco do Brasil", "title": "Banco do Brasil" },
-                  { "id": "Santander", "title": "Santander" },
-                  { "id": "Caixa Econômica Federal", "title": "Caixa Econômica Federal" },
-                  { "id": "Bradesco", "title": "Bradesco" },
-                  { "id": "Itaú", "title": "Itaú" },
-                  { "id": "Nubank", "title": "Nubank" },
-                  { "id": "Inter", "title": "Inter" },
-                  { "id": "C6 Bank", "title": "C6 Bank" },
-                  { "id": "PagBank", "title": "PagBank" },
-                  { "id": "Mercado Pago", "title": "Mercado Pago" },
-                  { "id": "PicPay", "title": "PicPay" },
-                  { "id": "Banco Original", "title": "Banco Original" },
-                  { "id": "Sicoob", "title": "Sicoob" },
-                  { "id": "Sicredi", "title": "Sicredi" },
-                  { "id": "Safra", "title": "Safra" },
-                  { "id": "BTG Pactual", "title": "BTG Pactual" }
+                  {
+                    "id": "Banco do Brasil",
+                    "title": "Banco do Brasil"
+                  },
+                  {
+                    "id": "Santander",
+                    "title": "Santander"
+                  },
+                  {
+                    "id": "Caixa Econômica Federal",
+                    "title": "Caixa Econômica Federal"
+                  },
+                  {
+                    "id": "Bradesco",
+                    "title": "Bradesco"
+                  },
+                  {
+                    "id": "Itaú",
+                    "title": "Itaú"
+                  },
+                  {
+                    "id": "Nubank",
+                    "title": "Nubank"
+                  },
+                  {
+                    "id": "Inter",
+                    "title": "Inter"
+                  },
+                  {
+                    "id": "C6 Bank",
+                    "title": "C6 Bank"
+                  },
+                  {
+                    "id": "PagBank",
+                    "title": "PagBank"
+                  },
+                  {
+                    "id": "Mercado Pago",
+                    "title": "Mercado Pago"
+                  },
+                  {
+                    "id": "PicPay",
+                    "title": "PicPay"
+                  },
+                  {
+                    "id": "Banco Original",
+                    "title": "Banco Original"
+                  },
+                  {
+                    "id": "Sicoob",
+                    "title": "Sicoob"
+                  },
+                  {
+                    "id": "Sicredi",
+                    "title": "Sicredi"
+                  },
+                  {
+                    "id": "Safra",
+                    "title": "Safra"
+                  },
+                  {
+                    "id": "BTG Pactual",
+                    "title": "BTG Pactual"
+                  }
                 ]
               },
               {
-                "type": "Dropdown", "name": "tipo_conta", "label": "Tipo de conta", "required": false,
-                "visible": "${form.forma_desembolso} == 'CONTA'",
+                "type": "Dropdown",
+                "name": "tipo_conta",
+                "label": "Tipo de conta",
+                "required": false,
                 "data-source": [
-                  { "id": "Corrente", "title": "Corrente" },
-                  { "id": "Poupança", "title": "Poupança" },
-                  { "id": "Salário", "title": "Salário" }
+                  {
+                    "id": "Corrente",
+                    "title": "Corrente"
+                  },
+                  {
+                    "id": "Poupança",
+                    "title": "Poupança"
+                  },
+                  {
+                    "id": "Salário",
+                    "title": "Salário"
+                  }
                 ]
               },
-              { "type": "TextInput", "name": "agencia", "label": "Agência", "required": false, "visible": "${form.forma_desembolso} == 'CONTA'" },
-              { "type": "TextInput", "name": "conta", "label": "Número da conta", "required": false, "visible": "${form.forma_desembolso} == 'CONTA'" },
-              { "type": "TextInput", "name": "digito_conta", "label": "Dígito da conta", "required": false, "visible": "${form.forma_desembolso} == 'CONTA'" },
-              { "type": "TextInput", "name": "email_rh", "label": "E-mail do RH da sua empresa", "input-type": "email", "required": true },
-              { "type": "TextInput", "name": "telefone_rh", "label": "Telefone do RH da sua empresa", "input-type": "phone", "required": true },
               {
-                "type": "Footer", "label": "Enviar",
+                "type": "TextInput",
+                "name": "agencia",
+                "label": "Agência",
+                "required": false
+              },
+              {
+                "type": "TextInput",
+                "name": "conta",
+                "label": "Número da conta",
+                "required": false
+              },
+              {
+                "type": "TextInput",
+                "name": "digito_conta",
+                "label": "Dígito da conta",
+                "required": false
+              },
+              {
+                "type": "TextInput",
+                "name": "email_rh",
+                "label": "E-mail do RH da sua empresa",
+                "input-type": "email",
+                "required": true
+              },
+              {
+                "type": "TextInput",
+                "name": "telefone_rh",
+                "label": "Telefone do RH da sua empresa",
+                "input-type": "phone",
+                "required": true
+              },
+              {
+                "type": "Footer",
+                "label": "Enviar",
                 "on-click-action": {
                   "name": "complete",
                   "payload": {
