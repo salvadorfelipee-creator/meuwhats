@@ -4300,6 +4300,19 @@ async function processarEntry(entry) {
             } catch (err) {
               console.error("Erro ao reabrir menu inicial:", err.message);
             }
+          } else if (businessNumberId === CAMPANHA_CLT_NUMBER_ID && normalizarTexto(corpo) === "clt1") {
+            // Gatilho dedicado pra entrar na originação automática (Novo Saque) sem mexer no
+            // roteamento padrão do número (getFluxo → escolherVarianteCampanhaCLT) — a campanha
+            // de Indicação FGTS que roda nele hoje fica 100% intocada, só quem mandar "clt1" (de
+            // propósito, ex.: vindo de um anúncio/link específico) entra aqui. Reaproveita
+            // handlerCampanhaCLTSimular: com NOVOSAQUE_ORIGINATION_ATIVO ligado, já manda direto
+            // pro pedido de CPF.
+            try {
+              await handlerCampanhaCLTSimular(de, businessNumberId);
+              mensagemJaTratada = true;
+            } catch (err) {
+              console.error("Erro ao iniciar atalho clt1:", err.message);
+            }
           } else if (await bateuGatilhoDeFluxoDinamico(businessNumberId, corpo, de)) {
             mensagemJaTratada = true;
           } else if (fluxo === FLUXO_FELIZCRED && ["fgts", "saque"].includes(normalizarTexto(corpo))) {
