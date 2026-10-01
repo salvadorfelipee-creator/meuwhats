@@ -2,6 +2,9 @@
 // com a API deles; nenhuma lógica de WhatsApp aqui (fica em server.js). Mesmo papel que
 // wa.js/r2.js já têm nesse projeto — https nativo, sem dependência nova.
 const https = require("https");
+// cpfValido extraído pra cpf.js em 01/10/2026 (2º cliente de API — novosaque.js — passou a
+// precisar da mesma validação).
+const { cpfValido } = require("./cpf");
 
 const UNNOTECH_HOST = "gtw.unnotech.com.br";
 const UNNOTECH_BASE_PATH = "/public";
@@ -122,24 +125,6 @@ async function requotar(applicationId, idempotencyKey) {
   });
   if (status >= 400) throw new Error(`Falha ao repetir cotação: ${JSON.stringify(body)}`);
   return body;
-}
-
-// Valida os 2 dígitos verificadores do CPF (algoritmo padrão) — achado na revisão final:
-// REGEX_CPF (server.js) só confere 11 dígitos no formato certo, então qualquer sequência de 11
-// dígitos (até um número de celular) abria solicitação de verdade na Unnotech, gastando cota
-// (100/dia) à toa. Só usada antes de chamar criarSolicitacao, não mexe no resto dos fluxos que
-// usam REGEX_CPF pra outros produtos (CLT, garantia, financiamento...).
-function cpfValido(cpf) {
-  const c = String(cpf || "").replace(/\D/g, "");
-  if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false; // 11 dígitos iguais não é CPF real
-  const digitos = c.split("").map(Number);
-  const calcularDigito = (fatorInicial) => {
-    let soma = 0;
-    for (let i = 0; i < fatorInicial - 1; i++) soma += digitos[i] * (fatorInicial - i);
-    const resto = (soma * 10) % 11;
-    return resto === 10 ? 0 : resto;
-  };
-  return calcularDigito(10) === digitos[9] && calcularDigito(11) === digitos[10];
 }
 
 // Só a tabela J17 (ÔNIX) interessa — pedido explícito do usuário: se vier oferta de outro

@@ -162,12 +162,13 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "resolvido_em")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN resolvido_em INTEGER`);
   }
-  // email do contato — capturado em alguns fluxos (ver capturarContatoEBoasVindas) mas até
-  // 2026-09-29 nunca era salvo na conversa, só usado na hora e descartado. Guardar aqui
-  // permite reusar pra retorno/campanha de e-mail sem pedir nome de novo.
-  if (!infoConversations.rows.some((r) => r.name === "email")) {
-    await client.execute(`ALTER TABLE conversations ADD COLUMN email TEXT`);
-  }
+  // Nota (01/10/2026): a coluna "email" já é criada lá em cima (contato_salvo_em) — esse era um
+  // 2º ALTER redundante pro mesmo propósito ("email do contato, reusar pra campanha"), que
+  // sempre existiu como dead code num banco já migrado (o guard via infoConversations.rows
+  // nunca via o ALTER anterior rodar, por ser a mesma consulta PRAGMA de antes — não re-lida no
+  // meio da função), mas quebrava com "duplicate column name" em qualquer banco NOVO rodando a
+  // migração pela 1ª vez (achado testando a integração da Novo Saque contra um banco local do
+  // zero). Removido — a coluna já existe desde o primeiro ALTER, nada mudou de comportamento.
   // pipeline_estagio = etapa atual da conversa no funil de atendimento/vendas (texto livre —
   // Felizcred usa PIPELINE_ESTAGIOS no painel, qualquer outro canal usa a lista genérica
   // PIPELINE_ESTAGIOS_GENERICO, ver pipelineEstagiosPara em painel-web) — separado do `status`
@@ -630,6 +631,40 @@ const ready = (async () => {
   );
   await client.execute(
     `CREATE INDEX IF NOT EXISTS idx_clt_origination_flow_token ON clt_origination(flow_token)`
+  );
+
+  // Uma linha por solicitação de consignado CLT em andamento na Novo Saque (ver
+  // docs/superpowers/specs/2026-10-01-novosaque-clt-design.md) — banco separado de
+  // clt_origination (Unnotech) de propósito: são 2 integrações independentes, a Unnotech
+  // continua em standby esperando a credencial dela, essa aqui é a nova. Mais enxuta que a da
+  // Unnotech — o fluxo da Novo Saque não tem portão de "escolher vínculo" nem "escolher base de
+  // simulação" (a 1ª simulação já sai pronta sozinha, confirmado testando contra o sandbox real).
+  await client.execute(`CREATE TABLE IF NOT EXISTS novosaque_origination (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    phone TEXT NOT NULL,
+    business_number_id TEXT NOT NULL,
+    transaction_id TEXT,
+    cpf TEXT,
+    terms_link TEXT,
+    margem_disponivel REAL,
+    simulation_id TEXT,
+    valor_parcela REAL,
+    link_assinatura_enviado_em INTEGER,
+    flow_token TEXT,
+    etapa TEXT NOT NULL DEFAULT 'aguardando_autorizacao',
+    etapa_em INTEGER,
+    status_novosaque TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`);
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_novosaque_origination_etapa ON novosaque_origination(etapa, updated_at)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_novosaque_origination_phone ON novosaque_origination(phone, business_number_id)`
+  );
+  await client.execute(
+    `CREATE INDEX IF NOT EXISTS idx_novosaque_origination_flow_token ON novosaque_origination(flow_token)`
   );
 
   // Mescla duplicatas causadas pelo "9º dígito" do celular brasileiro (mesmo contato virando
@@ -2079,6 +2114,81 @@ async function cltOriginationReivindicar(id, etapaEsperada, etapaNova) {
   return result.rowsAffected > 0;
 }
 
+// ─── novosaque_origination — mesmo padrão de clt_origination acima ────────────────────────
+// Só o CPF abre a simulação na Novo Saque (não precisa de e-mail antes, diferente da Unnotech)
+// — por isso aqui já nasce com transaction_id preenchido, sem etapa de rascunho.
+async function novosaqueOriginationCriar(phone, businessNumberId, transactionId, cpf) {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `INSERT INTO novosaque_origination
+            (phone, business_number_id, transaction_id, cpf, etapa, etapa_em, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 'aguardando_autorizacao', ?, ?, ?)`,
+    args: [phone, businessNumberId, transactionId, cpf, agora, agora, agora],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+const NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS = ["concluido", "sem_oferta", "erro"];
+
+async function novosaqueOriginationBuscarAberta(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM novosaque_origination WHERE phone = ? AND business_number_id = ?
+          AND etapa NOT IN (${NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
+          ORDER BY id DESC LIMIT 1`,
+    args: [phone, businessNumberId, ...NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS],
+  });
+  return result.rows[0] || null;
+}
+
+async function novosaqueOriginationBuscarPorId(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM novosaque_origination WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+async function novosaqueOriginationAtualizar(id, campos) {
+  await ready;
+  const colunas = Object.keys(campos);
+  if (!colunas.length) return;
+  const agora = Date.now();
+  const sets = colunas.map((c) => `${c} = ?`).join(", ");
+  const valores = colunas.map((c) => campos[c]);
+  const setaEtapaEm = "etapa" in campos;
+  await client.execute({
+    sql: `UPDATE novosaque_origination SET ${sets}${setaEtapaEm ? ", etapa_em = ?" : ""}, updated_at = ? WHERE id = ?`,
+    args: setaEtapaEm ? [...valores, agora, agora, id] : [...valores, agora, id],
+  });
+}
+
+async function novosaqueOriginationListarAbertas() {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM novosaque_origination
+          WHERE etapa NOT IN (${NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
+          ORDER BY updated_at ASC`,
+    args: NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS,
+  });
+  return result.rows;
+}
+
+async function novosaqueOriginationBuscarPorFlowToken(token) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM novosaque_origination WHERE flow_token = ?`, args: [token] });
+  return result.rows[0] || null;
+}
+
+async function novosaqueOriginationReivindicar(id, etapaEsperada, etapaNova) {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `UPDATE novosaque_origination SET etapa = ?, etapa_em = ?, updated_at = ? WHERE id = ? AND etapa = ?`,
+    args: [etapaNova, agora, agora, id, etapaEsperada],
+  });
+  return result.rowsAffected > 0;
+}
+
 // Agenda os contatos 2+ de um broadcast com intervalo — cada item já vem com seu
 // agendado_para calculado pelo chamador (server.js: agora + i * intervaloSegundos).
 async function broadcastAgendarLote(businessId, itens, fluxoId) {
@@ -2600,6 +2710,13 @@ module.exports = {
   cltOriginationAtualizar,
   cltOriginationReivindicar,
   cltOriginationListarAbertas,
+  novosaqueOriginationCriar,
+  novosaqueOriginationBuscarAberta,
+  novosaqueOriginationBuscarPorId,
+  novosaqueOriginationAtualizar,
+  novosaqueOriginationListarAbertas,
+  novosaqueOriginationBuscarPorFlowToken,
+  novosaqueOriginationReivindicar,
   tentarMarcarMenuEnviado,
   setFluxoPasso,
   listarFluxosAguardando,

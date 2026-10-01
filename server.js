@@ -17,6 +17,7 @@ const agenda = require("./agenda");
 const backup = require("./backup");
 const r2 = require("./r2");
 const unnotech = require("./unnotech");
+const novosaque = require("./novosaque");
 const flowCrypto = require("./flow-crypto");
 const google = require("./google");
 const mcp = require("./mcp");
@@ -2288,6 +2289,513 @@ async function processarEtapaCltAguardandoPagamento(row) {
   }
 }
 
+// ─── ORIGINAÇÃO AUTOMÁTICA DE CONSIGNADO CLT VIA NOVO SAQUE ────────────────────────────────
+// 2º banco integrado (01/10/2026) — a Unnotech segue em standby esperando a credencial dela
+// (ver bloco acima); essa é uma integração nova e INDEPENDENTE, testada ponta a ponta contra o
+// sandbox real da Novo Saque (não só a doc — ver
+// docs/superpowers/specs/2026-10-01-novosaque-clt-design.md). Fluxo mais enxuto que o da
+// Unnotech: só o CPF abre a simulação (sem e-mail antes), e não tem portão de "escolher
+// vínculo"/"escolher base de simulação" — a 1ª simulação já sai pronta sozinha depois da
+// autorização, confirmado ao vivo.
+//
+// Entrada: botão "Simulação" do fluxo arquivado FLUXO_CAMPANHA_CLT (ver
+// handlerCampanhaCLTSimular mais abaixo) — é o pitch de "consignado já aprovado" já desenhado
+// pro número Campanha CLT, só que esse fluxo está ARQUIVADO hoje (o número roda a campanha
+// ativa de Indicação FGTS no lugar, ver FLUXOS_POR_NUMERO/escolherVarianteCampanhaCLT). Ativar
+// essa automação NÃO reativa sozinho o FLUXO_CAMPANHA_CLT — são 2 decisões separadas de
+// propósito, pra não trocar o destino de tráfego pago ao vivo sem confirmação explícita.
+const NOVOSAQUE_ORIGINATION_ATIVO = false;
+
+const NSORIG_TEXTO_TERMINAL = {
+  sem_margem:
+    "No momento você não tem margem disponível pra consignado CLT. Isso pode mudar mês a mês — " +
+    "se quiser, tenta de novo depois.",
+  desconhecido:
+    "No momento não encontrei condições disponíveis pro seu consignado CLT. Se quiser, tenta de " +
+    "novo mais tarde.",
+};
+
+async function finalizarNsSemOferta(row, categoria) {
+  await db.novosaqueOriginationAtualizar(row.id, { etapa: "sem_oferta" });
+  await db.setFluxoPasso(row.phone, row.business_number_id, null);
+  try {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      NSORIG_TEXTO_TERMINAL[categoria] || NSORIG_TEXTO_TERMINAL.desconhecido
+    );
+  } catch (err) {
+    console.error(`Erro ao avisar cliente de encerramento sem oferta Novo Saque (linha #${row.id}):`, err.message);
+  }
+}
+
+const NSORIG_PRAZO_MS = 90 * 60 * 1000; // etapas de resposta rápida do cliente
+// Consentimento é ação do cliente fora do nosso controle (pode levar dias) — mesma folga de
+// 72h já usada na Unnotech, mesmo raciocínio (ver spec do CLT/Unnotech).
+const NSORIG_PRAZO_AUTORIZACAO_MS = 72 * 60 * 60 * 1000;
+// Pós-assinatura/pagamento — averbação e liquidação bancária podem legitimamente levar dias.
+const NSORIG_PRAZO_LONGO_MS = 5 * 24 * 60 * 60 * 1000;
+
+const NSORIG_ETAPAS_COM_PRAZO_CURTO = ["oferta_apresentada", "aguardando_valor", "simulando_pendente", "formulario", "enviando_kyc"];
+
+const NSORIG_ETAPA_REENTRADA = {
+  oferta_apresentada: { texto: "Já te mandei sua oferta ali acima — toca em QUERO CONTRATAR ou PARCELA MAIS BAIXA 😊", passo: null },
+  aguardando_valor: { texto: "Ainda esperando você me mandar o valor — pode mandar só o número? 😊", passo: "nsorig_valor" },
+  formulario: { texto: "Ainda esperando você preencher o formulário que te mandei ali acima 😊", passo: null },
+};
+
+// Varre os sub-resultados conhecidos da Novo Saque procurando por alguma falha explícita
+// (success: false) — achado testando ao vivo contra o sandbox: um erro real de validação
+// (ccb_creation_result, "insurance_amount - must be less than 1500") não aparece em
+// "stage"/"summary_status", só dentro desses sub-objetos. Sem essa checagem, um contrato
+// travado nesse tipo de erro ficaria sendo consultado pra sempre sem nunca escalar pro humano.
+function falhaNovoSaque(contract) {
+  const campos = [
+    "balance_check_result",
+    "ccb_creation_result",
+    "signature_result",
+    "signature_submission_result",
+    "signature_send_result",
+    "contract_send_result",
+    "terms_send_result",
+    "registry_result",
+    "disbursement_result",
+    "disbursement_reprocessing_result",
+  ];
+  for (const campo of campos) {
+    const r = contract[campo];
+    if (r && r.success === false) {
+      return `${campo}: ${(r.reason || []).join("; ") || r.error || "falha desconhecida"}`;
+    }
+  }
+  return null;
+}
+
+async function handlerNsOrigCapturaCpf(de, businessNumberId, corpo) {
+  const cpfBruto = (corpo.match(REGEX_CPF) || [])[0];
+  if (!cpfBruto) {
+    await db.setFluxoPasso(de, businessNumberId, "nsorig_cpf"); // reafirma, reseta o lembrete
+    return;
+  }
+  const cpf = cpfBruto.replace(/\D/g, "");
+  if (!novosaque.cpfValido(cpf)) {
+    await enviarRespostaAutomatica(businessNumberId, de, "Esse CPF não parece válido — confere os números e manda de novo, por favor. 😊");
+    return;
+  }
+  const existente = await db.novosaqueOriginationBuscarAberta(de, businessNumberId);
+  if (existente) {
+    const prazoAplicavel =
+      existente.etapa === "aguardando_autorizacao"
+        ? NSORIG_PRAZO_AUTORIZACAO_MS
+        : NSORIG_ETAPAS_COM_PRAZO_CURTO.includes(existente.etapa)
+        ? NSORIG_PRAZO_MS
+        : null;
+    const expirada =
+      prazoAplicavel !== null && Date.now() - Number(existente.etapa_em || existente.updated_at) > prazoAplicavel;
+    if (!expirada) {
+      if (existente.etapa === "aguardando_autorizacao") {
+        const linkTexto = existente.terms_link ? `\n${existente.terms_link}` : "";
+        await enviarRespostaAutomatica(businessNumberId, de, `Ainda esperando você assinar o termo de autorização.${linkTexto}`);
+        return;
+      }
+      const info = NSORIG_ETAPA_REENTRADA[existente.etapa];
+      await enviarRespostaAutomatica(
+        businessNumberId,
+        de,
+        info?.texto ||
+          "Você já tem uma simulação de consignado CLT em andamento — já já eu te aviso por aqui assim que tiver novidade. 😊"
+      );
+      await db.setFluxoPasso(de, businessNumberId, info?.passo ?? null);
+      return;
+    }
+    await db.novosaqueOriginationAtualizar(existente.id, { etapa: "sem_oferta" });
+  }
+  await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Só um instante enquanto eu abro sua simulação... ⏳");
+  try {
+    const transactionId = await novosaque.criarSimulacaoClt(cpf);
+    await db.novosaqueOriginationCriar(de, businessNumberId, transactionId, cpf);
+    await db.setFluxoPasso(de, businessNumberId, null);
+    // O link de autorização ainda não existe nesse exato instante (achado ao vivo: leva alguns
+    // segundos pra aparecer) — o verificador manda assim que aparecer (ver
+    // processarEtapaNsAguardandoAutorizacao).
+  } catch (err) {
+    console.error("Erro ao abrir simulação CLT na Novo Saque:", err.message);
+    await confirmarEncaminhamentoHumano(de, businessNumberId);
+  }
+}
+
+// Confirmação final de UMA oferta (normalmente só vem 1 tabela — ver escolherMelhorOferta em
+// novosaque.js) — mesma mensagem/botões em qualquer caminho que chegar aqui (1ª simulação
+// automática ou depois de pedir parcela mais baixa).
+async function apresentarOfertaEscolhidaNs(row, contract, oferta) {
+  await db.novosaqueOriginationAtualizar(row.id, {
+    etapa: "oferta_apresentada",
+    simulation_id: oferta.simulation_id,
+    valor_parcela: oferta.installment_value,
+    margem_disponivel: contract.balance_check_result?.balance_value ?? row.margem_disponivel,
+    status_novosaque: contract.summary_status,
+  });
+  try {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      `Tenho aprovado pra você: *R$ ${Number(oferta.disbursed_amount).toFixed(2)}* liberado, em ` +
+        `${oferta.installments}x de R$ ${Number(oferta.installment_value).toFixed(2)}.`
+    );
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      "Esse valor é liberado em até 40 minutos na sua conta, via PIX. O primeiro desconto só acontece " +
+        "depois de 60 dias, direto no seu salário."
+    );
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      "Quer contratar com esse valor ou prefere simular uma parcela mais baixa?",
+      [
+        { id: "nsorig_contratar", title: "QUERO CONTRATAR" },
+        { id: "nsorig_parcela_mais_baixa", title: "PARCELA MAIS BAIXA" },
+      ]
+    );
+  } catch (err) {
+    console.error(`Erro ao apresentar oferta Novo Saque (linha #${row.id}):`, err.message);
+  }
+  await db.setFluxoPasso(row.phone, row.business_number_id, "nsorig_oferta_apresentada");
+}
+
+async function processarEtapaNsAguardandoAutorizacao(row) {
+  let contract;
+  try {
+    contract = await novosaque.consultarContratoClt(row.transaction_id);
+  } catch (err) {
+    console.error(`Erro ao consultar contrato Novo Saque (linha #${row.id}):`, err.message);
+    return;
+  }
+  const falha = falhaNovoSaque(contract);
+  if (falha) {
+    console.error(`Falha reportada pela Novo Saque (linha #${row.id}): ${falha}`);
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente de falha Novo Saque (linha #${row.id}):`, err2.message);
+    }
+    return;
+  }
+  // terms_link não vem na resposta da criação — leva alguns segundos pra aparecer (achado ao
+  // vivo) — manda assim que a gente vir ele pela 1ª vez.
+  if (contract.terms_link && !row.terms_link) {
+    await db.novosaqueOriginationAtualizar(row.id, { terms_link: contract.terms_link, status_novosaque: contract.summary_status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        `Para verificar a disponibilidade é preciso autorizar a consulta. Clique no link abaixo para fazer ` +
+          `a autorização:\n${contract.terms_link}\n\nAssim que autorizar, eu continuo automaticamente por aqui. 😊`
+      );
+    } catch (err) {
+      console.error(`Erro ao avisar cliente do termo Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  if (contract.summary_status === "Offer unavailable") {
+    await finalizarNsSemOferta(row, "sem_margem");
+    return;
+  }
+  // Autorizado + margem + simulação prontas, tudo automático (achado ao vivo: a 1ª simulação
+  // já sai sozinha depois da autorização, sem precisar pedir nada ao cliente).
+  if ((contract.simulation_results || []).length) {
+    const oferta = novosaque.escolherMelhorOferta(contract.simulation_results);
+    if (!oferta) {
+      await finalizarNsSemOferta(row, "desconhecido");
+      return;
+    }
+    await apresentarOfertaEscolhidaNs(row, contract, oferta);
+    return;
+  }
+  if (Date.now() - Number(row.etapa_em || row.created_at) > NSORIG_PRAZO_AUTORIZACAO_MS) {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de autorização travada Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  await db.novosaqueOriginationAtualizar(row.id, {
+    status_novosaque: contract.summary_status,
+    margem_disponivel: contract.balance_check_result?.balance_value ?? row.margem_disponivel,
+  });
+}
+
+// Mesma lógica de processarEtapaNsAguardandoAutorizacao a partir do ponto "simulação pronta",
+// usada depois de um pedido de parcela mais baixa (a autorização já tinha sido dada antes,
+// então não precisa checar terms_link/margem de novo).
+async function processarEtapaNsSimulando(row) {
+  let contract;
+  try {
+    contract = await novosaque.consultarContratoClt(row.transaction_id);
+  } catch (err) {
+    console.error(`Erro ao consultar contrato Novo Saque (linha #${row.id}):`, err.message);
+    return;
+  }
+  const falha = falhaNovoSaque(contract);
+  if (falha) {
+    console.error(`Falha reportada pela Novo Saque (linha #${row.id}): ${falha}`);
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente de falha Novo Saque (linha #${row.id}):`, err2.message);
+    }
+    return;
+  }
+  if (contract.summary_status === "Offer unavailable") {
+    await finalizarNsSemOferta(row, "desconhecido");
+    return;
+  }
+  if ((contract.simulation_results || []).length) {
+    const oferta = novosaque.escolherMelhorOferta(contract.simulation_results);
+    if (!oferta) {
+      await finalizarNsSemOferta(row, "desconhecido");
+      return;
+    }
+    await apresentarOfertaEscolhidaNs(row, contract, oferta);
+    return;
+  }
+  if (Date.now() - Number(row.etapa_em || row.created_at) > NSORIG_PRAZO_MS) {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de resimulação travada Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  await db.novosaqueOriginationAtualizar(row.id, { status_novosaque: contract.summary_status });
+}
+
+async function handlerNsOrigParcelaMaisBaixa(de, businessNumberId) {
+  const row = await db.novosaqueOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "oferta_apresentada") return;
+  await db.novosaqueOriginationAtualizar(row.id, { etapa: "aguardando_valor" });
+  await enviarRespostaAutomatica(businessNumberId, de, "Quanto você quer pagar de parcela por mês? Me manda só o número (ex.: 300).");
+  await db.setFluxoPasso(de, businessNumberId, "nsorig_valor");
+}
+
+async function handlerNsOrigCapturaValor(de, businessNumberId, corpo) {
+  const valor = extrairValorReais(corpo);
+  if (!valor) {
+    await enviarRespostaAutomatica(businessNumberId, de, "Não consegui entender esse valor — me manda só o número, por favor (ex.: 300). 😊");
+    await db.setFluxoPasso(de, businessNumberId, "nsorig_valor");
+    return;
+  }
+  const row = await db.novosaqueOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "aguardando_valor") return;
+  if (row.margem_disponivel && valor > Number(row.margem_disponivel)) {
+    await enviarRespostaAutomatica(
+      businessNumberId,
+      de,
+      `Esse valor passa da sua margem disponível (R$ ${Number(row.margem_disponivel).toFixed(2)} por mês). ` +
+        "Me manda um valor até esse limite, por favor."
+    );
+    await db.setFluxoPasso(de, businessNumberId, "nsorig_valor");
+    return;
+  }
+  const reivindicou = await db.novosaqueOriginationReivindicar(row.id, "aguardando_valor", "simulando_pendente");
+  if (!reivindicou) return;
+  await enviarRespostaAutomatica(businessNumberId, de, "Simulando... isso leva só um minutinho ⏳");
+  try {
+    await novosaque.resimularClt(row.transaction_id, valor);
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "simulando", valor_parcela: valor });
+    await db.setFluxoPasso(de, businessNumberId, null);
+  } catch (err) {
+    console.error("Erro ao re-simular CLT na Novo Saque:", err.message);
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro" });
+    await confirmarEncaminhamentoHumano(de, businessNumberId);
+  }
+}
+
+async function handlerNsOrigContratar(de, businessNumberId) {
+  const row = await db.novosaqueOriginationBuscarAberta(de, businessNumberId);
+  if (!row || row.etapa !== "oferta_apresentada") return;
+  const flowToken = crypto.randomUUID();
+  try {
+    // Manda o Flow ANTES de gravar a etapa (mesmo cuidado já aprendido no CLT/Unnotech: se o
+    // envio falhar, a linha fica em 'oferta_apresentada' e o cliente pode clicar de novo).
+    await wa.sendFlow(businessNumberId, de, {
+      flowId: process.env.NOVOSAQUE_FLOW_ID,
+      flowToken,
+      bodyText: "Show! Só preciso de mais alguns dados pra fechar a contratação. Toca no botão abaixo:",
+      ctaText: "Preencher dados",
+      screenId: "DADOS_PESSOAIS",
+    });
+  } catch (err) {
+    console.error(`Erro ao enviar Flow Novo Saque (linha #${row.id}):`, err.message);
+    return;
+  }
+  await db.novosaqueOriginationAtualizar(row.id, { flow_token: flowToken, etapa: "formulario" });
+  await db.setFluxoPasso(de, businessNumberId, "nsorig_formulario");
+}
+
+async function processarSubmissaoFormularioNovoSaque(flowToken, de, businessNumberId, dados) {
+  if (!flowToken) return;
+  const row = await db.novosaqueOriginationBuscarPorFlowToken(flowToken);
+  if (!row) return;
+  if (row.phone !== de || row.business_number_id !== businessNumberId) {
+    console.error(`Submissão de Flow Novo Saque com remetente divergente da linha #${row.id} (esperado ${row.phone}, veio ${de}) — ignorada.`);
+    return;
+  }
+  const reivindicou = await db.novosaqueOriginationReivindicar(row.id, "formulario", "enviando_kyc");
+  if (!reivindicou) return;
+  try {
+    const customerData = novosaque.montarCustomerData(row.cpf, dados);
+    await novosaque.enviarFormalizacaoClt(row.transaction_id, row.simulation_id, customerData);
+    // Estado no banco ANTES de avisar (mesmo cuidado do CLT/Unnotech: se o aviso falhar depois
+    // da formalização já ter sido aceita de verdade, a linha não pode cair em 'erro').
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "aguardando_assinatura" });
+    await db.setFluxoPasso(row.phone, row.business_number_id, null);
+    try {
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "Perfeito, só um instante que já preparo seu contrato...");
+    } catch (err) {
+      console.error(`Erro ao avisar cliente do aceite Novo Saque (linha #${row.id}):`, err.message);
+    }
+  } catch (err) {
+    console.error(`Erro ao processar formulário Novo Saque (linha #${row.id}):`, err.message);
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro" });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente do encaminhamento Novo Saque (linha #${row.id}):`, err2.message);
+    }
+  }
+}
+
+async function processarEtapaNsAguardandoAssinatura(row) {
+  let contract;
+  try {
+    contract = await novosaque.consultarContratoClt(row.transaction_id);
+  } catch (err) {
+    console.error(`Erro ao consultar contrato Novo Saque (linha #${row.id}):`, err.message);
+    return;
+  }
+  const falha = falhaNovoSaque(contract);
+  if (falha) {
+    console.error(`Falha reportada pela Novo Saque (linha #${row.id}): ${falha}`);
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Tivemos um problema pra finalizar essa contratação. Vou te colocar com um atendente pra ver o que aconteceu."
+      );
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente da falha de contratação Novo Saque (linha #${row.id}):`, err2.message);
+    }
+    return;
+  }
+  if (contract.contract_link && !row.link_assinatura_enviado_em) {
+    await db.novosaqueOriginationAtualizar(row.id, { link_assinatura_enviado_em: Date.now(), status_novosaque: contract.summary_status });
+    try {
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "Seu contrato está pronto! ✍️ Assim que você assinar, eu te aviso por aqui.");
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "Toque no botão abaixo pra assinar:", null, null, {
+        buttonText: "Assinar contrato",
+        url: contract.contract_link,
+      });
+    } catch (err) {
+      console.error(`Erro ao mandar link de assinatura Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  // Achado ao vivo: depois de assinado, o `stage` avança pra "registry" (averbação) sem passar
+  // por nenhum status específico de "assinado" nos campos que a gente lê — a mudança de stage
+  // em si já é o sinal.
+  if (["registry", "disbursement", "pay-commission", "collateral"].includes(contract.stage)) {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "aguardando_pagamento", status_novosaque: contract.summary_status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Contrato assinado! 🎉 Agora é só aguardar a averbação e o depósito — te aviso assim que cair na sua conta."
+      );
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de assinatura Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  if (Date.now() - Number(row.etapa_em || row.created_at) > NSORIG_PRAZO_LONGO_MS) {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de assinatura travada Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  await db.novosaqueOriginationAtualizar(row.id, { status_novosaque: contract.summary_status });
+}
+
+async function processarEtapaNsAguardandoPagamento(row) {
+  let contract;
+  try {
+    contract = await novosaque.consultarContratoClt(row.transaction_id);
+  } catch (err) {
+    console.error(`Erro ao consultar contrato Novo Saque (linha #${row.id}):`, err.message);
+    return;
+  }
+  const falha = falhaNovoSaque(contract);
+  if (falha) {
+    console.error(`Falha reportada pela Novo Saque (linha #${row.id}): ${falha}`);
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Tivemos um problema depois da assinatura do seu contrato. Vou te colocar com um atendente pra resolver."
+      );
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente de falha pós-assinatura Novo Saque (linha #${row.id}):`, err2.message);
+    }
+    return;
+  }
+  if (contract.summary_status === "Contract paid") {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "concluido", status_novosaque: contract.summary_status });
+    await db.setFluxoPasso(row.phone, row.business_number_id, null);
+    try {
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "O valor já caiu! 💰 Qualquer coisa, é só me chamar.");
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de pagamento Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  if (contract.summary_status === "Payment returned") {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await enviarRespostaAutomatica(
+        row.business_number_id,
+        row.phone,
+        "Tivemos um problema no pagamento (dados bancários incorretos, por exemplo). Vou te colocar com um atendente pra resolver."
+      );
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de pagamento devolvido Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  if (Date.now() - Number(row.etapa_em || row.created_at) > NSORIG_PRAZO_LONGO_MS) {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de pagamento travado Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  await db.novosaqueOriginationAtualizar(row.id, { status_novosaque: contract.summary_status });
+}
+
 // Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
 // verdade na mensagem — qualquer outra coisa só reseta o relógio do lembrete, sem confirmar
 // nada errado (mesmo cuidado do handlerCapturaDadosClt, ver comentário lá em cima).
@@ -2821,6 +3329,13 @@ async function iniciarFluxoCampanhaCLT(de, businessNumberId) {
 }
 
 async function handlerCampanhaCLTSimular(de, businessNumberId) {
+  // Standby: ver NOVOSAQUE_ORIGINATION_ATIVO. Enquanto false, comportamento inalterado (pede
+  // os 5 dados em texto livre, atendimento humano).
+  if (NOVOSAQUE_ORIGINATION_ATIVO) {
+    await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Pra eu simular, me manda o seu CPF, por favor 😊");
+    await db.setFluxoPasso(de, businessNumberId, "nsorig_cpf");
+    return;
+  }
   await enviarRespostaAutomatica(businessNumberId, de, CAMPCLT_TEXTO_SIMULAR);
   await db.setFluxoPasso(de, businessNumberId, "campclt_aguardando_dados");
 }
@@ -2854,6 +3369,9 @@ const FLUXO_BOTOES_CAMPANHA_CLT = {
   // Reaproveita confirmarEncaminhamentoHumano (mesma mensagem de "já vou te colocar com um
   // atendente" usada no resto do CLT) — clicar em "dúvidas" já conta como pedido de humano.
   campclt_com_duvidas: confirmarEncaminhamentoHumano,
+  // Botões da originação automática via Novo Saque (ver NOVOSAQUE_ORIGINATION_ATIVO acima).
+  nsorig_contratar: handlerNsOrigContratar,
+  nsorig_parcela_mais_baixa: handlerNsOrigParcelaMaisBaixa,
 };
 
 const LEMBRETE_MINUTOS_CAMPANHA_CLT = {
@@ -2872,6 +3390,8 @@ const FLUXO_CAMPANHA_CLT = {
   lembreteHandlers: LEMBRETE_HANDLERS_CAMPANHA_CLT,
   capturaTexto: {
     campclt_aguardando_dados: handlerCapturaDadosCampanhaCLTNova,
+    nsorig_cpf: handlerNsOrigCapturaCpf,
+    nsorig_valor: handlerNsOrigCapturaValor,
   },
   // Sem manter_janela definido — igual ao Ciahot, sem o segundo aviso de "ainda por aí?" perto
   // das 24h (só o lembrete de 7min e nada além disso).
@@ -3733,6 +4253,11 @@ async function processarEntry(entry) {
               await processarSubmissaoFormularioClt(token, de, businessNumberId, dados);
             } catch (err) {
               console.error("Erro ao processar formulário CLT:", err.message);
+            }
+            try {
+              await processarSubmissaoFormularioNovoSaque(token, de, businessNumberId, dados);
+            } catch (err) {
+              console.error("Erro ao processar formulário Novo Saque:", err.message);
             }
           }
         } else if (tipo === "interactive" && (msg.interactive?.list_reply?.id || "").startsWith("cltorig_vinculo_")) {
@@ -6084,6 +6609,34 @@ setInterval(async () => {
     console.error("Erro no verificador de originação CLT:", err.message);
   } finally {
     verificandoCltOrigination = false;
+  }
+}, 30 * 1000);
+
+// Mesmo padrão dos 2 verificadores acima — tabela própria (novosaque_origination), independente
+// da Unnotech.
+let verificandoNsOrigination = false;
+setInterval(async () => {
+  if (verificandoNsOrigination) return;
+  verificandoNsOrigination = true;
+  try {
+    const abertas = await db.novosaqueOriginationListarAbertas();
+    for (const row of abertas) {
+      try {
+        if (row.etapa === "aguardando_autorizacao") await processarEtapaNsAguardandoAutorizacao(row);
+        else if (row.etapa === "simulando") await processarEtapaNsSimulando(row);
+        else if (row.etapa === "aguardando_assinatura") await processarEtapaNsAguardandoAssinatura(row);
+        else if (row.etapa === "aguardando_pagamento") await processarEtapaNsAguardandoPagamento(row);
+        // 'oferta_apresentada', 'aguardando_valor', 'simulando_pendente', 'formulario' e
+        // 'enviando_kyc' esperam uma ação do cliente (ou já foram reivindicadas) — mesmo
+        // raciocínio do verificador de CLT/Unnotech acima.
+      } catch (err) {
+        console.error(`Erro ao processar originação Novo Saque #${row.id} (etapa ${row.etapa}):`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no verificador de originação Novo Saque:", err.message);
+  } finally {
+    verificandoNsOrigination = false;
   }
 }, 30 * 1000);
 

@@ -127,6 +127,9 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `UNNOTECH_CLIENT_SECRET` | Credencial da API da Unnotech (originação de crédito FGTS) | — |
 | `FGTS_FLOW_ID` | ID do WhatsApp Flow de coleta de dados do FGTS, gerado ao publicar o Flow | — |
 | `CLT_FLOW_ID` | ID do WhatsApp Flow de coleta de dados do consignado CLT (`flows/clt-cadastro.json`) | — |
+| `NOVOSAQUE_API_KEY` | Chave de API da Novo Saque (originação de crédito CLT, 2º banco) | — |
+| `NOVOSAQUE_FLOW_ID` | ID do WhatsApp Flow de coleta de dados (`flows/novosaque-clt-cadastro.json`) | — |
+| `NOVOSAQUE_BASE_HOST` | Host da API da Novo Saque | `api.novosaque.dev.br` (sandbox) |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | Token de acesso da Página do Facebook (`pages_manage_posts` + `pages_manage_metadata`) | — |
 | `FACEBOOK_PAGE_ID` | ID numérico da Página do Facebook | — |
 | `TWITTER_API_KEY` / `TWITTER_API_SECRET` | Chaves do App no X Developer Portal | — |
@@ -719,6 +722,31 @@ humano se o menu inteiro for recusado.
 **Formulário de dados**: WhatsApp Flow nativo (`flows/clt-cadastro.json`), mesma estrutura de 4
 telas do FGTS, com 2 campos extras opcionais (e-mail/telefone do RH) na última tela. Mesmas
 regras de PIX=CPF e pré-preenchimento (Solteiro/Ensino Médio/SSP) do FGTS.
+
+### Originação automática de consignado CLT via Novo Saque (01/10/2026) — EM STANDBY
+
+2º banco integrado, **independente** da Unnotech acima (tabela própria `novosaque_origination`,
+cliente próprio `novosaque.js`, verificador próprio) — a Unnotech continua intacta e em standby
+esperando a credencial dela. Fluxo mais enxuto: só o CPF abre a simulação (sem e-mail antes), e
+não tem portão de "escolher vínculo"/"escolher base de simulação" — a 1ª simulação já sai
+pronta sozinha depois da autorização. Testado **ponta a ponta contra o sandbox real da Novo
+Saque** (não só mockado) — ver `docs/superpowers/specs/2026-10-01-novosaque-clt-design.md`
+pros achados completos (inclui 2 divergências reais entre a doc deles e a API, e um bug
+pré-existente de migração que essa sessão corrigiu de quebra).
+
+**Ainda desligado de propósito** — `NOVOSAQUE_ORIGINATION_ATIVO` no topo do bloco Novo Saque em
+`server.js` está `false`. A entrada fica no botão "Simulação" do fluxo `FLUXO_CAMPANHA_CLT`
+(número Campanha CLT) — que por sua vez **também está arquivado hoje** (esse número roda a
+campanha ativa de Indicação FGTS → horas extras no lugar). São 2 decisões separadas de
+propósito: ligar a automação não reativa sozinho o pitch de CLT nesse número. **Para ativar de
+verdade**, depois de ter uma chave de produção:
+1. Configure `NOVOSAQUE_API_KEY` (e `NOVOSAQUE_BASE_HOST` se for produção, não sandbox).
+2. Publique `flows/novosaque-clt-cadastro.json` no WhatsApp Manager → Flows e configure
+   `NOVOSAQUE_FLOW_ID`.
+3. Troque `NOVOSAQUE_ORIGINATION_ATIVO` para `true` em `server.js`.
+4. Decida separadamente se quer reativar `FLUXO_CAMPANHA_CLT` (reatribuir
+   `FLUXOS_POR_NUMERO`/a checagem de `CAMPANHA_CLT_NUMBER_ID` em `getFluxo`) ou conectar essa
+   automação em outra entrada.
 
 ### Aviso de horário comercial (31/07/2026)
 
