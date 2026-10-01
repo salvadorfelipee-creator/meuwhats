@@ -4046,7 +4046,18 @@ async function getFluxo(businessNumberId, phone, fluxoPassoAtual) {
     const fluxoAguardado = await db.fluxoDinamicoObter(fluxoId);
     if (fluxoAguardado) return montarFluxoDinamico(fluxoAguardado);
   }
-  if (businessNumberId === CAMPANHA_CLT_NUMBER_ID) return escolherVarianteCampanhaCLT(phone);
+  if (businessNumberId === CAMPANHA_CLT_NUMBER_ID) {
+    // Sticky pra quem entrou pelo atalho "clt1" (ver handlerCampanhaCLTSimular/nsorig_*): sem
+    // isso, a resposta da pessoa (CPF, ou os botões QUERO CONTRATAR/PARCELA MAIS BAIXA) cai no
+    // objeto de fluxo errado (a variante de Indicação FGTS, cujo capturaTexto/fluxoBotoes não
+    // tem essas chaves) e a conversa trava em silêncio — bug real encontrado ao vivo em
+    // 01/10/2026. Dois sinais porque fluxo_passo fica null entre a criação da transação e a
+    // apresentação da oferta (ver handlerNsOrigCapturaCpf) — nessa janela só a linha aberta em
+    // novosaque_origination identifica que a pessoa está nesse sub-fluxo.
+    if (String(fluxoPassoAtual || "").startsWith("nsorig_")) return FLUXO_CAMPANHA_CLT;
+    if (await db.novosaqueOriginationBuscarAberta(phone, businessNumberId)) return FLUXO_CAMPANHA_CLT;
+    return escolherVarianteCampanhaCLT(phone);
+  }
   if (businessNumberId === FELIZCRED_PRINCIPAL_NUMBER_ID) {
     if (String(fluxoPassoAtual || "").startsWith("fgtsad_")) return FLUXO_FGTS_ANUNCIO;
     if (await db.recebeuTemplate(phone, businessNumberId, "amigo_indicou")) return FLUXO_AMIGO_INDICOU;
