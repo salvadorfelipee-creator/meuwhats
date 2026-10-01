@@ -2311,7 +2311,7 @@ async function processarEtapaCltAguardandoPagamento(row) {
 // ativa de Indicação FGTS no lugar, ver FLUXOS_POR_NUMERO/escolherVarianteCampanhaCLT). Ativar
 // essa automação NÃO reativa sozinho o FLUXO_CAMPANHA_CLT — são 2 decisões separadas de
 // propósito, pra não trocar o destino de tráfego pago ao vivo sem confirmação explícita.
-const NOVOSAQUE_ORIGINATION_ATIVO = false;
+const NOVOSAQUE_ORIGINATION_ATIVO = true;
 
 const NSORIG_TEXTO_TERMINAL = {
   sem_margem:
