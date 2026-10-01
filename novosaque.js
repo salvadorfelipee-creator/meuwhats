@@ -171,9 +171,20 @@ function montarCustomerData(cpf, dados) {
     // Diferente da Unnotech (PIX só aceita chave = CPF do próprio tomador, regra explícita
     // deles), a doc da Novo Saque lista 4 tipos de chave sem nenhuma restrição desse tipo —
     // deixa o cliente escolher qual chave usar, em vez de travar em CPF por analogia errada.
-    const tipo = MAPA_PIX_TYPE_NOVOSAQUE[dados.pix_tipo] || "cpf";
+    let tipo = MAPA_PIX_TYPE_NOVOSAQUE[dados.pix_tipo] || "cpf";
+    let chave = tipo === "cpf" ? cpf : String(dados.pix_chave || "").trim();
+    // Achado na revisão final: o campo "Chave PIX" no Flow não é obrigatório (não dá pra fazer
+    // obrigatoriedade condicional no WhatsApp Flow com segurança) — se o cliente escolher um
+    // tipo diferente de CPF e deixar a chave em branco, cai pra CPF (sempre válido) em vez de
+    // mandar uma string vazia pra API e tomar 400.
+    if (!chave) {
+      tipo = "cpf";
+      chave = cpf;
+    } else if (tipo === "phone_number") {
+      chave = chave.replace(/\D/g, "");
+    }
     customerData.pix_key_type = tipo;
-    customerData.pix_key = tipo === "cpf" ? cpf : dados.pix_chave;
+    customerData.pix_key = chave;
   } else {
     customerData.bank_code = BANCOS_COMPE[dados.banco] || null;
     customerData.bank_branch = dados.agencia;

@@ -2017,6 +2017,13 @@ async function handlerCltOrigContratar(de, businessNumberId) {
     });
   } catch (err) {
     console.error(`Erro ao enviar Flow CLT (linha #${row.id}):`, err.message);
+    try {
+      // Achado na revisão final da integração Novo Saque (mesma lição, aplicada aqui também):
+      // sem isso, o cliente clica em QUERO CONTRATAR e não recebe nada.
+      await enviarRespostaAutomatica(businessNumberId, de, "Deu um probleminha aqui pra abrir o formulário — pode tocar em QUERO CONTRATAR de novo, por favor? 🙏");
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente da falha de Flow CLT (linha #${row.id}):`, err2.message);
+    }
     return;
   }
   await db.cltOriginationAtualizar(row.id, { flow_token: flowToken, etapa: "formulario" });
@@ -2336,7 +2343,14 @@ const NSORIG_PRAZO_AUTORIZACAO_MS = 72 * 60 * 60 * 1000;
 // Pós-assinatura/pagamento — averbação e liquidação bancária podem legitimamente levar dias.
 const NSORIG_PRAZO_LONGO_MS = 5 * 24 * 60 * 60 * 1000;
 
-const NSORIG_ETAPAS_COM_PRAZO_CURTO = ["oferta_apresentada", "aguardando_valor", "simulando_pendente", "formulario", "enviando_kyc"];
+const NSORIG_ETAPAS_COM_PRAZO_CURTO = [
+  "abrindo",
+  "oferta_apresentada",
+  "aguardando_valor",
+  "simulando_pendente",
+  "formulario",
+  "enviando_kyc",
+];
 
 const NSORIG_ETAPA_REENTRADA = {
   oferta_apresentada: { texto: "Já te mandei sua oferta ali acima — toca em QUERO CONTRATAR ou PARCELA MAIS BAIXA 😊", passo: null },
@@ -2344,31 +2358,82 @@ const NSORIG_ETAPA_REENTRADA = {
   formulario: { texto: "Ainda esperando você preencher o formulário que te mandei ali acima 😊", passo: null },
 };
 
-// Varre os sub-resultados conhecidos da Novo Saque procurando por alguma falha explícita
-// (success: false) — achado testando ao vivo contra o sandbox: um erro real de validação
-// (ccb_creation_result, "insurance_amount - must be less than 1500") não aparece em
-// "stage"/"summary_status", só dentro desses sub-objetos. Sem essa checagem, um contrato
-// travado nesse tipo de erro ficaria sendo consultado pra sempre sem nunca escalar pro humano.
+// Varre sub-resultados da Novo Saque que são TERMINAIS de verdade quando success:false —
+// achado testando ao vivo: um erro real de validação (ccb_creation_result, "insurance_amount -
+// must be less than 1500") não aparece em "stage"/"summary_status", só dentro do sub-objeto.
+// Achado na revisão final: a lista original incluía campos que têm um caminho PRÓPRIO e mais
+// amigável em outro lugar do código (balance_check_result → "Offer unavailable"/margem,
+// disbursement_result → "Payment returned") — escanear esses aqui também corria o risco de
+// disparar o encaminhamento genérico ANTES da mensagem certa rodar, ou de dar falso positivo
+// num sub-objeto que legitimamente começa "success: false" antes da etapa dele nem ter
+// rodado ainda. E os 3 campos "*_send_result" são o envio de link por e-mail/SMS que a PRÓPRIA
+// Novo Saque faz (a gente já manda o link pelo WhatsApp de qualquer jeito) — uma falha ali não
+// é motivo pra abortar um contrato válido.
 function falhaNovoSaque(contract) {
-  const campos = [
-    "balance_check_result",
-    "ccb_creation_result",
-    "signature_result",
-    "signature_submission_result",
-    "signature_send_result",
-    "contract_send_result",
-    "terms_send_result",
-    "registry_result",
-    "disbursement_result",
-    "disbursement_reprocessing_result",
-  ];
+  const campos = ["ccb_creation_result", "signature_result", "signature_submission_result", "registry_result", "disbursement_reprocessing_result"];
   for (const campo of campos) {
     const r = contract[campo];
     if (r && r.success === false) {
-      return `${campo}: ${(r.reason || []).join("; ") || r.error || "falha desconhecida"}`;
+      // reason nem sempre é array (achado na revisão final) — Array.isArray antes do join, senão
+      // um formato inesperado derruba a checagem inteira (e trava a linha, já que o catch de
+      // fora só loga e não deixa o teto de tempo rodar).
+      const motivo = Array.isArray(r.reason) ? r.reason.join("; ") : r.reason || r.error || "falha desconhecida";
+      return `${campo}: ${motivo}`;
     }
   }
   return null;
+}
+
+// Tolerância pra confirmar que uma simulação é a RESPOSTA do pedido de "parcela mais baixa", não
+// a oferta antiga ainda em cache do lado da Novo Saque — achado na revisão final: nada garante
+// que GET logo depois de um PUT já reflete o valor novo (a doc não documenta isso), então sem
+// essa checagem o cliente podia pedir uma parcela menor e receber de volta a oferta MAIOR de
+// antes, sem perceber. `valorAlvo` null (1ª simulação, sem pedido de valor específico ainda)
+// sempre passa.
+function dentroDaToleranciaNs(oferta, valorAlvo) {
+  if (!valorAlvo) return true;
+  const diff = Math.abs(Number(oferta.installment_value || 0) - Number(valorAlvo));
+  return diff <= Math.max(5, Number(valorAlvo) * 0.05);
+}
+
+// Volta pra 'oferta_apresentada' com a ÚLTIMA oferta boa conhecida (salva em oferta_cache toda
+// vez que apresentarOfertaEscolhidaNs roda) — achado na revisão final: se um pedido de "parcela
+// mais baixa" não achar nada (ou não conseguir confirmar que a simulação é a nova mesmo), a
+// versão anterior simplesmente encerrava com "sem oferta", matando um negócio que continuava
+// válido. Se o simulation_id antigo tiver sido invalidado do lado da Novo Saque nesse meio
+// tempo, o pior caso é a formalização falhar depois e escalar pro humano — ainda melhor que
+// encerrar na hora sem tentar.
+async function voltarParaOfertaAnteriorNs(row, motivo) {
+  let ofertaAnterior = null;
+  try {
+    ofertaAnterior = row.oferta_cache ? JSON.parse(row.oferta_cache) : null;
+  } catch {
+    ofertaAnterior = null;
+  }
+  if (!ofertaAnterior) {
+    await finalizarNsSemOferta(row, "desconhecido");
+    return;
+  }
+  await db.novosaqueOriginationAtualizar(row.id, {
+    etapa: "oferta_apresentada",
+    simulation_id: ofertaAnterior.simulation_id,
+    valor_parcela: ofertaAnterior.installment_value,
+  });
+  try {
+    await enviarRespostaAutomatica(
+      row.business_number_id,
+      row.phone,
+      `${motivo} Sua oferta anterior continua valendo: *R$ ${Number(ofertaAnterior.disbursed_amount).toFixed(2)}* liberado, em ` +
+        `${ofertaAnterior.installments}x de R$ ${Number(ofertaAnterior.installment_value).toFixed(2)}.`,
+      [
+        { id: "nsorig_contratar", title: "QUERO CONTRATAR" },
+        { id: "nsorig_parcela_mais_baixa", title: "PARCELA MAIS BAIXA" },
+      ]
+    );
+  } catch (err) {
+    console.error(`Erro ao voltar pra oferta anterior Novo Saque (linha #${row.id}):`, err.message);
+  }
+  await db.setFluxoPasso(row.phone, row.business_number_id, "nsorig_oferta_apresentada");
 }
 
 async function handlerNsOrigCapturaCpf(de, businessNumberId, corpo) {
@@ -2411,27 +2476,41 @@ async function handlerNsOrigCapturaCpf(de, businessNumberId, corpo) {
     await db.novosaqueOriginationAtualizar(existente.id, { etapa: "sem_oferta" });
   }
   await enviarRespostaAutomatica(businessNumberId, de, "Perfeito! Só um instante enquanto eu abro sua simulação... ⏳");
+  // Rascunho ANTES de chamar a API (achado na revisão final — ver comentário em
+  // novosaqueOriginationCriarRascunho em db.js): fecha a janela de corrida de uma reentrega de
+  // webhook ou mensagem duplicada abrindo 2 transações reais na Novo Saque pra mesma pessoa.
+  const rascunhoId = await db.novosaqueOriginationCriarRascunho(de, businessNumberId, cpf);
+  const ganhou = await db.novosaqueOriginationEhOMaisAntigoAberto(de, businessNumberId, rascunhoId);
+  if (!ganhou) {
+    // Outra mensagem (quase simultânea) já está processando esse mesmo pedido — essa desiste
+    // em silêncio, sem mandar mensagem nenhuma (a outra já está cuidando da conversa).
+    await db.novosaqueOriginationAtualizar(rascunhoId, { etapa: "sem_oferta" });
+    return;
+  }
   try {
     const transactionId = await novosaque.criarSimulacaoClt(cpf);
-    await db.novosaqueOriginationCriar(de, businessNumberId, transactionId, cpf);
+    await db.novosaqueOriginationAtualizar(rascunhoId, { transaction_id: transactionId, etapa: "aguardando_autorizacao" });
     await db.setFluxoPasso(de, businessNumberId, null);
     // O link de autorização ainda não existe nesse exato instante (achado ao vivo: leva alguns
     // segundos pra aparecer) — o verificador manda assim que aparecer (ver
     // processarEtapaNsAguardandoAutorizacao).
   } catch (err) {
     console.error("Erro ao abrir simulação CLT na Novo Saque:", err.message);
+    await db.novosaqueOriginationAtualizar(rascunhoId, { etapa: "erro" });
     await confirmarEncaminhamentoHumano(de, businessNumberId);
   }
 }
 
 // Confirmação final de UMA oferta (normalmente só vem 1 tabela — ver escolherMelhorOferta em
 // novosaque.js) — mesma mensagem/botões em qualquer caminho que chegar aqui (1ª simulação
-// automática ou depois de pedir parcela mais baixa).
+// automática ou depois de pedir parcela mais baixa). Guarda a oferta em oferta_cache — ver
+// voltarParaOfertaAnteriorNs.
 async function apresentarOfertaEscolhidaNs(row, contract, oferta) {
   await db.novosaqueOriginationAtualizar(row.id, {
     etapa: "oferta_apresentada",
     simulation_id: oferta.simulation_id,
     valor_parcela: oferta.installment_value,
+    oferta_cache: JSON.stringify(oferta),
     margem_disponivel: contract.balance_check_result?.balance_value ?? row.margem_disponivel,
     status_novosaque: contract.summary_status,
   });
@@ -2471,19 +2550,10 @@ async function processarEtapaNsAguardandoAutorizacao(row) {
     console.error(`Erro ao consultar contrato Novo Saque (linha #${row.id}):`, err.message);
     return;
   }
-  const falha = falhaNovoSaque(contract);
-  if (falha) {
-    console.error(`Falha reportada pela Novo Saque (linha #${row.id}): ${falha}`);
-    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
-    try {
-      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
-    } catch (err2) {
-      console.error(`Erro ao avisar cliente de falha Novo Saque (linha #${row.id}):`, err2.message);
-    }
-    return;
-  }
   // terms_link não vem na resposta da criação — leva alguns segundos pra aparecer (achado ao
-  // vivo) — manda assim que a gente vir ele pela 1ª vez.
+  // vivo) — manda assim que a gente vir ele pela 1ª vez. Checado ANTES de qualquer outra coisa:
+  // é sempre seguro mandar de novo (guard "!row.terms_link"), e não compete com nenhum outro
+  // caminho.
   if (contract.terms_link && !row.terms_link) {
     await db.novosaqueOriginationAtualizar(row.id, { terms_link: contract.terms_link, status_novosaque: contract.summary_status });
     try {
@@ -2498,18 +2568,33 @@ async function processarEtapaNsAguardandoAutorizacao(row) {
     }
     return;
   }
-  if (contract.summary_status === "Offer unavailable") {
+  // Margem indisponível — checado ANTES da varredura genérica de falha (achado na revisão
+  // final: balance_check_result tem motivo PRÓPRIO de dar success:false sem ser um erro de
+  // verdade, então ficou de fora de falhaNovoSaque; aqui cobrimos tanto o summary_status
+  // explícito quanto uma margem zerada/negativa que a Novo Saque confirme sem marcar como
+  // "Offer unavailable").
+  const margem = contract.balance_check_result;
+  if (contract.summary_status === "Offer unavailable" || (margem && margem.success === true && Number(margem.balance_value) <= 0)) {
     await finalizarNsSemOferta(row, "sem_margem");
     return;
   }
-  // Autorizado + margem + simulação prontas, tudo automático (achado ao vivo: a 1ª simulação
-  // já sai sozinha depois da autorização, sem precisar pedir nada ao cliente).
-  if ((contract.simulation_results || []).length) {
-    const oferta = novosaque.escolherMelhorOferta(contract.simulation_results);
-    if (!oferta) {
-      await finalizarNsSemOferta(row, "desconhecido");
-      return;
+  const falha = falhaNovoSaque(contract);
+  if (falha) {
+    console.error(`Falha reportada pela Novo Saque (linha #${row.id}): ${falha}`);
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+    try {
+      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente de falha Novo Saque (linha #${row.id}):`, err2.message);
     }
+    return;
+  }
+  // Autorizado + margem + simulação prontas, tudo automático (achado ao vivo: a 1ª simulação
+  // já sai sozinha depois da autorização, sem precisar pedir nada ao cliente). row.valor_parcela
+  // ainda é null aqui (nenhum pedido de valor específico foi feito) — dentroDaToleranciaNs
+  // sempre deixa passar nesse caso.
+  const oferta = novosaque.escolherMelhorOferta(contract.simulation_results);
+  if (oferta && dentroDaToleranciaNs(oferta, row.valor_parcela)) {
     await apresentarOfertaEscolhidaNs(row, contract, oferta);
     return;
   }
@@ -2524,19 +2609,25 @@ async function processarEtapaNsAguardandoAutorizacao(row) {
   }
   await db.novosaqueOriginationAtualizar(row.id, {
     status_novosaque: contract.summary_status,
-    margem_disponivel: contract.balance_check_result?.balance_value ?? row.margem_disponivel,
+    margem_disponivel: margem?.balance_value ?? row.margem_disponivel,
   });
 }
 
 // Mesma lógica de processarEtapaNsAguardandoAutorizacao a partir do ponto "simulação pronta",
 // usada depois de um pedido de parcela mais baixa (a autorização já tinha sido dada antes,
-// então não precisa checar terms_link/margem de novo).
+// então não precisa checar terms_link/margem de novo). Diferente dali: aqui row.valor_parcela
+// JÁ tem o valor pedido, então dentroDaToleranciaNs entra em ação de verdade — e se o prazo
+// estourar sem confirmar, volta pra oferta anterior em vez de encerrar (ver C1 da revisão final).
 async function processarEtapaNsSimulando(row) {
   let contract;
   try {
     contract = await novosaque.consultarContratoClt(row.transaction_id);
   } catch (err) {
     console.error(`Erro ao consultar contrato Novo Saque (linha #${row.id}):`, err.message);
+    return;
+  }
+  if (contract.summary_status === "Offer unavailable") {
+    await voltarParaOfertaAnteriorNs(row, "Não encontrei uma condição pra esse valor.");
     return;
   }
   const falha = falhaNovoSaque(contract);
@@ -2550,26 +2641,13 @@ async function processarEtapaNsSimulando(row) {
     }
     return;
   }
-  if (contract.summary_status === "Offer unavailable") {
-    await finalizarNsSemOferta(row, "desconhecido");
-    return;
-  }
-  if ((contract.simulation_results || []).length) {
-    const oferta = novosaque.escolherMelhorOferta(contract.simulation_results);
-    if (!oferta) {
-      await finalizarNsSemOferta(row, "desconhecido");
-      return;
-    }
+  const oferta = novosaque.escolherMelhorOferta(contract.simulation_results);
+  if (oferta && dentroDaToleranciaNs(oferta, row.valor_parcela)) {
     await apresentarOfertaEscolhidaNs(row, contract, oferta);
     return;
   }
   if (Date.now() - Number(row.etapa_em || row.created_at) > NSORIG_PRAZO_MS) {
-    await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
-    try {
-      await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
-    } catch (err) {
-      console.error(`Erro ao avisar cliente de resimulação travada Novo Saque (linha #${row.id}):`, err.message);
-    }
+    await voltarParaOfertaAnteriorNs(row, "Não consegui confirmar uma condição nova pra esse valor.");
     return;
   }
   await db.novosaqueOriginationAtualizar(row.id, { status_novosaque: contract.summary_status });
@@ -2632,6 +2710,13 @@ async function handlerNsOrigContratar(de, businessNumberId) {
     });
   } catch (err) {
     console.error(`Erro ao enviar Flow Novo Saque (linha #${row.id}):`, err.message);
+    try {
+      // Achado na revisão final: sem isso, o cliente clica em QUERO CONTRATAR e não recebe
+      // nada — a etapa fica em 'oferta_apresentada' (pode clicar de novo), mas em silêncio.
+      await enviarRespostaAutomatica(businessNumberId, de, "Deu um probleminha aqui pra abrir o formulário — pode tocar em QUERO CONTRATAR de novo, por favor? 🙏");
+    } catch (err2) {
+      console.error(`Erro ao avisar cliente da falha de Flow Novo Saque (linha #${row.id}):`, err2.message);
+    }
     return;
   }
   await db.novosaqueOriginationAtualizar(row.id, { flow_token: flowToken, etapa: "formulario" });
@@ -2705,6 +2790,20 @@ async function processarEtapaNsAguardandoAssinatura(row) {
       });
     } catch (err) {
       console.error(`Erro ao mandar link de assinatura Novo Saque (linha #${row.id}):`, err.message);
+    }
+    return;
+  }
+  // Achado na revisão final: se por algum motivo o cliente já estiver com o pagamento CAÍDO
+  // (summary_status "Contract paid") quando essa etapa roda de novo — por exemplo, 2 ticks bem
+  // próximos onde o 1º ainda não tinha visto "registry" mas o 2º já pulou direto pra pago —, vai
+  // direto pro "concluido" em vez de passar pela mensagem intermediária de "assinado, aguarde".
+  if (contract.summary_status === "Contract paid") {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "concluido", status_novosaque: contract.summary_status });
+    await db.setFluxoPasso(row.phone, row.business_number_id, null);
+    try {
+      await enviarRespostaAutomatica(row.business_number_id, row.phone, "O valor já caiu! 💰 Qualquer coisa, é só me chamar.");
+    } catch (err) {
+      console.error(`Erro ao avisar cliente de pagamento Novo Saque (linha #${row.id}):`, err.message);
     }
     return;
   }
@@ -2794,6 +2893,51 @@ async function processarEtapaNsAguardandoPagamento(row) {
     return;
   }
   await db.novosaqueOriginationAtualizar(row.id, { status_novosaque: contract.summary_status });
+}
+
+// ─── Recuperação de etapas transitórias travadas ───────────────────────────────────────────
+// Achado na revisão final: 'abrindo', 'simulando_pendente' e 'enviando_kyc' são etapas que um
+// HANDLER (não o verificador) deveria terminar de processar rapidinho — mas se o processo
+// reiniciar (deploy do Render) bem no meio, a linha fica presa nelas pra sempre: o verificador
+// não tinha nenhum `else if` pra elas, e a única saída era o cliente mandar o CPF de novo (o que
+// só acontece se ele perceber que parou de responder). Essas 3 funções dão ao verificador uma
+// chance de destravar sozinho depois do prazo curto normal, sem esperar o cliente notar.
+
+async function processarEtapaNsAbrindoTravada(row) {
+  if (Date.now() - Number(row.etapa_em || row.created_at) <= NSORIG_PRAZO_MS) return; // ainda dentro do tempo normal
+  // Nada foi aberto na Novo Saque ainda (transaction_id é null nessa etapa) — só encerra.
+  await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro" });
+}
+
+async function processarEtapaNsSimulandoPendenteTravada(row) {
+  if (Date.now() - Number(row.etapa_em || row.created_at) <= NSORIG_PRAZO_MS) return;
+  // Deixa o processarEtapaNsSimulando normal assumir a partir daqui — ele já sabe lidar com
+  // "ainda não vejo simulação nova" (volta pra oferta anterior) e com uma falha de verdade.
+  await db.novosaqueOriginationAtualizar(row.id, { etapa: "simulando" });
+}
+
+async function processarEtapaNsEnviandoKycTravada(row) {
+  if (Date.now() - Number(row.etapa_em || row.created_at) <= NSORIG_PRAZO_MS) return;
+  // Pode ter travado DEPOIS de formalizar com sucesso (202) e ANTES de gravar a etapa nova —
+  // confere no parceiro antes de desistir, pra não abandonar um contrato que já está em
+  // andamento de verdade do lado deles.
+  let contract;
+  try {
+    contract = await novosaque.consultarContratoClt(row.transaction_id);
+  } catch (err) {
+    console.error(`Erro ao reconferir contrato Novo Saque travado em enviando_kyc (linha #${row.id}):`, err.message);
+    return;
+  }
+  if (contract.contract_link || ["create-contract", "sign-contract", "registry", "disbursement", "pay-commission", "collateral"].includes(contract.stage)) {
+    await db.novosaqueOriginationAtualizar(row.id, { etapa: "aguardando_assinatura", status_novosaque: contract.summary_status });
+    return;
+  }
+  await db.novosaqueOriginationAtualizar(row.id, { etapa: "erro", status_novosaque: contract.summary_status });
+  try {
+    await confirmarEncaminhamentoHumano(row.phone, row.business_number_id);
+  } catch (err) {
+    console.error(`Erro ao avisar cliente de KYC travado Novo Saque (linha #${row.id}):`, err.message);
+  }
 }
 
 // Mesmo padrão do CLT/garantia/financiamento: só confirma quando reconhece um CPF de
@@ -6626,9 +6770,14 @@ setInterval(async () => {
         else if (row.etapa === "simulando") await processarEtapaNsSimulando(row);
         else if (row.etapa === "aguardando_assinatura") await processarEtapaNsAguardandoAssinatura(row);
         else if (row.etapa === "aguardando_pagamento") await processarEtapaNsAguardandoPagamento(row);
-        // 'oferta_apresentada', 'aguardando_valor', 'simulando_pendente', 'formulario' e
-        // 'enviando_kyc' esperam uma ação do cliente (ou já foram reivindicadas) — mesmo
-        // raciocínio do verificador de CLT/Unnotech acima.
+        else if (row.etapa === "abrindo") await processarEtapaNsAbrindoTravada(row);
+        else if (row.etapa === "simulando_pendente") await processarEtapaNsSimulandoPendenteTravada(row);
+        else if (row.etapa === "enviando_kyc") await processarEtapaNsEnviandoKycTravada(row);
+        // 'oferta_apresentada', 'aguardando_valor' e 'formulario' esperam uma ação do cliente —
+        // mesmo raciocínio do verificador de CLT/Unnotech acima. As 3 etapas tratadas logo
+        // acima são transitórias (um handler deveria terminar de processá-las rapidinho) — só
+        // entram em ação depois do prazo curto normal, como rede de segurança contra um
+        // processo que reiniciou no meio (achado na revisão final).
       } catch (err) {
         console.error(`Erro ao processar originação Novo Saque #${row.id} (etapa ${row.etapa}):`, err.message);
       }

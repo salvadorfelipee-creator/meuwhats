@@ -649,9 +649,10 @@ const ready = (async () => {
     margem_disponivel REAL,
     simulation_id TEXT,
     valor_parcela REAL,
+    oferta_cache TEXT,
     link_assinatura_enviado_em INTEGER,
     flow_token TEXT,
-    etapa TEXT NOT NULL DEFAULT 'aguardando_autorizacao',
+    etapa TEXT NOT NULL DEFAULT 'abrindo',
     etapa_em INTEGER,
     status_novosaque TEXT,
     created_at INTEGER NOT NULL,
@@ -2115,21 +2116,38 @@ async function cltOriginationReivindicar(id, etapaEsperada, etapaNova) {
 }
 
 // ─── novosaque_origination — mesmo padrão de clt_origination acima ────────────────────────
-// Só o CPF abre a simulação na Novo Saque (não precisa de e-mail antes, diferente da Unnotech)
-// — por isso aqui já nasce com transaction_id preenchido, sem etapa de rascunho.
-async function novosaqueOriginationCriar(phone, businessNumberId, transactionId, cpf) {
+// Rascunho SEM transaction_id (etapa 'abrindo') — achado na revisão final: a API da Novo Saque
+// não documenta Idempotency-Key, e abrir direto (chamar a API antes de ter qualquer linha no
+// banco) deixava uma janela real de corrida — 2 mensagens de CPF em paralelo, ou uma reentrega
+// do mesmo webhook pela Meta, podiam abrir 2 transações de verdade na Novo Saque pra mesma
+// pessoa. Agora insere o rascunho PRIMEIRO; novosaqueOriginationEhOMaisAntigoAberto (abaixo)
+// decide quem "ganha" se mais de um rascunho for criado ao mesmo tempo.
+async function novosaqueOriginationCriarRascunho(phone, businessNumberId, cpf) {
   await ready;
   const agora = Date.now();
   const result = await client.execute({
-    sql: `INSERT INTO novosaque_origination
-            (phone, business_number_id, transaction_id, cpf, etapa, etapa_em, created_at, updated_at)
-          VALUES (?, ?, ?, ?, 'aguardando_autorizacao', ?, ?, ?)`,
-    args: [phone, businessNumberId, transactionId, cpf, agora, agora, agora],
+    sql: `INSERT INTO novosaque_origination (phone, business_number_id, cpf, etapa, etapa_em, created_at, updated_at)
+          VALUES (?, ?, ?, 'abrindo', ?, ?, ?)`,
+    args: [phone, businessNumberId, cpf, agora, agora, agora],
   });
   return Number(result.lastInsertRowid);
 }
 
 const NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS = ["concluido", "sem_oferta", "erro"];
+
+// true só pra quem tem o MENOR id entre as linhas abertas desse contato — critério determinístico
+// pra decidir quem "ganha" quando 2 rascunhos nascem quase juntos (ver comentário acima). Cada
+// chamador re-lê o estado JÁ COM o próprio insert feito, então o MIN() reflete corretamente
+// qualquer concorrente que também já tenha inserido (garantia de escritor único do SQLite).
+async function novosaqueOriginationEhOMaisAntigoAberto(phone, businessNumberId, id) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT MIN(id) as menor FROM novosaque_origination WHERE phone = ? AND business_number_id = ?
+          AND etapa NOT IN (${NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})`,
+    args: [phone, businessNumberId, ...NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS],
+  });
+  return Number(result.rows[0]?.menor) === id;
+}
 
 async function novosaqueOriginationBuscarAberta(phone, businessNumberId) {
   await ready;
@@ -2710,7 +2728,8 @@ module.exports = {
   cltOriginationAtualizar,
   cltOriginationReivindicar,
   cltOriginationListarAbertas,
-  novosaqueOriginationCriar,
+  novosaqueOriginationCriarRascunho,
+  novosaqueOriginationEhOMaisAntigoAberto,
   novosaqueOriginationBuscarAberta,
   novosaqueOriginationBuscarPorId,
   novosaqueOriginationAtualizar,

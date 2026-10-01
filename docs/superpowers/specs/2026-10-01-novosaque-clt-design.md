@@ -114,6 +114,37 @@ essa migração há muito tempo (o bug só aparece na 1ª migração de um banco
 não é código novo da Novo Saque, é pré-existente, mas bloqueava qualquer teste local com banco
 limpo (inclusive o do Unnotech CLT) se alguém tentasse de novo no futuro.
 
+## Revisão final (fresh reviewer, opus) — 01/10/2026
+
+Revisão de branch despachada num contexto novo achou 1 crítico e 7 importantes — todos
+corrigidos e **re-testados contra o sandbox real** (não só o crítico; o fix de "parcela mais
+baixa" voltou a passar pelo fluxo completo pelo WhatsApp simulado, confirmando que o novo valor
+pedido — R$800 — aparece certinho, e não a oferta antiga de R$1.646,67).
+
+- **Crítico corrigido**: "PARCELA MAIS BAIXA" podia apresentar a oferta ANTIGA (ainda em cache
+  do lado da Novo Saque logo depois do PUT) como se fosse a nova, ou encerrar um negócio que
+  continuava válido quando o valor pedido não tinha condição. Corrigido com
+  `dentroDaToleranciaNs` (só aceita uma simulação cujo `installment_value` bate com o valor
+  pedido, com folga de R$5 ou 5%) e `voltarParaOfertaAnteriorNs` (se não confirmar dentro do
+  prazo, volta pra oferta anterior em vez de encerrar — guardada em `oferta_cache`).
+- **Importantes corrigidos**: reivindicação atômica na captura de CPF (antes só tinha
+  check-then-insert, igual ao da Unnotech CLT — mas aqui cada duplicata abre uma transação REAL
+  na Novo Saque, sem Idempotency-Key documentado do lado deles, então o risco é maior — ver
+  `novosaqueOriginationCriarRascunho`/`EhOMaisAntigoAberto`); `falhaNovoSaque` não escaneava
+  mais `balance_check_result`/`disbursement_result`/os 3 campos `*_send_result` (tinham caminho
+  próprio mais amigável, ou eram só aviso de entrega de link que a própria Novo Saque já tenta
+  mandar); guarda contra `reason` não ser array; recuperação de etapas transitórias travadas
+  (`abrindo`/`simulando_pendente`/`enviando_kyc`) se o processo reiniciar no meio; checagem
+  explícita de margem zerada além do `summary_status` textual; validação/normalização de chave
+  PIX (cai pra CPF se vier vazia, em vez de mandar string vazia pra API).
+- **Ruling — não fui atrás de confirmar o comportamento exato do PUT de resimulação contra o
+  sandbox de novo depois do fix.** Testei UMA vez (valor 800 → voltou 800,01 certinho), o que já
+  prova que `dentroDaToleranciaNs` funciona na prática — mas não testei o caminho de FALLBACK
+  (`voltarParaOfertaAnteriorNs`, quando a tolerância nunca bate) contra a API real, só por
+  leitura de código. **Custo se errado:** se esse caminho tiver um bug, o pior caso é o mesmo de
+  antes do fix (encerra sem achar uma condição) — não piora nada, só não é garantidamente
+  melhor até ser observado na prática.
+
 ## Itens em aberto (ficam para quando for pra produção)
 
 - `stage`/`summary_status` no nível raiz do contrato ficaram ~1s atrasados em relação ao último
