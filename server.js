@@ -2979,11 +2979,13 @@ const CIAHOT_NUMBER_ID = "1264737673394463";
 const CIAHOT_SITE_URL = "https://www.ciahot.com.br";
 const CIAHOT_ANUNCIAR_URL = "https://ciahot.com.br/anunciar/";
 
+// Apresentação + objetivo eram 2 mensagens separadas; viraram 1 só em 02/10/2026 — cada
+// mensagem de serviço passou a ser cobrada à parte pela Meta (ver pricing update de 01/10), e
+// esses 2 textos nunca tiveram motivo pra ser balões diferentes (é só a mesma apresentação
+// continuando, sem botão nem pausa proposital entre eles).
 const CIAHOT_TEXTO_BOAS_VINDAS =
   "Espero que esteja bem! 😊 Meu nome é Felipe, aqui é do escritório do site CIAHOT — um site de " +
-  "anúncios da região do Vale. 📣";
-
-const CIAHOT_TEXTO_OBJETIVO =
+  "anúncios da região do Vale. 📣\n\n" +
   "Nosso objetivo é criar anúncios premium e gerar mais atendimentos para você, e facilitar a gestão " +
   "do seu anúncio.";
 
@@ -3031,7 +3033,6 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
   setTimeout(async () => {
     try {
       await enviarComUmRetry(() => enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_BOAS_VINDAS));
-      await enviarComUmRetry(() => enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OBJETIVO));
       await enviarComUmRetry(() =>
         enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, [
           { id: "ciahot_visitar_site", title: "Conhecer site" },
@@ -3560,6 +3561,10 @@ const FLUXO_CAMPANHA_CLT = {
 // processamento do webhook) — nenhum depende de fluxo_passo salvo, porque a mensagem final
 // (ind_autoriza_sim) não pede mais nome/cidade, só avisa que a equipe liga pelo número que já
 // está na conversa. Por isso capturaTexto fica vazio: não sobrou nenhum passo de texto livre.
+// Apresentação + pitch iam em 2 mensagens; viraram 1 só em 02/10/2026 — cada mensagem de
+// serviço passou a ser cobrada à parte pela Meta a partir de 01/10 (antes só a conversa toda
+// contava), e essas duas sempre foram só uma apresentação continuando, sem motivo pra
+// separar. O texto não mudou, só juntou num balão com os 3 botões já embutidos.
 async function iniciarFluxoIndicacaoFGTS(de, businessNumberId) {
   setTimeout(async () => {
     try {
@@ -3571,12 +3576,8 @@ async function iniciarFluxoIndicacaoFGTS(de, businessNumberId) {
         de,
         `${saudacaoNome}Meu nome é Felipe, sou consultor na empresa FelizCred, correspondente ` +
           "bancário — somos especialistas em crédito do FGTS. Atendemos muitas pessoas por " +
-          "indicação, recebemos o seu contato assim, e vou ser breve pra não tomar seu tempo."
-      );
-      await enviarRespostaAutomatica(
-        businessNumberId,
-        de,
-        "Muitas pessoas que ocuparam cargo de confiança, como gerente, supervisor ou afins, " +
+          "indicação, recebemos o seu contato assim, e vou ser breve pra não tomar seu tempo.\n\n" +
+          "Muitas pessoas que ocuparam cargo de confiança, como gerente, supervisor ou afins, " +
           "podem ter diferenças a receber, como FGTS, e acabam nem sabendo desse direito. " +
           "Podemos fazer uma análise gratuita pra ver se é o seu caso.",
         [
@@ -3591,9 +3592,9 @@ async function iniciarFluxoIndicacaoFGTS(de, businessNumberId) {
   }, 5000);
 }
 
+// Mesma economia de 02/10/2026: "Perfeito, é rápido" + a pergunta viraram 1 mensagem só.
 async function handlerIndSaberMais(de, businessNumberId) {
-  await enviarRespostaAutomatica(businessNumberId, de, "Perfeito. É bem rápido.");
-  await enviarRespostaAutomatica(businessNumberId, de, "Você ainda trabalha como gerente ou supervisor?", [
+  await enviarRespostaAutomatica(businessNumberId, de, "Perfeito. É bem rápido.\n\nVocê ainda trabalha como gerente ou supervisor?", [
     { id: "ind_trabalha_sim", title: "SIM" },
     { id: "ind_trabalha_nao", title: "NÃO" },
   ]);
@@ -3704,6 +3705,9 @@ const FLUXO_CAMPANHA_CLT_INDICACAO_FGTS = {
 // valer: tirou a lista de produtos do final do ramo "prescrito" (mesmo pedido da variante 1) —
 // resto é literalmente a redação original, "empresa"/"cargo" incluso (não trocado aqui de
 // propósito, só na variante 1).
+// Mesma economia de 02/10/2026 da variante 1 (cada mensagem de serviço passou a ser cobrada à
+// parte pela Meta, ver pricing update de 01/10): apresentação+pitch e revelação+pergunta cada
+// uma virou 1 mensagem só, texto sem alteração nenhuma.
 async function iniciarFluxoIndicacaoFGTSV2(de, businessNumberId) {
   setTimeout(async () => {
     try {
@@ -3715,12 +3719,8 @@ async function iniciarFluxoIndicacaoFGTSV2(de, businessNumberId) {
         de,
         `${saudacaoNome}Meu nome é Felipe, sou consultor na empresa FelizCred, correspondente ` +
           "bancário — somos especialistas em crédito do FGTS. Atendemos muitas pessoas por " +
-          "indicação, recebemos o seu contato assim, e vou ser breve pra não tomar seu tempo."
-      );
-      await enviarRespostaAutomatica(
-        businessNumberId,
-        de,
-        "*Uma coisa no seu FGTS pode ter passado despercebido por anos.*\n" +
+          "indicação, recebemos o seu contato assim, e vou ser breve pra não tomar seu tempo.\n\n" +
+          "*Uma coisa no seu FGTS pode ter passado despercebido por anos.*\n" +
           "Muitas pessoas que ocuparam cargo de confiança como Gerente ou Supervisor deixaram de " +
           "receber FGTS e acabam nem sabendo desse direito. Caso você tenha trabalhado em uma " +
           "dessas funções, eu posso fazer uma análise gratuita pra ver se é o seu caso!",
@@ -3743,12 +3743,8 @@ async function handlerIndRevelacaoV2(de, businessNumberId) {
     "Isso muda bastante o seu caso 👀\n\nQuando alguém é registrado como gerente ou supervisor " +
       "mas bate ponto igual a qualquer outro funcionário, a lei entende que na prática não tinha " +
       "a autonomia que o cargo de confiança exige — e isso costuma dar direito a receber as " +
-      "horas extras não pagas desses anos, não só o FGTS."
-  );
-  await enviarRespostaAutomatica(
-    businessNumberId,
-    de,
-    "O escritório parceiro analisa os dois pontos juntos, de graça, só pra te dizer se é o seu " +
+      "horas extras não pagas desses anos, não só o FGTS.\n\n" +
+      "O escritório parceiro analisa os dois pontos juntos, de graça, só pra te dizer se é o seu " +
       "caso. Posso encaminhar?",
     [
       { id: "ind_autoriza_sim", title: "AUTORIZO" },
