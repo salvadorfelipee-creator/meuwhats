@@ -2996,22 +2996,14 @@ const CIAHOT_TEXTO_OFERTA =
 
 const CIAHOT_TEXTO_ATENDIMENTO = "Prefere falar direto com a gente? 👇";
 
-const CIAHOT_TEXTO_LINK_SITE = "Aqui está: 👇";
-
-const CIAHOT_TEXTO_SITE_AGORA_NAO = "Sem problemas! 😊 Fico à disposição, é só me chamar quando quiser.";
-
 const CIAHOT_TEXTO_VIP =
   "Você pode fazer seu anúncio gratuito, sem custo! 🎉 E ainda pode ganhar o selo *VIP* na campanha " +
   "que está ativa agora. Faça seu anúncio que ele já é liberado pela nossa equipe!";
 
-const CIAHOT_TEXTO_ANUNCIO_ACESSO = "Ótimo! 🙌 Vamos iniciar, é rápido e fácil — é só acessar:";
-const CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_PERGUNTA = "Quando terminar de preencher, toca aqui:";
 const CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA =
   "Ótimo! Agora é só aguardar a liberação, vamos te avisar por aqui. 📌 Já salva esse contato e " +
   "também nosso e-mail de suporte: contato@ciahot.com.br";
 const CIAHOT_TEXTO_ANUNCIO_AGORA_NAO = "Sem problemas! 😊 Vamos ficar à disposição, pode nos chamar se tiver alguma dúvida.";
-
-const CIAHOT_TEXTO_DIFICULDADE_ANUNCIO = "Está com dificuldades em fazer o anúncio? 🤔";
 
 // Dispara depois que a pessoa responde o template de campanha (ver dispararInicioFluxo).
 // Espera 15s (tempo de "digitando..." natural) antes de mandar, e só então marca o passo que
@@ -3028,11 +3020,15 @@ async function enviarComUmRetry(fn) {
   }
 }
 
-// Eram 3 mensagens (boas-vindas+objetivo / oferta / "prefere falar direto"); viraram 1 só em
-// 02/10/2026 — pedido do usuário pra cortar ao máximo mensagem de serviço cobrada (boa parte do
-// tráfego passa a vir por template, sem a janela grátis de 72h). Cabem os 3 botões juntos
-// (Conhecer site / No momento não / Falar com atendimento) porque 2+1 = 3, o máximo que a API
-// permite numa mensagem — não sobrou margem pra um 4º botão se precisar no futuro.
+// REDESENHADO em 02/10/2026 a pedido do usuário, pra cortar ao máximo mensagem de serviço
+// cobrada (boa parte do tráfego passa a vir por template, sem a janela grátis de 72h).
+// "Conhecer site" virou link direto de verdade (cta_url) em vez de botão de resposta — a
+// pessoa já cai no site ao tocar, sem precisar de uma 2ª mensagem só pra entregar o link.
+// Só que um clique em cta_url NÃO gera evento de webhook (diferente de botão de resposta), não
+// dá pra saber se/quando a pessoa clicou — por isso a mensagem seguinte (oferta VIP, com o link
+// do anúncio já embutido como texto, mesmo motivo técnico) sai sempre 5s depois, sem esperar
+// clique nenhum. "Falar com atendimento" não cabia na 1ª mensagem (cta_url só aceita 1 botão,
+// não mistura com botão de resposta) — foi pra 2ª, junto com "Fazer anúncio"/"No momento não".
 async function iniciarFluxoCiahot(de, businessNumberId) {
   setTimeout(async () => {
     try {
@@ -3040,10 +3036,21 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
         enviarRespostaAutomatica(
           businessNumberId,
           de,
-          `${CIAHOT_TEXTO_BOAS_VINDAS}\n\n${CIAHOT_TEXTO_OFERTA}\n\n${CIAHOT_TEXTO_ATENDIMENTO}`,
+          `${CIAHOT_TEXTO_BOAS_VINDAS}\n\n${CIAHOT_TEXTO_OFERTA}`,
+          null,
+          null,
+          { buttonText: "Conhecer site", url: CIAHOT_SITE_URL }
+        )
+      );
+      await new Promise((r) => setTimeout(r, 5000));
+      await enviarComUmRetry(() =>
+        enviarRespostaAutomatica(
+          businessNumberId,
+          de,
+          `${CIAHOT_TEXTO_VIP}\nÉ só acessar: ${CIAHOT_ANUNCIAR_URL}\n\n${CIAHOT_TEXTO_ATENDIMENTO}`,
           [
-            { id: "ciahot_visitar_site", title: "Conhecer site" },
-            { id: "ciahot_site_agora_nao", title: "No momento não" },
+            { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
+            { id: "ciahot_anuncio_nao", title: "No momento não" },
             { id: "ciahot_atendimento", title: "Falar com atendimento" },
           ]
         )
@@ -3055,76 +3062,23 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
   }, 15000);
 }
 
-// Clique em "Conhecer site" — virou 1 mensagem só em 02/10/2026 (antes eram 2, separadas por
-// 2min de silêncio: link primeiro, oferta VIP só se a pessoa não voltasse sozinha). Pedido do
-// usuário pra cortar ao máximo: agora o link (texto solto, não mais botão cta_url — não dá pra
-// misturar botão de link com botão de resposta) e a oferta VIP já vão juntos, com os 2 botões.
-// Troca de comportamento, não só formatação: antes só quem ficava quieto recebia o empurrão do
-// VIP; agora todo mundo recebe de cara. "Visitar site" é botão de RESPOSTA (não link direto) só
-// pra poder ficar lado a lado com "No momento não" no balão anterior (ver iniciarFluxoCiahot) —
-// e como é clique de botão normal, a Meta AVISA via webhook, sem precisar de link de rastreio
-// próprio pra saber que a pessoa clicou.
-async function handlerCiahotVisitarSite(de, businessNumberId) {
-  await enviarRespostaAutomatica(
-    businessNumberId,
-    de,
-    `${CIAHOT_TEXTO_LINK_SITE}\n${CIAHOT_SITE_URL}\n\n${CIAHOT_TEXTO_VIP}`,
-    [
-      { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
-      { id: "ciahot_anuncio_nao", title: "No momento não" },
-    ]
-  );
-  await db.setFluxoPasso(de, businessNumberId, "ciahot_vip_oferta");
-}
-
-// Clique em "Fazer anúncio" (oferta VIP) — como a API não deixa misturar botão de link com
-// botão de resposta na mesma mensagem, são duas mensagens: uma com o link do formulário,
-// outra perguntando se já concluiu.
-// Virou 1 mensagem só em 02/10/2026 (antes eram 2) — o link do anúncio deixou de ser botão
-// estilizado (cta_url) e virou link em texto solto, porque a API não deixa botão de link e
-// botão de resposta ("Anúncio concluído!") juntos na mesma mensagem. Clicável do mesmo jeito,
-// só sem o visual de botão.
-async function handlerCiahotAnuncioSim(de, businessNumberId) {
-  await enviarRespostaAutomatica(
-    businessNumberId,
-    de,
-    `${CIAHOT_TEXTO_ANUNCIO_ACESSO}\n${CIAHOT_ANUNCIAR_URL}\n\n${CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_PERGUNTA}`,
-    [{ id: "ciahot_anuncio_concluido", title: "Anúncio concluído!" }]
-  );
-  await db.setFluxoPasso(de, businessNumberId, "ciahot_aguardando_conclusao");
-}
-
-// Lembrete do passo "ciahot_aguardando_conclusao" (ver LEMBRETE_MINUTOS_CIAHOT) — quem clicou
-// "Fazer anúncio" mas não voltou pra confirmar em 13min pode estar com dificuldade no
-// formulário. Reaproveita o botão "ciahot_atendimento" (mesmo id do menu inicial), que já
-// limpa o fluxo_passo e passa pro atendimento humano — não precisa de handler próprio pra
-// isso. Não muda o fluxo_passo aqui: continua "ciahot_aguardando_conclusao", esperando o
-// clique real em "Anúncio concluído!" se a pessoa voltar sozinha.
-async function handlerLembreteCiahotDificuldade(phone, businessNumberId) {
-  await enviarRespostaAutomatica(businessNumberId, phone, CIAHOT_TEXTO_DIFICULDADE_ANUNCIO, [
-    { id: "ciahot_atendimento", title: "Falar com atendimento" },
-  ]);
-}
-
 const FLUXO_BOTOES_CIAHOT = {
   ciahot_atendimento: {
     texto: "Perfeito! 👍 Aguarde, em breve irei te responder.",
   },
-  ciahot_visitar_site: handlerCiahotVisitarSite,
-  ciahot_site_agora_nao: { texto: CIAHOT_TEXTO_SITE_AGORA_NAO },
-  ciahot_anuncio_sim: handlerCiahotAnuncioSim,
+  // "Fazer anúncio": como o link do formulário já veio embutido na mensagem anterior (ver
+  // iniciarFluxoCiahot), esse clique só confirma a intenção e fecha — tirei o passo
+  // intermediário "Quando terminar, toca aqui" (e o lembrete de dificuldade de 13min que
+  // dependia dele), a pedido do usuário.
+  ciahot_anuncio_sim: { texto: CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA },
   ciahot_anuncio_nao: { texto: CIAHOT_TEXTO_ANUNCIO_AGORA_NAO },
-  ciahot_anuncio_concluido: { texto: CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA },
 };
 
 const LEMBRETE_MINUTOS_CIAHOT = {
   ciahot_oferta: 17,
-  ciahot_aguardando_conclusao: 13,
 };
 
-const LEMBRETE_HANDLERS_CIAHOT = {
-  ciahot_aguardando_conclusao: handlerLembreteCiahotDificuldade,
-};
+const LEMBRETE_HANDLERS_CIAHOT = {};
 
 const LEMBRETE_TEXTOS_CIAHOT = {
   padrao:
@@ -4466,8 +4420,8 @@ async function processarEntry(entry) {
               if (reply.id === "clt_3mais") logFunil(businessNumberId, de, "clt_qualificado");
               if (typeof passo === "function") {
                 // Passo "handler": função própria cuida de tudo (inclui casos que precisam
-                // mandar mais de uma mensagem, ex.: link + botão de resposta separados —
-                // ver handlerCiahotAnuncioSim), inclusive marcar o fluxo_passo.
+                // mandar mais de uma mensagem — ver iniciarFluxoCiahot), inclusive marcar o
+                // fluxo_passo.
                 await passo(de, businessNumberId);
               } else {
                 const textoPasso = typeof passo.texto === "function" ? passo.texto() : passo.texto;
@@ -6475,8 +6429,9 @@ setInterval(async () => {
       if (agora - Number(p.fluxo_passo_at) < minutos * 60 * 1000) continue;
       if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id, indice))) continue;
       try {
-        // Passo com handler próprio (ex.: manda botões, não só texto — ver
-        // handlerLembreteCiahotDificuldade) cuida de tudo sozinho, inclusive setFluxoPasso.
+        // Passo com handler próprio (ex.: precisa mandar botões, não só texto puro) cuida de
+        // tudo sozinho, inclusive setFluxoPasso — nenhum fluxo usa isso agora, mas o mecanismo
+        // (lembreteHandlers) continua disponível pro próximo que precisar.
         const handler = fluxoDoContato.lembreteHandlers?.[p.fluxo_passo];
         if (handler) {
           await handler(p.phone, p.business_number_id);
