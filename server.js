@@ -3014,11 +3014,10 @@ const CIAHOT_TEXTO_ANUNCIO_AGORA_NAO = "Sem problemas! 😊 Vamos ficar à dispo
 const CIAHOT_TEXTO_DIFICULDADE_ANUNCIO = "Está com dificuldades em fazer o anúncio? 🤔";
 
 // Dispara depois que a pessoa responde o template de campanha (ver dispararInicioFluxo).
-// Espera 15s (tempo de "digitando..." natural) antes da primeira mensagem, manda a
-// sequência de aquecimento + oferta, e só então marca o passo que liga o lembrete de 17min.
-// Tenta de novo 1x (3s depois) antes de desistir — sem isso, um erro passageiro (rede,
-// rate limit momentâneo da Meta) na 1ª das 4 mensagens interrompia a sequência inteira, sem
-// nenhum vestígio na conversa (nada chegava a ser gravado), e só "menu" reabria manualmente.
+// Espera 15s (tempo de "digitando..." natural) antes de mandar, e só então marca o passo que
+// liga o lembrete de 17min. Tenta de novo 1x (3s depois) antes de desistir — sem isso, um erro
+// passageiro (rede, rate limit momentâneo da Meta) derrubava o envio sem nenhum vestígio na
+// conversa (nada chegava a ser gravado), e só "menu" reabria manualmente.
 async function enviarComUmRetry(fn) {
   try {
     await fn();
@@ -3029,20 +3028,25 @@ async function enviarComUmRetry(fn) {
   }
 }
 
+// Eram 3 mensagens (boas-vindas+objetivo / oferta / "prefere falar direto"); viraram 1 só em
+// 02/10/2026 — pedido do usuário pra cortar ao máximo mensagem de serviço cobrada (boa parte do
+// tráfego passa a vir por template, sem a janela grátis de 72h). Cabem os 3 botões juntos
+// (Conhecer site / No momento não / Falar com atendimento) porque 2+1 = 3, o máximo que a API
+// permite numa mensagem — não sobrou margem pra um 4º botão se precisar no futuro.
 async function iniciarFluxoCiahot(de, businessNumberId) {
   setTimeout(async () => {
     try {
-      await enviarComUmRetry(() => enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_BOAS_VINDAS));
       await enviarComUmRetry(() =>
-        enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_OFERTA, [
-          { id: "ciahot_visitar_site", title: "Conhecer site" },
-          { id: "ciahot_site_agora_nao", title: "No momento não" },
-        ])
-      );
-      await enviarComUmRetry(() =>
-        enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ATENDIMENTO, [
-          { id: "ciahot_atendimento", title: "Falar com atendimento" },
-        ])
+        enviarRespostaAutomatica(
+          businessNumberId,
+          de,
+          `${CIAHOT_TEXTO_BOAS_VINDAS}\n\n${CIAHOT_TEXTO_OFERTA}\n\n${CIAHOT_TEXTO_ATENDIMENTO}`,
+          [
+            { id: "ciahot_visitar_site", title: "Conhecer site" },
+            { id: "ciahot_site_agora_nao", title: "No momento não" },
+            { id: "ciahot_atendimento", title: "Falar com atendimento" },
+          ]
+        )
       );
       await db.setFluxoPasso(de, businessNumberId, "ciahot_oferta");
     } catch (err) {
