@@ -3080,14 +3080,17 @@ async function handlerLembreteCiahotVip(phone, businessNumberId) {
 // Clique em "Fazer anúncio" (oferta VIP) — como a API não deixa misturar botão de link com
 // botão de resposta na mesma mensagem, são duas mensagens: uma com o link do formulário,
 // outra perguntando se já concluiu.
+// Virou 1 mensagem só em 02/10/2026 (antes eram 2) — o link do anúncio deixou de ser botão
+// estilizado (cta_url) e virou link em texto solto, porque a API não deixa botão de link e
+// botão de resposta ("Anúncio concluído!") juntos na mesma mensagem. Clicável do mesmo jeito,
+// só sem o visual de botão.
 async function handlerCiahotAnuncioSim(de, businessNumberId) {
-  await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ANUNCIO_ACESSO, null, null, {
-    buttonText: "Fazer anúncio",
-    url: CIAHOT_ANUNCIAR_URL,
-  });
-  await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_PERGUNTA, [
-    { id: "ciahot_anuncio_concluido", title: "Anúncio concluído!" },
-  ]);
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    `${CIAHOT_TEXTO_ANUNCIO_ACESSO}\n${CIAHOT_ANUNCIAR_URL}\n\n${CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_PERGUNTA}`,
+    [{ id: "ciahot_anuncio_concluido", title: "Anúncio concluído!" }]
+  );
   await db.setFluxoPasso(de, businessNumberId, "ciahot_aguardando_conclusao");
 }
 
