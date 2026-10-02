@@ -3055,30 +3055,26 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
   }, 15000);
 }
 
-// Clique em "Visitar site" — "Visitar site" é botão de RESPOSTA (não link direto) só pra
-// poder ficar lado a lado com "No momento não" na mesma mensagem (a API não deixa misturar
-// botão de link com botão de resposta); o link de verdade vem agora, numa mensagem própria
-// (aí sim como botão de link cta_url). Como isso é um clique de botão normal, a Meta AVISA
-// via webhook — dá pra saber que a pessoa clicou sem precisar de link de rastreio próprio.
-// Só marca o passo "ciahot_pos_clique" aqui — quem manda a oferta VIP 2min depois é o
-// verificador de fluxos parados (lembreteHandlers.ciahot_pos_clique, mais abaixo), não um
-// setTimeout em memória: assim sobrevive a um redeploy/reinício no meio da espera.
+// Clique em "Conhecer site" — virou 1 mensagem só em 02/10/2026 (antes eram 2, separadas por
+// 2min de silêncio: link primeiro, oferta VIP só se a pessoa não voltasse sozinha). Pedido do
+// usuário pra cortar ao máximo: agora o link (texto solto, não mais botão cta_url — não dá pra
+// misturar botão de link com botão de resposta) e a oferta VIP já vão juntos, com os 2 botões.
+// Troca de comportamento, não só formatação: antes só quem ficava quieto recebia o empurrão do
+// VIP; agora todo mundo recebe de cara. "Visitar site" é botão de RESPOSTA (não link direto) só
+// pra poder ficar lado a lado com "No momento não" no balão anterior (ver iniciarFluxoCiahot) —
+// e como é clique de botão normal, a Meta AVISA via webhook, sem precisar de link de rastreio
+// próprio pra saber que a pessoa clicou.
 async function handlerCiahotVisitarSite(de, businessNumberId) {
-  await enviarRespostaAutomatica(businessNumberId, de, CIAHOT_TEXTO_LINK_SITE, null, null, {
-    buttonText: "Visitar site",
-    url: CIAHOT_SITE_URL,
-  });
-  await db.setFluxoPasso(de, businessNumberId, "ciahot_pos_clique");
-}
-
-// Handler do lembrete "ciahot_pos_clique" (ver lembreteHandlers/LEMBRETE_MINUTOS_CIAHOT) —
-// manda botões, por isso não dá pra usar o lembreteTextos genérico (só texto puro).
-async function handlerLembreteCiahotVip(phone, businessNumberId) {
-  await enviarRespostaAutomatica(businessNumberId, phone, CIAHOT_TEXTO_VIP, [
-    { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
-    { id: "ciahot_anuncio_nao", title: "No momento não" },
-  ]);
-  await db.setFluxoPasso(phone, businessNumberId, "ciahot_vip_oferta");
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    `${CIAHOT_TEXTO_LINK_SITE}\n${CIAHOT_SITE_URL}\n\n${CIAHOT_TEXTO_VIP}`,
+    [
+      { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
+      { id: "ciahot_anuncio_nao", title: "No momento não" },
+    ]
+  );
+  await db.setFluxoPasso(de, businessNumberId, "ciahot_vip_oferta");
 }
 
 // Clique em "Fazer anúncio" (oferta VIP) — como a API não deixa misturar botão de link com
@@ -3123,12 +3119,10 @@ const FLUXO_BOTOES_CIAHOT = {
 
 const LEMBRETE_MINUTOS_CIAHOT = {
   ciahot_oferta: 17,
-  ciahot_pos_clique: 2,
   ciahot_aguardando_conclusao: 13,
 };
 
 const LEMBRETE_HANDLERS_CIAHOT = {
-  ciahot_pos_clique: handlerLembreteCiahotVip,
   ciahot_aguardando_conclusao: handlerLembreteCiahotDificuldade,
 };
 
@@ -6482,7 +6476,7 @@ setInterval(async () => {
       if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id, indice))) continue;
       try {
         // Passo com handler próprio (ex.: manda botões, não só texto — ver
-        // handlerLembreteCiahotVip) cuida de tudo sozinho, inclusive setFluxoPasso.
+        // handlerLembreteCiahotDificuldade) cuida de tudo sozinho, inclusive setFluxoPasso.
         const handler = fluxoDoContato.lembreteHandlers?.[p.fluxo_passo];
         if (handler) {
           await handler(p.phone, p.business_number_id);
