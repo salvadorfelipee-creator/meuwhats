@@ -2994,8 +2994,6 @@ const CIAHOT_TEXTO_OFERTA =
   "Te convido a visitar nosso site pra ver como será seu anúncio — se desejar fazer, em 1 min você vê " +
   "e faz seu anúncio *premium*!";
 
-const CIAHOT_TEXTO_ATENDIMENTO = "Prefere falar direto com a gente? 👇";
-
 const CIAHOT_TEXTO_VIP =
   "Você pode fazer seu anúncio gratuito, sem custo! 🎉 E ainda pode ganhar o selo *VIP* na campanha " +
   "que está ativa agora. Faça seu anúncio que ele já é liberado pela nossa equipe!";
@@ -3047,11 +3045,10 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
         enviarRespostaAutomatica(
           businessNumberId,
           de,
-          `${CIAHOT_TEXTO_VIP}\nÉ só acessar: ${CIAHOT_ANUNCIAR_URL}\n\n${CIAHOT_TEXTO_ATENDIMENTO}`,
+          `${CIAHOT_TEXTO_VIP}\nÉ só acessar: ${CIAHOT_ANUNCIAR_URL}`,
           [
-            { id: "ciahot_anuncio_sim", title: "Fazer anúncio" },
+            { id: "ciahot_anuncio_sim", title: "Anúncio feito" },
             { id: "ciahot_anuncio_nao", title: "No momento não" },
-            { id: "ciahot_atendimento", title: "Falar com atendimento" },
           ]
         )
       );
@@ -3063,13 +3060,10 @@ async function iniciarFluxoCiahot(de, businessNumberId) {
 }
 
 const FLUXO_BOTOES_CIAHOT = {
-  ciahot_atendimento: {
-    texto: "Perfeito! 👍 Aguarde, em breve irei te responder.",
-  },
-  // "Fazer anúncio": como o link do formulário já veio embutido na mensagem anterior (ver
-  // iniciarFluxoCiahot), esse clique só confirma a intenção e fecha — tirei o passo
-  // intermediário "Quando terminar, toca aqui" (e o lembrete de dificuldade de 13min que
-  // dependia dele), a pedido do usuário.
+  // "Anúncio feito" (antes "Fazer anúncio") — pedido do usuário em 02/10/2026: nome mais fiel
+  // ao que o clique de fato confirma (o link do formulário já veio embutido na mensagem
+  // anterior, ver iniciarFluxoCiahot). "Falar com atendimento" saiu dessa mensagem — não sobrou
+  // nenhum botão apontando pra esse id, tirei do fluxo.
   ciahot_anuncio_sim: { texto: CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA },
   ciahot_anuncio_nao: { texto: CIAHOT_TEXTO_ANUNCIO_AGORA_NAO },
 };
