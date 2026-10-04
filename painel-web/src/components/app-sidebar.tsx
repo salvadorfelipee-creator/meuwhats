@@ -33,9 +33,10 @@ import {
   BarChart3,
   Sparkles,
   Mail,
+  Columns3,
 } from "lucide-react"
 
-export type Screen = "chats" | "agenda" | "publicar" | "reels" | "funil" | "analytics" | "ia" | "email"
+export type Screen = "chats" | "agenda" | "publicar" | "reels" | "funil" | "pipeline" | "analytics" | "ia" | "email"
 
 // "reels" fica fora do menu por enquanto (edição em massa parada) — a rota em
 // App.tsx continua existindo, só reativar aqui quando voltar a usar.
@@ -43,6 +44,7 @@ const NAV_ITEMS: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
   { id: "chats", title: "Conversas", icon: MessageCircle },
   { id: "agenda", title: "Agenda", icon: CalendarDays },
   { id: "publicar", title: "Publicar", icon: Send },
+  { id: "pipeline", title: "Pipeline", icon: Columns3 },
   { id: "funil", title: "Funil", icon: Filter },
   { id: "analytics", title: "Analytics", icon: BarChart3 },
   { id: "email", title: "Email", icon: Mail },

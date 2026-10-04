@@ -67,7 +67,10 @@ import {
   CalendarClock,
   Trash2,
   Settings,
-  Clock,
+  Columns3,
+  Tags,
+  StickyNote,
+  History,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -1279,7 +1282,9 @@ function CamposPersonalizadosSecao({ businessId, phone }: { businessId: string; 
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <label className="text-sm font-medium block">Campos personalizados</label>
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+          <Settings className="h-3.5 w-3.5" /> Campos personalizados
+        </label>
         <GerenciarCamposPersonalizados businessId={businessId} campos={campos} onChange={carregar} />
       </div>
       {campos.length === 0 && <p className="text-xs text-muted-foreground">Nenhum campo criado ainda.</p>}
@@ -1343,7 +1348,9 @@ function NotasSecao({ businessId, phone }: { businessId: string; phone: string }
 
   return (
     <div>
-      <label className="text-sm font-medium mb-1 block">Histórico de notas</label>
+      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1.5">
+        <FileText className="h-3.5 w-3.5" /> Histórico de notas
+      </label>
       <div className="flex flex-col gap-1.5 mb-2">
         <Textarea
           value={texto}
@@ -1398,8 +1405,8 @@ function AtividadesSecao({ businessId, phone, refreshKey }: { businessId: string
 
   return (
     <div>
-      <label className="text-sm font-medium mb-1 flex items-center gap-1.5">
-        <Clock className="h-3.5 w-3.5" />
+      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1.5">
+        <History className="h-3.5 w-3.5" />
         Linha do tempo
       </label>
       <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
@@ -1415,6 +1422,49 @@ function AtividadesSecao({ businessId, phone, refreshKey }: { businessId: string
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// Mesma lógica de avatar colorido do Pipeline (src/pages/pipeline.tsx) — duplicada aqui de
+// propósito: são só ~10 linhas, e as duas telas não compartilham um módulo de UI em comum
+// ainda, não vale criar um pra isso só.
+const AVATAR_CORES = ["#111214", "#2F6FED", "#7C5CFC", "#D9476B", "#15803D", "#B45309", "#0E7490"]
+function corAvatarContato(seed: string) {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
+  return AVATAR_CORES[h % AVATAR_CORES.length]
+}
+function iniciaisContato(nome: string | null, phone: string) {
+  const base = (nome || phone).trim()
+  const partes = base.split(/\s+/).filter(Boolean)
+  if (partes.length >= 2) return (partes[0][0] + partes[1][0]).toUpperCase()
+  return base.slice(0, 2).toUpperCase()
+}
+
+// Agrupa um bloco do painel de CRM (ícone + título + conteúdo) numa carta com borda — antes
+// era tudo empilhado sem separação visual nenhuma, difícil de escanear com o olho rápido.
+function Secao({
+  icon: Icon,
+  titulo,
+  acao,
+  children,
+}: {
+  icon: typeof Columns3
+  titulo: string
+  acao?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-xl border p-3 flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <Icon className="h-3.5 w-3.5" />
+          {titulo}
+        </div>
+        {acao}
+      </div>
+      {children}
     </div>
   )
 }
@@ -1523,75 +1573,103 @@ function ContactDetails({
     }
   }
 
+  const corContato = corAvatarContato(conversation.phone)
+  const estagioAtual = estagios.find((e) => e.id === estagio)
+
   return (
-    <div className="mt-4 flex flex-col gap-4">
-      <div>
-        <p className="text-sm font-medium">{conversation.name || "Sem nome"}</p>
-        <p className="text-sm text-muted-foreground">{conversation.phone}</p>
+    <div className="mt-4 flex flex-col gap-3">
+      <div className="flex items-center gap-2.5">
+        <div
+          className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
+          style={{ background: corContato }}
+        >
+          {iniciaisContato(conversation.name, conversation.phone)}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{conversation.name || "Sem nome"}</p>
+          <p className="text-xs text-muted-foreground">{conversation.phone}</p>
+        </div>
       </div>
-      {businessId !== "instagram" && <ExportarConversaBotao businessId={businessId} phone={conversation.phone} />}
+
+      {/* Nota fixada primeiro — é o "resumo de 1 olhada", por isso tem que ser mesmo a 1ª
+          coisa visível, não a última (bug de ordem da versão anterior: o texto já dizia
+          "sempre visível no topo" mas o bloco vinha depois de tudo). */}
+      <div className="rounded-xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50 p-3 flex flex-col gap-2">
+        <label className="text-xs font-semibold text-amber-800 dark:text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
+          <StickyNote className="h-3.5 w-3.5" /> Nota fixada
+        </label>
+        <Textarea
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          rows={2}
+          placeholder="Resumo curto sempre visível aqui em cima..."
+          className="text-sm bg-background"
+        />
+        <Button size="sm" className="w-fit" onClick={salvar} disabled={salvando}>
+          {salvando ? "Salvando..." : "Salvar nota"}
+        </Button>
+      </div>
+
+      {mostrarPipelineTags && (
+        <Secao
+          icon={Columns3}
+          titulo="Etapa do pipeline"
+          acao={
+            estagioAtual && (
+              <span className="h-2 w-2 rounded-full" style={{ background: estagioAtual.cor }} />
+            )
+          }
+        >
+          <select
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm disabled:opacity-50"
+            value={estagio}
+            disabled={salvandoEstagio}
+            onChange={(e) => mudarEstagio(e.target.value)}
+          >
+            <option value="">Sem etapa definida</option>
+            {estagios.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome}
+              </option>
+            ))}
+          </select>
+        </Secao>
+      )}
+
+      {mostrarPipelineTags && (
+        <Secao icon={Tags} titulo="Tags" acao={<GerenciarTags businessId={businessId} tags={todasTags} onChange={carregarTags} />}>
+          {todasTags.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Nenhuma tag criada ainda.</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {todasTags.map((tag) => {
+                const ativa = tagsConversa.some((t) => t.id === tag.id)
+                return (
+                  <button
+                    key={tag.id}
+                    onClick={() => alternarTag(tag)}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      ativa ? "text-white border-transparent" : "text-muted-foreground border-border hover:bg-accent"
+                    }`}
+                    style={ativa ? { background: tag.cor } : undefined}
+                  >
+                    {tag.nome}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </Secao>
+      )}
+
       {businessId !== "instagram" && (
-        <div>
-          <Button size="sm" variant="outline" onClick={reabrirFluxo} disabled={reabrindo}>
-            {reabrindo ? "Reabrindo..." : "Reabrir fluxo automático"}
-          </Button>
-          <p className="text-xs text-muted-foreground mt-1">
-            Mesmo efeito de o cliente mandar "menu" — use se a automação travou.
-          </p>
-          {reabrirMsg && <p className="text-xs mt-1">{reabrirMsg}</p>}
+        <div className="rounded-xl border p-3">
+          <CamposPersonalizadosSecao businessId={businessId} phone={conversation.phone} />
         </div>
       )}
-      {mostrarPipelineTags && (
-        <>
-          <div>
-            <label className="text-sm font-medium mb-1 block">Etapa do pipeline</label>
-            <select
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm disabled:opacity-50"
-              value={estagio}
-              disabled={salvandoEstagio}
-              onChange={(e) => mudarEstagio(e.target.value)}
-            >
-              <option value="">Sem etapa definida</option>
-              {estagios.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium block">Tags</label>
-              <GerenciarTags businessId={businessId} tags={todasTags} onChange={carregarTags} />
-            </div>
-            {todasTags.length === 0 ? (
-              <p className="text-xs text-muted-foreground">Nenhuma tag criada ainda.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {todasTags.map((tag) => {
-                  const ativa = tagsConversa.some((t) => t.id === tag.id)
-                  return (
-                    <button
-                      key={tag.id}
-                      onClick={() => alternarTag(tag)}
-                      className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
-                        ativa ? "text-white border-transparent" : "text-muted-foreground border-border hover:bg-accent"
-                      }`}
-                      style={ativa ? { background: tag.cor } : undefined}
-                    >
-                      {tag.nome}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </>
-      )}
-      {businessId !== "instagram" && <CamposPersonalizadosSecao businessId={businessId} phone={conversation.phone} />}
+
       {businessId !== "instagram" && (
-        <div>
-          <label className="text-sm font-medium mb-1 block">Retornos agendados</label>
+        <Secao icon={CalendarClock} titulo="Retornos agendados">
           {conversation.email && (
             <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
               <Mail className="h-3 w-3" /> {conversation.email}
@@ -1627,18 +1705,37 @@ function ContactDetails({
               setAtivRefresh((v) => v + 1)
             }}
           />
+        </Secao>
+      )}
+
+      {businessId !== "instagram" && (
+        <div className="rounded-xl border p-3">
+          <NotasSecao businessId={businessId} phone={conversation.phone} />
         </div>
       )}
-      {businessId !== "instagram" && <NotasSecao businessId={businessId} phone={conversation.phone} />}
-      {businessId !== "instagram" && <AtividadesSecao businessId={businessId} phone={conversation.phone} refreshKey={ativRefresh} />}
-      <div>
-        <label className="text-sm font-medium mb-1 block">Nota fixada</label>
-        <p className="text-xs text-muted-foreground mb-1">Um resumo curto sempre visível no topo — pra histórico completo, use as notas acima.</p>
-        <Textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={3} />
-        <Button size="sm" className="mt-2" onClick={salvar} disabled={salvando}>
-          {salvando ? "Salvando..." : "Salvar nota"}
-        </Button>
-      </div>
+
+      {businessId !== "instagram" && (
+        <div className="rounded-xl border p-3">
+          <AtividadesSecao businessId={businessId} phone={conversation.phone} refreshKey={ativRefresh} />
+        </div>
+      )}
+
+      {/* Ações operacionais (exportar, reabrir fluxo) vão por último — é o que se usa menos
+          vezes por conversa, não precisa competir por atenção com o que muda toda hora. */}
+      {businessId !== "instagram" && (
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <ExportarConversaBotao businessId={businessId} phone={conversation.phone} />
+            <Button size="sm" variant="outline" onClick={reabrirFluxo} disabled={reabrindo}>
+              {reabrindo ? "Reabrindo..." : "Reabrir fluxo automático"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            "Reabrir fluxo" tem o mesmo efeito de o cliente mandar "menu" — use se a automação travou.
+          </p>
+          {reabrirMsg && <p className="text-xs">{reabrirMsg}</p>}
+        </div>
+      )}
     </div>
   )
 }

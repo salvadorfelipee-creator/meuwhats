@@ -25,6 +25,10 @@ type UnreadContextValue = {
   // o contato certo (ver limparAlvoAbrir, chamado depois de aplicar).
   alvoAbrir: { channelId: string; phone: string } | null
   limparAlvoAbrir: () => void
+  // Pra qualquer tela (ex. Pipeline) pedir "abre essa conversa" sem precisar saber como o
+  // ChatsPage funciona por dentro — mesmo mecanismo de alvoAbrir que o clique em notificação já
+  // usa, só exposto como função pública também.
+  abrirConversa: (channelId: string, phone: string) => void
 }
 
 function chaveConversa(channelId: string, phone: string) {
@@ -72,6 +76,10 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
   const [unreadConversations, setUnreadConversations] = React.useState<Set<string>>(new Set())
   const [alvoAbrir, setAlvoAbrir] = React.useState<{ channelId: string; phone: string } | null>(null)
   const limparAlvoAbrir = React.useCallback(() => setAlvoAbrir(null), [])
+  const abrirConversa = React.useCallback(
+    (channelId: string, phone: string) => setAlvoAbrir({ channelId, phone }),
+    [],
+  )
   const [notifPermission, setNotifPermission] = React.useState<NotificationPermission | "unsupported">(
     typeof Notification === "undefined" ? "unsupported" : Notification.permission,
   )
@@ -204,6 +212,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       requestNotifPermission,
       alvoAbrir,
       limparAlvoAbrir,
+      abrirConversa,
     }),
     [
       unreadChannels,
@@ -215,6 +224,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       requestNotifPermission,
       alvoAbrir,
       limparAlvoAbrir,
+      abrirConversa,
     ],
   )
 
