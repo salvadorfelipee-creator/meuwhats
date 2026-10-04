@@ -1,30 +1,27 @@
 import * as React from "react"
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  useDraggable,
-  useDroppable,
-  type DragEndEvent,
-  type DragStartEvent,
-} from "@dnd-kit/core"
+import { KanbanBoard, type KanbanColumn, type KanbanTask } from "@/components/ui/kanban-board"
 import { api, pipelineEstagiosPara, type Conversation, type Message, type Tag } from "@/lib/api"
 import { useChannel } from "@/lib/channel-context"
 import { useUnread } from "@/lib/unread-context"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { RefreshCw, MessageCircle, X, Send, ExternalLink, FileText } from "lucide-react"
+import { RefreshCw, X, Send, ExternalLink, FileText } from "lucide-react"
 
-// Quadro kanban do pipeline — agrupa as conversas do canal atual por `pipeline_estagio`.
-// Drag de verdade via @dnd-kit (acessível, com overlay flutuante) em vez do HTML5 DnD nativo
-// da primeira versão. Não cria campo novo: `tags_json` já vem pronto no GET /conversations
-// (ver db.js), então as tags do cartão não pedem uma chamada extra por contato.
+// Quadro kanban do pipeline — agrupa as conversas do canal atual por `pipeline_estagio`, usando
+// o componente genérico de @/components/ui/kanban-board (drag por pointer events, com placeholder,
+// spring physics e teclado). `tags_json` já vem pronto no GET /conversations (ver db.js), então
+// as tags do cartão não pedem uma chamada extra por contato.
 //
-// O quadro é interativo: clicar num cartão abre um painel de resposta rápida ao lado (sem
-// sair do Pipeline), com as mensagens da conversa e um campo pra responder — pensado pra
-// não obrigar trocar de aba só pra mandar uma mensagem enquanto se organiza o funil.
+// "Prioridade" no cartão não é um campo novo no banco — é calculada: cliente esperando resposta
+// (última mensagem foi dele) há mais de 2h vira "Prioridade", mais de 24h vira "Urgente". É o
+// jeito de responder "quem eu preciso atender primeiro" olhando só o quadro, sem abrir cada
+// conversa. "Progresso"/categoria do componente original não têm equivalente real aqui (não tem
+// como errar: estágio perdido mostrando 100% de progresso passaria a ideia errada de "concluído
+// com sucesso"), por isso ficam de fora — ver CLAUDE.md se quiser adicionar depois com dado real.
+//
+// O quadro é interativo: clicar num cartão (sem arrastar) abre um painel de resposta rápida ao
+// lado, sem sair do Pipeline. Pra mídia, busca no histórico ou resposta pronta, "Ver conversa
+// completa" ainda manda pra aba Conversas de verdade.
 
 const AVATAR_CORES = ["#111214", "#2F6FED", "#7C5CFC", "#D9476B", "#15803D", "#B45309", "#0E7490"]
 
@@ -64,110 +61,43 @@ function tagsDe(conversa: Conversation): Tag[] {
   }
 }
 
-function CartaoConteudo({ conversa }: { conversa: Conversation }) {
-  const tags = tagsDe(conversa)
-  return (
-    <>
-      <div className="flex items-center gap-2">
-        <div
-          className="h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-semibold text-white shrink-0"
-          style={{ background: corAvatar(conversa.phone) }}
-        >
-          {iniciais(conversa.name, conversa.phone)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium truncate">{conversa.name || conversa.phone}</div>
-        </div>
-        <span className="text-[10px] text-muted-foreground shrink-0">{horaRelativa(conversa.last_message_at)}</span>
-      </div>
-      {conversa.last_body && (
-        <div className="text-xs text-muted-foreground line-clamp-2">{conversa.last_body}</div>
-      )}
-      {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {tags.slice(0, 3).map((t) => (
-            <span
-              key={t.id}
-              className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
-              style={{ background: `${t.cor}1a`, color: t.cor }}
-            >
-              {t.nome}
-            </span>
-          ))}
-        </div>
-      )}
-    </>
-  )
+const SEM_ETAPA_COL = "__sem_etapa__"
+const LIMIAR_PRIORIDADE_MIN = 120 // 2h esperando resposta
+const LIMIAR_URGENTE_MIN = 24 * 60 // 24h esperando resposta
+
+function conversaParaTask(conversa: Conversation): KanbanTask {
+  const aguardandoResposta = conversa.last_direction === "in"
+  const elapsedMin = conversa.last_message_at ? (Date.now() - conversa.last_message_at) / 60000 : null
+
+  let priority: KanbanTask["priority"] | undefined
+  if (aguardandoResposta && elapsedMin != null) {
+    if (elapsedMin >= LIMIAR_URGENTE_MIN) priority = "urgent"
+    else if (elapsedMin >= LIMIAR_PRIORIDADE_MIN) priority = "high"
+  }
+
+  return {
+    id: conversa.phone,
+    title: conversa.name || conversa.phone,
+    note: conversa.last_body || undefined,
+    priority,
+    tags: tagsDe(conversa).map((t) => ({ id: t.id, nome: t.nome, cor: t.cor })),
+    people: [{ name: conversa.name || conversa.phone, color: corAvatar(conversa.phone) }],
+    due: horaRelativa(conversa.last_message_at),
+    dueSoon: priority === "urgent" || priority === "high",
+  }
 }
 
-function Cartao({
-  conversa,
-  selecionado,
-  onAbrir,
-}: {
-  conversa: Conversation
-  selecionado: boolean
-  onAbrir: (conversa: Conversation) => void
-}) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: conversa.phone })
-  return (
-    <div
-      ref={setNodeRef}
-      {...listeners}
-      {...attributes}
-      onClick={() => onAbrir(conversa)}
-      className={`rounded-xl border bg-card p-3 flex flex-col gap-2 cursor-grab active:cursor-grabbing hover:border-foreground/30 hover:shadow-sm transition-[border-color,box-shadow,opacity] group ${
-        isDragging ? "opacity-30" : ""
-      } ${selecionado ? "border-foreground/60 ring-1 ring-foreground/20" : ""}`}
-    >
-      <CartaoConteudo conversa={conversa} />
-      <div className="flex items-center gap-1 text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-        <MessageCircle className="h-3 w-3" /> Responder
-      </div>
-    </div>
-  )
-}
-
-function Coluna({
-  id,
-  nome,
-  cor,
-  conversas,
-  selecionada,
-  onAbrir,
-}: {
-  id: string
-  nome: string
-  cor: string
-  conversas: Conversation[]
-  selecionada: string | null
-  onAbrir: (conversa: Conversation) => void
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id })
-  return (
-    <div className="w-64 shrink-0 flex flex-col gap-3">
-      <div className="flex items-center gap-2 px-1">
-        <span className="h-2 w-2 rounded-full shrink-0" style={{ background: cor }} />
-        <span className="text-xs font-semibold">{nome}</span>
-        <span className="text-[11px] text-muted-foreground">{conversas.length}</span>
-      </div>
-      <div
-        ref={setNodeRef}
-        className={`flex-1 min-h-24 flex flex-col gap-2 rounded-xl p-1.5 transition-colors ${
-          isOver ? "bg-secondary/60 ring-2 ring-foreground/15" : ""
-        }`}
-      >
-        {conversas.map((c) => (
-          <Cartao key={c.phone} conversa={c} selecionado={c.phone === selecionada} onAbrir={onAbrir} />
-        ))}
-        {conversas.length === 0 && (
-          <div className="text-[11px] text-muted-foreground text-center py-6 border border-dashed rounded-xl">
-            Arraste um contato aqui
-          </div>
-        )}
-      </div>
-    </div>
-  )
+function construirColunas(conversas: Conversation[], estagios: ReturnType<typeof pipelineEstagiosPara>): KanbanColumn[] {
+  const semEtapa = conversas.filter((c) => !c.pipeline_estagio)
+  return [
+    { id: SEM_ETAPA_COL, name: "Sem etapa", dotColor: "#cbd5e1", tasks: semEtapa.map(conversaParaTask) },
+    ...estagios.map((estagio) => ({
+      id: estagio.id,
+      name: estagio.nome,
+      dotColor: estagio.cor,
+      tasks: conversas.filter((c) => c.pipeline_estagio === estagio.id).map(conversaParaTask),
+    })),
+  ]
 }
 
 // Painel de resposta rápida — fica ao lado do quadro, sem navegar pra aba Conversas. Cobre o
@@ -324,11 +254,9 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (phone: str
   const { setActiveConversation, markConversationSeen } = useUnread()
   const [conversas, setConversas] = React.useState<Conversation[]>([])
   const [carregando, setCarregando] = React.useState(true)
-  const [arrastando, setArrastando] = React.useState<Conversation | null>(null)
   const [selecionada, setSelecionada] = React.useState<Conversation | null>(null)
 
   const estagios = pipelineEstagiosPara(current?.label)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const carregar = React.useCallback(() => {
     if (!current || current.id === "instagram") return
@@ -360,20 +288,31 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (phone: str
     setSelecionada(null)
   }, [current?.id])
 
-  function onDragStart(e: DragStartEvent) {
-    setArrastando(conversas.find((c) => c.phone === e.active.id) || null)
+  // Referência estável enquanto `conversas`/`estagios` não mudam de verdade, senão o
+  // KanbanBoard re-sincroniza o estado interno a cada render e desfaz um reordenar dentro da
+  // mesma coluna que o usuário acabou de fazer (ver efeito de sync em kanban-board.tsx).
+  const columns = React.useMemo(() => construirColunas(conversas, estagios), [conversas, estagios])
+
+  function abrirPorId(phone: string) {
+    const conversa = conversas.find((c) => c.phone === phone)
+    if (conversa) setSelecionada(conversa)
   }
 
-  // Otimista: move o card na hora, confirma depois. Se o PATCH falhar, recarrega do servidor
-  // pra não deixar o quadro mentindo sobre o estado real.
-  function onDragEnd(e: DragEndEvent) {
-    setArrastando(null)
-    const phone = e.active.id as string
-    const destino = e.over?.id as string | undefined
-    if (!current || destino === undefined) return
-    const estagioId = destino === "__sem_etapa__" ? null : destino
-    setConversas((prev) => prev.map((c) => (c.phone === phone ? { ...c, pipeline_estagio: estagioId } : c)))
-    api.setPipeline(current.id, phone, estagioId).catch(() => carregar())
+  // Otimista: acha o card cuja coluna nova diverge do estágio salvo, atualiza na hora, confirma
+  // depois. Se o PATCH falhar, recarrega do servidor pra não deixar o quadro mentindo.
+  function onBoardChange(next: KanbanColumn[]) {
+    if (!current) return
+    for (const col of next) {
+      const estagioId = col.id === SEM_ETAPA_COL ? null : col.id
+      for (const task of col.tasks) {
+        const conversa = conversas.find((c) => c.phone === task.id)
+        if (conversa && (conversa.pipeline_estagio ?? null) !== estagioId) {
+          setConversas((prev) => prev.map((c) => (c.phone === task.id ? { ...c, pipeline_estagio: estagioId } : c)))
+          api.setPipeline(current.id, task.id, estagioId).catch(() => carregar())
+          return
+        }
+      }
+    }
   }
 
   if (current?.id === "instagram") {
@@ -383,8 +322,6 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (phone: str
       </div>
     )
   }
-
-  const semEtapa = conversas.filter((c) => !c.pipeline_estagio)
 
   return (
     <div className="h-screen overflow-hidden flex flex-col">
@@ -401,40 +338,10 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (phone: str
         </Button>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-          <div className="flex-1 overflow-x-auto overflow-y-hidden">
-            <div className="h-full flex gap-4 p-4 min-w-max">
-              <Coluna
-                id="__sem_etapa__"
-                nome="Sem etapa"
-                cor="#cbd5e1"
-                conversas={semEtapa}
-                selecionada={selecionada?.phone ?? null}
-                onAbrir={setSelecionada}
-              />
-              {estagios.map((estagio) => (
-                <Coluna
-                  key={estagio.id}
-                  id={estagio.id}
-                  nome={estagio.nome}
-                  cor={estagio.cor}
-                  conversas={conversas.filter((c) => c.pipeline_estagio === estagio.id)}
-                  selecionada={selecionada?.phone ?? null}
-                  onAbrir={setSelecionada}
-                />
-              ))}
-            </div>
-          </div>
-
-          <DragOverlay>
-            {arrastando && (
-              <div className="w-64 rounded-xl border bg-card p-3 flex flex-col gap-2 shadow-lg rotate-2">
-                <CartaoConteudo conversa={arrastando} />
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
+      <div className="flex-1 min-w-0 flex overflow-hidden">
+        <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden p-4">
+          <KanbanBoard columns={columns} onChange={onBoardChange} onTaskClick={abrirPorId} label="Pipeline" />
+        </div>
 
         {selecionada && current && (
           <PainelConversa
