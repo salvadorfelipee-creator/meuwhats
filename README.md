@@ -143,7 +143,7 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `FELIZCRED_EMAIL_FROM` / `FELIZCRED_EMAIL_FROM_NOME` | Remetente do e-mail de boas-vindas da Felizcred (usa o mesmo `BREVO_API_KEY`) | `contato@felizcred.com.br` / "Felizcred" |
 | `PUBLIC_URL` | URL pública do servidor (usada pelo auto-ping e pra montar a URL do vídeo que o Instagram busca) | `https://meuwhats.onrender.com` |
 | `GEMINI_API_KEY` | Chave da API gratuita do Google Gemini (ver `gemini.js`) — lê as últimas mensagens da conversa e sugere etapa do pipeline + campos personalizados no painel ("Sugestão da IA", botão nos Detalhes do contato). Sem essa variável, o botão aparece mas devolve erro "IA não configurada". Gerar grátis, sem cartão, em https://aistudio.google.com/apikey | — |
-| `GEMINI_MODEL` | Nome do modelo do Gemini usado na sugestão acima | `gemini-2.5-flash` |
+| `GEMINI_MODEL` | Nome do modelo do Gemini usado na sugestão acima | `gemini-3.8-flash` |
 
 ⚠️ Defina `PAINEL_USER`/`PAINEL_PASS` com valores próprios — o painel mostra suas conversas.
 
@@ -1139,6 +1139,15 @@ realmente enviados na requisição (a lista de etapas válidas vem do frontend, 
 `pipelineEstagiosPara` — o servidor não sabe qual funil cada canal usa); campos sugeridos só são
 aceitos se o nome bater com um campo personalizado que já existe nesse negócio — a IA nunca cria
 campo novo sozinha. Configurar: `GEMINI_API_KEY` no Render (ver tabela de variáveis acima).
+
+**Nome do modelo muda com o tempo** — o Google aposenta modelo "flash" antigo pra usuário novo
+sem muito aviso (`gemini-2.5-flash` parou de funcionar e virou `gemini-3.8-flash` entre a criação
+desta feature em 04/10/2026 e o primeiro teste em produção, no mesmo dia). Se o botão voltar a
+dar erro genérico depois de meses sem mexer em nada, o `console.error` do Render mostra a causa
+real (`gemini.js` só expõe mensagem genérica pro painel) — provavelmente é só trocar
+`GEMINI_MODEL` pro nome atual, que a própria mensagem de erro 404 da Google costuma recomendar.
+`gemini.js` já tenta de novo 1x sozinho num 503 (sobrecarregado) antes de desistir — isso é
+diferente de erro de nome de modelo (404), que não adianta tentar de novo.
 
 ### E-mail (Brevo) — templates, campanha em massa e retornos (2026-09-29)
 

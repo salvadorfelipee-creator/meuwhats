@@ -2,7 +2,7 @@
 // e SUGERIR etapa do pipeline + valores de campos personalizados. Nunca aplica nada sozinha: a
 // pessoa sempre confirma com um clique no painel (ver POST .../sugestao-ia em server.js). Chave
 // gratuita em https://aistudio.google.com/apikey — sem cartão, com cota diária generosa.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
 
 function montarPrompt({ mensagens, estagios, campos, valoresAtuais }) {
   const transcricao = mensagens
@@ -53,17 +53,31 @@ async function sugerirPipeline({ mensagens, estagios, campos, valoresAtuais }) {
 
   const prompt = montarPrompt({ mensagens, estagios, campos, valoresAtuais });
 
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-      }),
-    },
-  );
+  // O modelo "flash" mais recente devolve 503 (sobrecarregado) com alguma frequência em
+  // horário de pico — transitório, some sozinho em poucos segundos. Vale a pena tentar de novo
+  // 1x antes de mostrar erro pra pessoa, em vez de fazer ela clicar "analisar" de novo na mão.
+  let resp;
+  for (let tentativa = 0; tentativa < 2; tentativa++) {
+    resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.2,
+            // Classificação simples não precisa do modo "thinking" do modelo — desligar corta
+            // o custo em tokens de forma significativa sem perder qualidade pra essa tarefa.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+      },
+    );
+    if (resp.ok || resp.status !== 503) break;
+    await new Promise((r) => setTimeout(r, 1500));
+  }
 
   if (!resp.ok) {
     const texto = await resp.text().catch(() => "");
