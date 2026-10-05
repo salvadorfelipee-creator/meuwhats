@@ -57,7 +57,7 @@ Primeiro contato em 03/10/2026. Fizemos auditoria completa lendo direto as conta
 
 ### Meta Ads
 - **Cortar:** pausar (não excluir de cara) as ~73 campanhas de "Impulsionar publicação" quebradas/com erro — não são campanhas estruturadas, são posts avulsos impulsionados.
-- **Investigar antes de cortar:** existe cobrança real diária (R$44-71/dia, saldo R$650,14 em 03/10/2026) — uma campanha específica ainda não identificada está gerando esse gasto. **Primeiro passo de qualquer sessão nova: achar qual é essa campanha e decidir se mantém ou substitui.**
+- **Identificado em 05/10/2026 via Marketing API** (`especita clinica/meta-ads-automation/campaigns/listar-ativos.js`, consulta só leitura): o gasto real de R$44-71/dia é a campanha **"[leads] form"** (objetivo Geração de Leads, formulário instantâneo dentro do anúncio — não é WhatsApp) com 2 conjuntos ativos, `botox` R$25/dia e `ortodontia` R$25/dia, mais um post do Instagram impulsionado ("Sabia que trocar suas...") R$8/dia otimizado pra visita no perfil. Total ativo: **R$58/dia**. Todas as outras ~29 campanhas da conta estão pausadas (sem gasto). Manter essas duas rodando — já provam resultado (ver histórico de benchmark acima) — qualquer campanha nova (ex: Noivos via Marketing API) entra com orçamento **separado**, nunca substituindo isso sem um teste validado rodando em paralelo primeiro.
 - Nunca desligar um canal que já traz paciente sem ter um substituto validado rodando em paralelo.
 
 ## Plano de A/B test
