@@ -1,60 +1,116 @@
-/* Especitá · comportamento do site (sem dependências) */
+/* Especitá · v2 · comportamento. Depende de GSAP + ScrollTrigger e Lenis (CDN, carregados antes). */
 (function () {
   "use strict";
   var WA = document.documentElement.getAttribute("data-wa") || "";
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var fine = window.matchMedia("(hover:hover) and (pointer:fine)").matches;
 
-  // ---- menu mobile
-  var burger = document.querySelector(".burger");
-  var nav = document.querySelector("nav.main");
-  if (burger && nav) burger.addEventListener("click", function () {
-    var open = nav.classList.toggle("open");
+  // ---------- menu
+  var burger = document.querySelector(".burger"), menu = document.querySelector(".menu");
+  if (burger && menu) burger.addEventListener("click", function () {
+    var open = menu.classList.toggle("open");
     burger.setAttribute("aria-expanded", open ? "true" : "false");
+    burger.textContent = open ? "Fechar" : "Menu";
+    document.body.style.overflow = open ? "hidden" : "";
   });
 
-  // ---- WhatsApp: texto pré-preenchido + origem (utm) para o painel reconhecer a campanha
+  // ---------- WhatsApp com texto e origem (utm)
   function utm() {
     try {
-      var p = new URLSearchParams(location.search);
-      var src = p.get("utm_source"), camp = p.get("utm_campaign");
-      if (!src && !camp) return "";
-      return " (origem: " + [src, camp].filter(Boolean).join(" / ") + ")";
+      var p = new URLSearchParams(location.search), s = p.get("utm_source"), c = p.get("utm_campaign");
+      return (s || c) ? " (origem: " + [s, c].filter(Boolean).join(" / ") + ")" : "";
     } catch (e) { return ""; }
   }
-  function waLink(text) {
-    return "https://wa.me/" + WA + "?text=" + encodeURIComponent(text + utm());
+  function waLink(t) { return "https://wa.me/" + WA + "?text=" + encodeURIComponent(t + utm()); }
+  document.querySelectorAll("a[data-wa-text]").forEach(function (a) { a.href = waLink(a.getAttribute("data-wa-text")); a.target = "_blank"; a.rel = "noopener"; });
+
+  // ---------- reveals (CSS + IntersectionObserver)
+  var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }); }, { rootMargin: "0px 0px -10% 0px" });
+  document.querySelectorAll("[data-reveal],[data-clip]").forEach(function (el) { io.observe(el); });
+
+  // ---------- manifesto: palavras acendem com o scroll
+  var man = document.querySelector(".manifesto p");
+  if (man && !man.dataset.split) {
+    man.innerHTML = man.textContent.trim().split(/\s+/).map(function (w) { return '<span class="w">' + w + "</span>"; }).join(" ");
+    man.dataset.split = "1";
+    var ws = man.querySelectorAll(".w");
+    function paint() {
+      var r = man.getBoundingClientRect(), vh = window.innerHeight;
+      var p = Math.min(1, Math.max(0, (vh * 0.8 - r.top) / (r.height + vh * 0.3)));
+      var n = Math.round(p * ws.length);
+      ws.forEach(function (w, i) { w.classList.toggle("on", i < n); });
+    }
+    if (reduce) ws.forEach(function (w) { w.classList.add("on"); }); else { window.addEventListener("scroll", paint, { passive: true }); paint(); }
   }
-  document.querySelectorAll("a[data-wa-text]").forEach(function (a) {
-    a.href = waLink(a.getAttribute("data-wa-text"));
-    a.target = "_blank"; a.rel = "noopener";
+
+  // ---------- índice: preview de foto no hover
+  var prev = document.querySelector(".index .preview");
+  if (prev) {
+    var imgs = prev.querySelectorAll("img");
+    document.querySelectorAll(".index li a[data-img]").forEach(function (a) {
+      a.addEventListener("mouseenter", function () { var k = a.getAttribute("data-img"); imgs.forEach(function (im) { im.classList.toggle("on", im.getAttribute("data-k") === k); }); });
+    });
+    if (imgs[0]) imgs[0].classList.add("on");
+  }
+
+  // ---------- contadores
+  document.querySelectorAll("[data-count]").forEach(function (el) {
+    var target = parseInt(el.getAttribute("data-count"), 10), suf = el.getAttribute("data-suffix") || "";
+    var o = new IntersectionObserver(function (es) {
+      if (!es[0].isIntersecting) return; o.disconnect();
+      if (reduce) { el.textContent = target + suf; return; }
+      var t0 = null; function step(t) { if (!t0) t0 = t; var p = Math.min(1, (t - t0) / 1200); el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))) + suf; if (p < 1) requestAnimationFrame(step); }
+      requestAnimationFrame(step);
+    }); o.observe(el);
   });
 
-  // ---- antes/depois (slider)
+  // ---------- Lenis + GSAP (parallax e texto que atravessa a banda)
+  if (!reduce && window.gsap && window.ScrollTrigger) {
+    gsap.registerPlugin(ScrollTrigger);
+    if (window.Lenis) {
+      var lenis = new Lenis({ lerp: 0.1, smoothWheel: true });
+      lenis.on("scroll", ScrollTrigger.update);
+      gsap.ticker.add(function (t) { lenis.raf(t * 1000); });
+      gsap.ticker.lagSmoothing(0);
+      document.querySelectorAll('a[href^="#"]').forEach(function (a) { a.addEventListener("click", function (e) { var id = a.getAttribute("href"); var el = id.length > 1 && document.querySelector(id); if (el) { e.preventDefault(); lenis.scrollTo(el, { offset: -80 }); } }); });
+    }
+    document.querySelectorAll(".hero .right img, .shero .ph img").forEach(function (im) {
+      gsap.to(im, { yPercent: 12, ease: "none", scrollTrigger: { trigger: im.parentElement, start: "top top", end: "bottom top", scrub: true } });
+    });
+    document.querySelectorAll(".band").forEach(function (b) {
+      var img = b.querySelector("img"), txt = b.querySelector(".txt");
+      gsap.fromTo(img, { yPercent: -8 }, { yPercent: 8, ease: "none", scrollTrigger: { trigger: b, start: "top bottom", end: "bottom top", scrub: true } });
+      if (txt) gsap.fromTo(txt, { xPercent: 10 }, { xPercent: -60, ease: "none", scrollTrigger: { trigger: b, start: "top bottom", end: "bottom top", scrub: true } });
+    });
+    document.querySelectorAll(".dra .ph img, .index .preview").forEach(function (im) {
+      gsap.fromTo(im, { yPercent: -6 }, { yPercent: 6, ease: "none", scrollTrigger: { trigger: im.parentElement, start: "top bottom", end: "bottom top", scrub: true } });
+    });
+    // botão magnético (só mouse)
+    if (fine) document.querySelectorAll(".btn.solid, .wa-float").forEach(function (b) {
+      var xTo = gsap.quickTo(b, "x", { duration: .4, ease: "power3" }), yTo = gsap.quickTo(b, "y", { duration: .4, ease: "power3" });
+      b.addEventListener("mousemove", function (e) { var r = b.getBoundingClientRect(); xTo((e.clientX - r.left - r.width / 2) * .25); yTo((e.clientY - r.top - r.height / 2) * .25); });
+      b.addEventListener("mouseleave", function () { xTo(0); yTo(0); });
+    });
+  }
+
+  // ---------- antes/depois
   document.querySelectorAll(".ba").forEach(function (box) {
     var inp = box.querySelector("input"), after = box.querySelector(".after"), handle = box.querySelector(".handle");
     function set(v) { after.style.clipPath = "inset(0 0 0 " + v + "%)"; handle.style.left = v + "%"; }
-    inp.addEventListener("input", function () { set(inp.value); });
-    set(inp.value);
+    inp.addEventListener("input", function () { set(inp.value); }); set(inp.value);
   });
 
-  // ---- quiz genérico: data-quiz com perguntas em .q, botões com data-v; resultado em .res
+  // ---------- quiz
   document.querySelectorAll(".quiz").forEach(function (qz) {
     var qs = Array.prototype.slice.call(qz.querySelectorAll(".q")), i = 0, answers = [];
-    var prog = qz.querySelector(".prog i"), res = qz.querySelector(".res");
-    var ctaText = qz.getAttribute("data-cta") || "Olá! Vim pelo site.";
-    function show(n) {
-      qs.forEach(function (q, k) { q.classList.toggle("on", k === n); });
-      if (prog) prog.style.width = Math.round((n / qs.length) * 100) + "%";
-    }
+    var prog = qz.querySelector(".prog i"), res = qz.querySelector(".res"), ctaText = qz.getAttribute("data-cta") || "Olá! Vim pelo site.";
+    function show(n) { qs.forEach(function (q, k) { q.classList.toggle("on", k === n); }); if (prog) prog.style.width = Math.round((n / qs.length) * 100) + "%"; }
     qz.querySelectorAll(".opts button").forEach(function (b) {
       b.addEventListener("click", function () {
-        answers.push(b.getAttribute("data-v") || b.textContent.trim());
-        i++;
+        answers.push(b.getAttribute("data-v") || b.textContent.trim()); i++;
         if (i < qs.length) { show(i); return; }
-        qs.forEach(function (q) { q.classList.remove("on"); });
-        if (prog) prog.style.width = "100%";
-        var key = answers.join("|");
-        var rules = JSON.parse(qz.getAttribute("data-rules") || "{}");
-        var txt = rules["default"] || "";
+        qs.forEach(function (q) { q.classList.remove("on"); }); if (prog) prog.style.width = "100%";
+        var key = answers.join("|"), rules = JSON.parse(qz.getAttribute("data-rules") || "{}"), txt = rules["default"] || "";
         Object.keys(rules).forEach(function (k) { if (k !== "default" && key.indexOf(k) === 0) txt = rules[k]; });
         res.querySelector(".txt").textContent = txt;
         var a = res.querySelector("a"); if (a) a.href = waLink(ctaText + " Minhas respostas: " + answers.join(", ") + ".");
@@ -64,70 +120,52 @@
     show(0);
   });
 
-  // ---- checklist de urgência → mensagem
+  // ---------- checklist → mensagem
   document.querySelectorAll(".chk-wa").forEach(function (f) {
     var a = f.querySelector("a[data-chk-cta]");
-    function upd() {
-      var marcados = Array.prototype.slice.call(f.querySelectorAll("input:checked")).map(function (c) { return c.parentNode.textContent.trim(); });
-      a.href = waLink(a.getAttribute("data-chk-cta") + (marcados.length ? " Situação: " + marcados.join("; ") + "." : ""));
-    }
+    function upd() { var m = Array.prototype.slice.call(f.querySelectorAll("input:checked")).map(function (c) { return c.parentNode.textContent.trim(); }); a.href = waLink(a.getAttribute("data-chk-cta") + (m.length ? " Situação: " + m.join("; ") + "." : "")); }
     f.addEventListener("change", upd); upd();
   });
 
-  // ---- calculadora primeiro dentinho
+  // ---------- calculadora primeiro dentinho
   var calc = document.querySelector(".calc[data-calc='dentinho']");
   if (calc) {
-    var inp = calc.querySelector("input"), out = calc.querySelector(".out");
+    var inp2 = calc.querySelector("input"), out = calc.querySelector(".out");
     function run() {
-      var m = parseInt(inp.value, 10);
-      if (isNaN(m) || m < 0) { out.textContent = "Digite a idade do bebê em meses."; return; }
-      var t;
-      if (m <= 6) t = "Ainda sem dentes na maioria dos bebês. Já vale a orientação sobre limpeza da gengiva, chupeta e mamadeira. A primeira visita pode ser agendada para quando o primeiro dente nascer.";
+      var m = parseInt(inp2.value, 10), t;
+      if (isNaN(m) || m < 0) t = "Digite a idade do bebê em meses.";
+      else if (m <= 6) t = "Ainda sem dentes na maioria dos bebês. Já vale a orientação sobre limpeza da gengiva, chupeta e mamadeira. A primeira visita pode ser marcada para quando o primeiro dente nascer.";
       else if (m <= 12) t = "É a janela ideal para a primeira visita: até 1 ano de idade, segundo as sociedades de odontopediatria. Visitas precoces reduzem muito o risco de cárie nos primeiros anos.";
-      else if (m <= 36) t = "Hora de uma visita de adaptação, se ainda não foi. Nessa fase a criança conhece a cadeira sem procedimento e os pais recebem orientação de escovação e alimentação.";
+      else if (m <= 36) t = "Hora de uma visita de adaptação, se ainda não foi. A criança conhece a cadeira sem procedimento e os pais recebem orientação de escovação e alimentação.";
       else if (m <= 84) t = "Revisões a cada 6 meses, flúor e selantes conforme indicação. Entre 6 e 7 anos, a primeira avaliação ortodôntica.";
       else t = "Revisões a cada 6 meses e avaliação ortodôntica, se ainda não fez. Converse com a Dra. sobre selantes nos dentes permanentes.";
       out.textContent = t;
     }
-    inp.addEventListener("input", run); run();
+    inp2.addEventListener("input", run); run();
   }
 
-  // ---- comparar ortodontia
+  // ---------- comparar ortodontia
   document.querySelectorAll(".cmp").forEach(function (c) {
-    var opts = c.querySelectorAll(".opt"), rows = c.querySelectorAll("tbody tr");
-    opts.forEach(function (o) {
-      o.addEventListener("click", function () {
-        opts.forEach(function (x) { x.classList.remove("on"); }); o.classList.add("on");
-        var k = o.getAttribute("data-k");
-        rows.forEach(function (r) { r.querySelectorAll("td[data-k]").forEach(function (td) { td.style.fontWeight = td.getAttribute("data-k") === k ? "700" : "400"; td.style.color = td.getAttribute("data-k") === k ? "var(--brand-deep)" : ""; }); });
-      });
-    });
+    var opts = c.querySelectorAll(".opt"), tds = c.querySelectorAll("td[data-k]");
+    function pick(k) { opts.forEach(function (o) { o.classList.toggle("on", o.getAttribute("data-k") === k); }); tds.forEach(function (td) { td.classList.toggle("hi", td.getAttribute("data-k") === k); }); }
+    opts.forEach(function (o) { o.addEventListener("click", function () { pick(o.getAttribute("data-k")); }); }); pick("fixo");
   });
 
-  // ---- escala de clareamento (ilustrativa)
+  // ---------- escala de clareamento
   var sh = document.querySelector(".shade");
   if (sh) {
-    var tones = ["#E9D7B8", "#EBDCC1", "#EEE2CB", "#F1E8D5", "#F4EDDF", "#F7F2E8", "#FAF7F0", "#FCFAF6"];
+    var tones = ["#D9C39F", "#DFCCAE", "#E5D5BB", "#EADDC7", "#EFE5D3", "#F3EBDE", "#F7F1E8", "#FAF6F0"];
     sh.innerHTML = tones.map(function (t, k) { return '<i style="background:' + t + '" data-k="' + k + '"></i>'; }).join("");
     var r = document.querySelector(".shade-range"), lbl = document.querySelector(".shade-lbl");
-    function paint() {
-      var v = parseInt(r.value, 10);
-      sh.querySelectorAll("i").forEach(function (el, k) { el.classList.toggle("on", k === v); });
-      lbl.textContent = v <= 1 ? "Tom inicial comum em quem toma café, chá ou fuma." : v <= 4 ? "Tons intermediários, alcançados nas primeiras semanas do protocolo." : "Tons claros: o resultado depende do esmalte de cada pessoa, não de 'mais produto'.";
-    }
-    r.addEventListener("input", paint); paint();
+    function paint2() { var v = parseInt(r.value, 10); sh.querySelectorAll("i").forEach(function (el, k) { el.classList.toggle("on", k === v); }); lbl.textContent = v <= 1 ? "Tom inicial comum em quem toma café, chá ou fuma." : v <= 4 ? "Tons intermediários, alcançados nas primeiras semanas do protocolo." : "Tons claros: o resultado depende do esmalte de cada pessoa, não de 'mais produto'."; }
+    r.addEventListener("input", paint2); paint2();
   }
 
-  // ---- simulador ilustrativo de expressão (harmonização)
+  // ---------- simulador ilustrativo de expressão
   var sim = document.querySelector("[data-sim='expressao']");
   if (sim) {
-    var rng = sim.querySelector("input[type=range]"), lines = sim.querySelectorAll(".ruga");
-    var out2 = sim.querySelector(".sim-out");
-    function s() {
-      var v = parseInt(rng.value, 10) / 100; // 0 = antes, 1 = suavizado
-      lines.forEach(function (l) { l.style.opacity = (1 - v * 0.85).toFixed(2); l.style.strokeWidth = (2.2 - v * 1.4).toFixed(2); });
-      out2.textContent = v < 0.2 ? "Linhas de expressão marcadas (ilustração)." : v < 0.7 ? "Suavização parcial: é o objetivo de uma abordagem discreta." : "Suavização maior. Na prática, a Dra. define dose e pontos para manter a expressão natural.";
-    }
+    var rng = sim.querySelector("input[type=range]"), lines = sim.querySelectorAll(".ruga"), out2 = sim.querySelector(".sim-out");
+    function s() { var v = parseInt(rng.value, 10) / 100; lines.forEach(function (l) { l.style.opacity = (1 - v * 0.85).toFixed(2); l.style.strokeWidth = (2.2 - v * 1.4).toFixed(2); }); out2.textContent = v < 0.2 ? "Linhas de expressão marcadas (ilustração)." : v < 0.7 ? "Suavização parcial: é o objetivo de uma abordagem discreta." : "Suavização maior. Na prática, a Dra. define dose e pontos para manter a expressão natural."; }
     rng.addEventListener("input", s); s();
   }
 })();

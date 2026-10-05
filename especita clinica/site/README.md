@@ -75,14 +75,34 @@ Ordem sugerida. O prompt pronto para outra conversa está em `PROMPT-PARA-COLAR.
 8. **E-mail profissional** no domínio (ex.: contato@…) e o endereço nas páginas legais.
 9. **Textos pré-preenchidos por campanha**: cada anúncio usa um link com `?utm_source=meta&utm_campaign=implante`; o botão de WhatsApp acrescenta a origem na mensagem, e o painel grava a etiqueta.
 
-## Decisões de design
+## Decisões de design (v2, 05/10/2026)
 
-- Verde-menta profundo como marca, areia clara como calor, branco como superfície. Títulos em
-  Bricolage Grotesque, texto em Instrument Sans (Google Fonts). Mesma identidade usada no painel e
-  no material da clínica, para a Dra. reconhecer tudo como uma coisa só.
-- Uma ferramenta interativa por página de serviço, sempre ilustrativa e com aviso, porque
-  simular o rosto ou o sorriso real do visitante esbarra em promessa de resultado (CFO) e em
-  dado sensível (LGPD). Quando a clínica tiver casos com termo de consentimento, o componente
-  antes/depois aceita fotos reais no lugar das ilustrações.
-- Sem formulário de e-mail: tudo vai para o WhatsApp, que é onde a recepção atende e onde o
-  painel mede.
+Direção: editorial clínica, no padrão dos sites de clínica premiados em 2026 (referência estudada:
+Aventura Dental Arts, Awwwards SOTD 03/2026: duas cores, serifa grande com itálico, foto em tela
+cheia, texto que atravessa a imagem).
+
+- **Duas cores**: marfim quente `#EFEBE4` e grafite esverdeado `#161A19`. Sem cor de acento nos
+  blocos; o verde aparece só no hover do WhatsApp.
+- **Tipografia**: Instrument Serif (títulos, itálico como voz) + Hanken Grotesk (texto). Google Fonts.
+- **Sem cards com ícones, sem blobs, sem eyebrows em todo canto.** Serviços são um índice numerado
+  com prévia de foto no hover; passos são cartões empilhados (sticky); a Dra. é um perfil de revista.
+- **Movimento**: Lenis (rolagem suave) + GSAP ScrollTrigger (parallax da foto, texto que atravessa
+  a banda, botão magnético). Reveals em CSS + IntersectionObserver. Tudo desliga com
+  `prefers-reduced-motion`; efeitos de mouse só em `(hover:hover) and (pointer:fine)`.
+- **Ferramentas interativas** em bloco grafite, uma por serviço, sempre ilustrativas e com aviso
+  (CFO: sem promessa de resultado; LGPD: sem foto do visitante).
+- **Sem formulário de e-mail**: tudo vai para o WhatsApp, onde a recepção atende e o painel mede.
+
+## Bibliotecas e fotos (licenças)
+
+| Recurso | Licença | Uso |
+|---|---|---|
+| GSAP 3.15 + ScrollTrigger (cdnjs) | GreenSock "No Charge" (grátis para uso comercial desde 2025) | parallax, texto da banda, botão magnético |
+| Lenis 1.3.26 (unpkg) | MIT | rolagem suave |
+| Instrument Serif, Hanken Grotesk | OFL (Google Fonts) | tipografia |
+| Fotos Unsplash (`images.unsplash.com/photo-1629909613654…`, `…1677026010083…`, `…1593022356769…`, `…1698749778813…`, `…1598256989800…`, `…1588776814546…`) | Unsplash License (comercial, sem atribuição) | consultório, sorriso, implante, espelho, cadeira, procedimento |
+| Fotos Pexels (8413334, 5355705, 7800568, 6627447, 14235198) | Pexels License (comercial, sem atribuição) | dentista, Dra. (placeholder), criança, atendimento, retrato |
+
+As fotos são **provisórias e hotlinkadas** dos CDNs. Antes de publicar: trocar pelas fotos reais da
+clínica (ou baixar as escolhidas, converter para WebP e colocar em `assets/img/`). Nenhuma foto de
+banco pode ser apresentada como paciente real ou depoimento.
