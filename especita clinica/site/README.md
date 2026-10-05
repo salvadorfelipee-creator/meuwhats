@@ -93,6 +93,18 @@ cheia, texto que atravessa a imagem).
   (CFO: sem promessa de resultado; LGPD: sem foto do visitante).
 - **Sem formulário de e-mail**: tudo vai para o WhatsApp, onde a recepção atende e o painel mede.
 
+## Componentes (passada de 05/10, padrões portados do 21st.dev para HTML puro)
+
+| Componente | Padrão de referência | Como ficou |
+|---|---|---|
+| Botões | "Interactive Hover Button" | ponto que expande no hover, seta que entra da direita; versão clara e escura |
+| Passo a passo | "Timeline" (cubby-ui) | linha vertical com marcadores numerados e foto fixa ao lado; substitui os cartões empilhados |
+| FAQ | "Two-Column FAQ" | título fixo à esquerda, acordeão à direita, pergunta em sans 19px |
+| Hero | "Editorial Collage Hero" / Aventura Dental Arts | foto deslocada 88px do topo para a navegação nunca cruzar a imagem; tag no alto, gradiente no rodapé |
+| Campos | Inputs/Sliders/Checkbox do catálogo | slider com trilho de 1px e botão circular, checkbox quadrado desenhado, contador de meses com − / + |
+| Quiz | Lists/Buttons | opções com seta que desliza no hover, barra de progresso de 1px |
+| Ilustrações | próprias | implante em corte didático (coroa / gengiva / osso) e rosto em linha única |
+
 ## Bibliotecas e fotos (licenças)
 
 | Recurso | Licença | Uso |

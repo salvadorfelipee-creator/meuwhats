@@ -26,8 +26,11 @@ PHOTO_BY_SLUG = {"dente-quebrado": "mirror", "dor-de-dente": "chair", "implante-
 WA_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.5l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 11.9 11.9 0 0 0 4.6 4c1.7.7 2.3.8 3.1.7a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.4-.3z"/></svg>'
 
 def e(s): return html.escape(s, quote=True)
+ARR = '<span class="arr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>'
+def btn(href, label, cls="btn", extra=""):
+    return f'<a class="{cls}" href="{href}"{extra}>{e(label)}{ARR}</a>'
 def wa(text, label, cls="btn solid"):
-    return f'<a class="{cls}" data-wa-text="{e(text)}" href="https://wa.me/{SITE["whatsapp"]}">{WA_ICON}{e(label)}</a>'
+    return f'<a class="{cls}" data-wa-text="{e(text)}" href="https://wa.me/{SITE["whatsapp"]}">{WA_ICON}{e(label)}{ARR}</a>'
 def img(key, alt, extra=""):
     return f'<img src="{PHOTOS[key]}" alt="{e(alt)}" loading="lazy" decoding="async" {extra}>'
 
@@ -100,30 +103,30 @@ def footer():
 </body></html>'''
 
 def ctab(text, label):
-    return f'''<section class="ctab"><div><h2 data-reveal>Fale com a recepção, <em>sem formulário.</em></h2><p data-reveal>Conte o que você precisa pelo WhatsApp. No horário de atendimento a resposta vem em minutos, já com dois horários para escolher.</p></div><div class="acts" data-reveal>{wa(text, label)}<a class="btn" href="{SITE["maps"]}" target="_blank" rel="noopener">Como chegar</a></div></section>'''
+    return f'''<section class="ctab"><div><h2 data-reveal>Fale com a recepção, <em>sem formulário.</em></h2><p data-reveal>Conte o que você precisa pelo WhatsApp. No horário de atendimento a resposta vem em minutos, já com dois horários para escolher.</p></div><div class="acts" data-reveal>{wa(text, label)}{btn(SITE["maps"], "Como chegar", extra=' target="_blank" rel="noopener"')}</div></section>'''
 
 def local_block():
     return f'''<section class="local" id="local"><div><p class="caps">Onde estamos</p><h2 data-reveal>Santa Rita, <em>em frente à ponte dos bombeiros.</em></h2>
 <div class="lines"><div><span>Endereço</span>{e(SITE["endereco"])}</div><div><span>Horário</span>{e(SITE["horario"])}</div><div><span>WhatsApp</span>{e(SITE["whatsapp_fmt"])}</div><div><span>Instagram</span><a href="{SITE["instagram"]}" target="_blank" rel="noopener">{e(SITE["instagram_handle"])}</a></div></div>
-<p style="margin-top:28px"><a class="btn" href="{SITE["maps"]}" target="_blank" rel="noopener">Abrir no Google Maps</a></p></div>
-<div class="map" data-reveal><div><b>Mapa</b><br>Substituir pelo embed do Google Maps quando o domínio estiver no ar (ver README).</div></div></section>'''
+<p style="margin-top:28px">{btn(SITE["maps"], "Abrir no Google Maps", extra=' target="_blank" rel="noopener"')}</p></div>
+<div class="map" data-reveal><div><div class="pin"></div>Mapa do Google entra aqui quando o site for publicado</div></div></section>'''
 
 # ---------------------------------------------------------------- widgets
 def face_svg():
-    return '''<svg class="face" viewBox="0 0 320 360" aria-label="Ilustração de um rosto com linhas de expressão">
-<ellipse cx="160" cy="190" rx="110" ry="140" fill="#EFEBE4"/>
-<path d="M60 150 Q160 20 260 150 Q250 70 160 60 Q70 70 60 150Z" fill="#3B403E"/>
-<ellipse cx="120" cy="175" rx="14" ry="8" fill="#fff"/><circle cx="120" cy="175" r="5" fill="#161A19"/>
-<ellipse cx="200" cy="175" rx="14" ry="8" fill="#fff"/><circle cx="200" cy="175" r="5" fill="#161A19"/>
-<path d="M100 158 q20-10 40 0M180 158 q20-10 40 0" stroke="#3B403E" stroke-width="4" fill="none" stroke-linecap="round"/>
-<path d="M160 190 q-6 18 4 26" stroke="#C9C2B6" stroke-width="3" fill="none" stroke-linecap="round"/>
-<path d="M130 262 q30 18 60 0" stroke="#8C6B63" stroke-width="5" fill="none" stroke-linecap="round"/>
-<g class="rugas" stroke="#8A8278" fill="none" stroke-linecap="round">
-<path class="ruga" d="M105 112 q55-10 110 0"/><path class="ruga" d="M110 126 q50-8 100 0"/>
-<path class="ruga" d="M150 150 l-4 22M170 150 l4 22"/>
-<path class="ruga" d="M92 180 l-14-6M92 188 l-15 2M92 196 l-13 8"/>
-<path class="ruga" d="M228 180 l14-6M228 188 l15 2M228 196 l13 8"/>
-<path class="ruga" d="M120 225 q6 20 18 34M200 225 q-6 20-18 34"/>
+    return '''<svg class="face" viewBox="0 0 320 380" aria-label="Ilustração em linha de um rosto com linhas de expressão" fill="none" stroke="#EFEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+<path d="M70 150 C70 70 120 40 160 40 C200 40 250 70 250 150 C250 230 215 300 160 316 C105 300 70 230 70 150Z"/>
+<path d="M90 120 C110 70 210 70 230 120" opacity=".5"/>
+<path d="M110 158 q22-14 44 0M166 158 q22-14 44 0" stroke-width="2"/>
+<path d="M118 180 q14-10 28 0M174 180 q14-10 28 0"/>
+<path d="M160 170 q-10 30 0 62 q8 4 14 0" opacity=".7"/>
+<path d="M126 268 q34 14 68 0 M134 272 q26 18 52 0" stroke-width="1.8"/>
+<path d="M90 320 C110 350 210 350 230 320" opacity=".4"/>
+<g class="rugas" stroke="#B8C3BF" stroke-width="2">
+<path class="ruga" d="M112 98 q48-14 96 0"/><path class="ruga" d="M118 112 q42-10 84 0"/>
+<path class="ruga" d="M150 136 l-5 18M170 136 l5 18"/>
+<path class="ruga" d="M100 166 l-14-5M100 174 l-16 1M100 182 l-14 7"/>
+<path class="ruga" d="M220 166 l14-5M220 174 l16 1M220 182 l14 7"/>
+<path class="ruga" d="M124 232 q10 18 22 30M196 232 q-10 18-22 30"/>
 </g></svg>'''
 
 def widget(s):
@@ -132,8 +135,20 @@ def widget(s):
     if w == "simulador-expressao":
         body = f'''<p class="caps">Ferramenta</p><div class="two" data-sim="expressao"><div>{face_svg()}</div><div><h3>O que "suavizar" quer dizer</h3><p class="sub">Ilustração interativa. Não é simulação do seu rosto nem previsão de resultado.</p><label for="sim-r" class="caps" style="color:#B8C3BF">Antes → suavizado</label><input id="sim-r" class="range" type="range" min="0" max="100" value="0"><p class="out sim-out"></p><p style="margin-top:22px">{wa(cta, "Agendar avaliação facial")}</p><p class="disc">Testa, entre as sobrancelhas e ao lado dos olhos são as regiões mais comuns da toxina botulínica. Cada rosto pede avaliação individual com a Dra. Catiucia.</p></div></div>'''
     elif w == "implante":
-        before = '''<svg viewBox="0 0 400 300" class="layer" aria-hidden="true"><rect width="400" height="300" fill="#2A302E"/><path d="M40 170 q160-70 320 0" stroke="#7A5B5B" stroke-width="26" fill="none" stroke-linecap="round"/>''' + "".join(f'<rect x="{70+i*34}" y="{128 if i in (0,8) else 118}" width="26" height="{46 if i in (0,8) else 56}" rx="8" fill="#EFEBE4"/>' for i in range(9) if i != 4) + '</svg>'
-        after = '''<svg viewBox="0 0 400 300" class="layer after" aria-hidden="true"><rect width="400" height="300" fill="#1F2523"/><path d="M40 170 q160-70 320 0" stroke="#8C6B6B" stroke-width="26" fill="none" stroke-linecap="round"/>''' + "".join(f'<rect x="{70+i*34}" y="{128 if i in (0,8) else 118}" width="26" height="{46 if i in (0,8) else 56}" rx="8" fill="#FFFFFF"/>' for i in range(9)) + '<rect x="206" y="176" width="22" height="40" rx="6" fill="#9FB7B0"/><circle cx="217" cy="222" r="10" fill="#7C9A92"/></svg>'
+        def crowns(skip):
+            out = []
+            for i in range(9):
+                if skip and i == 4: continue
+                x = 76 + i * 31; cx = x + 12
+                rot = f' transform="rotate(-6 {cx} 150)"' if (skip and i == 3) else (f' transform="rotate(6 {cx} 150)"' if (skip and i == 5) else "")
+                out.append(f'<path d="M{x} 150 v-40 q0-16 12-16 q12 0 12 16 v40z" fill="#EFEBE4" stroke="#C9C2B6" stroke-width="1"{rot}/>')
+                out.append(f'<path d="M{x+3} 150 q9 50 9 70 q0-20 9-70z" fill="#D9D1C6" opacity=".9"{rot}/>')
+            return "".join(out)
+        gum = '<path d="M0 150 h400 v150 h-400z" fill="#5B4A47"/><path d="M0 150 h400" stroke="#EFEBE4" stroke-width="1" opacity=".6"/><path d="M0 206 h400" stroke="#EFEBE4" stroke-width="1" stroke-dasharray="2 6" opacity=".35"/><text x="14" y="200" font-family="Hanken Grotesk, Arial" font-size="9" fill="#EFEBE4" opacity=".55" letter-spacing="1.5">GENGIVA</text><text x="14" y="226" font-family="Hanken Grotesk, Arial" font-size="9" fill="#EFEBE4" opacity=".55" letter-spacing="1.5">OSSO</text>'
+        threads = "".join(f'<path d="M-8 {y} h16" stroke="#5B4A47" stroke-width="1.6"/>' for y in range(166, 226, 7))
+        gap_x = 76 + 4 * 31 + 12
+        before = f'''<svg viewBox="0 0 400 300" class="layer" aria-hidden="true"><rect width="400" height="300" fill="#1C2220"/>{crowns(True)}{gum}<path d="M{gap_x} 96 v54" stroke="#EFEBE4" stroke-width="1" stroke-dasharray="3 5" opacity=".6"/><path d="M{gap_x-14} 150 q14 18 28 0" stroke="#EFEBE4" stroke-width="1" fill="none" opacity=".6"/></svg>'''
+        after = f'''<svg viewBox="0 0 400 300" class="layer after" aria-hidden="true"><rect width="400" height="300" fill="#1C2220"/>{crowns(False)}{gum}<g transform="translate({gap_x} 0)"><rect x="-4" y="150" width="8" height="12" fill="#B8C3BF"/><path d="M-8 162 h16 v56 l-8 10 l-8-10z" fill="#9FB7B0"/>{threads}<path d="M-8 162 h16 v56 l-8 10 l-8-10z" fill="none" stroke="#EFEBE4" stroke-width="1"/></g></svg>'''
         rules = json.dumps({"1": "Um dente faltando: o caso clássico de implante unitário com coroa. A avaliação confirma osso e gengiva.",
                             "varios": "Vários dentes: pode ser implantes individuais ou prótese fixa sobre implantes. O planejamento digital compara as opções.",
                             "todos": "Todos os dentes de uma arcada: a prótese protocolo (fixa sobre implantes) é a alternativa à prótese móvel que solta.",
@@ -143,7 +158,7 @@ def widget(s):
 <div class="q on"><b>Quantos dentes faltam?</b><div class="opts"><button data-v="1">Só 1</button><button data-v="varios">Vários</button><button data-v="todos">Todos (uso prótese)</button></div></div>
 <div class="q"><b>Usa prótese móvel hoje?</b><div class="opts"><button data-v="protese sim">Sim</button><button data-v="protese nao">Não</button></div></div>
 <div class="q"><b>Há quanto tempo está assim?</b><div class="opts"><button data-v="menos de 1 ano">Menos de 1 ano</button><button data-v="1 a 5 anos">1 a 5 anos</button><button data-v="mais de 5 anos">Mais de 5 anos</button></div></div>
-<div class="res"><p class="txt"></p><a class="btn solid" href="#">{WA_ICON}Enviar respostas e agendar</a></div></div></div>'''
+<div class="res"><p class="txt"></p><a class="btn solid" href="#">{WA_ICON}Enviar respostas e agendar{ARR}</a></div></div></div>'''
     elif w == "triagem-dor":
         rules = json.dumps({"inchaco sim": "Inchaço ou febre indicam infecção: procure atendimento hoje. Avise a recepção que há inchaço; esses casos têm prioridade.",
                             "inchaco nao|hoje": "Dor recente sem inchaço: vale avaliar nos próximos dias para evitar que evolua. Peça um encaixe.",
@@ -153,12 +168,12 @@ def widget(s):
         body = f'''<p class="caps">Ferramenta</p><div class="two"><div><h3>Triagem rápida <em>da dor</em></h3><p class="sub">As duas perguntas que a recepção faria. Não substitui a avaliação.</p></div><div class="quiz" data-cta="{e(cta)}" data-rules='{e(rules)}'><div class="prog"><i></i></div>
 <div class="q on"><b>Tem inchaço no rosto ou na gengiva, ou febre?</b><div class="opts"><button data-v="inchaco sim">Sim</button><button data-v="inchaco nao">Não</button></div></div>
 <div class="q"><b>Há quanto tempo dói?</b><div class="opts"><button data-v="hoje">Começou hoje</button><button data-v="dias">Alguns dias</button><button data-v="semana">Mais de uma semana</button></div></div>
-<div class="res"><p class="txt"></p><a class="btn solid" href="#">{WA_ICON}Pedir encaixe agora</a></div></div></div>'''
+<div class="res"><p class="txt"></p><a class="btn solid" href="#">{WA_ICON}Pedir encaixe agora{ARR}</a></div></div></div>'''
     elif w == "checklist-urgencia":
         itens = ["Dente da frente", "Está doendo", "Tenho o pedaço do dente", "Está sangrando", "Foi uma pancada ou queda", "Caiu uma restauração"]
-        body = f'''<p class="caps">Ferramenta</p><div class="two"><div><h3>Me conte <em>o que aconteceu</em></h3><p class="sub">Marque o que se aplica. A mensagem para a recepção já vai preenchida.</p></div><div class="chk-wa"><div class="chk">{"".join(f'<label><input type="checkbox"> {e(i)}</label>' for i in itens)}</div><p style="margin-top:18px"><a class="btn solid" data-chk-cta="{e(cta)}" href="#" target="_blank" rel="noopener">{WA_ICON}Enviar e pedir encaixe</a></p></div></div>'''
+        body = f'''<p class="caps">Ferramenta</p><div class="two"><div><h3>Me conte <em>o que aconteceu</em></h3><p class="sub">Marque o que se aplica. A mensagem para a recepção já vai preenchida.</p></div><div class="chk-wa"><div class="chk">{"".join(f'<label><input type="checkbox"> {e(i)}</label>' for i in itens)}</div><p style="margin-top:18px"><a class="btn solid" data-chk-cta="{e(cta)}" href="#" target="_blank" rel="noopener">{WA_ICON}Enviar e pedir encaixe{ARR}</a></p></div></div>'''
     elif w == "primeiro-dentinho":
-        body = f'''<p class="caps">Ferramenta</p><div class="two"><div><h3>Quando levar <em>meu bebê</em> ao dentista?</h3><p class="sub">Digite a idade em meses e veja a orientação para essa fase.</p></div><div class="calc" data-calc="dentinho"><label class="caps" for="meses" style="color:#B8C3BF">Idade do bebê (meses)</label><br><input id="meses" type="number" min="0" max="144" value="8"><div class="out" style="margin-top:14px"></div><p style="margin-top:18px">{wa(cta, "Agendar a primeira visita")}</p><p class="disc">Base: recomendações das sociedades de odontopediatria (primeira visita até 1 ano). Orientação geral; a Dra. avalia cada criança.</p></div></div>'''
+        body = f'''<p class="caps">Ferramenta</p><div class="two"><div><h3>Quando levar <em>meu bebê</em> ao dentista?</h3><p class="sub">Digite a idade em meses e veja a orientação para essa fase.</p></div><div class="calc" data-calc="dentinho"><label class="caps" for="meses" style="color:#B8C3BF">Idade do bebê (meses)</label><div class="num"><button type="button" data-step="-1" aria-label="Menos um mês">&minus;</button><input id="meses" type="number" min="0" max="144" value="8"><button type="button" data-step="1" aria-label="Mais um mês">+</button></div><div class="out" style="margin-top:14px"></div><p style="margin-top:18px">{wa(cta, "Agendar a primeira visita")}</p><p class="disc">Base: recomendações das sociedades de odontopediatria (primeira visita até 1 ano). Orientação geral; a Dra. avalia cada criança.</p></div></div>'''
     elif w == "comparar-orto":
         body = f'''<p class="caps">Ferramenta</p><div class="two"><div><h3>Fixo ou <em>alinhador?</em></h3><p class="sub">Clique em uma opção para destacar. A indicação final é da Dra. Catiucia, na avaliação.</p><p style="margin-top:22px">{wa(cta, "Avaliar qual é o melhor para mim")}</p></div>
 <div class="cmp"><div class="opts"><div class="opt on" data-k="fixo"><b>Aparelho fixo</b><span>Braquetes colados, ajustes nas manutenções.</span></div><div class="opt" data-k="alin"><b>Alinhador</b><span>Placas transparentes removíveis.</span></div></div>
@@ -174,7 +189,7 @@ def widget(s):
         body = f'''<p class="caps">Ferramenta</p><div class="two"><div><h3>Escala de tons, <em>em ilustração</em></h3><p class="sub">Arraste para ver a lógica do clareamento. Não é previsão do seu resultado.</p><p style="margin-top:22px">{wa(cta, "Agendar avaliação para clareamento")}</p></div><div><div class="shade"></div><input class="range shade-range" type="range" min="0" max="7" value="1" aria-label="Tom"><p class="out shade-lbl"></p><p class="disc">Restaurações e facetas não clareiam. O tom final depende do esmalte de cada pessoa e do protocolo supervisionado.</p></div></div>'''
     else:
         return ""
-    return f'<section class="tool" id="ferramenta">{body}</section>'
+    return f'<section class="tool" id="ferramenta"><div class="inner">{body}</div></section>'
 
 # ---------------------------------------------------------------- páginas
 def service_page(s):
@@ -185,7 +200,7 @@ def service_page(s):
         a, b = h1.split(":", 1); h1html = f'{e(a.strip())}: <em>{e(b.strip())}</em>'
     else: h1html = e(h1)
     para = "".join(f'<div class="row" data-reveal><span class="n">{i+1:02d}</span><h3>{e(t)}</h3><p>{e(d)}</p></div>' for i, (t, d) in enumerate(s["para_quem"]))
-    como = "".join(f'<article><span class="n">{i+1:02d}</span><div><h3>{e(t)}</h3><p>{e(d)}</p></div></article>' for i, (t, d) in enumerate(s["como"]))
+    como = "".join(f'<li class="{"on" if i == 0 else ""}" data-reveal><span class="dot">{i+1}</span><h3>{e(t)}</h3><p>{e(d)}</p></li>' for i, (t, d) in enumerate(s["como"]))
     sinais = "".join(f'<li>{e(i)}</li>' for i in s["sinais"])
     faq = "".join(f'<details><summary>{e(q)}</summary><p>{e(a)}</p></details>' for q, a in s["faq"])
     rel = "".join(f'<a href="/{r}" data-reveal><span class="caps mute">{e(BY_SLUG[r]["grupo"])}</span><span class="t">{e(BY_SLUG[r]["menu"])}</span><span class="d">{e(BY_SLUG[r]["lede"].split(". ")[0])}.</span></a>' for r in s["relacionados"])
@@ -194,23 +209,23 @@ def service_page(s):
     return head(s["title"], s["description"], s["slug"], lds) + header(s["slug"]) + f'''
 <main>
 <section class="shero"><div class="tx"><div class="crumbs"><a href="/">Início</a><span>›</span><span>{e(s["grupo"])}</span><span>›</span><span>Brusque</span></div>
-<h1>{h1html}</h1><p class="lede">{e(s["lede"])}</p><div class="acts">{wa(s["cta"], s["cta_label"])}<a class="btn" href="#faq">Dúvidas comuns</a></div>{aviso}</div>
+<h1>{h1html}</h1><p class="lede">{e(s["lede"])}</p><div class="acts">{wa(s["cta"], s["cta_label"])}{btn("#faq", "Dúvidas comuns")}</div>{aviso}</div>
 <div class="ph">{img(ph, s["menu"] + " na Especitá, Brusque", 'fetchpriority="high"')}<span class="tag">{e(SITE["dra"])}<br>{e(SITE["cro"])}</span></div></section>
 
-<section class="sec"><div class="head"><p class="caps">Para quem é</p><h2 data-reveal>Quando <em>procurar.</em></h2></div><div class="rows">{para}</div></section>
+<section class="sec"><div class="inner"><div class="head"><p class="caps">Para quem é</p><h2 data-reveal>Quando <em>procurar.</em></h2></div><div class="rows">{para}</div></div></section>
 
 {widget(s)}
 
-<section class="sec steps"><div class="head"><p class="caps">Como funciona na Especitá</p><h2 data-reveal>Passo <em>a passo.</em></h2></div><div class="stack">{como}</div></section>
+<section class="sec steps"><div class="inner"><div class="head"><p class="caps">Como funciona na Especitá</p><h2 data-reveal>Passo <em>a passo.</em></h2></div><div class="tl"><ol>{como}</ol><div class="side" data-clip>{img("procedure" if ph != "procedure" else "office", "Atendimento na Especitá")}<span class="tag">Especitá · Brusque</span></div></div></div></section>
 
-<section class="sec"><div class="ficha"><div><p class="caps" style="margin-bottom:14px">{e(s["sinais_titulo"])}</p><ul>{sinais}</ul></div>
+<section class="sec"><div class="inner ficha"><div><p class="caps" style="margin-bottom:14px">{e(s["sinais_titulo"])}</p><ul>{sinais}</ul></div>
 <div class="card" data-reveal><p class="caps">Responsável técnica</p><b>{e(SITE["dra"])}</b><p>{e(SITE["cro"])} · {e(SITE["epao"])}. Mais de 10 anos atendendo em Brusque; acompanha cada paciente do primeiro contato à manutenção.</p><p><a href="/sobre" class="link">Conheça a Dra.</a></p></div></div></section>
 
-<section class="sec" id="faq"><div class="head"><p class="caps">Perguntas frequentes</p><h2 data-reveal>{e(s["menu"])}: <em>dúvidas comuns.</em></h2></div><div class="faq">{faq}</div></section>
+<section class="sec" id="faq"><div class="inner faq-grid"><div class="st"><p class="caps">Perguntas frequentes</p><h2 data-reveal style="font-size:clamp(34px,4vw,56px)">{e(s["menu"])}: <em>dúvidas comuns.</em></h2><p class="mute" style="margin-top:18px;max-width:34ch">Não achou a sua? Pergunte pelo WhatsApp, a recepção responde no horário de atendimento.</p></div><div class="faq">{faq}</div></div></section>
 
 {ctab(s["cta"], s["cta_label"])}
 
-<section class="sec"><div class="head"><p class="caps">Veja também</p><h2 data-reveal>Outros <em>cuidados.</em></h2></div><div class="related">{rel}</div></section>
+<section class="sec"><div class="inner"><div class="head"><p class="caps">Veja também</p><h2 data-reveal>Outros <em>cuidados.</em></h2></div><div class="related">{rel}</div></div></section>
 {local_block()}
 </main>''' + footer()
 
@@ -236,12 +251,12 @@ def home_page():
 
 <section class="band">{img("smile", "Sorriso de perto")}<p class="txt" aria-hidden="true">Seu sorriso, no seu tempo. Seu sorriso, no seu tempo.</p><span class="cap">Santa Rita · Brusque</span></section>
 
-<section class="sec steps"><div class="head"><p class="caps">Como funciona</p><h2 data-reveal>Três passos, <em>sem formulário.</em></h2></div>
-<div class="stack">
-<article><span class="n">01</span><div><h3>Chame no WhatsApp</h3><p>Conte o que precisa. No horário de atendimento, a resposta vem em minutos, já com dois horários para escolher.</p></div></article>
-<article><span class="n">02</span><div><h3>Avaliação completa</h3><p>Exame, fotos e radiografias quando necessário. A Dra. explica o que vê e monta o plano com você, em linguagem simples.</p></div></article>
-<article><span class="n">03</span><div><h3>Tratamento e revisão</h3><p>Em etapas, no seu ritmo. Depois, lembrete de revisão a cada seis meses pelo WhatsApp.</p></div></article>
-</div></section>
+<section class="sec steps"><div class="inner"><div class="head"><p class="caps">Como funciona</p><h2 data-reveal>Três passos, <em>sem formulário.</em></h2></div>
+<div class="tl"><ol>
+<li class="on" data-reveal><span class="dot">1</span><h3>Chame no WhatsApp</h3><p>Conte o que precisa. No horário de atendimento, a resposta vem em minutos, já com dois horários para escolher.</p></li>
+<li data-reveal><span class="dot">2</span><h3>Avaliação completa</h3><p>Exame, fotos e radiografias quando necessário. A Dra. explica o que vê e monta o plano com você, em linguagem simples.</p></li>
+<li data-reveal><span class="dot">3</span><h3>Tratamento e revisão</h3><p>Em etapas, no seu ritmo. Depois, lembrete de revisão a cada seis meses pelo WhatsApp.</p></li>
+</ol><div class="side" data-clip>{img("procedure", "Atendimento na Especitá")}<span class="tag">Especitá · Brusque</span></div></div></div></section>
 
 <section class="dra"><div class="ph">{img("checkup", "Dra. Catiucia em atendimento")}</div><div class="tx"><p class="caps">A Dra.</p><h2 data-reveal>Catiucia <em>L. Riffel</em></h2><p style="margin-top:22px">Cirurgiã-dentista, há mais de dez anos em Brusque. Fundou a Especitá para que o paciente tenha uma só profissional do primeiro contato à manutenção, em qualquer especialidade.</p><dl><div><dt>Registro</dt><dd>{e(SITE["cro"])}</dd></div><div><dt>Habilitação</dt><dd>EPAO 4417</dd></div><div><dt>Em Brusque</dt><dd>10+ anos</dd></div></dl><p style="margin-top:28px"><a class="link" href="/sobre">Conheça a Dra.</a></p></div></section>
 
@@ -260,7 +275,7 @@ def sobre_page():
 def contato_page():
     lds = [ld_business(), ld_crumbs([("Início", DOM + "/"), ("Contato", DOM + "/contato")])]
     return head("Contato e como chegar | Especitá Odontologia · Brusque", "WhatsApp, endereço, horário e como chegar à Especitá Odontologia e Estética, no Santa Rita, em Brusque, em frente à ponte dos bombeiros.", "contato", lds) + header("") + f'''
-<main><section class="shero"><div class="tx"><div class="crumbs"><a href="/">Início</a><span>›</span><span>Contato</span></div><h1>Fale com <em>a recepção.</em></h1><p class="lede">O jeito mais rápido é o WhatsApp. Conte o que você precisa e receba os horários disponíveis.</p><div class="acts">{wa(HOME["cta"], "Chamar no WhatsApp")}<a class="btn" href="{SITE["instagram"]}" target="_blank" rel="noopener">Instagram</a></div></div><div class="ph">{img("office", "Consultório da Especitá", 'fetchpriority="high"')}<span class="tag">Rua Sete de Setembro, 55<br>Santa Rita · Brusque</span></div></section>
+<main><section class="shero"><div class="tx"><div class="crumbs"><a href="/">Início</a><span>›</span><span>Contato</span></div><h1>Fale com <em>a recepção.</em></h1><p class="lede">O jeito mais rápido é o WhatsApp. Conte o que você precisa e receba os horários disponíveis.</p><div class="acts">{wa(HOME["cta"], "Chamar no WhatsApp")}{btn(SITE["instagram"], "Instagram", extra=' target="_blank" rel="noopener"')}</div></div><div class="ph">{img("office", "Consultório da Especitá", 'fetchpriority="high"')}<span class="tag">Rua Sete de Setembro, 55<br>Santa Rita · Brusque</span></div></section>
 {local_block()}
 <section class="sec"><div class="ficha"><div><p class="caps" style="margin-bottom:14px">O que trazer na primeira consulta</p><ul><li>Documento com foto.</li><li>Exames, radiografias ou orçamentos anteriores, se tiver.</li><li>Lista de medicamentos em uso.</li><li>Carteirinha do convênio, se for o caso (confirme o atendimento pelo WhatsApp).</li></ul></div></div></section></main>''' + footer()
 

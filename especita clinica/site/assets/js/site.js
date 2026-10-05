@@ -142,6 +142,7 @@
       out.textContent = t;
     }
     inp2.addEventListener("input", run); run();
+    calc.querySelectorAll("[data-step]").forEach(function (b) { b.addEventListener("click", function () { inp2.value = Math.min(144, Math.max(0, (parseInt(inp2.value, 10) || 0) + parseInt(b.getAttribute("data-step"), 10))); run(); }); });
   }
 
   // ---------- comparar ortodontia
