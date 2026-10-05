@@ -16,8 +16,32 @@ Urgência (dente quebrado, dor de dente), Implante dentário, Ortodontia (aparel
 - **Google Ads Customer ID:** 113-943-9321
 - **Conta de anúncios Meta:** 638556319545340 (nome do portfólio "Dra Catiucia Lanzzarin")
 - **Página Facebook:** Específica Odontologia & Estética — ID 179575495920599
-- **WhatsApp da clínica:** +55 47 9778-9519 — WABA ID 580089355818423, status "Conectado"/"Aprovada", **empresa ainda não verificada no Meta** (trava o limite de mensagem em 250 conversas/24h; verificando sobe pra 2.000)
+- **WhatsApp da clínica:** +55 47 9778-9519 — WABA ID 580089355818423, status "Conectado"/"Aprovada".
+- **Business Manager:** "Dra Catiucia Lanzzarin" — business_id 381198169049625. **Verificação da empresa concluída em 05/10/2026** ("ESPECITA ODONTOLOGIA E ESTETICA LTDA", status Verificada) — limite de mensagem WhatsApp já deve estar em 2.000 conversas/24h, não mais 250.
 - **Risco de acesso:** "HUGO PETYK" (hugopetyk@gmail.com) tem acesso total + financeiro no Business Manager dela, provavelmente da agência anterior — revisar/remover antes de qualquer migração.
+
+## Próximo passo decidido (05/10/2026, sessão separada — projeto ainda estava dentro de `meuwhatsapp`)
+
+Objetivo: criar campanhas Meta Ads **via API** (não manual pelo Gerenciador de Anúncios), pra poder
+executar os playbooks já desenhados acima (ex: campanha "Noivos" de Harmonização Orofacial) de
+forma automatizada/assistida por IA.
+
+- Como o Business Manager já está **verificado** (ver acima), dá pra usar **Standard Access** —
+  **não precisa de App Review do Meta**, que só é exigido pra Advanced Access (gerenciar conta de
+  terceiros ou permissões sensíveis). Confirmar isso antes de seguir, caso as regras do Meta tenham
+  mudado.
+- Passo a passo: 1) criar app em developers.facebook.com tipo "Negócios", vinculado ao Business
+  Portfolio "Dra Catiucia Lanzzarin" (business_id 381198169049625); 2) adicionar produto Marketing
+  API; 3) criar Usuário do Sistema em Configurações do Business → Usuários → Usuários do sistema,
+  função Admin; 4) atribuir a ele a conta de anúncios **991888939034732** (a que gasta de verdade —
+  NÃO a 638556319545340, que só tem posts impulsionados quebrados) com permissão "Gerenciar
+  campanha total"; 5) gerar token de Usuário do Sistema sem validade, escopos `ads_management`,
+  `ads_read`, `business_management`.
+- Antes de gerar o token, revisar/remover o acesso do "HUGO PETYK" (ver risco de acesso acima) —
+  não faz sentido dar automação nova numa conta com acesso de agência anterior ainda ativo.
+- Com o token em mãos, construir o script/integração que cria a campanha (começar pela de
+  "Noivos", R$50/dia, já tem plano pronto na seção de Harmonização Orofacial acima) via Marketing
+  API em vez de montar manualmente no Gerenciador de Anúncios.
 
 ## Como chegamos até aqui
 
