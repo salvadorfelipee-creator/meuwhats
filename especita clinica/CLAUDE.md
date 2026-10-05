@@ -129,3 +129,24 @@ Todos os 5 capítulos (21 anúncios no total) estão no artifact "Campanhas Espe
 3. Antes de qualquer recomendação nova, confirmar se o tracking do Google já foi corrigido e se a campanha Meta que gasta de verdade já foi identificada — se não, isso é prioridade sobre qualquer outra tarefa.
 4. Usar a skill `ads-odonto` (e as skills `ads-*`/`ads-audit`/`ads-google`/`ads-meta` instaladas) como base de conhecimento de growth marketing pro nicho odontológico/estético.
 5. Qualquer página/relatório feito pra mostrar pra Dra. Catiucia: linguagem simples, nada de jargão técnico, tom direto e não muito formal.
+
+## Plano de mídia para a reunião de 05/10/2026 (feito em 04/10/2026)
+
+Pasta `especita clinica/plano-midia-2026-10/`: `00-RESUMO-REUNIAO.md` (roteiro de 45 min),
+`01-AUDITORIA-CAMPANHAS.md` (manter/alterar/pausar por campanha), `02-PUBLICOS-E-PERSONAS.md`
+(um público por serviço), `03-PLANO-DE-TESTES.md`, `04-CRIATIVOS-E-CONTEUDO.md` (roteiros de
+Reels e calendário), `05-CRONOGRAMA-E-MEDICAO.md`. Apresentação em slides:
+https://claude.ai/artifact/NAXDX4xGzp5wy21EbCVL1c
+
+Achados novos que entraram nesse plano (confirmar antes de agir):
+- **Duas contas de anúncio na Meta**: 991888939034732 (a que gasta de verdade: botox R$ 25/dia +
+  ortodontia R$ 25/dia = os R$ 44-71/dia que a auditoria não tinha identificado) e 638556319545340
+  (74 posts impulsionados rejeitados, R$ 0). Concentrar tudo na primeira.
+- **TRF1, 19/08/2026**: 8ª Turma considerou ilegal a Resolução CFO 198/2019 (harmonização
+  orofacial como especialidade do dentista); CFO vai recorrer. Confirmar com CRO-SC/advogado antes
+  de campanha nova de botox/preenchimento. A campanha atual segue.
+- **CFO (Res. 196/2019 + 271/2025)**: anúncio não pode ter preço, parcelamento, "grátis",
+  promoção, garantia, depoimento; antes/depois só com TCLE e fora de anúncio pago. Nome + CRO sempre.
+- **Meta 2025-2026**: exclusão por interesse acabou (só por público personalizado); Advantage+
+  detalhado forçado em campanhas de conversão/mensagem; localização e idade são as únicas
+  restrições duras. Em Brusque (141 mil hab.), o criativo é o público.
