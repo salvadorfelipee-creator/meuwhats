@@ -1,0 +1,5 @@
+campanha,orcamento_diario,status,pontuacao_otimizacao,tipo_campanha,estrategia_lances,valor_conversao,conversoes,taxa_conversao,custo_por_conversao,impressoes,cliques,ctr,custo,periodo
+[pesquisa] 18/08 dentista,R$ 65,00/dia,Qualificada (limitada),82,8%,Pesquisa,CPA desejado,27,00,27,00,4,28%,R$ 74,36,13509,631,4,67%,R$ 2007,73,28/02/2024 a 03/10/2026
+[pesquisa 28/07],R$ 20,00/dia,Pausada,—,Pesquisa,Maximizar cliques,4,00,4,00,2,31%,R$ 265,48,2883,173,6,00%,R$ 1061,92,28/02/2024 a 03/10/2026
+TOTAL_VISUALIZACAO,—,—,—,—,—,—,31,00,3,86%,R$ 99,02,16392,804,4,90%,R$ 3069,65,28/02/2024 a 03/10/2026
+TOTAL_CONTA,R$ 65,00/dia,—,—,—,—,38,00,11,61%,R$ 39,28,100136,4093,4,09%,R$ 18658,16,28/02/2024 a 03/10/2026

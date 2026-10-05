@@ -1,0 +1,10 @@
+Cliente,Semana,Data inicio,Data fim,Objetivo/KR,Status health,Score health,Entregas no prazo (%),Itens bloqueados,Aprovacoes pendentes,Leads/resultado relevante,Custo por resultado,Qualidade do dado,Decisao da semana,Dono da decisao,Prazo da decisao,Criterio de manter/ajustar,Link evidencia,Observacoes
+{{cliente}},1,{{inicio}},{{fim}},{{kr}},{{status}},{{score}},{{sla}},{{bloqueados}},{{aprovacoes}},{{resultado}},{{custo}},{{qualidade}},{{decisao}},{{dono}},{{prazo}},{{criterio}},{{link}},{{observacoes}}
+{{cliente}},2,{{inicio}},{{fim}},{{kr}},{{status}},{{score}},{{sla}},{{bloqueados}},{{aprovacoes}},{{resultado}},{{custo}},{{qualidade}},{{decisao}},{{dono}},{{prazo}},{{criterio}},{{link}},{{observacoes}}
+{{cliente}},3,{{inicio}},{{fim}},{{kr}},{{status}},{{score}},{{sla}},{{bloqueados}},{{aprovacoes}},{{resultado}},{{custo}},{{qualidade}},{{decisao}},{{dono}},{{prazo}},{{criterio}},{{link}},{{observacoes}}
+{{cliente}},4,{{inicio}},{{fim}},{{kr}},{{status}},{{score}},{{sla}},{{bloqueados}},{{aprovacoes}},{{resultado}},{{custo}},{{qualidade}},{{decisao}},{{dono}},{{prazo}},{{criterio}},{{link}},{{observacoes}}
+LEGENDA,,,,,,,,,,,,,,,,,,
+Score health = soma(valor da dimensao x peso) / 100; pesos e evidencias ficam no template health-score-e-recuperacao.md,,,,,,,,,,,,,,,,,,
+SLA = itens dentro do prazo / itens elegiveis x 100; registre pausas por dependencia do cliente separadamente,,,,,,,,,,,,,,,,,,
+Painel recomendado: 5 a 10 KPIs ligados ao objetivo; atividade sem impacto deve ir para observacoes ou backlog,,,,,,,,,,,,,,,,,,
+Toda decisao precisa de dono, prazo, criterio e link de evidencia; silencio nao e aceite,,,,,,,,,,,,,,,,,,

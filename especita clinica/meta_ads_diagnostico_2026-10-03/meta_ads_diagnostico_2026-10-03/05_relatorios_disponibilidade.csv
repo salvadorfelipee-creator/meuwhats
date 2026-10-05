@@ -1,0 +1,8 @@
+relatorio_ou_detalhamento,status,periodo_ou_condicao,observacao
+Campanhas,Disponível,03/09/2026 a 02/10/2026,74 campanhas exibidas; linhas visíveis sem veiculação e sem gasto
+Conjuntos de anúncios,Disponível,03/09/2026 a 02/10/2026,92 conjuntos exibidos; tabela demorou a carregar e não apresentou linhas no primeiro carregamento
+Anúncios,Disponível,03/09/2026 a 02/10/2026,92 anúncios; linhas visíveis com 2 itens com erros e vários rejeitados
+Relatórios de anúncios,Disponível,07/03/2024 a 06/04/2024,Intervalo mais próximo informado pela Meta após “nenhum dado” no mês atual
+Relatórios de anúncios,Sem dados,01/10/2026 a 03/10/2026,A interface informou nenhum dado durante esse intervalo
+Públicos,Disponível,Todo o período,Grupos de públicos visíveis; tamanhos estimados não exibidos
+Detalhamento por hora,Disponível,Últimos 13 meses,Opção disponível; valor do fuso da conta não foi exibido

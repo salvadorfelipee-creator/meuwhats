@@ -1,0 +1,7 @@
+prioridade,alerta,evidencia,impacto_potencial
+Alta,Ausência de veiculação no período atual,Linhas visíveis mostram “Não está em veiculação” e R$ 0,00,Não há entrega recente para avaliar performance atual
+Alta,Erros e rejeições de anúncios,Anúncio visível com 3 erros, outro com 2 erros e vários com status Rejeitado,Impossibilidade de entrega e risco de desperdício de tempo em criativos inativos
+Alta,Relatório atual sem dados,Relatórios informam “Nenhum dado durante esse intervalo de datas”,Não é possível comparar desempenho recente sem ampliar o período
+Média,Eventos de resultado heterogêneos,Conversa por mensagem iniciada, Clique no link, Visita ao perfil, vídeo e engajamento,CPA agregado pode misturar objetivos de valor diferente
+Média,Tamanhos de públicos não exibidos,Todos os grupos mostram traço em tamanho estimado,Não é possível validar alcance potencial ou elegibilidade
+Baixa,Nome formal e fuso não isolados,Conta mostra ID e portfólio Dra Catiucia Lanzzarin, mas não exibe esses campos formalmente,Registrar como não exibido e não inferir

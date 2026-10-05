@@ -1,0 +1,11 @@
+campo,valor,observacao
+plataforma,Meta Ads Manager,Coleta somente leitura pelo My Browser autenticado
+id_conta_anuncios,638556319545340,Conta atualmente selecionada no navegador
+nome_exibido,Dra Catiucia Lanzzarin,Nome do portfólio/empresa exibido no seletor; nome formal da conta não apareceu isoladamente
+moeda_aparente,BRL (R$),Inferida pela formatação de orçamento e gasto exibida
+fuso_horario,Não exibido na interface capturada,Não foi inferido; detalhamento por hora oferece fuso da conta mas não o valor
+periodo_padrao,03/09/2026 a 02/10/2026,Últimos 30 dias exibidos no Ads Manager
+pontuacao_oportunidade,100,Exibida no cabeçalho do Ads Manager
+campanhas_total,74,Quantidade exibida na tabela atual
+conjuntos_anuncios_total,92,Quantidade exibida na tabela atual
+anuncios_total,92,Quantidade exibida na tabela atual

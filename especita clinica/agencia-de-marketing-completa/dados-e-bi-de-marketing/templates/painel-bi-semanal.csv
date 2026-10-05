@@ -1,0 +1,5 @@
+periodo,canal,fonte,metrica,valor,unidade,status,comparacao,atualizado_em,dono,prazo,criterio_decisao,observacao
+2026-W01,Google Search,CRM+financeiro,clientes_novos,0,clientes,medido,,2026-01-08,BI,2026-01-09,manter se CAC abaixo do teto,preencher com dado conciliado
+2026-W01,Google Search,CRM+financeiro,cac_blended,0,BRL,estimado,,2026-01-08,Marketing,2026-01-09,pausar se acima do teto por 2 leituras,marcar premissa
+2026-W01,Meta Ads,GA4+CRM,leads_qualificados,0,leads,hipotese,,2026-01-08,Comercial,2026-01-09,manter se taxa lead-venda não cair,validar origem
+2026-W01,Todas,Financeiro,margem_contribuicao,0,BRL,medido,,2026-01-08,Financeiro,2026-01-09,escalar só com margem positiva,liquido de cancelamentos

@@ -1,0 +1,7 @@
+id,data_abertura,hipotese,canal,variavel_unica,metrica_primaria,metrica_guarda,controle,amostra_ou_janela,dono,prazo,status,resultado,decisao,proxima_acao,evidencia
+EXP-001,,,,,,,,,,aberto,,,,,
+EXP-002,,,,,,,,,,aberto,,,,,
+EXP-003,,,,,,,,,,aberto,,,,,
+LEGENDA,status: aberto|em_execucao|venceu|perdeu|inconclusivo|arquivado,,,,,,,,,,,,,,
+REGRA,escreva a hipotese como Acreditamos que mudanca gera efeito porque evidencia; nao declare causalidade sem controle,,,,,,,,,,,,,,
+REGRA,toda linha deve ter dono prazo metrica criterio e link ou caminho da evidencia,,,,,,,,,,,,,,

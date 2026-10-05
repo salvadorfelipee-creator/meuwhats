@@ -1,0 +1,4 @@
+id,data_inicio,data_leitura,canal,controle,tratamento,variavel_unica,hipotese,evidencia,metrica_primaria,metrica_guarda,baseline,meta_ou_regra,impressoes_cliques,conversoes_controle,conversoes_tratamento,gasto_controle,gasto_tratamento,dono,status,decisao,aprendizado,proximo_passo
+EXP001,,,,,,,,,,,,,,,,,,,,,,
+EXP002,,,,,,,,,,,,,,,,,,,,,,
+EXP003,,,,,,,,,,,,,,,,,,,,,,

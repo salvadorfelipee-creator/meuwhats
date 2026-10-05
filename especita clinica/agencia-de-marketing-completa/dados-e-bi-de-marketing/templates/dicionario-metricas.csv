@@ -1,0 +1,5 @@
+nome,definicao,formula,tipo,status,fonte_de_verdade,fontes_auxiliares,granularidade,chave,dono,frequencia,qualidade_minima,decisao_ligada,versao,data_revisao
+clientes_novos,Cliente com primeira venda aprovada,contagem de order_id com status aprovado,KPI,medido,financeiro,CRM/canais,cliente e mes,customer_id,BI,mensal,100% com order_id,aumentar ou reduzir aquisicao,v1.0,
+leads_qualificados,Lead com dor prazo e escopo confirmados,contagem de leads qualificados,funil,estimado,CRM,GA4/midia,lead e dia,lead_id,Comercial,semanal,95% com origem e proxima_acao,priorizar canal,v1.0,
+cac_blended,Custo total de aquisicao por cliente novo,(midia+custo_comercial+ferramentas)/clientes_novos,eficiencia,hipotese,financeiro,CRM/midia,canal e mes,order_id,Marketing,mensal,receita e custos conciliados,escalar ou pausar,v1.0,
+ltv,Valor de margem esperado ao longo da vida,ticket*frequencia*margem*duracao,valor,estimado,financeiro,CRM/cohort,cohort,customer_id,BI,mensal,duracao declarada e cohort,limite de CAC,v1.0,
