@@ -150,3 +150,14 @@ Achados novos que entraram nesse plano (confirmar antes de agir):
 - **Meta 2025-2026**: exclusão por interesse acabou (só por público personalizado); Advantage+
   detalhado forçado em campanhas de conversão/mensagem; localização e idade são as únicas
   restrições duras. Em Brusque (141 mil hab.), o criativo é o público.
+
+## Site da clínica (construído 2026-10-05, ainda não publicado)
+
+Pasta `especita clinica/site/` — site estático (HTML/CSS/JS puros) gerado por
+`_build/build_site.py` a partir de `_build/content.py`. 16 páginas: home, 11 de serviço (uma por
+produto, com SEO, JSON-LD, FAQ e ferramenta interativa ilustrativa), sobre, contato,
+privacidade, termos; mais sitemap, robots, llms.txt e vercel.json. Ver `site/README.md` para
+editar e `site/PROMPT-PARA-COLAR.md` para a conversa de publicação (domínio ainda não comprado;
+publicar na Vercel como projeto próprio com Root Directory `especita clinica/site`, igual ao
+felizcred-site). Pendentes que dependem do Salvador/clínica: domínio, fotos reais, CNPJ/e-mail,
+formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
