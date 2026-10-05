@@ -132,7 +132,7 @@ Todos os 5 capítulos (21 anúncios no total) estão no artifact "Campanhas Espe
 
 ## Plano de mídia para a reunião de 05/10/2026 (feito em 04/10/2026)
 
-Pasta `especita clinica/plano-midia-2026-10/`: `00-RESUMO-REUNIAO.md` (roteiro de 45 min),
+Pasta `especita clinica/plano-midia-2026-10/`: `00-RESUMO-REUNIAO.md` (roteiro de 45 min), `06-FLUXOS-WHATSAPP.html` (fluxos de conversa por produto, artifact https://claude.ai/artifact/UkATCgHQ9xiAdLYCnnjxep; editar via 06-FLUXOS-WHATSAPP.build.py),
 `01-AUDITORIA-CAMPANHAS.md` (manter/alterar/pausar por campanha), `02-PUBLICOS-E-PERSONAS.md`
 (um público por serviço), `03-PLANO-DE-TESTES.md`, `04-CRIATIVOS-E-CONTEUDO.md` (roteiros de
 Reels e calendário), `05-CRONOGRAMA-E-MEDICAO.md`. Apresentação em slides:
