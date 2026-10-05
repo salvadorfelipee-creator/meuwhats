@@ -166,14 +166,47 @@ Achados novos que entraram nesse plano (confirmar antes de agir):
 - **Duas contas de anúncio na Meta**: 991888939034732 (a que gasta de verdade: botox R$ 25/dia +
   ortodontia R$ 25/dia = os R$ 44-71/dia que a auditoria não tinha identificado) e 638556319545340
   (74 posts impulsionados rejeitados, R$ 0). Concentrar tudo na primeira.
-- **TRF1, 19/08/2026**: 8ª Turma considerou ilegal a Resolução CFO 198/2019 (harmonização
-  orofacial como especialidade do dentista); CFO vai recorrer. Confirmar com CRO-SC/advogado antes
-  de campanha nova de botox/preenchimento. A campanha atual segue.
+- **TRF1 (19/08/2026, harmonização orofacial) — resolvido.** A pendência de confirmar com o
+  CRO-SC/advogado antes de anunciar harmonização/botox foi resolvida (confirmado pelo Salvador em
+  05/10/2026). Não é mais um bloqueio — campanha nova de Harmonização Facial pode ser criada
+  normalmente, só mantendo as regras de publicidade do CFO abaixo.
 - **CFO (Res. 196/2019 + 271/2025)**: anúncio não pode ter preço, parcelamento, "grátis",
   promoção, garantia, depoimento; antes/depois só com TCLE e fora de anúncio pago. Nome + CRO sempre.
-- **Meta 2025-2026**: exclusão por interesse acabou (só por público personalizado); Advantage+
-  detalhado forçado em campanhas de conversão/mensagem; localização e idade são as únicas
-  restrições duras. Em Brusque (141 mil hab.), o criativo é o público.
+- **Meta 2025-2026**: exclusão por interesse acabou (só por público personalizado). Importante:
+  **Advantage+ Audience, não só o detalhamento de interesse, trava a segmentação em conjuntos de
+  Mensagens/Conversas** — a própria API recusa `age_min` acima de 25 se o Advantage+ Audience
+  estiver ligado (erro real recebido ao criar conjunto, 05/10/2026). Pra idade/gênero valerem como
+  restrição de verdade (não só sugestão), precisa mandar `targeting_automation: {advantage_audience: 0}`
+  explicitamente — ver `meta-ads-automation/campaigns/criar-conjuntos.js`. Em Brusque (141 mil
+  hab.), o criativo continua sendo o principal fator de segmentação.
+
+## Conjuntos de anúncios por produto — criados em 05/10/2026 (via API, pausados)
+
+A campanha "Noivos" (nicho de Harmonização Orofacial) foi descartada a pedido do Salvador — não
+construir. Em vez disso, `meta-ads-automation/` ganhou um módulo reutilizável de Marketing API
+(`lib/metaMarketingApi.js`) e um gerador por produto (`campaigns/produtos.js` +
+`campaigns/criar-conjuntos.js`) que criou **7 campanhas novas / 11 conjuntos de anúncios novos**
+na conta 991888939034732, todos com objetivo clique-direto-pro-WhatsApp (`OUTCOME_ENGAGEMENT` +
+`destination_type: WHATSAPP`, não formulário), status **PAUSED**, horário seg-sex 7h-21h (precisa
+de orçamento vitalício pra funcionar — dayparting não funciona com orçamento diário, ver
+comentário no lib), público em Brusque + Botuverá + Nova Trento + São João Batista + Guabiruba,
+R$20/dia de teste por conjunto (o script ajusta sozinho se o Meta recusar por orçamento mínimo).
+Público por produto: combinação do plano local (`plano-midia-2026-10/02-PUBLICOS-E-PERSONAS.md`)
+com pesquisa externa em agências brasileiras de marketing odontológico/estético (05/10/2026) —
+fontes e raciocínio documentados nos comentários de `produtos.js`. **Não mexe em nada que já
+roda** (botox/ortodontia formulário, post impulsionado — ver seção de campanha ativa acima).
+
+Falta pra cada conjunto virar anúncio de verdade: **imagem** (Dra. Catiucia vai enviar depois —
+copy de rascunho já está em `produtos.js`, campo `copyRascunho`, revisar com ela antes de publicar
+por causa das regras do CFO) + rodar um script de criação de criativo/anúncio (ainda não escrito,
+é o próximo passo depois que a imagem chegar — reaproveitar `uploadImage`/`createAdCreative`/
+`createAd` de `lib/metaMarketingApi.js`, já tem tudo pronto, só falta o script por produto).
+
+**Pendente, crítico pra "rastrear tudo":** clique-pro-WhatsApp manda um campo `referral`
+(`source_id`, `ctwa_clid`, etc.) no payload do webhook do WhatsApp quando a conversa vem de
+anúncio — precisa confirmar se o painel (`whatsapp especita/server.js`) já captura e salva isso
+na conversa (tag/pipeline) pra saber de qual campanha/conjunto cada lead veio. Ver essa pendência
+antes de considerar o rastreamento "pronto".
 
 ## Site da clínica (construído 2026-10-05, ainda não publicado)
 

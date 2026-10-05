@@ -53,6 +53,25 @@ async function searchGeoLocation(query, types = ["city"]) {
   });
 }
 
+// Acha a cidade certa em SC (evita pegar uma cidade de mesmo nome em outro estado)
+async function findCitySC(name) {
+  const result = await searchGeoLocation(name, ["city"]);
+  const match = result.data.find((c) => c.type === "city" && c.region === "Santa Catarina" && c.country_code === "BR");
+  if (!match) throw new Error(`Não achei "${name}, SC" na busca de localização do Meta.`);
+  return match;
+}
+
+// Busca de interesse pra segmentação detalhada (só sugestão/Advantage+ desde 2025,
+// não é mais filtro duro — ver especita clinica/plano-midia-2026-10/02-PUBLICOS-E-PERSONAS.md)
+async function searchInterest(query) {
+  const result = await graphRequest("GET", "search", {
+    type: "adinterest",
+    q: query,
+    limit: 5,
+  });
+  return result.data;
+}
+
 // --- Criação -----------------------------------------------------------
 
 async function createCampaign({ name, objective, status = "PAUSED", specialAdCategories = [] }) {
@@ -61,6 +80,9 @@ async function createCampaign({ name, objective, status = "PAUSED", specialAdCat
     objective,
     status,
     special_ad_categories: specialAdCategories,
+    // false: cada conjunto de anúncios controla o próprio orçamento (não é CBO/orçamento
+    // de campanha compartilhado) — obrigatório informar desde a v26 da Graph API.
+    is_adset_budget_sharing_enabled: false,
   });
 }
 
@@ -68,23 +90,42 @@ async function createAdSet({
   name,
   campaignId,
   dailyBudgetCents,
+  lifetimeBudgetCents,
+  endTime,
+  startTime,
+  adsetSchedule,
   optimizationGoal,
   destinationType,
   promotedObject,
   targeting,
   status = "PAUSED",
+  bidStrategy = "LOWEST_COST_WITHOUT_CAP",
 }) {
-  return graphRequest("POST", `act_${adAccountId()}/adsets`, {
+  const body = {
     name,
     campaign_id: campaignId,
-    daily_budget: dailyBudgetCents,
     billing_event: "IMPRESSIONS",
     optimization_goal: optimizationGoal,
     destination_type: destinationType,
     promoted_object: promotedObject,
     targeting,
     status,
-  });
+    bid_strategy: bidStrategy,
+  };
+
+  if (adsetSchedule) {
+    // Agendamento por horário (dayparting) só funciona com orçamento vitalício,
+    // não com orçamento diário — ver docs oficiais do Meta.
+    body.lifetime_budget = lifetimeBudgetCents;
+    body.end_time = endTime;
+    body.start_time = startTime;
+    body.pacing_type = ["day_parting"];
+    body.adset_schedule = adsetSchedule;
+  } else {
+    body.daily_budget = dailyBudgetCents;
+  }
+
+  return graphRequest("POST", `act_${adAccountId()}/adsets`, body);
 }
 
 async function uploadImage(filePath) {
@@ -157,6 +198,8 @@ async function createAd({ name, adSetId, creativeId, status = "PAUSED" }) {
 export {
   graphRequest,
   searchGeoLocation,
+  findCitySC,
+  searchInterest,
   createCampaign,
   createAdSet,
   uploadImage,
