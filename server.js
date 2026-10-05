@@ -21,6 +21,7 @@ const novosaque = require("./novosaque");
 const flowCrypto = require("./flow-crypto");
 const google = require("./google");
 const mcp = require("./mcp");
+const gemini = require("./gemini");
 const { notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarEmail } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
@@ -5378,6 +5379,35 @@ const server = http.createServer(async (req, res) => {
         body.valor ?? ""
       );
       return send(res, 200, { ok: true });
+    }
+
+    // POST /painel/api/conversations/:businessId/:phone/sugestao-ia — lê as últimas mensagens e
+    // sugere etapa do pipeline + campos personalizados (ver gemini.js). Nunca aplica sozinha —
+    // só devolve a sugestão, quem decide é a pessoa clicando "aplicar" no painel.
+    // Body: { estagios: [{ id, nome }] } — a lista de etapas válidas pro canal atual, calculada
+    // no frontend (pipelineEstagiosPara), porque o servidor não sabe qual funil cada canal usa.
+    const matchSugestaoIa = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/sugestao-ia$/);
+    if (req.method === "POST" && matchSugestaoIa) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchSugestaoIa[1]);
+      const phone = decodeURIComponent(matchSugestaoIa[2]);
+      const body = await parseBody(req);
+      const estagios = Array.isArray(body.estagios) ? body.estagios : [];
+      try {
+        const [mensagens, campos, valoresAtuais] = await Promise.all([
+          db.ultimasMensagens(phone, businessId, 30),
+          db.camposPersonalizadosListar(businessId),
+          db.conversationCamposObter(businessId, phone),
+        ]);
+        const sugestao = await gemini.sugerirPipeline({ mensagens, estagios, campos, valoresAtuais });
+        return send(res, 200, sugestao);
+      } catch (err) {
+        if (err.code === "SEM_CHAVE") {
+          return send(res, 400, { error: "IA não configurada neste servidor (falta GEMINI_API_KEY)." });
+        }
+        console.error("Erro na sugestão de IA:", err.message);
+        return send(res, 502, { error: "Não deu pra consultar a IA agora. Tente de novo em instantes." });
+      }
     }
 
     // ── Notas em lista (CRM) ────────────────────────────────────────────────────────────────

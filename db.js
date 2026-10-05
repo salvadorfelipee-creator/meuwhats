@@ -1449,6 +1449,18 @@ async function listMessages(phone, businessNumberId) {
   return result.rows;
 }
 
+// Últimas N mensagens em ordem cronológica — usado pra montar o contexto enviado à IA na
+// sugestão de pipeline (ver gemini.js). Separado de listMessages (que traz tudo, pro painel
+// renderizar a conversa inteira) pra não jogar histórico enorme inteiro pro prompt.
+async function ultimasMensagens(phone, businessNumberId, limite = 30) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM messages WHERE phone = ? AND business_number_id = ? ORDER BY created_at DESC LIMIT ?`,
+    args: [phone, businessNumberId, limite],
+  });
+  return result.rows.reverse();
+}
+
 async function instagramJaFoiSaudado(userId) {
   await ready;
   const result = await client.execute({
@@ -2748,6 +2760,7 @@ module.exports = {
   updateStatusByWaId,
   listConversations,
   listMessages,
+  ultimasMensagens,
   instagramJaFoiSaudado,
   instagramMarcarSaudado,
   instagramLimparSaudados,

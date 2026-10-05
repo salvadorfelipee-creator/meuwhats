@@ -17,6 +17,7 @@ import {
   type NotaConversa,
   type AtividadeConversa,
   type FluxoDinamico,
+  type SugestaoIa,
   pipelineEstagiosPara,
 } from "@/lib/api"
 import { GerenciarTags } from "@/pages/analytics"
@@ -71,6 +72,8 @@ import {
   Tags,
   StickyNote,
   History,
+  Sparkles,
+  Loader2,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -1252,7 +1255,15 @@ function GerenciarCamposPersonalizados({
 
 // Campos personalizados desse contato — cada input salva sozinho ao sair do campo (blur) ou
 // Enter, sem botão "salvar" separado (menos fricção pra preencher vários campos seguidos).
-function CamposPersonalizadosSecao({ businessId, phone }: { businessId: string; phone: string }) {
+function CamposPersonalizadosSecao({
+  businessId,
+  phone,
+  refreshKey,
+}: {
+  businessId: string
+  phone: string
+  refreshKey: number
+}) {
   const [campos, setCampos] = React.useState<CampoPersonalizado[]>([])
   const [valores, setValores] = React.useState<CampoValor[]>([])
   const [editando, setEditando] = React.useState<Record<number, string>>({})
@@ -1265,7 +1276,7 @@ function CamposPersonalizadosSecao({ businessId, phone }: { businessId: string; 
 
   React.useEffect(() => {
     carregar()
-  }, [carregar])
+  }, [carregar, refreshKey])
 
   async function salvarValor(campoId: number, valorAtual: string) {
     const valor = editando[campoId] ?? valorAtual
@@ -1548,6 +1559,34 @@ function ContactDetails({
     }
   }
 
+  // Sugestão de IA (Gemini) — lê as últimas mensagens e sugere etapa + campos, mas nunca aplica
+  // sozinha: cada item só vira dado de verdade quando a pessoa clica "Aplicar".
+  const [sugestao, setSugestao] = React.useState<SugestaoIa | null>(null)
+  const [carregandoSugestao, setCarregandoSugestao] = React.useState(false)
+  const [erroSugestao, setErroSugestao] = React.useState<string | null>(null)
+  const [camposAplicados, setCamposAplicados] = React.useState<Set<number>>(new Set())
+
+  async function pedirSugestaoIa() {
+    setCarregandoSugestao(true)
+    setErroSugestao(null)
+    setSugestao(null)
+    setCamposAplicados(new Set())
+    try {
+      const resultado = await api.sugestaoIa(businessId, conversation.phone, estagios)
+      setSugestao(resultado)
+    } catch (err) {
+      setErroSugestao(err instanceof Error ? err.message : "Erro ao consultar a IA")
+    } finally {
+      setCarregandoSugestao(false)
+    }
+  }
+
+  async function aplicarCampoSugerido(campoId: number, valor: string) {
+    await api.definirCampoConversa(businessId, conversation.phone, campoId, valor)
+    setCamposAplicados((prev) => new Set(prev).add(campoId))
+    setAtivRefresh((v) => v + 1)
+  }
+
   async function salvar() {
     setSalvando(true)
     try {
@@ -1611,6 +1650,95 @@ function ContactDetails({
       </div>
 
       {mostrarPipelineTags && (
+        <div className="rounded-xl border p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <Sparkles className="h-3.5 w-3.5" /> Sugestão da IA
+            </div>
+            {sugestao && (
+              <button
+                onClick={() => setSugestao(null)}
+                className="text-muted-foreground hover:text-foreground"
+                title="Dispensar"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {!sugestao && !carregandoSugestao && (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Lê as últimas mensagens e sugere a etapa e os campos — você decide se aplica.
+              </p>
+              <Button size="sm" variant="outline" className="w-fit gap-1.5" onClick={pedirSugestaoIa}>
+                <Sparkles className="h-3.5 w-3.5" /> Analisar conversa
+              </Button>
+              {erroSugestao && <p className="text-xs text-red-600 dark:text-red-400">{erroSugestao}</p>}
+            </>
+          )}
+
+          {carregandoSugestao && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Analisando conversa...
+            </p>
+          )}
+
+          {sugestao && (
+            <div className="flex flex-col gap-2.5">
+              {sugestao.resumo && <p className="text-xs text-muted-foreground italic">{sugestao.resumo}</p>}
+
+              {sugestao.etapa_id && (
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span>
+                    Etapa sugerida:{" "}
+                    <span className="font-medium">
+                      {estagios.find((e) => e.id === sugestao.etapa_id)?.nome || sugestao.etapa_id}
+                    </span>
+                  </span>
+                  {estagio === sugestao.etapa_id ? (
+                    <span className="text-[11px] text-muted-foreground">já aplicada</span>
+                  ) : (
+                    <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => mudarEstagio(sugestao.etapa_id!)}>
+                      Aplicar
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {sugestao.campos.map((c) => (
+                <div key={c.campo_id} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="min-w-0 truncate">
+                    {c.nome}: <span className="font-medium">{c.valor}</span>
+                  </span>
+                  {camposAplicados.has(c.campo_id) ? (
+                    <span className="text-[11px] text-muted-foreground shrink-0">aplicado</span>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-xs shrink-0"
+                      onClick={() => aplicarCampoSugerido(c.campo_id, c.valor)}
+                    >
+                      Aplicar
+                    </Button>
+                  )}
+                </div>
+              ))}
+
+              {!sugestao.etapa_id && sugestao.campos.length === 0 && (
+                <p className="text-xs text-muted-foreground">Não achei nada confiável pra sugerir nessa conversa.</p>
+              )}
+
+              <Button size="sm" variant="ghost" className="w-fit h-7 text-xs gap-1.5" onClick={pedirSugestaoIa}>
+                <Sparkles className="h-3 w-3" /> Analisar de novo
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {mostrarPipelineTags && (
         <Secao
           icon={Columns3}
           titulo="Etapa do pipeline"
@@ -1664,7 +1792,7 @@ function ContactDetails({
 
       {businessId !== "instagram" && (
         <div className="rounded-xl border p-3">
-          <CamposPersonalizadosSecao businessId={businessId} phone={conversation.phone} />
+          <CamposPersonalizadosSecao businessId={businessId} phone={conversation.phone} refreshKey={ativRefresh} />
         </div>
       )}
 

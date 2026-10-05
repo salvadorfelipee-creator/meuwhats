@@ -36,6 +36,13 @@ export type NotaConversa = { id: number; business_id: string; phone: string; tex
 export type AtividadeConversa = { id: number; business_id: string; phone: string; tipo: string; descricao: string; created_at: number }
 export type FluxoDinamico = { id: number; business_id: string; nome: string; ativo: number; no_inicial_id: number | null; created_at: number }
 
+export type SugestaoIa = {
+  etapa_id: string | null
+  confianca: "alta" | "media" | "baixa"
+  campos: { campo_id: number; nome: string; valor: string }[]
+  resumo: string
+}
+
 export type EmailTemplate = { id: number; business_id: string; nome: string; assunto: string; corpo_html: string; created_at: number }
 
 export type EmailAgendado = {
@@ -548,6 +555,14 @@ export const api = {
 
   apagarTag: (businessId: string, tagId: number) =>
     request<{ ok: true }>(`/painel/api/tags/${encodeURIComponent(businessId)}/${tagId}`, { method: "DELETE" }),
+
+  // Lê as últimas mensagens da conversa e sugere etapa do pipeline + campos personalizados
+  // (Gemini grátis, ver gemini.js) — nunca aplica sozinho, só devolve a sugestão pra confirmar.
+  sugestaoIa: (businessId: string, phone: string, estagios: readonly { id: string; nome: string }[]) =>
+    request<SugestaoIa>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/sugestao-ia`,
+      { method: "POST", body: JSON.stringify({ estagios }) },
+    ),
 
   // ── Analytics (só o número principal da Felizcred, ver chats.tsx/analytics.tsx) ─────────
   analytics: (businessId: string, dias: number) =>

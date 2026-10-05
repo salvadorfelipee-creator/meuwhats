@@ -142,6 +142,8 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Credencial OAuth do Google Cloud (People API + Calendar API — captura de contato do WhatsApp e agendamento de horário, ver CHAVES-LOCAL.md). **Não configurado em produção ainda (30/09/2026)** — ver "Agendamento de horário real via Google Agenda". | — |
 | `FELIZCRED_EMAIL_FROM` / `FELIZCRED_EMAIL_FROM_NOME` | Remetente do e-mail de boas-vindas da Felizcred (usa o mesmo `BREVO_API_KEY`) | `contato@felizcred.com.br` / "Felizcred" |
 | `PUBLIC_URL` | URL pública do servidor (usada pelo auto-ping e pra montar a URL do vídeo que o Instagram busca) | `https://meuwhats.onrender.com` |
+| `GEMINI_API_KEY` | Chave da API gratuita do Google Gemini (ver `gemini.js`) — lê as últimas mensagens da conversa e sugere etapa do pipeline + campos personalizados no painel ("Sugestão da IA", botão nos Detalhes do contato). Sem essa variável, o botão aparece mas devolve erro "IA não configurada". Gerar grátis, sem cartão, em https://aistudio.google.com/apikey | — |
+| `GEMINI_MODEL` | Nome do modelo do Gemini usado na sugestão acima | `gemini-2.5-flash` |
 
 ⚠️ Defina `PAINEL_USER`/`PAINEL_PASS` com valores próprios — o painel mostra suas conversas.
 
@@ -1116,6 +1118,27 @@ Ferramentas hoje (`mcp.js`, lista completa em `TOOLS`): `painel_listar_canais`,
 `retorno_cancelar`. Toda ferramenta de criar campanha/conjunto/anúncio sai **sempre `PAUSED`**
 — ativar (`ads_atualizar_status`) é a única que liga gasto de verdade, de propósito separada
 das demais.
+
+### Sugestão de pipeline por IA (Gemini grátis, 2026-10-04)
+
+Diferente do conector MCP acima (chat livre no app do Claude), isto é uma chamada de API direta
+e pontual: botão **"Sugestão da IA"** nos Detalhes do contato (painel-web, `chats.tsx`) que lê as
+últimas 30 mensagens da conversa (`db.ultimasMensagens`) e pede pro Gemini sugerir a etapa do
+pipeline + valores pros campos personalizados já cadastrados — nunca aplica sozinho, só devolve
+a sugestão (`POST /painel/api/conversations/:businessId/:phone/sugestao-ia`, módulo `gemini.js`);
+a pessoa clica "Aplicar" item por item.
+
+Por que Gemini e não a API da Claude: decisão de custo, igual ao conector MCP acima — o nível
+gratuito do Google AI Studio (sem cartão) cobre tranquilamente o volume de uma clínica pequena
+(~1.000 atendimentos/mês ≈ 33 conversas/dia, bem abaixo da cota diária gratuita), e só é chamado
+quando a pessoa clica no botão (não a cada mensagem nova, não em lote automático — fica caro e
+desnecessário rodar sem alguém pedir).
+
+Validação defensiva em `gemini.js`: `etapa_id` só é aceito se bater com um dos ids de etapa
+realmente enviados na requisição (a lista de etapas válidas vem do frontend, via
+`pipelineEstagiosPara` — o servidor não sabe qual funil cada canal usa); campos sugeridos só são
+aceitos se o nome bater com um campo personalizado que já existe nesse negócio — a IA nunca cria
+campo novo sozinha. Configurar: `GEMINI_API_KEY` no Render (ver tabela de variáveis acima).
 
 ### E-mail (Brevo) — templates, campanha em massa e retornos (2026-09-29)
 
