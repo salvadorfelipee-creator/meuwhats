@@ -161,3 +161,29 @@ editar e `site/PROMPT-PARA-COLAR.md` para a conversa de publicação (domínio a
 publicar na Vercel como projeto próprio com Root Directory `especita clinica/site`, igual ao
 felizcred-site). Pendentes que dependem do Salvador/clínica: domínio, fotos reais, CNPJ/e-mail,
 formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
+
+## Google Ads — campanhas novas por produto (05/10/2026, sessão interrompida por limite de uso)
+
+Arquivos: `especita clinica/plano-midia-2026-10/07-GOOGLE-ADS.build.py` (gerador, valida limites do Google e
+regras do CFO) → `07-GOOGLE-ADS-ESTRUTURA.md` (doc) + `upload/*.csv` (formato dos modelos oficiais de
+Ferramentas > Ações em massa > Uploads; cabeçalhos em inglês, `EU political ads`=No, orçamento com vírgula,
+local `Brusque,State of Santa Catarina,Brazil`, palavra usa coluna `Type`, anúncio usa `Description 1`).
+
+**Feito na conta 113-943-9321 (tudo PAUSADO, Salvador decide quando ligar):**
+- 7 campanhas `ESP - …` criadas (Urgência 15, Implante e Prótese 20, Ortodontia 10, Odontopediatria 8,
+  Clareamento e Lentes 10, Harmonização Facial 10 [só ligar após CRO-SC], Dentista em Brusque e Família 10 R$/dia).
+  AI Max desligado, ampla desligada, recursos automáticos desligados, só Rede de Pesquisa, Maximizar conversões.
+- 13 grupos de anúncios criados; 57 das 112 palavras entraram (`upload/03b-palavras-faltantes.csv` tem as 55 que faltam).
+- Local: só a cidade de Brusque (pedido do Salvador: sem raio, Botuverá é longe). Opção "Presença" salva em 6
+  campanhas; **conferir ESP - Ortodontia** (o save pode não ter pegado).
+- Listas de negativas criadas e aplicadas: "ESP - Negativas gerais" (49, nas 7) e "ESP - Negativas de preço" (8, em Implante + Harmonização).
+
+**Falta (o Google bloqueou uploads por ~2 h a partir das 15:15 de 05/10 — "muitas planilhas"):**
+1. Subir `upload/04-anuncios.csv` (13 anúncios responsivos), `03b-palavras-faltantes.csv`, `07-sitelinks.csv`
+   (nível campanha; os sitelinks antigos da CONTA dizem "Consulta Grátis" — vedado pelo CFO — e não devem ser
+   herdados pelas novas). Frases de destaque e snippet: criar pela tela de Recursos (não há modelo de upload).
+2. Recursos de chamada (+55 47 99778-9519) e de mensagem/WhatsApp (nível conta ou nas 7 campanhas).
+3. Programação de anúncios (Urgência 7h–20h seg–sex, sáb 7h–13h; demais 7h–21h) e públicos em observação (lista no doc 07).
+4. Conversões: deixar primárias clique no WhatsApp (site tem GTM-5W2C495R + AW-16475900720), ligação e "Leads de mensagens"; rota como secundária.
+5. URL final de todos os grupos é a home do site real https://clinicaespecita.com (WordPress de uma página; o .com.br
+   da auditoria era o domínio errado). Trocar pelas páginas por serviço quando o site da pasta `site/` for publicado em subdomínio do mesmo domínio.
