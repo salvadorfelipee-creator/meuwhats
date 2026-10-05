@@ -1,0 +1,10 @@
+{
+  "name": "especita-meta-ads-automation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Criação de campanhas Meta Ads via Marketing API pra Especitá Odontologia e Estética",
+  "scripts": {
+    "noivos": "node campaigns/noivos.js"
+  }
+}
