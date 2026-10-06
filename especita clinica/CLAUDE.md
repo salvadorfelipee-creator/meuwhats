@@ -259,6 +259,12 @@ publicar na Vercel como projeto próprio com Root Directory `especita clinica/si
 felizcred-site). Pendentes que dependem do Salvador/clínica: domínio, fotos reais, CNPJ/e-mail,
 formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
 
+## Google Ads — RASTREIO DE CONVERSÃO WHATSAPP (feito 06/10/2026, correção de falha minha)
+
+- Criada no Google Ads a conversão **"WhatsApp - Clique no site"** (categoria Contato, ação PRINCIPAL, valor R$1, contagem "Uma", janela 90 dias). Tag: `AW-16475900720/Ez-5CM30l5MdELCWqbA9`.
+- Disparo: WordPress > Elementor > Custom Code, código nº 215 "Rastreio conversão WhatsApp (Google Ads)", local <head>, site inteiro. Escuta cliques em qualquer link wa.me/api.whatsapp.com e o evento `submit_success` dos formulários Elementor (popup 137); empurra `whatsapp_click` no dataLayer e chama gtag conversion. Testado em 06/10: 1 disparo por clique, sem duplicar.
+- A conta Google logada NÃO tem acesso ao GTM-5W2C495R (container é de outra conta/agência); por isso o código foi direto no WordPress. Botão de mensagem do ANÚNCIO: o Google não oferece conversão de "mensagem" nessa conta (assistente só tem site/app/chamadas/offline); mede-se só como interação do recurso (Recursos > Mensagem). Status "sem conversões recentes" até o primeiro clique real; conferir em 24-48h.
+
 ## Google Ads — VARREDURA FINAL 06/10/2026 (setup encerrado)
 
 Conferido: 7 campanhas ESP ativas (R$80/dia), só Rede de Pesquisa do Google, português, só Brusque, programação personalizada, Maximizar conversões, rotação "otimizar"; anúncios "Qualificada" (incl. o novo da Harmonização); aplicação automática de recomendações 0 de 21 (desligada); sem bônus/oferta (única promo R$1.200 de 2024 esgotada); Perfil da Empresa já vinculado como local no nível da conta (ESP herdam); chamada + mensagem WhatsApp + 6 frases de destaque no nível da conta "Qualificada"; sitelinks de cada ESP (6) aparecem "Qualificada (limitada) – Saúde em publicidade personalizada" (normal, serve). Conta PRÉ-PAGA (Pix): saldo R$1.370,77 em 06/10 ≈ 17 dias a R$80/dia -> recarregar até ~22/10. Notificação do sino = só sugestão de "parceiros de pesquisa" (NÃO aplicar).
