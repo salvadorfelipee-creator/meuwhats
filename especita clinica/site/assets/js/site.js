@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   var WA = document.documentElement.getAttribute("data-wa") || "";
-  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches && !document.documentElement.hasAttribute("data-force-fx");
   var fine = window.matchMedia("(hover:hover) and (pointer:fine)").matches;
 
   // ---------- menu
@@ -72,6 +72,14 @@
     }
   }
 
+  // ---------- barra de progresso + revelações automáticas
+  var bar = document.querySelector(".nav-progress i");
+  if (bar) { var pt = false; var upd = function () { pt = false; var h = document.documentElement.scrollHeight - window.innerHeight; bar.style.transform = "scaleX(" + (h > 0 ? Math.min(1, window.scrollY / h) : 0) + ")"; };
+    window.addEventListener("scroll", function () { if (!pt) { pt = true; requestAnimationFrame(upd); } }, { passive: true }); upd(); }
+  document.querySelectorAll(".mf .meta, .dra .tx > *, .local .lines, .local .btn, .ctab .acts, .stp .head, .picker .pk-panel > *, .rows .row, .related a, .faq details").forEach(function (el, i) {
+    if (!el.hasAttribute("data-reveal")) { el.setAttribute("data-reveal", ""); el.style.transitionDelay = ((i % 5) * 70) + "ms"; io.observe(el); }
+  });
+
   // ---------- nav clara/escura conforme a seção sob ela
   var navEl = document.querySelector(".nav"), darkSecs = Array.prototype.slice.call(document.querySelectorAll("[data-nav]"));
   if (navEl && darkSecs.length) {
@@ -107,6 +115,15 @@
         .to(".h-copy .h-title,.h-cap", { opacity: 0, yPercent: -8, duration: 0.14 * D }, 0.4 * D)
         .fromTo(sweep, { x: function () { return window.innerWidth; } }, { x: function () { return -(sweep.offsetWidth + 60); }, duration: 0.56 * D }, 0.43 * D);
       for (var hi = 1; hi < hps.length; hi++) tl.to(hps[hi], { opacity: 1, duration: 0.14 * D }, (0.43 + (0.56 / hps.length) * hi) * D);
+    }
+
+    // HOME · topo: ao rolar, a foto sobe devagar e encolhe, o texto desce e some
+    var hhEl = document.querySelector(".hh");
+    if (hhEl) {
+      var trig = { trigger: hhEl, start: "top top", end: "bottom top", scrub: 0.6 };
+      gsap.to(".hh-media", { y: -70, ease: "none", scrollTrigger: trig });
+      gsap.to(".hh-photo", { scale: 0.9, ease: "none", scrollTrigger: trig });
+      gsap.to(".hh-copy", { y: 60, opacity: 0.1, ease: "none", scrollTrigger: trig });
     }
 
     // MANIFESTO: retrato com parallax

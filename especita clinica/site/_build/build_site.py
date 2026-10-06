@@ -70,7 +70,7 @@ def head(title, description, path, lds):
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Hanken+Grotesk:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.26/dist/lenis.css">
 <script type="importmap">{{"imports":{{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}}}</script>
-<script>if(matchMedia("(min-width:901px) and (prefers-reduced-motion:no-preference)").matches)document.documentElement.classList.add("fx")</script>
+<script>(function(){{var f=false;try{{if(location.search.indexOf("efeitos=1")>-1)localStorage.setItem("esp-fx","1");if(location.search.indexOf("efeitos=0")>-1)localStorage.removeItem("esp-fx");f=localStorage.getItem("esp-fx")==="1"}}catch(e){{}}var h=document.documentElement;if(f)h.setAttribute("data-force-fx","1");if(matchMedia("(min-width:901px)").matches&&(f||matchMedia("(prefers-reduced-motion:no-preference)").matches))h.classList.add("fx")}})()</script>
 <link rel="stylesheet" href="/assets/css/site.css">
 {ld(lds)}
 </head>
@@ -79,7 +79,8 @@ def head(title, description, path, lds):
 def header(current=""):
     links = "".join(f'<a href="/{slug}"{" aria-current=page" if slug == current else ""}>{e(lbl)}</a>' for slug, lbl in NAV)
     menu = "".join(f'<a href="/{s["slug"]}"><small>{i+1:02d}</small>{e(s["menu"])}</a>' for i, s in enumerate(SERVICOS))
-    return f'''<header class="nav">
+    return f'''<div class="nav-progress" aria-hidden="true"><i></i></div>
+<header class="nav">
 <a class="brand" href="/">Especitá <small>Brusque</small></a>
 <nav class="links" aria-label="Principal">{links}<a href="/sobre">A Dra.</a><a href="/contato">Contato</a></nav>
 <a class="cta" data-wa-text="{e(HOME["cta"])}" href="https://wa.me/{SITE["whatsapp"]}">{WA_ICON}WhatsApp</a>

@@ -137,3 +137,8 @@ banco pode ser apresentada como paciente real ou depoimento.
 
 ## v6 (06/10/2026): novo topo da home (só a home)
 Hero no estilo cartão de foto arredondado com duas mensagens flutuantes ("Cuidado humanizado" entra pela direita, em cima; "Atendimento seguro" entra pela esquerda, embaixo), selo, título com trecho destacado, botões e três números. Cabe em uma tela e não tem mais a rolagem fixa longa do hero antigo (a home ficou ~4.800 px mais curta). Efeitos: foto se revela por recorte, cartões deslizam e depois flutuam, troca de fotos a cada ~5,6 s, parallax suave com o mouse; tudo desliga com "reduzir movimento". Código: `.hh*` em `site.css`, bloco "novo hero" em `site.js`, trecho `hero =` de `home_page()` no `build_site.py`. As páginas de serviço continuam com o hero pinado antigo.
+
+## v7 (06/10/2026): estilo landing page + efeitos de rolagem no topo
+- **Miolo de 1200px** centralizado (`--gutter` agora vale `max(4vw, (100vw − 1200px)/2)`), seções com menos espaço vertical. Fundos e fotos dos painéis continuam de ponta a ponta.
+- **Efeitos novos**: barra de progresso no topo da página; no topo da home a foto sobe e encolhe e o texto desce e some ao rolar; revelações automáticas nos blocos de texto, listas e perguntas.
+- **Se "não tem efeito nenhum"**: o site obedece à configuração "reduzir animações" do sistema (Windows: Configurações > Acessibilidade > Efeitos visuais > Efeitos de animação; Chrome herda). Com isso ligado, tudo fica estático. Para ver os efeitos mesmo assim, abra qualquer página com `?efeitos=1` no endereço (fica salvo no navegador); `?efeitos=0` desfaz.
