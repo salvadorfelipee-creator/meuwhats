@@ -316,3 +316,7 @@ Handoff de continuação: `plano-midia-2026-10/PROMPT-CONTINUAR-GOOGLE-ADS.md`.
 4. URLs finais = home https://clinicaespecita.com; trocar por páginas por serviço quando `site/` for publicado em subdomínio.
 5. Confirmar que +55 47 99778-9519 é o WhatsApp Business ligado ao recurso de mensagem.
 6. Ordem sugerida para ligar: Urgência + Implante (R$35/dia, 14 dias), depois Ortodontia e Família, Clareamento/Harmonização por último.
+
+
+## Site — v5 (06/10/2026, sessão do site)
+Coreografia de rolagem do Aventura (hero pinado que expande a foto, frase gigante, painéis pinados, lista com contador) agora em TODAS as páginas; fontes menores; paleta Pantone (Demitasse/Coffee Liqueur/Dijon/Warm Sand + branco). Seletor 3D "escolha o dente" (three.js + modelos do Dental Scope, CC BY-SA 2.1 JP, crédito no rodapé/Termos) na home, implante, dente quebrado, dor de dente e lente de contato; o botão abre o WhatsApp com os dentes (FDI) e a situação. Ver `site/README.md` (seções v4 e v5). Servir local: qualquer servidor estático na pasta `site/` com URLs sem `.html`.

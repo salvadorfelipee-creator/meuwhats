@@ -32,7 +32,8 @@ def btn(href, label, cls="btn", extra=""):
 def wa(text, label, cls="btn solid"):
     return f'<a class="{cls}" data-wa-text="{e(text)}" href="https://wa.me/{SITE["whatsapp"]}">{WA_ICON}{e(label)}{ARR}</a>'
 def img(key, alt, extra=""):
-    return f'<img src="{PHOTOS[key]}" alt="{e(alt)}" loading="lazy" decoding="async" {extra}>'
+    lz = "" if "loading=" in extra else 'loading="lazy" '
+    return f'<img src="{PHOTOS[key]}" alt="{e(alt)}" {lz}decoding="async" {extra}>'
 
 # ---------------------------------------------------------------- JSON-LD
 def ld_business():
@@ -68,6 +69,7 @@ def head(title, description, path, lds):
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Hanken+Grotesk:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.26/dist/lenis.css">
+<script type="importmap">{{"imports":{{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}}}</script>
 <script>if(matchMedia("(min-width:901px) and (prefers-reduced-motion:no-preference)").matches)document.documentElement.classList.add("fx")</script>
 <link rel="stylesheet" href="/assets/css/site.css">
 {ld(lds)}
@@ -94,13 +96,14 @@ def footer():
 <div><h4>Navegar</h4><ul><li><a href="/sobre">Dra. Catiucia</a></li><li><a href="/contato">Contato e como chegar</a></li><li><a href="/dentista-em-brusque">Avaliação completa</a></li><li><a href="{SITE["instagram"]}" rel="noopener" target="_blank">Instagram {e(SITE["instagram_handle"])}</a></li></ul></div>
 <div><h4>Atendimento</h4><ul><li><a data-wa-text="{e(HOME["cta"])}" href="https://wa.me/{SITE["whatsapp"]}">WhatsApp {e(SITE["whatsapp_fmt"])}</a></li><li><a href="{SITE["maps"]}" rel="noopener" target="_blank">Google Maps</a></li><li><a href="/privacidade">Privacidade</a></li><li><a href="/termos">Termos</a></li></ul></div>
 </div>
-<div class="legal">Responsável técnica: {e(SITE["dra"])} · {e(SITE["cro"])} · {e(SITE["epao"])}. Conteúdo informativo; não substitui a consulta. Resultados variam de pessoa para pessoa. Fotos ilustrativas. © {datetime.date.today().year} {e(SITE["nome"])}.</div>
+<div class="legal">Responsável técnica: {e(SITE["dra"])} · {e(SITE["cro"])} · {e(SITE["epao"])}. Conteúdo informativo; não substitui a consulta. Resultados variam de pessoa para pessoa. Fotos ilustrativas. Modelo 3D dos dentes: BodyParts3D © DBCLS (CC BY-SA 2.1 JP), via Dental Scope (MIT). © {datetime.date.today().year} {e(SITE["nome"])}.</div>
 </footer>
 <a class="wa-float" data-wa-text="{e(HOME["cta"])}" href="https://wa.me/{SITE["whatsapp"]}" aria-label="Falar no WhatsApp">{WA_ICON}<span>WhatsApp</span></a>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/gsap.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.15.0/ScrollTrigger.min.js" defer></script>
 <script src="https://unpkg.com/lenis@1.3.26/dist/lenis.min.js" defer></script>
 <script src="/assets/js/site.js" defer></script>
+<script type="module" src="/assets/js/tooth-picker.js"></script>
 </body></html>'''
 
 def ctab(text, label):
@@ -193,36 +196,104 @@ def widget(s):
     return f'<section class="tool" id="ferramenta" data-nav="dark"><div class="inner">{body}</div></section>'
 
 # ---------------------------------------------------------------- páginas
+# -*- coding: utf-8 -*-
+# Trecho novo que substitui service_page, home_page, sobre_page e contato_page em build_site.py
+# (as funções auxiliares img, wa, btn, e, ARR, SITE, HOME, SOBRE, ld_*, head, header, footer, ctab, local_block já existem lá)
+
+HERO = {
+    "dente-quebrado": ("Dente quebrado?", "Encaixe hoje.", "Atendimento de urgência em Brusque, de segunda a sábado.", "Quebrou? A gente resolve hoje.", "mirror", "chair"),
+    "dor-de-dente": ("Dor de dente", "não espera.", "Encaixe no mesmo dia, em Brusque.", "Primeiro a dor, depois o plano.", "chair", "mirror"),
+    "implante-dentario": ("Implante dentário", "em Brusque.", "Voltar a mastigar e sorrir com segurança.", "Mastigar de tudo, de novo.", "implant", "scanner"),
+    "ortodontia": ("Ortodontia", "em Brusque.", "Aparelho fixo ou alinhador, com acompanhamento perto de casa.", "Dentes alinhados, rotina intacta.", "scanner", "smile"),
+    "alinhador-invisivel": ("Alinhador", "invisível.", "Alinhe os dentes sem metal, com acompanhamento em Brusque.", "O aparelho que ninguém vê.", "smile", "scanner"),
+    "odontopediatria": ("Dentista para", "crianças.", "A primeira visita é só para conhecer.", "Sem medo, sem trauma.", "child", "office"),
+    "tratamento-odontologico": ("Um dentista para", "a família inteira.", "Limpeza, restaurações, gengiva, canal e revisões, em horários seguidos.", "Cuidado de casa.", "office", "child"),
+    "harmonizacao-facial": ("Harmonização", "orofacial.", "Resultado discreto, a partir de uma avaliação individual.", "Natural é uma escolha.", "portrait", "office"),
+    "clareamento-dental": ("Clareamento", "personalizado.", "Supervisionado, com moldeira sob medida.", "Branco, do seu jeito.", "smile", "portrait"),
+    "lente-de-contato-dental": ("Lentes de contato", "dentais.", "O sorriso planejado antes de qualquer procedimento.", "Um sorriso planejado.", "smile", "procedure"),
+    "dentista-em-brusque": ("Dentista", "em Brusque.", "Avaliação completa, sem pressa e sem julgamento.", "Comece do começo.", "office", "checkup"),
+}
+
+SIT_LABELS = {"faltando": "Faltando", "quebrado": "Quebrado ou lascado", "dor": "Com dor", "manchado": "Manchado ou escuro", "torto": "Torto ou com espaço", "pequeno": "Pequeno ou desgastado"}
+PICKER = {
+    "implante-dentario": ("Qual dente <em>está faltando?</em>", "Gire a arcada e clique nos dentes. A mensagem para a recepção já vai preenchida.", ["faltando", "dor", "quebrado"], "faltando"),
+    "dente-quebrado": ("Qual dente <em>quebrou?</em>", "Clique no dente e conte a situação. Você pede o encaixe já com a informação certa.", ["quebrado", "dor"], "quebrado"),
+    "dor-de-dente": ("Onde <em>dói?</em>", "Clique no dente que incomoda. A recepção já sabe qual é antes de responder.", ["dor", "quebrado"], "dor"),
+    "lente-de-contato-dental": ("Quais dentes você <em>quer melhorar?</em>", "Marque os dentes do sorriso e a situação. A avaliação mostra a proposta antes de qualquer procedimento.", ["pequeno", "manchado", "torto"], "pequeno"),
+    "_home": ("Mostre <em>onde incomoda.</em>", "Gire a arcada, clique no dente e escolha a situação. A mensagem para a recepção já vai pronta.", ["dor", "quebrado", "faltando", "manchado", "torto", "pequeno"], "dor"),
+}
+UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28]
+LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38]
+
+def picker_section(key, cta):
+    title, sub, sits, default = PICKER[key]
+    sbtn = "".join(f'<button type="button" data-s="{k}">{e(SIT_LABELS[k])}</button>' for k in sits)
+    nums = "".join(f'<button type="button" data-n="{n}" aria-pressed="false">{n}</button>' for n in UPPER + LOWER)
+    body = f'''<div class="picker" data-picker data-cta="{e(cta)}" data-default-sit="{default}">
+<div class="pk-stage"><canvas aria-label="Modelo 3D da arcada dentária. Clique em um dente para escolher."></canvas><p class="pk-load">Carregando a arcada em 3D…</p><span class="pk-tip"></span>
+<div class="pk-views" role="group" aria-label="Vistas"><button type="button" class="on" data-view="front">Frente</button><button type="button" data-view="upper">Superior</button><button type="button" data-view="lower">Inferior</button><button type="button" data-view="right">Direita</button><button type="button" data-view="left">Esquerda</button></div>
+<p class="pk-hint">Arraste para girar · clique no dente</p></div>
+<div class="pk-panel"><p class="caps">Escolha o dente</p><h3>{title}</h3><p class="sub">{e(sub)}</p>
+<div class="pk-chips" aria-live="polite"></div><div class="pk-sit" role="group" aria-label="Situação">{sbtn}</div><p class="pk-out"></p>
+<p style="margin:18px 0 0"><a class="btn solid" data-pk-cta href="#">{WA_ICON}Enviar ao WhatsApp{ARR}</a></p>
+<details class="pk-numwrap"><summary>Ou escolha pelo número (sistema FDI)</summary><div class="pk-num">{nums}</div></details>
+<p class="disc">Modelo 3D educativo, não é o seu caso. Ele só ajuda a recepção a entender a sua dúvida. Créditos dos modelos no rodapé.</p></div></div>'''
+    return f'<section class="tool" id="escolha" data-nav="dark"><div class="inner">{body}</div></section>'
+
+def hero_html(meta, title_html, sub, cap, sweep_html, photo_keys, alt, acts="", pin=250):
+    imgs = "".join(img(k, alt, ('class="hp" fetchpriority="high" loading="eager"' if i == 0 else 'class="hp" loading="eager"')) for i, k in enumerate(photo_keys))
+    return f'''<section class="hero" data-pin="{pin}">
+<div class="hero-pin">
+  <div class="h-copy">
+    <p class="h-meta">{e(meta)}</p>
+    <h1 class="h-title">{title_html}</h1>
+    <div class="h-foot"><p class="h-sub">{e(sub)}</p>{acts}</div>
+  </div>
+  <div class="h-media">
+    {imgs}
+    <div class="h-copy" aria-hidden="true"><p class="h-title">{title_html}</p><p class="h-cap">{e(cap)}</p></div>
+    <p class="h-sweep" aria-hidden="true">{sweep_html}</p>
+  </div>
+</div>
+</section>'''
+
+def steps_html(head_caps, head_h2, items, photo_keys):
+    rows = "".join(f'<li class="stp-row{" on" if i == 0 else ""}"><h3>{e(t)}</h3><p>{e(d)}</p></li>' for i, (t, d) in enumerate(items))
+    pics = "".join(img(k, t, 'class="on"' if i == 0 else "") for i, ((t, _), k) in enumerate(zip(items, photo_keys)))
+    return f'''<section class="stp"><div class="head"><p class="caps">{e(head_caps)}</p><h2>{head_h2}</h2></div>
+<div class="stp-grid"><div><p class="stp-count"><b>01</b> <small>/ {len(items):02d}</small></p><div class="stp-pic">{pics}</div></div><ol class="stp-rows">{rows}</ol></div></section>'''
+
 def service_page(s):
     crumbs = [("Início", DOM + "/"), (s["menu"], f"{DOM}/{s['slug']}")]
     lds = [ld_business(), ld_service(s), ld_faq(s["faq"]), ld_crumbs(crumbs)]
-    h1 = s["h1"]
-    if ":" in h1:
-        a, b = h1.split(":", 1); h1html = f'{e(a.strip())}: <em>{e(b.strip())}</em>'
-    else: h1html = e(h1)
+    t1, t2, sub, sweep, p1, p2 = HERO[s["slug"]]
+    acts = wa(s["cta"], s["cta_label"]) + btn("#faq", "Dúvidas comuns")
+    hero = hero_html(f'{s["grupo"]} · Brusque', f'{e(t1)}<br><em>{e(t2)}</em>', sub, f'{SITE["dra"]} · {SITE["cro"]}', f'{e(sweep.split(",")[0])}, <em>{e(sweep.split(",", 1)[1].strip()) if "," in sweep else ""}</em>' if "," in sweep else f'<em>{e(sweep)}</em>', [p1, p2], f'{s["menu"]} na Especitá, Brusque', acts, 220)
     para = "".join(f'<div class="row" data-reveal><span class="n">{i+1:02d}</span><h3>{e(t)}</h3><p>{e(d)}</p></div>' for i, (t, d) in enumerate(s["para_quem"]))
-    como = "".join(f'<li class="{"on" if i == 0 else ""}" data-reveal><span class="dot">{i+1}</span><h3>{e(t)}</h3><p>{e(d)}</p></li>' for i, (t, d) in enumerate(s["como"]))
     sinais = "".join(f'<li>{e(i)}</li>' for i in s["sinais"])
     faq = "".join(f'<details><summary>{e(q)}</summary><p>{e(a)}</p></details>' for q, a in s["faq"])
     rel = "".join(f'<a href="/{r}" data-reveal><span class="caps mute">{e(BY_SLUG[r]["grupo"])}</span><span class="t">{e(BY_SLUG[r]["menu"])}</span><span class="d">{e(BY_SLUG[r]["lede"].split(". ")[0])}.</span></a>' for r in s["relacionados"])
     aviso = f'<p class="aviso" style="margin-top:22px">{e(s["aviso"])}</p>' if s.get("aviso") else ""
-    ph = PHOTO_BY_SLUG.get(s["slug"], "office")
+    tools = ""
+    if s["slug"] in PICKER: tools += picker_section(s["slug"], s["cta"])
+    if s.get("widget") and s["slug"] not in ("dente-quebrado", "implante-dentario"): tools += widget(s)
+    steps_photos = [p2, p1, "procedure"][:len(s["como"])]
+    steps = steps_html("Como funciona na Especitá", "Passo <em>a passo.</em>", s["como"], steps_photos)
     return head(s["title"], s["description"], s["slug"], lds) + header(s["slug"]) + f'''
 <main>
-<section class="shero"><div class="tx"><div class="crumbs"><a href="/">Início</a><span>›</span><span>{e(s["grupo"])}</span><span>›</span><span>Brusque</span></div>
-<h1>{h1html}</h1><p class="lede">{e(s["lede"])}</p><div class="acts">{wa(s["cta"], s["cta_label"])}{btn("#faq", "Dúvidas comuns")}</div>{aviso}</div>
-<div class="ph">{img(ph, s["menu"] + " na Especitá, Brusque", 'fetchpriority="high"')}<span class="tag">{e(SITE["dra"])}<br>{e(SITE["cro"])}</span></div></section>
+{hero}
+<section class="intro"><div class="inner"><p class="big">{e(s["lede"])}</p>{aviso}</div></section>
 
 <section class="sec"><div class="inner"><div class="head"><p class="caps">Para quem é</p><h2 data-reveal>Quando <em>procurar.</em></h2></div><div class="rows">{para}</div></div></section>
 
-{widget(s)}
+{tools}
 
-<section class="sec steps"><div class="inner"><div class="head"><p class="caps">Como funciona na Especitá</p><h2 data-reveal>Passo <em>a passo.</em></h2></div><div class="tl"><ol>{como}</ol><div class="side" data-clip>{img("procedure" if ph != "procedure" else "office", "Atendimento na Especitá")}<span class="tag">Especitá · Brusque</span></div></div></div></section>
+{steps}
 
 <section class="sec"><div class="inner ficha"><div><p class="caps" style="margin-bottom:14px">{e(s["sinais_titulo"])}</p><ul>{sinais}</ul></div>
 <div class="card" data-reveal><p class="caps">Responsável técnica</p><b>{e(SITE["dra"])}</b><p>{e(SITE["cro"])} · {e(SITE["epao"])}. Mais de 10 anos atendendo em Brusque; acompanha cada paciente do primeiro contato à manutenção.</p><p><a href="/sobre" class="link">Conheça a Dra.</a></p></div></div></section>
 
-<section class="sec" id="faq"><div class="inner faq-grid"><div class="st"><p class="caps">Perguntas frequentes</p><h2 data-reveal style="font-size:clamp(34px,4vw,56px)">{e(s["menu"])}: <em>dúvidas comuns.</em></h2><p class="mute" style="margin-top:18px;max-width:34ch">Não achou a sua? Pergunte pelo WhatsApp, a recepção responde no horário de atendimento.</p></div><div class="faq">{faq}</div></div></section>
+<section class="sec" id="faq"><div class="inner faq-grid"><div class="st"><p class="caps">Perguntas frequentes</p><h2 data-reveal>{e(s["menu"])}: <em>dúvidas comuns.</em></h2><p class="mute" style="margin-top:18px;max-width:34ch">Não achou a sua? Pergunte pelo WhatsApp, a recepção responde no horário de atendimento.</p></div><div class="faq">{faq}</div></div></section>
 
 {ctab(s["cta"], s["cta_label"])}
 
@@ -242,31 +313,16 @@ def home_page():
     ]
     panels = "".join(f'<article class="svc-panel"><div class="sp-photo">{img(k, a_ + " " + b_)}<h2 class="sp-title">{e(a_)}<em>{e(b_)}</em></h2></div><div class="sp-side"><p class="caps">Nossos cuidados</p><p class="sp-desc">{e(d)}</p><ul class="sp-list">{lst(l)}</ul></div></article>' for k, a_, b_, d, l in PANELS)
     index = "".join(f"<li>{e(a_)}</li>" for _, a_, _, _, _ in PANELS)
-    steps = [("Chame no WhatsApp", "Conte o que precisa. No horário de atendimento, a resposta vem em minutos, já com dois horários para escolher.", "chair"),
-             ("Avaliação completa", "Exame, fotos e radiografias quando necessário. A Dra. explica o que vê e monta o plano com você, em linguagem simples.", "procedure"),
-             ("Tratamento e revisão", "Em etapas, no seu ritmo. Depois, lembrete de revisão a cada seis meses pelo WhatsApp.", "scanner")]
-    srows = "".join(f'<li class="stp-row{" on" if i == 0 else ""}"><h3>{e(t)}</h3><p>{e(d)}</p></li>' for i, (t, d, _) in enumerate(steps))
-    spics = "".join(img(k, t, 'class="on"' if i == 0 else "") for i, (t, _, k) in enumerate(steps))
+    steps = steps_html("Como funciona", "Três passos, <em>sem formulário.</em>", [
+        ("Chame no WhatsApp", "Conte o que precisa. No horário de atendimento, a resposta vem em minutos, já com dois horários para escolher."),
+        ("Avaliação completa", "Exame, fotos e radiografias quando necessário. A Dra. explica o que vê e monta o plano com você, em linguagem simples."),
+        ("Tratamento e revisão", "Em etapas, no seu ritmo. Depois, lembrete de revisão a cada seis meses pelo WhatsApp.")], ["chair", "procedure", "scanner"])
+    hero = hero_html("Santa Rita · Brusque · SC", 'Odontologia<br>e estética,<em>com calma.</em>', "Implantes, aparelhos, dentista para crianças, clareamento e harmonização, com a mesma profissional do início ao fim.", "Um plano explicado em linguagem simples, no seu ritmo.", 'Seu sorriso, <em>no seu tempo.</em>', ["hero", "office", "smile"], "Dra. atendendo paciente na Especitá", "", 430)
     return head(HOME["title"], HOME["description"], "", lds) + header("") + f'''
 <main>
-<section class="hero">
-<div class="hero-pin">
-  <div class="h-copy">
-    <p class="h-meta">Santa Rita · Brusque · SC</p>
-    <h1 class="h-title">Odontologia<br>e estética,<em>com calma.</em></h1>
-    <p class="h-sub">Implantes, aparelhos, dentista para crianças, clareamento e harmonização, com a mesma profissional do início ao fim.</p>
-  </div>
-  <div class="h-media">
-    {img("hero", "Dra. atendendo paciente na Especitá", 'class="hp" fetchpriority="high" loading="eager"')}
-    {img("office", "Consultório da Especitá", 'class="hp" loading="eager"')}
-    {img("smile", "Sorriso", 'class="hp" loading="eager"')}
-    <div class="h-copy" aria-hidden="true"><p class="h-title">Odontologia<br>e estética,<em>com calma.</em></p><p class="h-cap">Um plano explicado em linguagem simples, no seu ritmo.</p></div>
-    <p class="h-sweep" aria-hidden="true">Seu sorriso, <em>no seu tempo.</em></p>
-  </div>
-</div>
-</section>
+{hero}
 
-<section class="mf" data-reveal-skip>
+<section class="mf">
   <div class="card">{img("checkup", "Dra. Catiucia (foto provisória)")}<span>Dra. Catiucia · CRO-SC 14067</span></div>
   <div><p class="big">A Especitá é uma clínica de bairro, no Santa Rita, onde a mesma dentista conhece o seu histórico, explica cada passo e organiza o tratamento com você, sem pressa e sem jargão.</p>
   <div class="meta"><div><b data-count="10" data-suffix="+">0</b>anos em Brusque</div><div><b data-count="11">0</b>cuidados no mesmo lugar</div><div><b data-count="6">0</b>dias por semana com encaixe</div></div></div>
@@ -277,10 +333,9 @@ def home_page():
   {panels}
 </section>
 
-<section class="stp" id="como">
-  <div class="head"><p class="caps">Como funciona</p><h2>Três passos, <em>sem formulário.</em></h2></div>
-  <div class="stp-grid"><div><p class="stp-count"><b>01</b> <small>/ 03</small></p><div class="stp-pic">{spics}</div></div><ol class="stp-rows">{srows}</ol></div>
-</section>
+{steps}
+
+{picker_section("_home", HOME["cta"])}
 
 <section class="dra"><div class="ph">{img("checkup", "Dra. Catiucia em atendimento")}</div><div class="tx"><p class="caps">A Dra.</p><h2 data-reveal>Catiucia <em>L. Riffel</em></h2><p style="margin-top:22px">Cirurgiã-dentista, há mais de dez anos em Brusque. Fundou a Especitá para que o paciente tenha uma só profissional do primeiro contato à manutenção, em qualquer especialidade.</p><dl><div><dt>Registro</dt><dd>{e(SITE["cro"])}</dd></div><div><dt>Habilitação</dt><dd>EPAO 4417</dd></div><div><dt>Em Brusque</dt><dd>10+ anos</dd></div></dl><p style="margin-top:28px"><a class="link" href="/sobre">Conheça a Dra.</a></p></div></section>
 
@@ -291,17 +346,20 @@ def home_page():
 def sobre_page():
     lds = [ld_business(), {"@context": "https://schema.org", "@type": "Person", "name": SITE["dra"], "jobTitle": "Cirurgiã-dentista", "identifier": SITE["cro"], "worksFor": {"@id": DOM + "/#clinica"}, "url": DOM + "/sobre"}]
     texto = "".join(f"<p>{e(t)}</p>" for t in SOBRE["texto"])
+    hero = hero_html("A Dra. · Brusque", 'Catiucia<br><em>L. Riffel.</em>', f'{SITE["cro"]} · {SITE["epao"]}', "Uma profissional, do início ao fim.", 'Uma profissional, <em>do início ao fim.</em>', ["checkup", "office"], "Dra. Catiucia (foto provisória)", wa(HOME["cta"], "Agendar avaliação"), 200)
     return head(SOBRE["title"], SOBRE["description"], "sobre", lds) + header("") + f'''
-<main><section class="shero"><div class="tx"><div class="crumbs"><a href="/">Início</a><span>›</span><span>A Dra.</span></div><h1>Catiucia <em>L. Riffel</em></h1><p class="lede">{e(SITE["cro"])} · {e(SITE["epao"])}</p><div class="acts">{wa(HOME["cta"], "Agendar avaliação")}</div></div><div class="ph">{img("checkup", "Dra. Catiucia", 'fetchpriority="high"')}<span class="tag">Foto a substituir<br>pela foto real da Dra.</span></div></section>
-<section class="sec"><div class="ficha"><div style="font-size:19px;color:var(--ink-2)">{texto}<p class="aviso">{e(SOBRE["formacao_placeholder"])}</p></div><div class="card" data-reveal><p class="caps">Na Especitá</p><b>Uma profissional, do início ao fim</b><p>Odontologia geral, implantes, ortodontia, odontopediatria, estética do sorriso e harmonização orofacial, no mesmo consultório, com o mesmo histórico.</p></div></div></section>
+<main>{hero}
+<section class="sec"><div class="inner ficha"><div style="font-size:19px;color:var(--ink-2)">{texto}<p class="aviso">{e(SOBRE["formacao_placeholder"])}</p></div><div class="card" data-reveal><p class="caps">Na Especitá</p><b>Uma profissional, do início ao fim</b><p>Odontologia geral, implantes, ortodontia, odontopediatria, estética do sorriso e harmonização orofacial, no mesmo consultório, com o mesmo histórico.</p></div></div></section>
 {local_block()}</main>''' + footer()
 
 def contato_page():
     lds = [ld_business(), ld_crumbs([("Início", DOM + "/"), ("Contato", DOM + "/contato")])]
+    hero = hero_html("Contato · Brusque", 'Fale com<br><em>a recepção.</em>', "O jeito mais rápido é o WhatsApp. Conte o que você precisa e receba os horários.", "Rua Sete de Setembro, 55 · Santa Rita", 'Resposta em <em>minutos.</em>', ["office", "chair"], "Consultório da Especitá", wa(HOME["cta"], "Chamar no WhatsApp") + btn(SITE["instagram"], "Instagram", extra=' target="_blank" rel="noopener"'), 200)
     return head("Contato e como chegar | Especitá Odontologia · Brusque", "WhatsApp, endereço, horário e como chegar à Especitá Odontologia e Estética, no Santa Rita, em Brusque, em frente à ponte dos bombeiros.", "contato", lds) + header("") + f'''
-<main><section class="shero"><div class="tx"><div class="crumbs"><a href="/">Início</a><span>›</span><span>Contato</span></div><h1>Fale com <em>a recepção.</em></h1><p class="lede">O jeito mais rápido é o WhatsApp. Conte o que você precisa e receba os horários disponíveis.</p><div class="acts">{wa(HOME["cta"], "Chamar no WhatsApp")}{btn(SITE["instagram"], "Instagram", extra=' target="_blank" rel="noopener"')}</div></div><div class="ph">{img("office", "Consultório da Especitá", 'fetchpriority="high"')}<span class="tag">Rua Sete de Setembro, 55<br>Santa Rita · Brusque</span></div></section>
+<main>{hero}
 {local_block()}
-<section class="sec"><div class="ficha"><div><p class="caps" style="margin-bottom:14px">O que trazer na primeira consulta</p><ul><li>Documento com foto.</li><li>Exames, radiografias ou orçamentos anteriores, se tiver.</li><li>Lista de medicamentos em uso.</li><li>Carteirinha do convênio, se for o caso (confirme o atendimento pelo WhatsApp).</li></ul></div></div></section></main>''' + footer()
+<section class="sec"><div class="inner ficha"><div><p class="caps" style="margin-bottom:14px">O que trazer na primeira consulta</p><ul><li>Documento com foto.</li><li>Exames, radiografias ou orçamentos anteriores, se tiver.</li><li>Lista de medicamentos em uso.</li><li>Carteirinha do convênio, se for o caso (confirme o atendimento pelo WhatsApp).</li></ul></div></div></section></main>''' + footer()
+
 
 LEGAL_PRIV = f'''<h3>Quem somos</h3><p>{SITE["nome"]}, responsável técnica {SITE["dra"]} ({SITE["cro"]}), com sede na {SITE["endereco"]}. [CNPJ: preencher]</p>
 <h3>Quais dados coletamos</h3><p>Ao entrar em contato pelo WhatsApp, coletamos nome, telefone, a mensagem enviada e, quando você informa, dados sobre o atendimento desejado. Ao navegar, podem ser coletados dados de uso por ferramentas de medição (Google Analytics, Meta Pixel), conforme sua configuração de cookies.</p>
@@ -311,7 +369,7 @@ LEGAL_PRIV = f'''<h3>Quem somos</h3><p>{SITE["nome"]}, responsável técnica {SI
 <h3>Retenção e segurança</h3><p>Dados de atendimento são mantidos pelo prazo exigido pelas normas odontológicas e fiscais. Adotamos medidas técnicas e organizacionais para proteger as informações.</p><p class="mute">Última atualização: {TODAY}.</p>'''
 LEGAL_TERMS = f'''<h3>Uso do site</h3><p>O conteúdo deste site é informativo e educativo. Não substitui consulta, diagnóstico ou tratamento com profissional habilitado. Resultados de tratamentos variam de pessoa para pessoa.</p>
 <h3>Agendamentos</h3><p>Horários solicitados pelo WhatsApp são confirmados pela recepção. Cancelamentos e remarcações devem ser avisados com antecedência pelo mesmo canal.</p>
-<h3>Propriedade intelectual</h3><p>Textos, ilustrações e marca pertencem à {SITE["nome"]}. Ilustrações interativas são didáticas e não representam casos reais ou previsões de resultado. Fotografias de banco de imagens são ilustrativas.</p>
+<h3>Propriedade intelectual</h3><p>Textos, ilustrações e marca pertencem à {SITE["nome"]}. Ilustrações interativas são didáticas e não representam casos reais ou previsões de resultado. Fotografias de banco de imagens são ilustrativas. O modelo 3D dos dentes é derivado do BodyParts3D © DBCLS (CC BY-SA 2.1 Japão), via projeto Dental Scope (MIT), e permanece sob a mesma licença; é educativo e não serve para diagnóstico.</p>
 <h3>Responsabilidade profissional</h3><p>Responsável técnica: {SITE["dra"]}, {SITE["cro"]}. Publicidade conforme o Código de Ética Odontológica.</p><p class="mute">Última atualização: {TODAY}.</p>'''
 
 def legal_page(slug, title, body):

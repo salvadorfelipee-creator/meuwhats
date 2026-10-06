@@ -28,30 +28,20 @@
   var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } }); }, { rootMargin: "0px 0px -10% 0px" });
   document.querySelectorAll("[data-reveal],[data-clip]").forEach(function (el) { io.observe(el); });
 
-  // ---------- manifesto: palavras acendem com o scroll
-  var man = document.querySelector(".mf .big");
-  if (man && !man.dataset.split) {
+  // ---------- texto grande: palavras acendem com o scroll (home e páginas internas)
+  document.querySelectorAll(".mf .big, .intro .big").forEach(function (man) {
+    if (man.dataset.split) return;
     man.innerHTML = man.textContent.trim().split(/\s+/).map(function (w) { return '<span class="w">' + w + "</span>"; }).join(" ");
     man.dataset.split = "1";
     var ws = man.querySelectorAll(".w");
     function paint() {
       var r = man.getBoundingClientRect(), vh = window.innerHeight;
-      var p = Math.min(1, Math.max(0, (vh * 0.8 - r.top) / (r.height + vh * 0.3)));
+      var p = Math.min(1, Math.max(0, (vh * 0.85 - r.top) / (r.height + vh * 0.35)));
       var n = Math.round(p * ws.length);
       ws.forEach(function (w, i) { w.classList.toggle("on", i < n); });
     }
     if (reduce) ws.forEach(function (w) { w.classList.add("on"); }); else { window.addEventListener("scroll", paint, { passive: true }); paint(); }
-  }
-
-  // ---------- índice: preview de foto no hover
-  var prev = document.querySelector(".index .preview");
-  if (prev) {
-    var imgs = prev.querySelectorAll("img");
-    document.querySelectorAll(".index li a[data-img]").forEach(function (a) {
-      a.addEventListener("mouseenter", function () { var k = a.getAttribute("data-img"); imgs.forEach(function (im) { im.classList.toggle("on", im.getAttribute("data-k") === k); }); });
-    });
-    if (imgs[0]) imgs[0].classList.add("on");
-  }
+  });
 
   // ---------- contadores
   document.querySelectorAll("[data-count]").forEach(function (el) {
@@ -86,19 +76,19 @@
       document.querySelectorAll('a[href^="#"]').forEach(function (a) { a.addEventListener("click", function (e) { var id = a.getAttribute("href"); var el = id.length > 1 && document.querySelector(id); if (el) { e.preventDefault(); lenis.scrollTo(el, { offset: -80 }); } }); });
     }
 
-    // HERO: a foto cresce de metade para a tela toda, a frase gigante atravessa, as fotos trocam
+    // HERO (home e páginas internas): a foto cresce de metade para a tela toda, a frase gigante atravessa, as fotos trocam
     var hero = document.querySelector(".hero");
     if (fxOn && hero) {
+      var pinPct = parseInt(hero.getAttribute("data-pin"), 10) || 430, D = pinPct / 100;
       var media = hero.querySelector(".h-media"), hps = hero.querySelectorAll(".h-media .hp"), sweep = hero.querySelector(".h-sweep");
       gsap.set(sweep, { yPercent: -50, x: function () { return window.innerWidth; }, opacity: 1 });
-      var tl = gsap.timeline({ defaults: { ease: "none" }, scrollTrigger: { trigger: hero, start: "top top", end: "+=430%", scrub: 0.6, pin: ".hero-pin", anticipatePin: 1, invalidateOnRefresh: true } });
-      tl.to(media, { clipPath: "inset(0% 0% 0% 0%)", duration: 1.4 }, 0)
-        .fromTo(hps[0], { scale: 1.22 }, { scale: 1, duration: 1.4 }, 0)
-        .to(".h-copy .h-sub,.h-copy .h-meta", { opacity: 0, duration: 0.4 }, 0.9)
-        .to(".h-copy .h-title,.h-cap", { opacity: 0, yPercent: -8, duration: 0.6 }, 1.8)
-        .fromTo(sweep, { x: function () { return window.innerWidth; } }, { x: function () { return -(sweep.offsetWidth + 60); }, duration: 3.4 }, 1.9)
-        .to(hps[1], { opacity: 1, duration: 0.7 }, 2.7)
-        .to(hps[2], { opacity: 1, duration: 0.7 }, 4.0);
+      var tl = gsap.timeline({ defaults: { ease: "none" }, scrollTrigger: { trigger: hero, start: "top top", end: "+=" + pinPct + "%", scrub: 0.6, pin: ".hero-pin", anticipatePin: 1, invalidateOnRefresh: true } });
+      tl.to(media, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.3 * D }, 0)
+        .fromTo(hps[0], { scale: 1.22 }, { scale: 1, duration: 0.3 * D }, 0)
+        .to(".h-copy .h-foot,.h-copy .h-meta", { opacity: 0, duration: 0.1 * D }, 0.2 * D)
+        .to(".h-copy .h-title,.h-cap", { opacity: 0, yPercent: -8, duration: 0.14 * D }, 0.4 * D)
+        .fromTo(sweep, { x: function () { return window.innerWidth; } }, { x: function () { return -(sweep.offsetWidth + 60); }, duration: 0.56 * D }, 0.43 * D);
+      for (var hi = 1; hi < hps.length; hi++) tl.to(hps[hi], { opacity: 1, duration: 0.14 * D }, (0.43 + (0.56 / hps.length) * hi) * D);
     }
 
     // MANIFESTO: retrato com parallax
