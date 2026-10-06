@@ -219,6 +219,15 @@ publicar na Vercel como projeto próprio com Root Directory `especita clinica/si
 felizcred-site). Pendentes que dependem do Salvador/clínica: domínio, fotos reais, CNPJ/e-mail,
 formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
 
+## Google Ads — LIGADAS em 05/10/2026 (ordem do Salvador)
+
+- **Ativas (6):** Urgência 15, Implante e Prótese 20, Ortodontia 10, Odontopediatria 8, Clareamento e Lentes 7 (baixado de 10), Dentista em Brusque e Família 10 = **R$70/dia** (teto pedido: R$80).
+- **Pausadas:** `[pesquisa] 18/08 dentista` (antiga, R$65/dia, pausada para não competir) e `[pesquisa 28/07]`. Reativar a antiga se o teste de 14 dias for pior.
+- **Harmonização Facial NÃO foi ligada:** Google reprovou o anúncio de Botox e limitou o de preenchimento ("termos relacionados a medicamentos restritos"). Precisa reescrever sem "botox"/"preenchimento" antes de ligar.
+- Melhores termos da antiga copiados: "implante dentario perto de mim" (3 conv.) e "implantes dentários perto de mim" (2 conv., R$5,91) em ESP - Implante e Prótese > Implante dentário (frase, com pedido de exceção de saúde). Os demais já existiam nas novas.
+- Contato: opção 1 (título leva ao site; botão de mensagem leva ao WhatsApp). Site ainda sem logo, será refeito.
+- Meta (Facebook) fica para depois do Google; os 11 conjuntos novos seguem sem anúncio/imagem.
+
 ## Google Ads — campanhas novas por produto (atualizado 05/10/2026)
 
 Arquivos: `especita clinica/plano-midia-2026-10/07-GOOGLE-ADS.build.py` (gerador) -> `07-GOOGLE-ADS-ESTRUTURA.md` + `upload/*.csv`.
