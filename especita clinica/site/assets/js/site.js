@@ -54,6 +54,24 @@
     }); o.observe(el);
   });
 
+  // ---------- HOME · novo hero: entrada em sequência, troca de fotos, parallax suave
+  var hh = document.querySelector(".hh");
+  if (hh) {
+    requestAnimationFrame(function () { requestAnimationFrame(function () { hh.classList.add("ready"); }); });
+    setTimeout(function () { hh.classList.add("settled"); }, 2600);
+    var hhImgs = hh.querySelectorAll(".hh-photo img"), hk = 0;
+    if (!reduce && hhImgs.length > 1) setInterval(function () { hhImgs[hk].classList.remove("on"); hk = (hk + 1) % hhImgs.length; hhImgs[hk].classList.add("on"); }, 5600);
+    if (fine && !reduce) {
+      var hp = hh.querySelector(".hh-photo"), hc1 = hh.querySelector(".c1"), hc2 = hh.querySelector(".c2");
+      hh.addEventListener("mousemove", function (e) {
+        var r = hh.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+        hp.style.setProperty("--px", (x * -12).toFixed(1) + "px"); hp.style.setProperty("--py", (y * -8).toFixed(1) + "px");
+        hc1.style.setProperty("--px", (x * 22).toFixed(1) + "px"); hc1.style.setProperty("--py", (y * 14).toFixed(1) + "px");
+        hc2.style.setProperty("--px", (x * -22).toFixed(1) + "px"); hc2.style.setProperty("--py", (y * -14).toFixed(1) + "px");
+      });
+    }
+  }
+
   // ---------- nav clara/escura conforme a seção sob ela
   var navEl = document.querySelector(".nav"), darkSecs = Array.prototype.slice.call(document.querySelectorAll("[data-nav]"));
   if (navEl && darkSecs.length) {

@@ -317,7 +317,24 @@ def home_page():
         ("Chame no WhatsApp", "Conte o que precisa. No horário de atendimento, a resposta vem em minutos, já com dois horários para escolher."),
         ("Avaliação completa", "Exame, fotos e radiografias quando necessário. A Dra. explica o que vê e monta o plano com você, em linguagem simples."),
         ("Tratamento e revisão", "Em etapas, no seu ritmo. Depois, lembrete de revisão a cada seis meses pelo WhatsApp.")], ["chair", "procedure", "scanner"])
-    hero = hero_html("Santa Rita · Brusque · SC", 'Odontologia<br>e estética,<em>com calma.</em>', "Implantes, aparelhos, dentista para crianças, clareamento e harmonização, com a mesma profissional do início ao fim.", "Um plano explicado em linguagem simples, no seu ritmo.", 'Seu sorriso, <em>no seu tempo.</em>', ["hero", "office", "smile"], "Dra. atendendo paciente na Especitá", "", 430)
+    HEART = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>'
+    SHIELD = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3.2 8.3-7 10-3.8-1.7-7-5-7-10V6z"/></svg>'
+    hh_imgs = "".join(img(k, a, ('class="on" fetchpriority="high" loading="eager"' if i == 0 else 'loading="eager"')) for i, (k, a) in enumerate([("office", "Consultório da Especitá"), ("hero", "Dra. atendendo paciente"), ("smile", "Sorriso")]))
+    hero = f'''<section class="hh" id="inicio">
+<div class="hh-copy">
+  <p class="hh-pill hh-in"><i></i>Atendimento de segunda a sábado</p>
+  <h1 class="hh-in">Odontologia e estética, <mark>com calma.</mark></h1>
+  <p class="hh-lede hh-in">Implantes, aparelhos, dentista para crianças, clareamento e harmonização, com a mesma profissional do início ao fim, em Brusque.</p>
+  <div class="hh-acts hh-in">{wa(HOME["cta"], "Agendar pelo WhatsApp")}{btn("#servicos", "Ver cuidados")}</div>
+  <div class="hh-stats hh-in"><div><b>10+</b><span>anos em Brusque</span></div><div><b>11</b><span>cuidados no mesmo lugar</span></div><div><b>6</b><span>dias com encaixe de urgência</span></div></div>
+</div>
+<div class="hh-media">
+  <div class="hh-photo">{hh_imgs}</div>
+  <div class="hh-card c1"><span class="ic">{HEART}</span><div><b>Cuidado humanizado</b><span>Você em primeiro lugar</span></div></div>
+  <div class="hh-card c2"><span class="ic">{SHIELD}</span><div><b>Atendimento seguro</b><span>Biossegurança em cada consulta</span></div></div>
+</div>
+</section>
+'''
     return head(HOME["title"], HOME["description"], "", lds) + header("") + f'''
 <main>
 {hero}
