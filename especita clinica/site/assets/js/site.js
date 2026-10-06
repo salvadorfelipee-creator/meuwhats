@@ -29,7 +29,7 @@
   document.querySelectorAll("[data-reveal],[data-clip]").forEach(function (el) { io.observe(el); });
 
   // ---------- manifesto: palavras acendem com o scroll
-  var man = document.querySelector(".manifesto p");
+  var man = document.querySelector(".mf .big");
   if (man && !man.dataset.split) {
     man.innerHTML = man.textContent.trim().split(/\s+/).map(function (w) { return '<span class="w">' + w + "</span>"; }).join(" ");
     man.dataset.split = "1";
@@ -64,7 +64,18 @@
     }); o.observe(el);
   });
 
-  // ---------- Lenis + GSAP (parallax e texto que atravessa a banda)
+  // ---------- nav clara/escura conforme a seção sob ela
+  var navEl = document.querySelector(".nav"), darkSecs = Array.prototype.slice.call(document.querySelectorAll("[data-nav]"));
+  if (navEl && darkSecs.length) {
+    var navTick = false;
+    function navUpdate() { navTick = false; var dark = darkSecs.some(function (el) { var r = el.getBoundingClientRect(); return r.top <= 36 && r.bottom > 36; }); navEl.classList.toggle("dark", dark); }
+    window.addEventListener("scroll", function () { if (!navTick) { navTick = true; requestAnimationFrame(navUpdate); } }, { passive: true });
+    navUpdate();
+  }
+
+  // ---------- Lenis + GSAP: rolagem suave e coreografia (copiada do mecanismo do Aventura: hero pinado + painéis pinados)
+  var rootEl = document.documentElement, fxOn = rootEl.classList.contains("fx");
+  if (fxOn && !(window.gsap && window.ScrollTrigger)) { rootEl.classList.remove("fx"); fxOn = false; }
   if (!reduce && window.gsap && window.ScrollTrigger) {
     gsap.registerPlugin(ScrollTrigger);
     if (window.Lenis) {
@@ -74,23 +85,63 @@
       gsap.ticker.lagSmoothing(0);
       document.querySelectorAll('a[href^="#"]').forEach(function (a) { a.addEventListener("click", function (e) { var id = a.getAttribute("href"); var el = id.length > 1 && document.querySelector(id); if (el) { e.preventDefault(); lenis.scrollTo(el, { offset: -80 }); } }); });
     }
-    document.querySelectorAll(".hero .right img, .shero .ph img").forEach(function (im) {
+
+    // HERO: a foto cresce de metade para a tela toda, a frase gigante atravessa, as fotos trocam
+    var hero = document.querySelector(".hero");
+    if (fxOn && hero) {
+      var media = hero.querySelector(".h-media"), hps = hero.querySelectorAll(".h-media .hp"), sweep = hero.querySelector(".h-sweep");
+      gsap.set(sweep, { yPercent: -50, x: function () { return window.innerWidth; }, opacity: 1 });
+      var tl = gsap.timeline({ defaults: { ease: "none" }, scrollTrigger: { trigger: hero, start: "top top", end: "+=430%", scrub: 0.6, pin: ".hero-pin", anticipatePin: 1, invalidateOnRefresh: true } });
+      tl.to(media, { clipPath: "inset(0% 0% 0% 0%)", duration: 1.4 }, 0)
+        .fromTo(hps[0], { scale: 1.22 }, { scale: 1, duration: 1.4 }, 0)
+        .to(".h-copy .h-sub,.h-copy .h-meta", { opacity: 0, duration: 0.4 }, 0.9)
+        .to(".h-copy .h-title,.h-cap", { opacity: 0, yPercent: -8, duration: 0.6 }, 1.8)
+        .fromTo(sweep, { x: function () { return window.innerWidth; } }, { x: function () { return -(sweep.offsetWidth + 60); }, duration: 3.4 }, 1.9)
+        .to(hps[1], { opacity: 1, duration: 0.7 }, 2.7)
+        .to(hps[2], { opacity: 1, duration: 0.7 }, 4.0);
+    }
+
+    // MANIFESTO: retrato com parallax
+    document.querySelectorAll(".mf .card img").forEach(function (im) {
+      gsap.fromTo(im, { yPercent: -7 }, { yPercent: 7, ease: "none", scrollTrigger: { trigger: im.parentElement, start: "top bottom", end: "bottom top", scrub: true } });
+    });
+
+    // SERVIÇOS: seção fixa; cada painel sobe cobrindo o anterior
+    var svc = document.querySelector(".svc");
+    if (fxOn && svc) {
+      var panels = svc.querySelectorAll(".svc-panel"), idx = svc.querySelectorAll(".svc-index li"), n = panels.length;
+      gsap.set(panels, { clipPath: function (i) { return i ? "inset(100% 0% 0% 0%)" : "inset(0% 0% 0% 0%)"; } });
+      var st = gsap.timeline({ defaults: { ease: "none" }, scrollTrigger: { trigger: svc, start: "top top", end: "+=" + (n - 1) * 110 + "%", scrub: 0.6, pin: true, anticipatePin: 1,
+        onUpdate: function (self) { var k = Math.min(n - 1, Math.round(self.progress * (n - 1))); idx.forEach(function (li, j) { li.classList.toggle("on", j === k); }); } } });
+      for (var i = 1; i < n; i++) {
+        st.to(panels[i], { clipPath: "inset(0% 0% 0% 0%)", duration: 1 }, i - 1)
+          .fromTo(panels[i].querySelector(".sp-photo img"), { scale: 1.25 }, { scale: 1, duration: 1 }, i - 1)
+          .fromTo(panels[i].querySelector(".sp-title"), { yPercent: 35, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.8 }, i - 1 + 0.2);
+      }
+      if (idx[0]) idx[0].classList.add("on");
+    }
+
+    // COMO FUNCIONA: lista fixa, contador e foto trocam com a rolagem
+    var stp = document.querySelector(".stp");
+    if (fxOn && stp) {
+      var rows = stp.querySelectorAll(".stp-row"), pics = stp.querySelectorAll(".stp-pic img"), cnt = stp.querySelector(".stp-count b");
+      function setStep(k) { rows.forEach(function (r, j) { r.classList.toggle("on", j === k); }); pics.forEach(function (p, j) { p.classList.toggle("on", j === k); }); if (cnt) cnt.textContent = "0" + (k + 1); }
+      setStep(0);
+      ScrollTrigger.create({ trigger: stp, start: "top top", end: "+=" + rows.length * 80 + "%", pin: true, anticipatePin: 1, onUpdate: function (self) { setStep(Math.min(rows.length - 1, Math.floor(self.progress * rows.length))); } });
+    }
+
+    document.querySelectorAll(".shero .ph img").forEach(function (im) {
       gsap.to(im, { yPercent: 12, ease: "none", scrollTrigger: { trigger: im.parentElement, start: "top top", end: "bottom top", scrub: true } });
     });
-    document.querySelectorAll(".band").forEach(function (b) {
-      var img = b.querySelector("img"), txt = b.querySelector(".txt");
-      gsap.fromTo(img, { yPercent: -8 }, { yPercent: 8, ease: "none", scrollTrigger: { trigger: b, start: "top bottom", end: "bottom top", scrub: true } });
-      if (txt) gsap.fromTo(txt, { xPercent: 10 }, { xPercent: -60, ease: "none", scrollTrigger: { trigger: b, start: "top bottom", end: "bottom top", scrub: true } });
-    });
-    document.querySelectorAll(".dra .ph img, .index .preview").forEach(function (im) {
+    document.querySelectorAll(".dra .ph img").forEach(function (im) {
       gsap.fromTo(im, { yPercent: -6 }, { yPercent: 6, ease: "none", scrollTrigger: { trigger: im.parentElement, start: "top bottom", end: "bottom top", scrub: true } });
     });
-    // botão magnético (só mouse)
     if (fine) document.querySelectorAll(".btn.solid, .wa-float").forEach(function (b) {
       var xTo = gsap.quickTo(b, "x", { duration: .4, ease: "power3" }), yTo = gsap.quickTo(b, "y", { duration: .4, ease: "power3" });
       b.addEventListener("mousemove", function (e) { var r = b.getBoundingClientRect(); xTo((e.clientX - r.left - r.width / 2) * .25); yTo((e.clientY - r.top - r.height / 2) * .25); });
       b.addEventListener("mouseleave", function () { xTo(0); yTo(0); });
     });
+    window.addEventListener("load", function () { ScrollTrigger.refresh(); });
   }
 
   // ---------- antes/depois

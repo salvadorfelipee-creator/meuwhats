@@ -13,7 +13,7 @@ BY_SLUG = {s["slug"]: s for s in SERVICOS}
 def UN(id_): return f"https://images.unsplash.com/{id_}?auto=format&fit=crop&w=1600&q=75"
 def PX(id_): return f"https://images.pexels.com/photos/{id_}/pexels-photo-{id_}.jpeg?auto=compress&cs=tinysrgb&w=1600"
 PHOTOS = {
-    "hero": PX("8413334"), "checkup": PX("5355705"), "child": PX("7800568"), "scanner": PX("6627447"), "portrait": PX("14235198"),
+    "hero": PX("8413334"), "checkup": PX("6627325"), "child": PX("7800568"), "scanner": PX("5355705"), "portrait": PX("14235198"),
     "office": UN("photo-1629909613654-28e377c37b09"), "smile": UN("photo-1677026010083-78ec7f1b84ed"),
     "implant": UN("photo-1593022356769-11f762e25ed9"), "mirror": UN("photo-1698749778813-ad5f2814e50f"),
     "chair": UN("photo-1598256989800-fe5f95da9787"), "procedure": UN("photo-1588776814546-daab30f310ce"),
@@ -63,11 +63,12 @@ def head(title, description, path, lds):
 <link rel="canonical" href="{url}">
 <meta property="og:type" content="website"><meta property="og:locale" content="pt_BR"><meta property="og:site_name" content="{e(SITE["nome"])}">
 <meta property="og:title" content="{e(title)}"><meta property="og:description" content="{e(description)}"><meta property="og:url" content="{url}"><meta property="og:image" content="{DOM}/assets/img/og.png">
-<meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#161A19">
+<meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#3E322A">
 <link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Hanken+Grotesk:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.26/dist/lenis.css">
+<script>if(matchMedia("(min-width:901px) and (prefers-reduced-motion:no-preference)").matches)document.documentElement.classList.add("fx")</script>
 <link rel="stylesheet" href="/assets/css/site.css">
 {ld(lds)}
 </head>
@@ -103,7 +104,7 @@ def footer():
 </body></html>'''
 
 def ctab(text, label):
-    return f'''<section class="ctab"><div><h2 data-reveal>Fale com a recepção, <em>sem formulário.</em></h2><p data-reveal>Conte o que você precisa pelo WhatsApp. No horário de atendimento a resposta vem em minutos, já com dois horários para escolher.</p></div><div class="acts" data-reveal>{wa(text, label)}{btn(SITE["maps"], "Como chegar", extra=' target="_blank" rel="noopener"')}</div></section>'''
+    return f'''<section class="ctab" data-nav="dark"><div><h2 data-reveal>Fale com a recepção, <em>sem formulário.</em></h2><p data-reveal>Conte o que você precisa pelo WhatsApp. No horário de atendimento a resposta vem em minutos, já com dois horários para escolher.</p></div><div class="acts" data-reveal>{wa(text, label)}{btn(SITE["maps"], "Como chegar", extra=' target="_blank" rel="noopener"')}</div></section>'''
 
 def local_block():
     return f'''<section class="local" id="local"><div><p class="caps">Onde estamos</p><h2 data-reveal>Santa Rita, <em>em frente à ponte dos bombeiros.</em></h2>
@@ -113,7 +114,7 @@ def local_block():
 
 # ---------------------------------------------------------------- widgets
 def face_svg():
-    return '''<svg class="face" viewBox="0 0 320 380" aria-label="Ilustração em linha de um rosto com linhas de expressão" fill="none" stroke="#EFEBE4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    return '''<svg class="face" viewBox="0 0 320 380" aria-label="Ilustração em linha de um rosto com linhas de expressão" fill="none" stroke="#F4EFE8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
 <path d="M70 150 C70 70 120 40 160 40 C200 40 250 70 250 150 C250 230 215 300 160 316 C105 300 70 230 70 150Z"/>
 <path d="M90 120 C110 70 210 70 230 120" opacity=".5"/>
 <path d="M110 158 q22-14 44 0M166 158 q22-14 44 0" stroke-width="2"/>
@@ -141,14 +142,14 @@ def widget(s):
                 if skip and i == 4: continue
                 x = 76 + i * 31; cx = x + 12
                 rot = f' transform="rotate(-6 {cx} 150)"' if (skip and i == 3) else (f' transform="rotate(6 {cx} 150)"' if (skip and i == 5) else "")
-                out.append(f'<path d="M{x} 150 v-40 q0-16 12-16 q12 0 12 16 v40z" fill="#EFEBE4" stroke="#C9C2B6" stroke-width="1"{rot}/>')
+                out.append(f'<path d="M{x} 150 v-40 q0-16 12-16 q12 0 12 16 v40z" fill="#F4EFE8" stroke="#C9C2B6" stroke-width="1"{rot}/>')
                 out.append(f'<path d="M{x+3} 150 q9 50 9 70 q0-20 9-70z" fill="#D9D1C6" opacity=".9"{rot}/>')
             return "".join(out)
-        gum = '<path d="M0 150 h400 v150 h-400z" fill="#5B4A47"/><path d="M0 150 h400" stroke="#EFEBE4" stroke-width="1" opacity=".6"/><path d="M0 206 h400" stroke="#EFEBE4" stroke-width="1" stroke-dasharray="2 6" opacity=".35"/><text x="14" y="200" font-family="Hanken Grotesk, Arial" font-size="9" fill="#EFEBE4" opacity=".55" letter-spacing="1.5">GENGIVA</text><text x="14" y="226" font-family="Hanken Grotesk, Arial" font-size="9" fill="#EFEBE4" opacity=".55" letter-spacing="1.5">OSSO</text>'
+        gum = '<path d="M0 150 h400 v150 h-400z" fill="#5B4A47"/><path d="M0 150 h400" stroke="#F4EFE8" stroke-width="1" opacity=".6"/><path d="M0 206 h400" stroke="#F4EFE8" stroke-width="1" stroke-dasharray="2 6" opacity=".35"/><text x="14" y="200" font-family="Hanken Grotesk, Arial" font-size="9" fill="#F4EFE8" opacity=".55" letter-spacing="1.5">GENGIVA</text><text x="14" y="226" font-family="Hanken Grotesk, Arial" font-size="9" fill="#F4EFE8" opacity=".55" letter-spacing="1.5">OSSO</text>'
         threads = "".join(f'<path d="M-8 {y} h16" stroke="#5B4A47" stroke-width="1.6"/>' for y in range(166, 226, 7))
         gap_x = 76 + 4 * 31 + 12
-        before = f'''<svg viewBox="0 0 400 300" class="layer" aria-hidden="true"><rect width="400" height="300" fill="#1C2220"/>{crowns(True)}{gum}<path d="M{gap_x} 96 v54" stroke="#EFEBE4" stroke-width="1" stroke-dasharray="3 5" opacity=".6"/><path d="M{gap_x-14} 150 q14 18 28 0" stroke="#EFEBE4" stroke-width="1" fill="none" opacity=".6"/></svg>'''
-        after = f'''<svg viewBox="0 0 400 300" class="layer after" aria-hidden="true"><rect width="400" height="300" fill="#1C2220"/>{crowns(False)}{gum}<g transform="translate({gap_x} 0)"><rect x="-4" y="150" width="8" height="12" fill="#B8C3BF"/><path d="M-8 162 h16 v56 l-8 10 l-8-10z" fill="#9FB7B0"/>{threads}<path d="M-8 162 h16 v56 l-8 10 l-8-10z" fill="none" stroke="#EFEBE4" stroke-width="1"/></g></svg>'''
+        before = f'''<svg viewBox="0 0 400 300" class="layer" aria-hidden="true"><rect width="400" height="300" fill="#2F261F"/>{crowns(True)}{gum}<path d="M{gap_x} 96 v54" stroke="#F4EFE8" stroke-width="1" stroke-dasharray="3 5" opacity=".6"/><path d="M{gap_x-14} 150 q14 18 28 0" stroke="#F4EFE8" stroke-width="1" fill="none" opacity=".6"/></svg>'''
+        after = f'''<svg viewBox="0 0 400 300" class="layer after" aria-hidden="true"><rect width="400" height="300" fill="#2F261F"/>{crowns(False)}{gum}<g transform="translate({gap_x} 0)"><rect x="-4" y="150" width="8" height="12" fill="#B8C3BF"/><path d="M-8 162 h16 v56 l-8 10 l-8-10z" fill="#9FB7B0"/>{threads}<path d="M-8 162 h16 v56 l-8 10 l-8-10z" fill="none" stroke="#F4EFE8" stroke-width="1"/></g></svg>'''
         rules = json.dumps({"1": "Um dente faltando: o caso clássico de implante unitário com coroa. A avaliação confirma osso e gengiva.",
                             "varios": "Vários dentes: pode ser implantes individuais ou prótese fixa sobre implantes. O planejamento digital compara as opções.",
                             "todos": "Todos os dentes de uma arcada: a prótese protocolo (fixa sobre implantes) é a alternativa à prótese móvel que solta.",
@@ -189,7 +190,7 @@ def widget(s):
         body = f'''<p class="caps">Ferramenta</p><div class="two"><div><h3>Escala de tons, <em>em ilustração</em></h3><p class="sub">Arraste para ver a lógica do clareamento. Não é previsão do seu resultado.</p><p style="margin-top:22px">{wa(cta, "Agendar avaliação para clareamento")}</p></div><div><div class="shade"></div><input class="range shade-range" type="range" min="0" max="7" value="1" aria-label="Tom"><p class="out shade-lbl"></p><p class="disc">Restaurações e facetas não clareiam. O tom final depende do esmalte de cada pessoa e do protocolo supervisionado.</p></div></div>'''
     else:
         return ""
-    return f'<section class="tool" id="ferramenta"><div class="inner">{body}</div></section>'
+    return f'<section class="tool" id="ferramenta" data-nav="dark"><div class="inner">{body}</div></section>'
 
 # ---------------------------------------------------------------- páginas
 def service_page(s):
@@ -231,32 +232,55 @@ def service_page(s):
 
 def home_page():
     lds = [ld_business(), {"@context": "https://schema.org", "@type": "WebSite", "name": SITE["nome"], "url": DOM + "/"}]
-    items = "".join(f'<li><a href="/{s["slug"]}" data-img="{PHOTO_BY_SLUG.get(s["slug"], "office")}"><span class="n">{i+1:02d}</span><span class="t">{e(s["menu"])}</span><span class="g">{e(s["grupo"])}</span></a></li>' for i, s in enumerate(SERVICOS))
-    previews = "".join(f'<img src="{PHOTOS[k]}" alt="" data-k="{k}" loading="lazy" decoding="async">' for k in ["mirror", "chair", "implant", "checkup", "scanner", "child", "office", "portrait", "procedure", "smile"])
-    marquee = "".join(f'<span>{e(s["menu"])}<i>·</i></span>' for s in SERVICOS)
+    def lst(items): return "".join(f'<li><a href="/{sl}">{e(t)}</a></li>' for sl, t in items)
+    PANELS = [
+        ("mirror", "Urgência", "no mesmo dia", "Dente quebrado ou dor de dente não espera. Encaixes diários, de segunda a sábado.", [("dente-quebrado", "Dente quebrado"), ("dor-de-dente", "Dor de dente")]),
+        ("implant", "Implante", "e prótese", "Voltar a mastigar com segurança, a partir de um planejamento digital do seu caso.", [("implante-dentario", "Implante dentário"), ("implante-dentario", "Prótese protocolo")]),
+        ("scanner", "Ortodontia", "fixo ou invisível", "Dentes alinhados para crianças, adolescentes e adultos, com acompanhamento aqui em Brusque.", [("ortodontia", "Aparelho ortodôntico"), ("alinhador-invisivel", "Alinhador invisível")]),
+        ("child", "Infantil", "e família", "A primeira visita é só para conhecer. A família inteira atendida no mesmo dia, em horários seguidos.", [("odontopediatria", "Dentista para crianças"), ("tratamento-odontologico", "Tratamento geral e família"), ("dentista-em-brusque", "Avaliação e check-up")]),
+        ("portrait", "Estética", "do sorriso e do rosto", "Clareamento, lentes e harmonização orofacial, sempre a partir de uma avaliação individual.", [("clareamento-dental", "Clareamento dental"), ("lente-de-contato-dental", "Lente de contato dental"), ("harmonizacao-facial", "Harmonização facial")]),
+    ]
+    panels = "".join(f'<article class="svc-panel"><div class="sp-photo">{img(k, a_ + " " + b_)}<h2 class="sp-title">{e(a_)}<em>{e(b_)}</em></h2></div><div class="sp-side"><p class="caps">Nossos cuidados</p><p class="sp-desc">{e(d)}</p><ul class="sp-list">{lst(l)}</ul></div></article>' for k, a_, b_, d, l in PANELS)
+    index = "".join(f"<li>{e(a_)}</li>" for _, a_, _, _, _ in PANELS)
+    steps = [("Chame no WhatsApp", "Conte o que precisa. No horário de atendimento, a resposta vem em minutos, já com dois horários para escolher.", "chair"),
+             ("Avaliação completa", "Exame, fotos e radiografias quando necessário. A Dra. explica o que vê e monta o plano com você, em linguagem simples.", "procedure"),
+             ("Tratamento e revisão", "Em etapas, no seu ritmo. Depois, lembrete de revisão a cada seis meses pelo WhatsApp.", "scanner")]
+    srows = "".join(f'<li class="stp-row{" on" if i == 0 else ""}"><h3>{e(t)}</h3><p>{e(d)}</p></li>' for i, (t, d, _) in enumerate(steps))
+    spics = "".join(img(k, t, 'class="on"' if i == 0 else "") for i, (t, _, k) in enumerate(steps))
     return head(HOME["title"], HOME["description"], "", lds) + header("") + f'''
 <main>
 <section class="hero">
-<div class="left"><h1>Odontologia<br>e estética,<span class="l2"><em>com calma.</em></span></h1><p class="under"><b>Especitá · Brusque</b>Implantes, aparelhos, dentista para crianças, clareamento e harmonização, com a mesma profissional do início ao fim.</p><span class="scrollhint">Role para conhecer</span></div>
-<div class="right">{img("hero", "Dra. atendendo paciente na Especitá", 'fetchpriority="high" loading="eager"')}<p class="over">Um plano explicado em <em>linguagem simples,</em> no seu ritmo.</p><span class="tag">{e(SITE["dra"])}<br>{e(SITE["cro"])}</span></div>
+<div class="hero-pin">
+  <div class="h-copy">
+    <p class="h-meta">Santa Rita · Brusque · SC</p>
+    <h1 class="h-title">Odontologia<br>e estética,<em>com calma.</em></h1>
+    <p class="h-sub">Implantes, aparelhos, dentista para crianças, clareamento e harmonização, com a mesma profissional do início ao fim.</p>
+  </div>
+  <div class="h-media">
+    {img("hero", "Dra. atendendo paciente na Especitá", 'class="hp" fetchpriority="high" loading="eager"')}
+    {img("office", "Consultório da Especitá", 'class="hp" loading="eager"')}
+    {img("smile", "Sorriso", 'class="hp" loading="eager"')}
+    <div class="h-copy" aria-hidden="true"><p class="h-title">Odontologia<br>e estética,<em>com calma.</em></p><p class="h-cap">Um plano explicado em linguagem simples, no seu ritmo.</p></div>
+    <p class="h-sweep" aria-hidden="true">Seu sorriso, <em>no seu tempo.</em></p>
+  </div>
+</div>
 </section>
 
-<div class="marquee" aria-hidden="true"><div class="track">{marquee}{marquee}</div></div>
+<section class="mf" data-reveal-skip>
+  <div class="card">{img("checkup", "Dra. Catiucia (foto provisória)")}<span>Dra. Catiucia · CRO-SC 14067</span></div>
+  <div><p class="big">A Especitá é uma clínica de bairro, no Santa Rita, onde a mesma dentista conhece o seu histórico, explica cada passo e organiza o tratamento com você, sem pressa e sem jargão.</p>
+  <div class="meta"><div><b data-count="10" data-suffix="+">0</b>anos em Brusque</div><div><b data-count="11">0</b>cuidados no mesmo lugar</div><div><b data-count="6">0</b>dias por semana com encaixe</div></div></div>
+</section>
 
-<section class="manifesto"><p>A Especitá é uma clínica de bairro, no Santa Rita, onde a mesma dentista conhece o seu histórico, explica cada passo e organiza o tratamento com você, sem pressa e sem jargão.</p>
-<div class="meta"><div><b data-count="10" data-suffix="+">0</b>anos em Brusque</div><div><b data-count="11">0</b>cuidados no mesmo lugar</div><div><b data-count="6">0</b>dias por semana com encaixe</div></div></section>
+<section class="svc" data-nav="dark" id="servicos">
+  <ol class="svc-index">{index}</ol>
+  {panels}
+</section>
 
-<section class="index" id="servicos"><div class="head"><h2 data-reveal>O que fazemos <em>aqui.</em></h2><p class="caps">Índice de serviços</p></div>
-<div class="grid"><ol>{items}</ol><div class="preview" data-clip>{previews}</div></div></section>
-
-<section class="band">{img("smile", "Sorriso de perto")}<p class="txt" aria-hidden="true">Seu sorriso, no seu tempo. Seu sorriso, no seu tempo.</p><span class="cap">Santa Rita · Brusque</span></section>
-
-<section class="sec steps"><div class="inner"><div class="head"><p class="caps">Como funciona</p><h2 data-reveal>Três passos, <em>sem formulário.</em></h2></div>
-<div class="tl"><ol>
-<li class="on" data-reveal><span class="dot">1</span><h3>Chame no WhatsApp</h3><p>Conte o que precisa. No horário de atendimento, a resposta vem em minutos, já com dois horários para escolher.</p></li>
-<li data-reveal><span class="dot">2</span><h3>Avaliação completa</h3><p>Exame, fotos e radiografias quando necessário. A Dra. explica o que vê e monta o plano com você, em linguagem simples.</p></li>
-<li data-reveal><span class="dot">3</span><h3>Tratamento e revisão</h3><p>Em etapas, no seu ritmo. Depois, lembrete de revisão a cada seis meses pelo WhatsApp.</p></li>
-</ol><div class="side" data-clip>{img("procedure", "Atendimento na Especitá")}<span class="tag">Especitá · Brusque</span></div></div></div></section>
+<section class="stp" id="como">
+  <div class="head"><p class="caps">Como funciona</p><h2>Três passos, <em>sem formulário.</em></h2></div>
+  <div class="stp-grid"><div><p class="stp-count"><b>01</b> <small>/ 03</small></p><div class="stp-pic">{spics}</div></div><ol class="stp-rows">{srows}</ol></div>
+</section>
 
 <section class="dra"><div class="ph">{img("checkup", "Dra. Catiucia em atendimento")}</div><div class="tx"><p class="caps">A Dra.</p><h2 data-reveal>Catiucia <em>L. Riffel</em></h2><p style="margin-top:22px">Cirurgiã-dentista, há mais de dez anos em Brusque. Fundou a Especitá para que o paciente tenha uma só profissional do primeiro contato à manutenção, em qualquer especialidade.</p><dl><div><dt>Registro</dt><dd>{e(SITE["cro"])}</dd></div><div><dt>Habilitação</dt><dd>EPAO 4417</dd></div><div><dt>Em Brusque</dt><dd>10+ anos</dd></div></dl><p style="margin-top:28px"><a class="link" href="/sobre">Conheça a Dra.</a></p></div></section>
 
@@ -309,7 +333,7 @@ def build():
     write("robots.txt", f"User-agent: *\nAllow: /\nSitemap: {DOM}/sitemap.xml\n")
     write("llms.txt", f"# {SITE['nome']}\n\n> Clínica odontológica e de estética em Brusque/SC. Responsável técnica {SITE['dra']} ({SITE['cro']}). Atendimento pelo WhatsApp {SITE['whatsapp_fmt']}. Endereço: {SITE['endereco']}, {SITE['referencia']}. {SITE['horario']}.\n\n## Serviços\n" + "".join(f"- [{s['menu']}]({DOM}/{s['slug']}): {s['description']}\n" for s in SERVICOS) + f"\n## Clínica\n- [A Dra.]({DOM}/sobre)\n- [Contato]({DOM}/contato)\n\n## Regras de conteúdo\nEste site não divulga preços, promoções ou promessas de resultado (Código de Ética Odontológica). Valores são informados na avaliação ou pelo WhatsApp.\n")
     write("vercel.json", json.dumps({"cleanUrls": True, "trailingSlash": False, "headers": [{"source": "/assets/(.*)", "headers": [{"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}]}, {"source": "/(.*)", "headers": [{"key": "X-Content-Type-Options", "value": "nosniff"}, {"key": "Referrer-Policy", "value": "strict-origin-when-cross-origin"}]}]}, indent=2))
-    write("assets/img/favicon.svg", '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#161A19"/><text x="32" y="46" text-anchor="middle" font-family="Georgia, serif" font-size="40" fill="#EFEBE4">E</text></svg>')
+    write("assets/img/favicon.svg", '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="#3E322A"/><text x="32" y="46" text-anchor="middle" font-family="Georgia, serif" font-size="40" fill="#F4EFE8">E</text></svg>')
     print("ok:", len(pages), "páginas em", ROOT)
 
 if __name__ == "__main__":

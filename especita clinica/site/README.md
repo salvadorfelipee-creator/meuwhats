@@ -118,3 +118,11 @@ cheia, texto que atravessa a imagem).
 As fotos são **provisórias e hotlinkadas** dos CDNs. Antes de publicar: trocar pelas fotos reais da
 clínica (ou baixar as escolhidas, converter para WebP e colocar em `assets/img/`). Nenhuma foto de
 banco pode ser apresentada como paciente real ou depoimento.
+
+## v4 (06/10/2026): coreografia de rolagem estilo Aventura Dental Arts + paleta Pantone
+
+- **Paleta** (da referência enviada): Demitasse `#3E322A`, Coffee Liqueur `#6B523A`, Dijon `#97784F`, Warm Sand `#C4B196`, mais branco e um bege claro (`#F4EFE8`, tinta do Warm Sand). Fotos em tons de sépia via `filter` até chegarem as fotos reais da Dra.
+- **Fontes**: Newsreader 500 (títulos, itálico como voz) + Hanken Grotesk. Mais firmes que a versão anterior.
+- **Mecanismo copiado do Aventura** (estudado com Chromium; é Nuxt + Lenis + animação por rolagem): hero fixo (pin) onde a foto cresce de metade para a tela toda e a frase "Seu sorriso, no seu tempo." atravessa trocando 3 fotos; retrato com parallax e texto que acende palavra por palavra; seção de serviços fixa onde 5 painéis sobem cobrindo o anterior, com índice lateral; lista "como funciona" fixa com contador e foto que troca.
+- **Implementação**: GSAP + ScrollTrigger + Lenis (CDN). A classe `fx` no `<html>` liga a coreografia só em tela larga e sem "reduzir movimento"; no celular e para quem reduz movimento tudo fica empilhado e estático. Código em `assets/js/site.js`; estilos `.hero`, `.mf`, `.svc`, `.stp` em `assets/css/site.css`; estrutura em `home_page()` no `build_site.py`.
+- **Não usados de propósito**: three.js, Spline e Rive. São para cenas 3D ou animações vetoriais feitas em editor próprio; precisam de arquivos criados (`.splinecode`, `.riv`) e mais peso. Fazem sentido depois, se a clínica quiser um dente 3D girando.
