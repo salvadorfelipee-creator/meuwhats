@@ -1,6 +1,6 @@
 // Cria campanha + conjuntos de anúncios por produto (sem imagem/anúncio ainda —
 // isso fica pra quando a imagem chegar). Tudo em status PAUSED, clique direto pro
-// WhatsApp, horário seg-sex 7h-21h, público em Brusque + cidades vizinhas.
+// WhatsApp, horário seg-sex 7h-24h, público em Brusque + cidades vizinhas.
 //
 // Não mexe em nada que já está rodando (botox, ortodontia lead-form, post
 // impulsionado) — só cria objetos novos.
@@ -170,7 +170,7 @@ async function main() {
 
       console.log(`  Orçamento: R$ ${dailyEquivalent}/dia equivalente (R$ ${(lifetimeBudgetCents / 100).toFixed(2)} em ${DIAS_CAMPANHA} dias)`);
       console.log(`  Idade: ${conjunto.idadeMin}-${conjunto.idadeMax} | Gênero: ${conjunto.genero ? (conjunto.genero === 1 ? "homens" : "mulheres") : "todos"}`);
-      console.log(`  Horário: seg-sex 7h-21h`);
+      console.log(`  Horário: seg-sex 7h-24h`);
 
       if (execute) {
         const adSet = await criarConjuntoComRetry(payload);

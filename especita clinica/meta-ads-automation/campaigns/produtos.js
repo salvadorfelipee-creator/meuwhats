@@ -208,11 +208,13 @@ export const PRODUTOS = [
 
 export const CIDADES = ["Brusque", "Botuverá", "Nova Trento", "São João Batista", "Guabiruba"];
 
-// Agendamento: seg-sex, 7h-21h (precisa de orçamento vitalício, ver lib/metaMarketingApi.js)
+// Agendamento: seg-sex, 7h-24h (precisa de orçamento vitalício, ver lib/metaMarketingApi.js).
+// Estendido de 7h-21h pra 7h-24h em 05/10/2026 — o atendimento automático do painel cobre fora
+// do horário humano, e dado real mostra a janela 21h-24h como a mais barata do dia pro botox.
 export const HORARIO = {
   days: [1, 2, 3, 4, 5], // 0=domingo ... 6=sábado
   start_minute: 7 * 60,
-  end_minute: 21 * 60,
+  end_minute: 24 * 60, // meia-noite — 24h vira "1440" pro fim do dia na Marketing API
   timezone_type: "USER",
 };
 
