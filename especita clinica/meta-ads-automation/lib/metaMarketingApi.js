@@ -186,6 +186,55 @@ async function createAdCreative({ name, pageId, imageHash, headline, primaryText
   });
 }
 
+// Pra reaproveitar um vídeo que já está rodando (já publicado no Instagram, já tem
+// video_id e thumbnail) só trocando o destino do clique pra WhatsApp, em vez de
+// subir tudo de novo do zero.
+async function createAdCreativeDeVideo({
+  name,
+  pageId,
+  instagramUserId,
+  videoId,
+  thumbnailHash,
+  headline,
+  primaryText,
+  welcomeMessage,
+}) {
+  const videoData = {
+    video_id: videoId,
+    title: headline,
+    message: primaryText,
+    image_hash: thumbnailHash,
+    call_to_action: {
+      type: "WHATSAPP_MESSAGE",
+      value: { app_destination: "WHATSAPP" },
+    },
+  };
+
+  if (welcomeMessage) {
+    videoData.page_welcome_message = {
+      type: "VISUAL_EDITOR",
+      version: 2,
+      landing_screen_type: "welcome_message",
+      media_type: "text",
+      text_format: {
+        customer_action_type: "autofill_message",
+        message: {
+          text: welcomeMessage.greeting,
+          autofill_message: { content: welcomeMessage.autofill },
+        },
+      },
+    };
+  }
+
+  const objectStorySpec = { page_id: pageId, video_data: videoData };
+  if (instagramUserId) objectStorySpec.instagram_user_id = instagramUserId;
+
+  return graphRequest("POST", `act_${adAccountId()}/adcreatives`, {
+    name,
+    object_story_spec: objectStorySpec,
+  });
+}
+
 async function createAd({ name, adSetId, creativeId, status = "PAUSED" }) {
   return graphRequest("POST", `act_${adAccountId()}/ads`, {
     name,
@@ -204,5 +253,6 @@ export {
   createAdSet,
   uploadImage,
   createAdCreative,
+  createAdCreativeDeVideo,
   createAd,
 };

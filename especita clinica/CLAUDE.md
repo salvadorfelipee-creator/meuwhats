@@ -202,11 +202,51 @@ por causa das regras do CFO) + rodar um script de criação de criativo/anúncio
 é o próximo passo depois que a imagem chegar — reaproveitar `uploadImage`/`createAdCreative`/
 `createAd` de `lib/metaMarketingApi.js`, já tem tudo pronto, só falta o script por produto).
 
-**Pendente, crítico pra "rastrear tudo":** clique-pro-WhatsApp manda um campo `referral`
-(`source_id`, `ctwa_clid`, etc.) no payload do webhook do WhatsApp quando a conversa vem de
-anúncio — precisa confirmar se o painel (`whatsapp especita/server.js`) já captura e salva isso
-na conversa (tag/pipeline) pra saber de qual campanha/conjunto cada lead veio. Ver essa pendência
-antes de considerar o rastreamento "pronto".
+**Rastreamento — resolvido em 05/10/2026.** `whatsapp especita/server.js` + `db.js` agora captura
+`msg.referral` de qualquer clique-pro-WhatsApp (qualquer número, não só Felizcred): grava atividade
+detalhada na timeline da conversa + aplica tag de produto por palavra-chave no texto do criativo
+(ver `registrarOrigemAnuncio`/`tagDoProdutoPorReferral` em server.js). Já commitado e no ar.
+
+## App Meta publicado + 2 anúncios reaproveitando vídeo existente (05/10/2026)
+
+**App "Especita" (developers.facebook.com) publicado.** Bloqueio encontrado: criar anúncio em
+cima de post já existente (ver abaixo) exige app em modo público, não "em desenvolvimento" — e
+publicar exige URL de Política de Privacidade preenchida, que não existia ainda pra Especitá.
+Resolvido criando `public/privacidade.html` + `public/termos.html` no repo do painel (rotas
+`/privacidade` e `/termos` do server.js já esperavam esses arquivos e nunca tinham sido
+commitados — gap real, não só pendência documentada) e publicando via **GitHub Pages num
+repositório novo e público, só com essas 2 páginas**: `github.com/especitaodonto/especita-paginas-publicas`
+→ `https://especitaodonto.github.io/especita-paginas-publicas/privacidade.html` (e `/termos.html`).
+Decisão importante: **não tornar o repo `Whatsappespecita` público** — ele tem o código-fonte
+completo do produto que o Salvador vende pra outros clientes, só o conteúdo público da Especitá
+foi isolado num repo à parte. Falta preencher CNPJ e e-mail de contato nos dois textos (marcado
+como `[preencher]`).
+
+**2 anúncios criados reaproveitando vídeo que já roda** (sem subir mídia nova): o vídeo do conjunto
+"botox" (na real é sobre bioestimulador de colágeno, ver achado abaixo) foi usado no conjunto
+"ESP - Harmonização Facial - geral", e o vídeo "ortodontia" (avaliação infantil) no conjunto
+"ESP - Ortodontia - Aparelho fixo - pais" — ambos como anúncio novo PAUSADO, clique direto pro
+WhatsApp (os originais continuam como estão, só formulário). Usa `createAdCreativeDeVideo` em
+`lib/metaMarketingApi.js` (video_id + thumbnail já existentes, sem reupload) — ver
+`campaigns/reaproveitar-videos.js`.
+
+**Desempenho real dos 2 conjuntos ativos (insights de 90 dias, 05/10/2026) — pra decidir o que
+aproveitar/melhorar:**
+- `botox` (na real bioestimulador de colágeno): R$1.985 gastos, 117 leads a R$16,97, CTR 2,11%,
+  frequência 4,32 (criativo cansado, confirma o plano). De 117 leads só 82 iniciaram conversa de
+  WhatsApp — nem todo lead do formulário vira conversa.
+- `ortodontia`: R$1.948 gastos, 48 leads a R$40,59 (pior CPL, bate com o benchmark já conhecido),
+  CTR bem mais baixo (0,81% vs 2,11% do botox) — o vídeo/ângulo converte pior, não é só o produto.
+- **Achado que contraria a suposição de horário seg-sex 7h-21h**: por hora do dia, o CPL do botox
+  cai pra R$12,84 das 21h-24h (melhor janela do dia inteiro) contra R$19,36 na janela 7h-21h — as
+  campanhas atuais rodam 24h e boa parte do resultado bom vem à noite. Pra ortodontia a diferença é
+  pequena (R$41-47 em qualquer janela, amostra pequena). **Decisão pendente com o Salvador**: manter
+  7h-21h nos conjuntos novos (compatível com capacidade de resposta da recepção) ou estender até
+  23h/24h pra não deixar a janela mais barata de fora — é trade-off custo-por-lead x capacidade de
+  atendimento fora do horário comercial, não uma correção óbvia.
+- **Achado de nomenclatura**: o conjunto chamado "botox" não fala de botox — o vídeo e formulário
+  são sobre bioestimulador de colágeno. Nome do conjunto ficou de campanha antiga; confirmar com a
+  Dra. Catiucia se foi reposicionamento intencional ou anúncio esquecido com copy desatualizada.
 
 ## Site da clínica (construído 2026-10-05, ainda não publicado)
 
