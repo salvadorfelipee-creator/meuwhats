@@ -259,6 +259,9 @@ publicar na Vercel como projeto próprio com Root Directory `especita clinica/si
 felizcred-site). Pendentes que dependem do Salvador/clínica: domínio, fotos reais, CNPJ/e-mail,
 formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
 
+## Google Ads — LIMPEZA HARMONIZAÇÃO (06/10/2026, autorizada pelo Salvador)
+Removidos de vez (irreversível, sem histórico de desempenho): grupo "Botox" (com anúncio e palavras) e o anúncio antigo de "Harmonização e preenchimento" (com "Bioestimulador"/botox). Ficou só o anúncio novo, aprovado. O aviso de "reprovado/limitado" no Diagnóstico da campanha deve sumir sozinho; "estratégia de lances inativa" não foi esclarecida (provável campanha nova sem impressões) — se a Harmonização seguir com 0 impressões em 48h, conferir status das palavras (política de saúde). Palavra "bioestimulador de colágeno" ficou pausada.
+
 ## Google Ads — RASTREIO DE CONVERSÃO WHATSAPP (feito 06/10/2026, correção de falha minha)
 
 - Criada no Google Ads a conversão **"WhatsApp - Clique no site"** (categoria Contato, ação PRINCIPAL, valor R$1, contagem "Uma", janela 90 dias). Tag: `AW-16475900720/Ez-5CM30l5MdELCWqbA9`.
