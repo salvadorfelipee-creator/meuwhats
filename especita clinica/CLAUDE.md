@@ -219,28 +219,31 @@ publicar na Vercel como projeto próprio com Root Directory `especita clinica/si
 felizcred-site). Pendentes que dependem do Salvador/clínica: domínio, fotos reais, CNPJ/e-mail,
 formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
 
-## Google Ads — campanhas novas por produto (05/10/2026, sessão interrompida por limite de uso)
+## Google Ads — campanhas novas por produto (atualizado 05/10/2026)
 
-Arquivos: `especita clinica/plano-midia-2026-10/07-GOOGLE-ADS.build.py` (gerador, valida limites do Google e
-regras do CFO) → `07-GOOGLE-ADS-ESTRUTURA.md` (doc) + `upload/*.csv` (formato dos modelos oficiais de
-Ferramentas > Ações em massa > Uploads; cabeçalhos em inglês, `EU political ads`=No, orçamento com vírgula,
-local `Brusque,State of Santa Catarina,Brazil`, palavra usa coluna `Type`, anúncio usa `Description 1`).
+Arquivos: `especita clinica/plano-midia-2026-10/07-GOOGLE-ADS.build.py` (gerador) -> `07-GOOGLE-ADS-ESTRUTURA.md` + `upload/*.csv`.
+Handoff de continuação: `plano-midia-2026-10/PROMPT-CONTINUAR-GOOGLE-ADS.md`.
 
 **Feito na conta 113-943-9321 (tudo PAUSADO, Salvador decide quando ligar):**
-- 7 campanhas `ESP - …` criadas (Urgência 15, Implante e Prótese 20, Ortodontia 10, Odontopediatria 8,
-  Clareamento e Lentes 10, Harmonização Facial 10 [só ligar após CRO-SC], Dentista em Brusque e Família 10 R$/dia).
-  AI Max desligado, ampla desligada, recursos automáticos desligados, só Rede de Pesquisa, Maximizar conversões.
-- 13 grupos de anúncios criados; 57 das 112 palavras entraram (`upload/03b-palavras-faltantes.csv` tem as 55 que faltam).
-- Local: só a cidade de Brusque (pedido do Salvador: sem raio, Botuverá é longe). Opção "Presença" salva em 6
-  campanhas; **conferir ESP - Ortodontia** (o save pode não ter pegado).
-- Listas de negativas criadas e aplicadas: "ESP - Negativas gerais" (49, nas 7) e "ESP - Negativas de preço" (8, em Implante + Harmonização).
+- 7 campanhas `ESP - ...` (Urgência 15, Implante e Prótese 20, Ortodontia 10, Odontopediatria 8, Clareamento e Lentes 10,
+  Harmonização Facial 10, Dentista em Brusque e Família 10 R$/dia). AI Max e ampla desligados, só Rede de Pesquisa,
+  Maximizar conversões, local só Brusque (cidade, "Presença").
+- 13 grupos, 112 palavras (57 por upload + 55 pela tela com pedido de exceção; várias "em análise" pela política de saúde),
+  13 anúncios responsivos, listas de negativas (gerais nas 7; preço em Implante + Harmonização).
+- Sitelinks no nível de campanha, frases de destaque, snippet, recurso de chamada e de mensagem/WhatsApp, programação (seg-sex 7-21h, sáb 7-13h; Urgência até 20h).
+- Públicos em observação: Odontopediatria (4 faixas de pais), Ortodontia (pais de adolescentes), Clareamento e Lentes
+  (casamentos + beleza e higiene pessoal), Harmonização Facial (casamentos + beleza + maquiagem e cosméticos), Dentista em
+  Brusque e Família (3 faixas de pais + mudança e transferência). Implante e Urgência: sem público (decisão).
+- Anúncios conferidos em 05/10: nenhum reprovado; ESP aparecem "Pendente" (normal enquanto pausadas).
+- Harmonização: pendência do CRO-SC/TRF1 resolvida; só segue pausada junto com o resto.
 
-**Falta (o Google bloqueou uploads por ~2 h a partir das 15:15 de 05/10 — "muitas planilhas"):**
-1. Subir `upload/04-anuncios.csv` (13 anúncios responsivos), `03b-palavras-faltantes.csv`, `07-sitelinks.csv`
-   (nível campanha; os sitelinks antigos da CONTA dizem "Consulta Grátis" — vedado pelo CFO — e não devem ser
-   herdados pelas novas). Frases de destaque e snippet: criar pela tela de Recursos (não há modelo de upload).
-2. Recursos de chamada (+55 47 99778-9519) e de mensagem/WhatsApp (nível conta ou nas 7 campanhas).
-3. Programação de anúncios (Urgência 7h–20h seg–sex, sáb 7h–13h; demais 7h–21h) e públicos em observação (lista no doc 07).
-4. Conversões: deixar primárias clique no WhatsApp (site tem GTM-5W2C495R + AW-16475900720), ligação e "Leads de mensagens"; rota como secundária.
-5. URL final de todos os grupos é a home do site real https://clinicaespecita.com (WordPress de uma página; o .com.br
-   da auditoria era o domínio errado). Trocar pelas páginas por serviço quando o site da pasta `site/` for publicado em subdomínio do mesmo domínio.
+**Pendente / decisão do Salvador:**
+1. Conversões NÃO foram alteradas (mexer em primária/secundária é global e afeta a campanha antiga ativa `[pesquisa] 18/08`).
+   Situação: `Lead Formulário` (419 conv., "Requer atenção"), `[Lead][Botão WPP]` (18, "Requer atenção"), `Calls from ads`,
+   `Clicks to call`, `Local actions - Directions` (107) estão todas Principal; `FORM SITE` (36) está fora das metas.
+   Não existe ação "Leads de mensagens". Sugestão: tornar Lead Formulário e Directions secundárias, consertar o botão de WhatsApp no GTM-5W2C495R.
+2. Contagem de palavras "em análise"/reprovadas não conferida (tabela não carregou legível).
+3. Ajuste de lance por horário (Urgência +20% 11-14h e 17-20h) não feito.
+4. URLs finais = home https://clinicaespecita.com; trocar por páginas por serviço quando `site/` for publicado em subdomínio.
+5. Confirmar que +55 47 99778-9519 é o WhatsApp Business ligado ao recurso de mensagem.
+6. Ordem sugerida para ligar: Urgência + Implante (R$35/dia, 14 dias), depois Ortodontia e Família, Clareamento/Harmonização por último.
