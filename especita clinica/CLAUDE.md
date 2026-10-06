@@ -261,6 +261,8 @@ formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
 
 ## Google Ads — LIGADAS em 05/10/2026 (ordem do Salvador)
 
+**Atualização 06/10/2026:** Harmonização Facial também foi LIGADA (R$10/dia) a pedido do Salvador, com o anúncio novo sem botox. Total ativo = R$80/dia (7 campanhas ESP). Conferir nas próximas horas se o anúncio novo aparece "Qualificada" (não reprovado). Campanhas antigas `[pesquisa] 18/08`, `[pesquisa 28/07]` pausadas; GMN, `[SEARCH][LEAD][SITE]` e `Dentista em Brusque` (Smart) já estavam REMOVIDAS pela agência anterior (sem gasto nos últimos 30 dias). Ideia pendente: horário estendido até 23h nas campanhas não-urgentes, só se o WhatsApp tiver resposta automática fora do horário.
+
 - **Ativas (6):** Urgência 15, Implante e Prótese 20, Ortodontia 10, Odontopediatria 8, Clareamento e Lentes 7 (baixado de 10), Dentista em Brusque e Família 10 = **R$70/dia** (teto pedido: R$80).
 - **Pausadas:** `[pesquisa] 18/08 dentista` (antiga, R$65/dia, pausada para não competir) e `[pesquisa 28/07]`. Reativar a antiga se o teste de 14 dias for pior.
 - **Harmonização reescrita (05/10, opção A do Salvador):** novo anúncio sem botox/bioestimulador (`upload/04c-harmonizacao-novo-anuncio.csv`, já subido no grupo "Harmonização e preenchimento"); grupo "Botox", anúncio antigo e palavra "bioestimulador de colágeno" PAUSADOS (remoção permanente foi bloqueada). Campanha segue pausada até o Google analisar o anúncio novo; falta decidir ligar. Palavra "preenchimento com ácido hialurônico" ainda ativa (risco incerto). Botox fica só no Meta (R$18/lead). O site não mostra o CRO da Dra.; incluir. Tom dos anúncios das outras 6: Salvador ainda não aprovou ajuste para linguagem mais informal.
