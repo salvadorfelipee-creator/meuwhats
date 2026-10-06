@@ -259,6 +259,9 @@ publicar na Vercel como projeto próprio com Root Directory `especita clinica/si
 felizcred-site). Pendentes que dependem do Salvador/clínica: domínio, fotos reais, CNPJ/e-mail,
 formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
 
+## Primeiro dia de dados do Google Ads (06/10/2026, ~15h-fim do dia)
+68 impressões, 10 cliques, R$171,96 de custo (~R$17/clique, MUITO acima dos R$3-6 da campanha antiga; aprendizado de "Maximizar conversões" + orçamento pode estourar até 2x/dia). Cliques por tipo: título do anúncio (vai pro site) 9; "mais detalhes do local" (Maps/card) 1; ligar 0 (30 impressões do botão); sitelink 0; rota 0; botão de MENSAGEM do anúncio não apareceu em nenhuma impressão. Conversão "WhatsApp - Clique no site": ATIVA, 1 conversão (Implante e Prótese) — bate com o contato real "Olá! Vim pelo site..." recebido às 15:22. Ação: acompanhar 2-3 dias; se CPC seguir > ~R$8, considerar trocar para Maximizar cliques com CPC máximo por 7 dias (decisão do Salvador).
+
 ## Amostras dos anúncios para a clínica (06/10/2026)
 `plano-midia-2026-10/AMOSTRAS-ANUNCIOS-GOOGLE.html` (gerado por `.build.py` a partir dos CSVs de upload): 12 anúncios em mockup de celular. Artifact privado: https://claude.ai/artifact/T25Zs1Eys8xQJtoSHsaadm (compartilhar pelo menu Share).
 
