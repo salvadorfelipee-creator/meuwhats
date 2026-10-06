@@ -1,3 +1,5 @@
+> **Comece por `LEIA-ME.md`** (estado atual, como rodar, o que falta). Este arquivo é o histórico técnico das passadas de design.
+
 # Site da Especitá Odontologia e Estética
 
 Site estático (HTML, CSS e JS puros, sem framework), feito para ser publicado na Vercel como

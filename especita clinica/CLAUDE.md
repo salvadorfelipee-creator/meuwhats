@@ -323,3 +323,5 @@ Handoff de continuação: `plano-midia-2026-10/PROMPT-CONTINUAR-GOOGLE-ADS.md`.
 
 ## Site — v5 (06/10/2026, sessão do site)
 Coreografia de rolagem do Aventura (hero pinado que expande a foto, frase gigante, painéis pinados, lista com contador) agora em TODAS as páginas; fontes menores; paleta Pantone (Demitasse/Coffee Liqueur/Dijon/Warm Sand + branco). Seletor 3D "escolha o dente" (three.js + modelos do Dental Scope, CC BY-SA 2.1 JP, crédito no rodapé/Termos) na home, implante, dente quebrado, dor de dente e lente de contato; o botão abre o WhatsApp com os dentes (FDI) e a situação. Ver `site/README.md` (seções v4 e v5). Servir local: qualquer servidor estático na pasta `site/` com URLs sem `.html`.
+
+**Para continuar o site:** ler `site/LEIA-ME.md` (estado em 06/10, como rodar com `node serve.cjs`, regras do CFO, lista do que falta com responsável) e usar `site/PROMPT-PARA-COLAR.md` para a conversa de publicação. Domínio atual em `content.py`: https://clinicaespecita.com (WordPress na Hostinger; trocar para subdomínio ou domínio final antes de publicar).

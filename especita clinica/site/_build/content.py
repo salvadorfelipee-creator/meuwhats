@@ -6,7 +6,7 @@ Nome + CRO em toda página (o template já coloca)."""
 SITE = {
     "nome": "Especitá Odontologia e Estética",
     "nome_curto": "Especitá",
-    "dominio": "https://www.clinicaespecita.com.br",  # trocar se o domínio comprado for outro
+    "dominio": "https://clinicaespecita.com",  # domínio atual da clínica (WordPress na Hostinger); trocar se o endereço final for outro
     "cidade": "Brusque",
     "endereco": "Rua Sete de Setembro, 55 · Sala 1 · Santa Rita · Brusque/SC · 88352-000",
     "endereco_curto": "Rua Sete de Setembro, 55, Sala 1, Santa Rita, Brusque",
