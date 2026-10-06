@@ -1,0 +1,73 @@
+<title>Anúncios da Especitá no Google</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: cabeçalho à esquerda com a explicação, depois uma faixa por campanha com os celulares lado a lado. Cores vêm do marrom da logo da clínica. */
+:root{
+  --bg:#f4f1ee; --ink:#2a211c; --muted:#6d625b; --brand:#846c5d; --brand-ink:#ffffff; --line:#dcd3cc; --panel:#ffffff;
+  --frame:#3a302a; --screen:#ffffff; --screen-ink:#202124; --screen-muted:#5f6368; --ad-title:#1a0dab; --ad-url:#1e6e3a; --chip:#eef0f3;
+  --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif; --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif; --screenfont:Arial,Helvetica,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1c1713; --ink:#f1ebe6; --muted:#b4a79d; --brand:#b79b88; --brand-ink:#1c1713; --line:#3a312b; --panel:#26201b; --frame:#0d0a08; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#1c1713; --ink:#f1ebe6; --muted:#b4a79d; --brand:#b79b88; --brand-ink:#1c1713; --line:#3a312b; --panel:#26201b; --frame:#0d0a08; color-scheme:dark;}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;padding-inline:max(16px,4vw);padding-block:40px 64px}
+.wrap{max-width:1120px;margin-inline:auto;display:flex;flex-direction:column;gap:56px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.1}
+h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:700;letter-spacing:-.02em}
+h2{font-size:1.5rem;font-weight:600}
+.top{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:40px;align-items:start}
+.lead{font-size:1.1rem;max-width:56ch;margin:16px 0 0;color:var(--muted)}
+.brandline{font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--brand);font-weight:600;margin:0 0 14px}
+dl.facts{margin:0;display:grid;grid-template-columns:auto 1fr;gap:10px 18px;padding:20px 22px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+dl.facts dt{color:var(--muted);font-size:.9rem}
+dl.facts dd{margin:0;font-weight:500}
+section{display:flex;flex-direction:column;gap:20px}
+.sh{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 20px;border-bottom:1px solid var(--line);padding-bottom:10px}
+.bud{margin:0;color:var(--muted);font-size:.92rem;font-variant-numeric:tabular-nums}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),340px));gap:36px 32px}
+.fig{margin:0;display:flex;flex-direction:column;gap:12px;min-width:0}
+.phone{background:var(--frame);border-radius:30px;padding:12px 10px 14px;max-width:340px;width:100%;position:relative}
+.speaker{width:44px;height:5px;border-radius:3px;background:#5a4d44;margin:0 auto 9px}
+.screen{background:var(--screen);color:var(--screen-ink);border-radius:20px;padding:12px 13px 14px;font-family:var(--screenfont);min-height:360px}
+.sbar{display:flex;align-items:center;gap:8px;background:var(--chip);border-radius:20px;padding:8px 12px;font-size:13px;color:var(--screen-ink);margin-bottom:12px}
+.sbar svg{color:var(--screen-muted);flex:none}
+.sbar span{overflow-wrap:anywhere}
+.meta{font-size:11.5px;color:var(--screen-muted);margin-bottom:3px;overflow-wrap:anywhere}
+.meta b{color:var(--screen-ink)}
+.ad h3{font-size:17px;line-height:1.28;font-weight:400;color:var(--ad-title);margin:0 0 6px;font-family:var(--screenfont)}
+.ad p{font-size:13px;line-height:1.45;margin:0 0 10px;color:var(--screen-ink)}
+.btns{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #c9ccd1;border-radius:16px;padding:5px 12px;font-size:12.5px;color:#1a0dab}
+.sl{list-style:none;margin:0 0 8px;padding:0;display:grid;gap:7px}
+.sl a{color:var(--ad-title);font-size:13.5px}
+.sl span{display:block;font-size:11.5px;color:var(--screen-muted)}
+.loc{font-size:11.5px;color:var(--screen-muted);border-top:1px solid #e3e5e8;padding-top:8px}
+figcaption{font-size:.9rem;max-width:340px}
+.more{color:var(--muted);font-size:.82rem;line-height:1.45;display:block;margin-top:4px}
+.note{border-left:3px solid var(--brand);padding:2px 0 2px 18px;max-width:70ch}
+.note p{margin:0 0 10px}
+@media (max-width:760px){.top{grid-template-columns:minmax(0,1fr)}}
+</style>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <p class="brandline">Especitá · Odontologia e Estética</p>
+      <h1>Como os seus anúncios aparecem no Google</h1>
+      <p class="lead">Estes são exemplos do que uma pessoa de Brusque vê no celular quando procura por um dentista. Cada campanha tem o seu anúncio, com o telefone, o botão de mensagem e o endereço da clínica.</p>
+    </div>
+    <dl class="facts">
+      <dt>Onde aparece</dt><dd>Só em Brusque, na busca do Google</dd>
+      <dt>Quando</dt><dd>Seg a sex, 7h às 21h. Sábado, 7h às 13h. A urgência vai até 20h.</dd>
+      <dt>Campanhas</dt><dd>7, uma por tratamento</dd>
+      <dt>Investimento</dt><dd>R$ 80 por dia, somando todas</dd>
+      <dt>Contato</dt><dd>Ligar ou chamar no WhatsApp</dd>
+    </dl>
+  </div>
+  %%SECTIONS%%
+  <div class="note">
+    <p><strong>O texto muda um pouco de uma vez para outra.</strong> Cada anúncio tem 15 títulos e 4 descrições, e o Google combina os que funcionam melhor para cada pessoa. Por isso a linha de baixo de cada exemplo lista os outros títulos que também podem aparecer.</p>
+    <p>Em todos os anúncios aparecem o nome da Dra. Catiucia e o CRO-SC 14067, em frente à ponte dos bombeiros.</p>
+  </div>
+</div>

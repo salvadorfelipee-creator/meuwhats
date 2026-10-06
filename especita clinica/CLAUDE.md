@@ -259,6 +259,9 @@ publicar na Vercel como projeto próprio com Root Directory `especita clinica/si
 felizcred-site). Pendentes que dependem do Salvador/clínica: domínio, fotos reais, CNPJ/e-mail,
 formação da Dra., convênios, embed do mapa, GA4/Pixel, Search Console.
 
+## Amostras dos anúncios para a clínica (06/10/2026)
+`plano-midia-2026-10/AMOSTRAS-ANUNCIOS-GOOGLE.html` (gerado por `.build.py` a partir dos CSVs de upload): 12 anúncios em mockup de celular. Artifact privado: https://claude.ai/artifact/T25Zs1Eys8xQJtoSHsaadm (compartilhar pelo menu Share).
+
 ## Google Ads — LIMPEZA HARMONIZAÇÃO (06/10/2026, autorizada pelo Salvador)
 Removidos de vez (irreversível, sem histórico de desempenho): grupo "Botox" (com anúncio e palavras) e o anúncio antigo de "Harmonização e preenchimento" (com "Bioestimulador"/botox). Ficou só o anúncio novo, aprovado. O aviso de "reprovado/limitado" no Diagnóstico da campanha deve sumir sozinho; "estratégia de lances inativa" não foi esclarecida (provável campanha nova sem impressões) — se a Harmonização seguir com 0 impressões em 48h, conferir status das palavras (política de saúde). Palavra "bioestimulador de colágeno" ficou pausada.
 
