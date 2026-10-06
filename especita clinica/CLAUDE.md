@@ -233,7 +233,7 @@ Handoff de continuação: `plano-midia-2026-10/PROMPT-CONTINUAR-GOOGLE-ADS.md`.
 - Sitelinks no nível de campanha, frases de destaque, snippet, recurso de chamada e de mensagem/WhatsApp, programação (seg-sex 7-21h, sáb 7-13h; Urgência até 20h).
 - Públicos em observação: Odontopediatria (4 faixas de pais), Ortodontia (pais de adolescentes), Clareamento e Lentes
   (casamentos + beleza e higiene pessoal), Harmonização Facial (casamentos + beleza + maquiagem e cosméticos), Dentista em
-  Brusque e Família (3 faixas de pais + mudança e transferência). Implante e Urgência: sem público (decisão).
+  Brusque e Família (só pais de crianças 6-12 anos, pedido do Salvador 05/10, + mudança e transferência). Implante e Urgência: sem público (decisão).
 - Anúncios conferidos em 05/10: nenhum reprovado; ESP aparecem "Pendente" (normal enquanto pausadas).
 - Harmonização: pendência do CRO-SC/TRF1 resolvida; só segue pausada junto com o resto.
 
