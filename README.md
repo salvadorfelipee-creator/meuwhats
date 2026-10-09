@@ -206,6 +206,12 @@ uma variável de ambiente — nenhuma mudança de código é necessária.
    curl -X POST "https://graph.facebook.com/v21.0/{WABA_ID}/subscribed_apps" \
      -H "Authorization: Bearer {ACCESS_TOKEN}"
    ```
+   **Erro visto (Especitá, 09/10/2026):** a tela "Casos de uso" do developers.facebook.com mostrou
+   "Assinado" pro WABA mesmo sem estar inscrito de verdade — o ID de WABA exibido lá não batia com
+   o ID real da conta no Business Manager (conferir em Contas do WhatsApp → pesquisar o ID). Sintoma:
+   mensagem chega no celular (tique duplo) mas nunca aparece no painel, enquanto outro número do
+   mesmo app funciona normal. Não dá pra confiar só na UI — rodar o curl acima resolve e é seguro
+   repetir mesmo se achar que já está inscrito.
 4. **Atualizar a variável `PHONE_NUMBERS_JSON` no Render**, adicionando o novo número à lista:
    ```json
    [
