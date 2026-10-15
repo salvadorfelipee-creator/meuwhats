@@ -186,7 +186,8 @@
 .fc-clt-loading { color: var(--fc-muted); font-size: 12px; animation: fc-pulse 1.2s ease-in-out infinite; }
 .fc-clt-card > .fc-chat-primary { text-decoration: none; }
 .fc-clt-actions { display: grid; gap: 8px; }
-.fc-clt-secondary { min-height: 44px; border: 1px solid #d8e0e7; border-radius: 12px; background: #fff; color: var(--fc-ink); cursor: pointer; font: 650 13px "Sora", sans-serif; }
+.fc-clt-secondary { display: flex; min-height: 44px; align-items: center; justify-content: center; border: 1px solid #d8e0e7; border-radius: 12px; background: #fff; color: var(--fc-ink); cursor: pointer; font: 650 13px "Sora", sans-serif; text-decoration: none; }
+.fc-clt-checked { color: var(--fc-muted); font-size: 11px; text-align: center; }
 .fc-clt-inline-error { color: #b42318 !important; font-weight: 650; }
 @keyframes fc-pulse { 50% { opacity: .45; } }
 .fc-chat-compose textarea { min-height: 42px; max-height: 104px; flex: 1; padding: 10px 12px; }
