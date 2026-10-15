@@ -113,18 +113,21 @@ async function sincronizarSiteChatClt(row) {
   if (!row?.transaction_id || ["concluido", "sem_oferta", "erro"].includes(row.etapa)) return row;
   try {
     const contract = await novosaque.consultarContratoClt(row.transaction_id);
-    const changes = { status_novosaque: contract.summary_status || null, error_message: null };
+    const changes = { status_novosaque: contract.summary_status || contract.stage || null, error_message: null };
     if (contract.terms_link) changes.terms_link = contract.terms_link;
     if (contract.contract_link) {
       changes.contract_link = contract.contract_link;
       changes.etapa = "aguardando_assinatura";
     }
-    const offers = (contract.simulation_results || []).filter((o) => o.success !== false && o.simulation_id);
+    const offers = (Array.isArray(contract.simulation_results) ? contract.simulation_results : []).filter((o) => o.success !== false && o.simulation_id);
     if (offers.length && !["formalizando", "aguardando_assinatura"].includes(row.etapa)) {
       changes.offers_json = JSON.stringify(offers);
       changes.etapa = "oferta_disponivel";
     }
-    if (contract.summary_status === "Offer unavailable") changes.etapa = "sem_oferta";
+    const margem = contract.balance_check_result;
+    if (contract.summary_status === "Offer unavailable" || (margem?.success === true && Number(margem.balance_value) <= 0)) changes.etapa = "sem_oferta";
+    const falha = falhaNovoSaque(contract);
+    if (falha) changes.error_message = "O banco recebeu a autorização, mas não conseguiu concluir a análise. Nossa equipe pode verificar a proposta para você.";
     if (["Contract paid", "Collateral sended"].includes(contract.summary_status)) changes.etapa = "concluido";
     const updated = await db.siteChatCltAtualizar(row.conversation_id, changes);
     if (updated.contract_link) notificarContratoCltNoWhatsApp(updated).catch(() => {});

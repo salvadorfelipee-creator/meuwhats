@@ -72,12 +72,15 @@
       return;
     }
     if (["aguardando_autorizacao", "simulando"].includes(c.etapa)) {
-      const demorando = !c.termsLink && c.waitingSince && Date.now() - Number(c.waitingSince) > 90_000;
+      const demorando = c.waitingSince && Date.now() - Number(c.waitingSince) > 180_000;
       const termsLink = c.termsLink ? String(c.termsLink).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : "";
-      const authorizationCopy = state.authorizationOpened
+      const bankStatus = c.status ? String(c.status).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : "Aguardando processamento";
+      const authorizationCopy = demorando
+        ? `A autorização foi enviada, mas o banco ainda não devolveu as ofertas. Status atual: <strong>${bankStatus}</strong>. Você não precisa preencher novamente.`
+        : state.authorizationOpened
         ? "Conclua o formulário na janela do banco. Depois, feche essa janela e volte aqui: suas ofertas aparecerão automaticamente."
         : "A autorização abrirá em uma janela segura do banco. Depois de enviar o formulário, volte a este chat para ver suas ofertas.";
-      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">2 de 5 · Autorização</span><h3>${c.termsLink ? state.authorizationOpened ? "Aguardando a autorização do banco" : "Autorize a consulta" : c.error ? "Não recebemos o link do banco" : demorando ? "O banco ainda está preparando o link" : "Preparando sua autorização…"}</h3><p>${c.termsLink ? authorizationCopy : c.error ? c.error : demorando ? "Pode demorar um pouco no ambiente de testes. Continue nesta conversa; o botão aparecerá automaticamente assim que o banco liberar." : "Isso costuma levar poucos segundos."}</p>${c.termsLink ? `<a class="fc-chat-primary" href="${termsLink}" target="_blank" rel="noopener" data-open-authorization>${state.authorizationOpened ? "Abrir novamente" : "Autorizar no banco"}</a>` : c.error ? '<button type="button" class="fc-chat-primary" data-refresh-clt>Tentar novamente</button>' : '<span class="fc-clt-loading">Consultando o banco…</span>'}</div>`;
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">2 de 5 · Autorização</span><h3>${c.error ? "O banco não concluiu a análise" : c.termsLink ? demorando ? "Aguardando as ofertas do banco" : state.authorizationOpened ? "Aguardando a autorização do banco" : "Autorize a consulta" : demorando ? "O banco ainda está preparando o link" : "Preparando sua autorização…"}</h3><p>${c.error ? c.error : c.termsLink ? authorizationCopy : demorando ? "Pode demorar um pouco no ambiente de testes. Continue nesta conversa; o botão aparecerá automaticamente assim que o banco liberar." : "Isso costuma levar poucos segundos."}</p>${c.termsLink && !c.error ? `<div class="fc-clt-actions"><button type="button" class="fc-chat-primary" data-refresh-clt>Verificar ofertas agora</button><a class="fc-clt-secondary" href="${termsLink}" target="_blank" rel="noopener" data-open-authorization>${state.authorizationOpened ? "Abrir autorização novamente" : "Autorizar no banco"}</a></div>` : c.error ? '<button type="button" class="fc-chat-primary" data-refresh-clt>Verificar novamente</button>' : '<span class="fc-clt-loading">Consultando o banco…</span>'}</div>`;
       return;
     }
     if (c.etapa === "sem_oferta") { cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Consulta concluída</span><h3>Não há uma oferta disponível agora</h3><p>Você poderá tentar novamente quando sua margem mudar.</p></div>`; return; }
