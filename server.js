@@ -5247,7 +5247,11 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
           console.error(`Erro no fluxo CLT do site (${id}/${action}):`, err.message);
           await db.siteChatCltAtualizar(id, { error_message: "Não conseguimos avançar automaticamente. A equipe já pode continuar pelo chat." }).catch(() => {});
-          return send(res, 502, { error: "Não conseguimos avançar agora. Continue pelo chat com nossa equipe." }, corsHeaders);
+          const configurationError = /NOVOSAQUE_API_KEY não configurada/i.test(err.message);
+          return send(res, 502, {
+            error: configurationError ? "A integração bancária ainda não está configurada no servidor." : "Não conseguimos avançar agora. Continue pelo chat com nossa equipe.",
+            code: configurationError ? "NOVOSAQUE_CONFIG_MISSING" : "NOVOSAQUE_REQUEST_FAILED",
+          }, corsHeaders);
         }
       }
 
