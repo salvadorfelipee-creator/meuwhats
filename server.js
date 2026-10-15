@@ -5217,7 +5217,10 @@ const server = http.createServer(async (req, res) => {
           const atual = await db.siteChatCltObter(id);
           if (!atual) return send(res, 409, { error: "Inicie a simulação primeiro." }, corsHeaders);
           if (action === "resimulate") {
-            const installment = Number(String(body.installmentValue || "").replace(",", "."));
+            const rawInstallment = String(body.installmentValue || "").trim();
+            const numericMatch = rawInstallment.match(/\d[\d.]*([,]\d{1,2})?/);
+            let installment = numericMatch ? Number(numericMatch[0].replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) : NaN;
+            if (!Number.isFinite(installment) || installment <= 0) installment = await gemini.interpretarValorParcela(rawInstallment);
             if (!Number.isFinite(installment) || installment <= 0) return send(res, 400, { error: "Informe uma parcela válida." }, corsHeaders);
             let offers = [];
             try { offers = JSON.parse(atual.offers_json || "[]"); } catch {}

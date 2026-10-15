@@ -300,4 +300,15 @@ Mensagem: ${String(texto || "").slice(0, 2000)}`;
   return permitidos.includes(json.produto) ? json.produto : null;
 }
 
-module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite };
+async function interpretarValorParcela(texto) {
+  const prompt = `Extraia somente o valor de parcela mensal que o cliente deseja para um empréstimo consignado CLT.
+Exemplos: "quero parcela de 250" = 250; "duzentos e cinquenta reais" = 250; "R$ 189,90" = 189.90.
+Não invente valor. Se não houver um valor claro, use null.
+Responda somente JSON: {"valor": number|null}.
+Mensagem: ${String(texto || "").slice(0, 300)}`;
+  const json = await chamarGemini(prompt, GEMINI_MODEL_LITE);
+  const valor = Number(json.valor);
+  return Number.isFinite(valor) && valor > 0 ? valor : null;
+}
+
+module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite, interpretarValorParcela };

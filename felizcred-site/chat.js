@@ -75,8 +75,8 @@
     }
     if (c.etapa === "sem_oferta") { cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Consulta concluída</span><h3>Não há uma oferta disponível agora</h3><p>Você poderá tentar novamente quando sua margem mudar.</p></div>`; return; }
     if (c.etapa === "oferta_disponivel" && !state.selectedOffer) {
-      const preferred = c.offers.filter((o) => [18, 24].includes(Number(o.installments)));
-      const offers = preferred.length ? preferred : c.offers;
+      const priority = (term) => Number(term) === 18 ? 0 : Number(term) === 24 ? 1 : 2;
+      const offers = [...c.offers].sort((a, b) => priority(a.installments) - priority(b.installments) || Number(a.installments) - Number(b.installments));
       const maxInstallment = Math.max(...offers.map((o) => Number(o.installmentValue || 0)));
       cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">3 de 5 · Escolha</span><h3>Estas são suas condições</h3><p>Veja o valor máximo da parcela disponível para cada prazo. Escolha uma opção ou clique em “Escolher outra parcela”.</p><div class="fc-clt-offers">${offers.map((o) => `<button type="button" data-offer="${o.simulationId}" class="fc-clt-offer"><span>${o.installments} parcelas de</span><strong>${money(o.installmentValue)}</strong><small>Você recebe ${money(o.disbursedAmount)} · CET mensal ${Number(o.cetMonthlyRate || 0).toFixed(2)}%</small></button>`).join("")}</div><button type="button" class="fc-clt-link" data-lower>Escolher outra parcela</button><form class="fc-clt-resim" data-max="${maxInstallment}" hidden><p>Digite assim: “Quero uma parcela de R$ 250”. O valor precisa ser de até ${money(maxInstallment)}.</p><label>Valor desejado da parcela<input name="installmentValue" inputmode="decimal" required placeholder="Ex.: 250,00"></label><p class="fc-clt-inline-error" hidden></p><button class="fc-chat-primary">Ver prazos disponíveis</button></form></div>`;
       return;
@@ -110,7 +110,9 @@
         state.cltCpf = String(form.get("cpf") || "");
         const data = await api(`/${state.session.id}/clt/start`, { method: "POST", body: JSON.stringify({ cpf: state.cltCpf, phone: form.get("phone") }) }); state.clt = data.clt;
       } else if (e.target.classList.contains("fc-clt-resim")) {
-        const requested = Number(String(form.get("installmentValue") || "").replace(",", "."));
+        const rawRequested = String(form.get("installmentValue") || "");
+        const matchRequested = rawRequested.match(/\d[\d.]*([,]\d{1,2})?/);
+        const requested = matchRequested ? Number(matchRequested[0].replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) : NaN;
         const maximum = Number(e.target.dataset.max || 0);
         if (requested > maximum) {
           const error = e.target.querySelector(".fc-clt-inline-error");
