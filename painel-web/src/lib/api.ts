@@ -24,8 +24,53 @@ export type Conversation = {
   nao_lida?: boolean | number
   resolvido_em?: number | null
   pipeline_estagio?: string | null
+  pipeline_estagio_desde?: number | null
   tags_json?: string | null
+  campos_json?: string | null
   email?: string | null
+  foto_url?: string | null
+  last_origem?: "humano" | null
+  // Sugestão de resposta da IA ("copiloto de vendas") pré-computada em background pelo servidor
+  // e cacheada na linha da conversa — só é considerada válida quando copiloto_cache_em bate com
+  // last_message_at (ver api.sugestaoResposta), senão apareceria desatualizada.
+  copiloto_texto?: string | null
+  copiloto_insight?: string | null
+  copiloto_cache_em?: number | null
+}
+
+// Identidade de quem está logado (GET /painel/api/me) — vem do login de verdade (tabela
+// `usuarios`, ver db.js), com papel e a lista de canais que essa pessoa vê por padrão (null =
+// sem restrição, admin ou fallback PAINEL_USER/PAINEL_PASS).
+export type Identidade = {
+  nome: string
+  usuario: string
+  papel: "admin" | "atendente"
+  canais_padrao: string[] | null
+  // Etapas do pipeline em que ESSA pessoa quer notificação urgente/piscando — null/[] = só
+  // notificação normal (calma), nunca por etapa. Admin ignora esse campo por design (sempre
+  // calmo). Sempre array (nunca null) — o backend já normaliza.
+  etapas_notificacao: string[]
+}
+
+export type Usuario = {
+  id: number
+  nome: string
+  usuario: string
+  papel: "admin" | "atendente"
+  canais_padrao: string[] | null
+  etapas_notificacao: string[]
+  ativo: boolean
+  created_at: number
+}
+
+export type MinhaConversa = {
+  phone: string
+  name: string | null
+  business_number_id: string
+  channel: "whatsapp" | "instagram"
+  last_message_at: number | null
+  last_body: string | null
+  pipeline_estagio: string | null
 }
 
 export type Tag = { id: number; business_number_id: string; nome: string; cor: string; created_at: number }
@@ -105,6 +150,55 @@ export function pipelineEstagiosPara(label: string | undefined) {
 // tela de Analytics quanto pelo chat (pra saber quando mostrar o seletor de tags/etapa).
 export const CANAL_ANALYTICS_LABEL = "Felizcred (principal)"
 
+// Campo "Responsável" dessa conversa, se preenchido — mesmo parse que camposDe() em
+// chats.tsx/pipeline.tsx faz localmente; duplicado aqui de propósito (api.ts não deveria
+// importar das telas, ciclo de import) só pra decidir urgência de notificação (ver
+// conversaEhUrgente abaixo).
+function campoResponsavelDe(c: Conversation): string | null {
+  if (!c.campos_json) return null
+  try {
+    const campos = JSON.parse(c.campos_json) as Record<string, string>
+    return campos["Responsável"] || null
+  } catch {
+    return null
+  }
+}
+
+// Decide se uma conversa não lida deve "piscar" (urgente, chama atenção na hora) ou só notificar
+// calmo (badge sólido, sem animação) pra pessoa LOGADA agora. Usado em chats.tsx (lista de
+// conversas) e pipeline.tsx (cartão do kanban) — mesma regra nos dois lugares. Ordem de
+// precedência:
+//   1. Admin NUNCA pisca — calmo por design, mesmo com etapas_notificacao preenchido.
+//   2. Conversa ATRIBUÍDA (campo "Responsável") a alguém — só ESSA pessoa pisca, mesmo que a
+//      etapa da conversa não esteja na lista dela. Com Responsável preenchido, a checagem de
+//      etapa nem roda — pra mais ninguém, nem pra quem "bateria" por etapa.
+//   3. Sem "Responsável": pisca se a etapa atual (pipeline_estagio, ou "novo_lead" quando a
+//      conversa ainda não tem etapa salva) está na lista etapas_notificacao da pessoa. Lista
+//      vazia/ausente = nunca pisca por etapa.
+// Minutos sem NENHUMA resposta (bot ou humano) à última mensagem do cliente antes de virar
+// alerta universal de "sem resposta" — diferente de conversaEhUrgente acima: não depende de
+// quem está logado, de etapa, nem de Responsável; é puramente "faz tempo que ninguém
+// respondeu", pensado pra pegar os casos onde o bot "ficou surdo" (handoff pra humano sem
+// ninguém notar) ou uma mensagem automática falhou no meio do caminho.
+export const LIMITE_SEM_RESPOSTA_MS = 30 * 60 * 1000
+
+export function conversaSemRespostaHaMuitoTempo(c: Conversation): boolean {
+  if (!c.nao_lida) return false
+  if (c.last_direction !== "in") return false
+  if (!c.last_message_at) return false
+  return Date.now() - c.last_message_at > LIMITE_SEM_RESPOSTA_MS
+}
+
+export function conversaEhUrgente(c: Conversation, identidade: Identidade | null): boolean {
+  if (!identidade || identidade.papel === "admin") return false
+  const responsavel = campoResponsavelDe(c)
+  if (responsavel) return responsavel.toLowerCase() === identidade.nome.toLowerCase()
+  const etapas = identidade.etapas_notificacao || []
+  if (!etapas.length) return false
+  const estagio = c.pipeline_estagio || "novo_lead"
+  return etapas.includes(estagio)
+}
+
 export type AnalyticsResumo = {
   totalConversas: number
   novasConversas: number
@@ -139,7 +233,29 @@ export type Message = {
   created_at: number
 }
 
-export type RespostaPronta = { id: number; atalho: string; texto: string }
+export type RespostaPronta = { id: number; atalho: string; texto: string; uso_count?: number }
+
+// Mesmo telefone, conversa em outro canal — ver ContactDetails em chats.tsx, só informativo.
+export type OutroCanal = { business_number_id: string; name: string | null; last_message_at: number | null }
+
+export type RetornoComContato = Retorno & {
+  name: string | null
+  channel: "whatsapp" | "instagram"
+}
+
+// Sugestão de retorno pendente — gerada pela IA (etapa parada) ou pelo radar de inatividade
+// (tempo parado, sem IA). "pendente" até alguém aprovar (vira retorno de verdade, template/canal
+// escolhido na hora) ou descartar. "Aprovar" NUNCA envia nada sozinho.
+export type SugestaoRetorno = {
+  id: number
+  business_id: string
+  phone: string
+  name: string | null
+  tipo: "etapa_parada" | "inatividade"
+  motivo: string
+  status: "pendente" | "aprovado" | "descartado"
+  created_at: number
+}
 
 export type BroadcastContact = { phone: string; name?: string }
 export type BroadcastResult = { phone: string; ok: boolean; error?: string }
@@ -243,6 +359,30 @@ export function isLoggedIn() {
   return !!getCredentials()
 }
 
+// Token assinado pro servidor servir /media/:filename sem Basic Auth — <img>/<audio> não
+// conseguem mandar o header Authorization (recurso de navegador, não um fetch customizado), sem
+// isso o navegador mostrava o popup nativo feio toda vez que a conversa tinha mídia. Guardado só
+// em memória (não localStorage — token de 24h, perder no F5 não é problema, essa função busca um
+// novo sozinha). `mediaUrl` cai pra URL sem token se ainda não buscou (janela raríssima logo após
+// o login).
+let mediaToken: string | null = null
+
+export async function garantirMediaToken() {
+  try {
+    const resp = await request<{ token: string }>("/painel/api/media-token")
+    mediaToken = resp.token
+  } catch {
+    mediaToken = null
+  }
+}
+
+export function mediaUrl(path: string | null | undefined): string {
+  if (!path) return ""
+  if (!mediaToken || !path.startsWith("/media/")) return path
+  const separador = path.includes("?") ? "&" : "?"
+  return `${path}${separador}token=${encodeURIComponent(mediaToken)}`
+}
+
 class ApiError extends Error {
   status: number
   constructor(status: number, message: string) {
@@ -294,6 +434,37 @@ export async function login(user: string, pass: string): Promise<void> {
 export const api = {
   numbers: () => request<PhoneNumber[]>("/painel/api/numbers"),
 
+  // ── Identidade e usuários (login por pessoa) ─────────────────────────────────────────────
+  me: () => request<Identidade>("/painel/api/me"),
+
+  usuarios: () => request<Usuario[]>("/painel/api/usuarios"),
+
+  criarUsuario: (payload: {
+    nome: string
+    usuario: string
+    senha: string
+    papel: "admin" | "atendente"
+    canais_padrao?: string[] | null
+    etapas_notificacao?: string[] | null
+  }) => request<{ id: number }>("/painel/api/usuarios", { method: "POST", body: JSON.stringify(payload) }),
+
+  atualizarUsuario: (
+    id: number,
+    payload: {
+      nome?: string
+      papel?: "admin" | "atendente"
+      canais_padrao?: string[] | null
+      etapas_notificacao?: string[] | null
+      ativo?: boolean
+    },
+  ) => request<{ ok: true }>(`/painel/api/usuarios/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+
+  redefinirSenhaUsuario: (id: number, senha: string) =>
+    request<{ ok: true }>(`/painel/api/usuarios/${id}/senha`, { method: "POST", body: JSON.stringify({ senha }) }),
+
+  // ── "Atribuídas a mim" entre canais (handoff SDR → fechamento) ───────────────────────────
+  minhasConversas: () => request<MinhaConversa[]>("/painel/api/minhas-conversas"),
+
   inbox: () => request<Conversation[]>("/painel/api/inbox"),
 
   conversations: (businessId: string, opts?: { finalizadas?: boolean }) =>
@@ -301,10 +472,17 @@ export const api = {
       `/painel/api/conversations/${encodeURIComponent(businessId)}${opts?.finalizadas ? "?finalizadas=1" : ""}`,
     ),
 
-  messages: (businessId: string, phone: string) =>
-    request<Message[]>(
-      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/messages`,
-    ),
+  // `desde`/`ate` (epoch ms, opcionais) — janela de dias em vez do histórico inteiro, pra não
+  // reler/retransmitir a conversa toda a cada abertura/poll com contato de meses de histórico.
+  messages: (businessId: string, phone: string, opts?: { desde?: number; ate?: number }) => {
+    const params = new URLSearchParams()
+    if (opts?.desde != null) params.set("desde", String(opts.desde))
+    if (opts?.ate != null) params.set("ate", String(opts.ate))
+    const qs = params.toString()
+    return request<Message[]>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/messages${qs ? `?${qs}` : ""}`,
+    )
+  },
 
   // Chamar só quando a conversa está selecionada E a aba tem foco (document.hasFocus()) —
   // ver comentário em server.js sobre por que isso é separado do fetch de mensagens.
@@ -312,6 +490,17 @@ export const api = {
     request<{ ok: boolean }>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/marcar-lida`,
       { method: "POST" },
+    ),
+
+  // Só mídia (imagem/vídeo) da conversa inteira, sem janela de dias — pra Galeria.
+  midias: (businessId: string, phone: string) =>
+    request<Pick<Message, "id" | "type" | "media_path" | "media_mime" | "created_at">[]>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/midias`,
+    ),
+
+  outrosCanais: (businessId: string, phone: string) =>
+    request<OutroCanal[]>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/outros-canais`,
     ),
 
   // Baixa o .txt da conversa e já dispara o download no navegador — não usa request() porque
@@ -363,6 +552,77 @@ export const api = {
       { method: "PATCH", body: JSON.stringify({ nota }) },
     ),
 
+  renomearContato: (businessId: string, phone: string, nome: string) =>
+    request<{ ok: true }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/nome`,
+      { method: "PATCH", body: JSON.stringify({ nome }) },
+    ),
+
+  salvarEmailContato: (businessId: string, phone: string, email: string) =>
+    request<{ ok: true }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/email`,
+      { method: "PATCH", body: JSON.stringify({ email }) },
+    ),
+
+  // "Salvar contato" (foto, estilo WhatsApp) — fotoBase64 é um data URL (data:image/...;base64,...)
+  // gerado no navegador a partir do arquivo escolhido.
+  salvarFotoContato: (businessId: string, phone: string, fotoBase64: string) =>
+    request<{ ok: true; foto_url: string }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/foto`,
+      { method: "PATCH", body: JSON.stringify({ fotoBase64 }) },
+    ),
+
+  // Sugestão de resposta da IA ("copiloto de vendas") — lê o cache pré-computado em background
+  // pelo servidor; se ainda não tiver rodado pra essa conversa, devolve { texto: null }.
+  sugestaoResposta: (businessId: string, phone: string) =>
+    request<{ texto: string | null; insight: string | null }>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/sugestao-resposta`,
+    ),
+
+  // Corretor por-trecho — cada item vira um balão clicável posicionado em cima da
+  // palavra/expressão errada no textarea, não uma frase inteira reescrita.
+  corrigirTexto: (texto: string) =>
+    request<{ correcoes: { errado: string; certo: string }[] }>(`/painel/api/corrigir-texto`, {
+      method: "POST",
+      body: JSON.stringify({ texto }),
+    }),
+
+  // Feedback/aceitação da IA — "como sabemos se é útil?". Fire-and-forget nas telas que chamam
+  // (sempre com .catch(() => {}), nunca deve travar a experiência da pessoa).
+  iaFeedbackRegistrar: (payload: {
+    businessId?: string
+    phone?: string
+    tipo: string
+    evento: "mostrada" | "aceita" | "descartada" | "comentario"
+    comentario?: string
+  }) => request<{ ok: true }>(`/painel/api/ia/feedback`, { method: "POST", body: JSON.stringify(payload) }),
+
+  iaFeedbackResumo: () =>
+    request<{
+      resumo: { tipo: string; evento: string; total: number }[]
+      comentarios: { id: number; tipo: string; comentario: string; usuario: string | null; created_at: number }[]
+    }>(`/painel/api/ia/feedback`),
+
+  // ── Radar de retorno (etapa parada / cliente inativo) ────────────────────────────────────
+  retornosPendentes: () => request<RetornoComContato[]>("/painel/api/retornos"),
+
+  sugestoesRetornoPendentes: () => request<SugestaoRetorno[]>("/painel/api/sugestoes-retorno"),
+
+  sugestaoRetornoMarcarStatus: (id: number, status: "aprovado" | "descartado") =>
+    request<{ ok: true }>(`/painel/api/sugestoes-retorno/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
+
+  // Limiar (minutos) de alerta de "parado na etapa", editável por etapa do pipeline.
+  pipelineAlertasConfig: () => request<Record<string, number>>("/painel/api/pipeline/alertas-config"),
+
+  pipelineAlertaConfigDefinir: (estagioId: string, minutos: number | null) =>
+    request<{ ok: true }>(`/painel/api/pipeline/alertas-config/${encodeURIComponent(estagioId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ minutos }),
+    }),
+
   buscar: (businessId: string, termo: string) =>
     request<{ phone: string; body: string; created_at: number }[]>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/buscar?q=${encodeURIComponent(termo)}`,
@@ -378,6 +638,17 @@ export const api = {
 
   excluirRespostaPronta: (id: number) =>
     request<{ ok: true }>(`/painel/api/respostas-prontas/${id}`, { method: "DELETE" }),
+
+  atualizarRespostaPronta: (id: number, atalho: string, texto: string) =>
+    request<{ ok: true }>(`/painel/api/respostas-prontas/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ atalho, texto }),
+    }),
+
+  // Conta uso de verdade (clicou pra usar, não só abriu a lista) — alimenta ordenação "mais
+  // usados" dos chips do composer. Fire-and-forget no chamador.
+  registrarUsoRespostaPronta: (id: number) =>
+    request<{ ok: true }>(`/painel/api/respostas-prontas/${id}/uso`, { method: "POST" }),
 
   templates: (businessId: string) =>
     request<{ templates: TemplateInfo[] }>(`/painel/api/templates/${encodeURIComponent(businessId)}`),

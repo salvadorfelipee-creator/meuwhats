@@ -32,6 +32,21 @@ const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const PAINEL_USER = process.env.PAINEL_USER || "admin";
 const PAINEL_PASS = process.env.PAINEL_PASS || "admin";
 
+// Cache em memória dos usuários do painel (login por pessoa) — isAuthorized precisa ser síncrona
+// (Node só tem 1 thread, e toda requisição autenticada passa por ali), então não dá pra consultar
+// o banco a cada chamada. Recarregado sempre que um usuário é criado/editado/desativado/tem senha
+// redefinida pelas rotas de administração abaixo. PAINEL_USER/PAINEL_PASS continuam valendo como
+// fallback de bootstrap/recuperação (ver isAuthorized) — nunca removidos, pra nunca deixar a
+// equipe sem acesso se a tabela de usuários ficar vazia ou o banco cair.
+let usuariosCache = [];
+async function recarregarUsuariosCache() {
+  try {
+    usuariosCache = await db.usuarioListar();
+  } catch (err) {
+    console.error("Erro ao carregar usuários do banco (login por pessoa fica indisponível, só o fallback PAINEL_USER/PAINEL_PASS funciona):", err.message);
+  }
+}
+
 const TELEGRAM_START_MESSAGE =
   process.env.TELEGRAM_START_MESSAGE ||
   "Olá! 👋 Para continuar seu atendimento, toque no botão abaixo pra compartilhar seu contato.";
@@ -442,19 +457,94 @@ function send(res, status, body, headers = {}) {
   res.end(payload);
 }
 
+// Login por pessoa (cada atendente com seu próprio usuário/senha) — PAINEL_USER/PAINEL_PASS
+// continua funcionando como fallback de bootstrap/recuperação mesmo com usuários reais
+// cadastrados, nunca é removido. Devolve o usuário autenticado (objeto, nunca só `true`) ou
+// `null` — quem só precisa saber "está logado?" usa como antes
+// (`if (!requireAuth(req, res)) return;`, objeto é truthy); rotas que precisam saber QUEM é
+// (admin-only, /painel/api/me, filtro de canal por pessoa, "atribuídas a mim") leem o retorno.
+// Continua 100% síncrona (sem acessar o banco) — compara contra usuariosCache, recarregado pelas
+// rotas de administração sempre que um usuário muda (ver recarregarUsuariosCache).
 function isAuthorized(req) {
   const header = req.headers.authorization || "";
   const [scheme, encoded] = header.split(" ");
-  if (scheme !== "Basic" || !encoded) return false;
+  if (scheme !== "Basic" || !encoded) return null;
   const [user, pass] = Buffer.from(encoded, "base64").toString("utf8").split(":");
-  return user === PAINEL_USER && pass === PAINEL_PASS;
+  if (user === PAINEL_USER && pass === PAINEL_PASS) {
+    return { id: null, nome: "Admin", usuario: PAINEL_USER, papel: "admin", canais_padrao: null, ativo: 1 };
+  }
+  const registro = usuariosCache.find((u) => u.usuario === user && u.ativo);
+  if (!registro) return null;
+  if (!db.verificarSenha(pass || "", registro.senha_hash)) return null;
+  return registro;
 }
 
 function requireAuth(req, res) {
-  if (isAuthorized(req)) return true;
+  const usuario = isAuthorized(req);
+  if (usuario) return usuario;
   res.writeHead(401, { "WWW-Authenticate": 'Basic realm="painel"' });
   res.end("Authorization required");
   return false;
+}
+
+// Lê `canais_padrao` (TEXT JSON no banco, ou já `null` no admin sintético/fallback) de forma
+// resiliente — null/vazio/JSON quebrado tudo cai em "sem restrição" (nunca trava alguém de fora
+// por um dado mal formado).
+function canaisPermitidosDoUsuario(usuarioAtual) {
+  if (!usuarioAtual || usuarioAtual.papel === "admin") return null; // null = sem restrição
+  const bruto = usuarioAtual.canais_padrao;
+  if (!bruto) return null;
+  try {
+    const lista = typeof bruto === "string" ? JSON.parse(bruto) : bruto;
+    if (!Array.isArray(lista) || lista.length === 0) return null;
+    return lista;
+  } catch {
+    return null;
+  }
+}
+
+// Lê `etapas_notificacao` (TEXT JSON no banco) de forma resiliente — null/vazio/JSON quebrado
+// tudo cai em `[]` (nunca força notificação urgente por etapa a partir de dado mal formado).
+function etapasNotificacaoDoUsuario(usuarioAtual) {
+  const bruto = usuarioAtual?.etapas_notificacao;
+  if (!bruto) return [];
+  try {
+    const lista = typeof bruto === "string" ? JSON.parse(bruto) : bruto;
+    return Array.isArray(lista) ? lista : [];
+  } catch {
+    return [];
+  }
+}
+
+// Token de mídia — `<img src="/media/...">`/`<audio src="...">` não conseguem mandar o header
+// Authorization (é um recurso de navegador, não um fetch com header customizado), então mídia
+// atrás de Basic Auth não carregava sozinha dentro de elementos nativos. O painel busca 1 token
+// assinado (HMAC, só esse processo conhece o segredo) logo após o login e embute como `?token=`
+// em toda URL de mídia — GET /media/:filename aceita esse token como alternativa ao Basic Auth.
+// Secret gerado 1x no boot (nunca persistido): token para de valer depois de um restart/deploy,
+// tudo bem, o painel busca um novo sozinho na próxima vez que loga.
+const MEDIA_TOKEN_SECRET = crypto.randomBytes(32);
+const MEDIA_TOKEN_VALIDADE_MS = 24 * 60 * 60 * 1000;
+
+function gerarTokenMedia(usuario) {
+  const expiraEm = Date.now() + MEDIA_TOKEN_VALIDADE_MS;
+  const payload = `${usuario}.${expiraEm}`;
+  const assinatura = crypto.createHmac("sha256", MEDIA_TOKEN_SECRET).update(payload).digest("hex");
+  return Buffer.from(`${payload}.${assinatura}`).toString("base64url");
+}
+
+function validarTokenMedia(token) {
+  try {
+    const [usuario, expiraEmStr, assinatura] = Buffer.from(token, "base64url").toString("utf8").split(".");
+    const expiraEm = Number(expiraEmStr);
+    if (!usuario || !expiraEm || Date.now() > expiraEm || !assinatura) return false;
+    const esperada = crypto.createHmac("sha256", MEDIA_TOKEN_SECRET).update(`${usuario}.${expiraEm}`).digest("hex");
+    const bufEsperada = Buffer.from(esperada, "hex");
+    const bufRecebida = Buffer.from(assinatura, "hex");
+    return bufEsperada.length === bufRecebida.length && crypto.timingSafeEqual(bufEsperada, bufRecebida);
+  } catch {
+    return false;
+  }
 }
 
 function safeFilename(waMessageId, ext) {
@@ -5018,10 +5108,153 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, html, { "Content-Type": "text/html; charset=utf-8" });
     }
 
-    // GET /painel/api/numbers — lista de números configurados
+    // GET /painel/api/numbers — lista de números configurados. Quem é admin (ou não tem
+    // `canais_padrao` restrito) vê todos, igual sempre foi; atendente com canal restrito só vê
+    // os números da própria lista.
     if (req.method === "GET" && path_ === "/painel/api/numbers") {
-      if (!requireAuth(req, res)) return;
-      return send(res, 200, PHONE_NUMBERS);
+      const usuarioAtual = requireAuth(req, res);
+      if (!usuarioAtual) return;
+      const permitidos = canaisPermitidosDoUsuario(usuarioAtual);
+      if (!permitidos) return send(res, 200, PHONE_NUMBERS);
+      return send(res, 200, PHONE_NUMBERS.filter((n) => permitidos.includes(n.id)));
+    }
+
+    // GET /painel/api/me — identidade de quem está logado. Chamado 1x pelo frontend depois do
+    // login pra saber nome/papel/canais.
+    if (req.method === "GET" && path_ === "/painel/api/me") {
+      const usuarioAtual = requireAuth(req, res);
+      if (!usuarioAtual) return;
+      return send(res, 200, {
+        nome: usuarioAtual.nome,
+        usuario: usuarioAtual.usuario,
+        papel: usuarioAtual.papel,
+        canais_padrao: canaisPermitidosDoUsuario(usuarioAtual),
+        etapas_notificacao: etapasNotificacaoDoUsuario(usuarioAtual),
+      });
+    }
+
+    // GET /painel/api/media-token — token assinado que o painel busca 1x logo após o login e
+    // embute em toda URL de mídia (`/media/:filename?token=...`), pra nunca mais precisar do
+    // popup nativo de Basic Auth do navegador em <img>/<video>.
+    if (req.method === "GET" && path_ === "/painel/api/media-token") {
+      const usuarioAtual = requireAuth(req, res);
+      if (!usuarioAtual) return;
+      return send(res, 200, { token: gerarTokenMedia(usuarioAtual.usuario) });
+    }
+
+    // ── Administração de usuários (login por pessoa) — só admin ──────────────────────────────
+    // GET lista (sem senha_hash), POST cria, PATCH edita (nome/papel/canais/ativo), POST
+    // .../senha redefine a senha.
+    if (path_ === "/painel/api/usuarios" || path_.startsWith("/painel/api/usuarios/")) {
+      const usuarioAtual = requireAuth(req, res);
+      if (!usuarioAtual) return;
+      if (usuarioAtual.papel !== "admin") return send(res, 403, { error: "Só administrador pode gerenciar usuários." });
+
+      if (req.method === "GET" && path_ === "/painel/api/usuarios") {
+        const lista = await db.usuarioListar();
+        return send(res, 200, lista.map((u) => ({
+          id: u.id,
+          nome: u.nome,
+          usuario: u.usuario,
+          papel: u.papel,
+          canais_padrao: canaisPermitidosDoUsuario(u),
+          etapas_notificacao: etapasNotificacaoDoUsuario(u),
+          ativo: !!u.ativo,
+          created_at: u.created_at,
+        })));
+      }
+
+      if (req.method === "POST" && path_ === "/painel/api/usuarios") {
+        const body = await parseBody(req);
+        if (!body.nome?.trim() || !body.usuario?.trim() || !body.senha?.trim()) {
+          return send(res, 400, { error: "Informe nome, usuário e senha." });
+        }
+        try {
+          const id = await db.usuarioCriar({
+            nome: body.nome.trim(),
+            usuario: body.usuario.trim(),
+            senha: body.senha,
+            papel: body.papel === "admin" ? "admin" : "atendente",
+            canaisPadrao: Array.isArray(body.canais_padrao) ? body.canais_padrao : null,
+            etapasNotificacao: Array.isArray(body.etapas_notificacao) ? body.etapas_notificacao : null,
+          });
+          await recarregarUsuariosCache();
+          return send(res, 200, { id });
+        } catch (err) {
+          return send(res, 400, { error: err.message });
+        }
+      }
+
+      const matchUsuarioId = path_.match(/^\/painel\/api\/usuarios\/(\d+)$/);
+      if (req.method === "PATCH" && matchUsuarioId) {
+        const id = Number(matchUsuarioId[1]);
+        const existente = await db.usuarioObterPorId(id);
+        if (!existente) return send(res, 404, { error: "Usuário não encontrado" });
+        const body = await parseBody(req);
+        await db.usuarioAtualizar(id, {
+          nome: body.nome !== undefined ? String(body.nome).trim() || existente.nome : existente.nome,
+          papel: body.papel === "admin" || body.papel === "atendente" ? body.papel : existente.papel,
+          canaisPadrao: Array.isArray(body.canais_padrao)
+            ? body.canais_padrao
+            : canaisPermitidosDoUsuario(existente),
+          etapasNotificacao: Array.isArray(body.etapas_notificacao)
+            ? body.etapas_notificacao
+            : etapasNotificacaoDoUsuario(existente),
+          ativo: body.ativo !== undefined ? !!body.ativo : !!existente.ativo,
+        });
+        await recarregarUsuariosCache();
+        return send(res, 200, { ok: true });
+      }
+
+      const matchUsuarioSenha = path_.match(/^\/painel\/api\/usuarios\/(\d+)\/senha$/);
+      if (req.method === "POST" && matchUsuarioSenha) {
+        const id = Number(matchUsuarioSenha[1]);
+        const existente = await db.usuarioObterPorId(id);
+        if (!existente) return send(res, 404, { error: "Usuário não encontrado" });
+        const body = await parseBody(req);
+        if (!body.senha?.trim()) return send(res, 400, { error: "Informe a nova senha." });
+        await db.usuarioRedefinirSenha(id, body.senha);
+        await recarregarUsuariosCache();
+        return send(res, 200, { ok: true });
+      }
+    }
+
+    // GET /painel/api/minhas-conversas — conversas atribuídas (campo "Responsável", ver CRM) à
+    // pessoa logada, em QUALQUER canal — poder pro atendimento de "handoff": a SDR qualifica num
+    // número e atribui pro fechamento, que normalmente não navega naquele número, mas ainda
+    // precisa achar essa conversa específica.
+    if (req.method === "GET" && path_ === "/painel/api/minhas-conversas") {
+      const usuarioAtual = requireAuth(req, res);
+      if (!usuarioAtual) return;
+      const nome = (usuarioAtual.nome || "").trim().toLowerCase();
+      if (!nome) return send(res, 200, []);
+      const listas = await Promise.all([
+        ...PHONE_NUMBERS.map((n) => db.listConversations(n.id)),
+        db.listConversations("instagram"),
+      ]);
+      const minhas = [];
+      for (const c of listas.flat()) {
+        if (!c.campos_json) continue;
+        let campos;
+        try {
+          campos = JSON.parse(c.campos_json);
+        } catch {
+          continue;
+        }
+        const responsavel = campos["Responsável"];
+        if (!responsavel || String(responsavel).trim().toLowerCase() !== nome) continue;
+        minhas.push({
+          phone: c.phone,
+          name: c.name,
+          business_number_id: c.business_number_id,
+          channel: c.business_number_id === "instagram" ? "instagram" : "whatsapp",
+          last_message_at: c.last_message_at,
+          last_body: c.last_body,
+          pipeline_estagio: c.pipeline_estagio,
+        });
+      }
+      minhas.sort((a, b) => (b.last_message_at || 0) - (a.last_message_at || 0));
+      return send(res, 200, minhas);
     }
 
     // GET /painel/api/mcp-info — URL do conector MCP pra colar no claude.ai (Configurações >
@@ -5077,8 +5310,119 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchMessages[1]);
       const phone = decodeURIComponent(matchMessages[2]);
-      const mensagens = await db.listMessages(phone, businessId);
+      const desdeParam = url.searchParams.get("desde");
+      const ateParam = url.searchParams.get("ate");
+      const mensagens = await db.listMessages(phone, businessId, {
+        desde: desdeParam ? Number(desdeParam) : undefined,
+        ate: ateParam ? Number(ateParam) : undefined,
+      });
       return send(res, 200, mensagens);
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/midias — só mídia (imagem/vídeo) da
+    // conversa inteira, sem limite de janela — alimenta a Galeria do painel.
+    const matchMidias = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/midias$/);
+    if (req.method === "GET" && matchMidias) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchMidias[1]);
+      const phone = decodeURIComponent(matchMidias[2]);
+      return send(res, 200, await db.listMidiasDaConversa(phone, businessId));
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/outros-canais — mesmo telefone em
+    // OUTRO(S) canal(is) — puramente informativo, não mescla nada.
+    const matchOutrosCanais = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/outros-canais$/);
+    if (req.method === "GET" && matchOutrosCanais) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchOutrosCanais[1]);
+      const phone = decodeURIComponent(matchOutrosCanais[2]);
+      return send(res, 200, await db.conversasDoTelefoneEmOutrosCanais(phone, businessId));
+    }
+
+    // PATCH /painel/api/conversations/:businessId/:phone/nome — renomear manualmente. Fallback
+    // pra quando o WhatsApp não manda profile.name (perfil sem nome configurado) e o contato
+    // fica só com o número. Propaga pros outros canais com o mesmo telefone (ver
+    // propagarIdentidadeContato) — pipeline/tags continuam por canal.
+    const matchRenomear = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/nome$/);
+    if (req.method === "PATCH" && matchRenomear) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const businessId = decodeURIComponent(matchRenomear[1]);
+      const phone = decodeURIComponent(matchRenomear[2]);
+      const nomeNovo = String(body.nome || "").trim();
+      if (!nomeNovo) return send(res, 400, { error: "Nome não pode ser vazio" });
+      await db.renomearConversa(phone, businessId, nomeNovo);
+      db.propagarIdentidadeContato(phone, businessId, { nome: nomeNovo }).catch((err) =>
+        console.error("Erro ao propagar nome pros outros canais:", err.message)
+      );
+      return send(res, 200, { ok: true });
+    }
+
+    // PATCH /painel/api/conversations/:businessId/:phone/foto — "Salvar contato" (foto, estilo
+    // WhatsApp) — não é a foto de perfil do WhatsApp (a Cloud API não expõe isso pra número de
+    // negócio), é escolhida manualmente no painel. Mesmo caminho de toda mídia anexada pelo
+    // painel: vai pro R2, servida depois por GET /media/:filename.
+    const matchFoto = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/foto$/);
+    if (req.method === "PATCH" && matchFoto) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const businessId = decodeURIComponent(matchFoto[1]);
+      const phone = decodeURIComponent(matchFoto[2]);
+      if (!body.fotoBase64) return send(res, 400, { error: "Nenhuma foto enviada" });
+      try {
+        const { buffer, contentType, nomeArquivo } = decodificarImagemBase64(body.fotoBase64);
+        const filename = `avatar-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${nomeArquivo.split(".").pop()}`;
+        await r2.enviarVideo(`clientes/${filename}`, buffer, contentType);
+        const fotoUrl = `/media/${filename}`;
+        await db.definirFotoContato(phone, businessId, fotoUrl);
+        db.propagarIdentidadeContato(phone, businessId, { fotoUrl }).catch((err) =>
+          console.error("Erro ao propagar foto pros outros canais:", err.message)
+        );
+        return send(res, 200, { ok: true, foto_url: fotoUrl });
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
+
+    // PATCH /painel/api/conversations/:businessId/:phone/email — "salvar contato" (e-mail).
+    const matchEmailContato = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/email$/);
+    if (req.method === "PATCH" && matchEmailContato) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const businessId = decodeURIComponent(matchEmailContato[1]);
+      const phone = decodeURIComponent(matchEmailContato[2]);
+      const emailNovo = String(body.email || "").trim();
+      await db.atualizarEmailConversa(phone, businessId, emailNovo || null);
+      return send(res, 200, { ok: true });
+    }
+
+    // POST /painel/api/corrigir-texto — corretor por-trecho (balão clicável em cima da
+    // palavra/expressão errada no textarea, não a frase inteira).
+    if (req.method === "POST" && path_ === "/painel/api/corrigir-texto") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        return send(res, 200, await gemini.corrigirTexto(String(body.texto || "")));
+      } catch (err) {
+        return send(res, err.code === "SEM_CHAVE" ? 400 : 500, { error: err.message });
+      }
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/sugestao-resposta — sugestão de resposta
+    // da IA ("copiloto de vendas") pré-computada em background pelo servidor (ver cron) e
+    // cacheada na própria conversa. Cache só é válido quando copiloto_cache_em bate com
+    // last_message_at — se a mensagem mais recente for mais nova que o cache, não tem sugestão
+    // pronta ainda (o cron ainda vai processar essa conversa na próxima rodada).
+    const matchSugestaoResposta = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/sugestao-resposta$/);
+    if (req.method === "GET" && matchSugestaoResposta) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchSugestaoResposta[1]);
+      const phone = decodeURIComponent(matchSugestaoResposta[2]);
+      const conversa = await db.getConversation(phone, businessId);
+      if (!conversa || !conversa.copiloto_cache_em || conversa.copiloto_cache_em !== conversa.last_message_at) {
+        return send(res, 200, { texto: null, insight: null });
+      }
+      return send(res, 200, { texto: conversa.copiloto_texto || null, insight: conversa.copiloto_insight || null });
     }
 
     // POST /painel/api/conversations/:businessId/:phone/marcar-lida — separado do GET
@@ -5496,6 +5840,109 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "DELETE" && matchRespostaProntaDel) {
       if (!requireAuth(req, res)) return;
       await db.respostaProntaExcluir(Number(matchRespostaProntaDel[1]));
+      return send(res, 200, { ok: true });
+    }
+    // Edição direta (em vez de apagar e recriar, que perdia o id).
+    if (req.method === "PATCH" && matchRespostaProntaDel) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!body.atalho || !body.texto) return send(res, 400, { error: "Informe atalho e texto" });
+      await db.respostaProntaAtualizar(Number(matchRespostaProntaDel[1]), body.atalho.trim(), body.texto.trim());
+      return send(res, 200, { ok: true });
+    }
+    // Conta uso de verdade (clicou pra usar, não só abriu a lista) — alimenta ordenação "mais
+    // usados" dos chips do composer.
+    const matchRespostaProntaUso = path_.match(/^\/painel\/api\/respostas-prontas\/(\d+)\/uso$/);
+    if (req.method === "POST" && matchRespostaProntaUso) {
+      if (!requireAuth(req, res)) return;
+      await db.respostaProntaRegistrarUso(Number(matchRespostaProntaUso[1]));
+      return send(res, 200, { ok: true });
+    }
+
+    // GET/POST /painel/api/ia/feedback — feedback/aceitação da IA ("como sabemos se é útil?").
+    if (path_ === "/painel/api/ia/feedback") {
+      const usuarioAtual = requireAuth(req, res);
+      if (!usuarioAtual) return;
+      if (req.method === "GET") {
+        const [resumo, comentarios] = await Promise.all([
+          db.iaFeedbackResumoPorTipo(),
+          db.iaFeedbackListarComentarios(),
+        ]);
+        return send(res, 200, { resumo, comentarios });
+      }
+      if (req.method === "POST") {
+        const body = await parseBody(req);
+        if (!body.tipo || !body.evento) return send(res, 400, { error: "Informe tipo e evento" });
+        await db.iaFeedbackRegistrar({
+          businessId: body.businessId,
+          phone: body.phone,
+          tipo: body.tipo,
+          evento: body.evento,
+          comentario: body.comentario,
+          usuario: usuarioAtual.nome,
+        });
+        return send(res, 200, { ok: true });
+      }
+    }
+
+    // GET/PATCH /painel/api/pipeline/alertas-config — limiar (minutos) de alerta de "parado na
+    // etapa", editável por etapa do pipeline.
+    if (req.method === "GET" && path_ === "/painel/api/pipeline/alertas-config") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.pipelineAlertasConfigListar());
+    }
+    const matchAlertaConfig = path_.match(/^\/painel\/api\/pipeline\/alertas-config\/([^/]+)$/);
+    if (req.method === "PATCH" && matchAlertaConfig) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const minutos = body.minutos == null ? null : Number(body.minutos);
+      await db.pipelineAlertaConfigDefinir(decodeURIComponent(matchAlertaConfig[1]), minutos);
+      return send(res, 200, { ok: true });
+    }
+
+    // GET /painel/api/retornos — fila cross-channel de retornos pendentes (agrupada em
+    // Atrasados/Hoje/Esta semana/Mais adiante no frontend), distinta da rota por-negócio
+    // /retornos/:businessId que já existia (usada pelo cron de envio).
+    if (req.method === "GET" && path_ === "/painel/api/retornos") {
+      if (!requireAuth(req, res)) return;
+      const listas = await Promise.all([
+        ...PHONE_NUMBERS.map((n) => db.retornoListarPendentes(n.id)),
+        db.retornoListarPendentes("instagram"),
+      ]);
+      const retornos = listas.flat();
+      const telefones = [...new Set(retornos.map((r) => r.business_id + "|" + r.phone))];
+      const nomes = {};
+      await Promise.all(
+        telefones.map(async (chave) => {
+          const [businessId, phone] = chave.split("|");
+          const conversa = await db.getConversation(phone, businessId);
+          nomes[chave] = conversa?.name || null;
+        }),
+      );
+      return send(
+        res,
+        200,
+        retornos.map((r) => ({
+          ...r,
+          name: nomes[r.business_id + "|" + r.phone] || null,
+          channel: r.business_id === "instagram" ? "instagram" : "whatsapp",
+        })),
+      );
+    }
+
+    // GET /painel/api/sugestoes-retorno — radar de "vale um retorno" (etapa parada / inativo).
+    // PATCH .../status NUNCA envia nada sozinho — só marca aprovado/descartado, quem abre a
+    // conversa e decide canal/texto é sempre um humano.
+    if (req.method === "GET" && path_ === "/painel/api/sugestoes-retorno") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.sugestoesRetornoPendentes());
+    }
+    const matchSugestaoStatus = path_.match(/^\/painel\/api\/sugestoes-retorno\/(\d+)\/status$/);
+    if (req.method === "PATCH" && matchSugestaoStatus) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      if (!["aprovado", "descartado"].includes(body.status)) return send(res, 400, { error: "Status inválido" });
+      await db.sugestaoRetornoMarcarStatus(Number(matchSugestaoStatus[1]), body.status);
       return send(res, 200, { ok: true });
     }
 
@@ -6339,10 +6786,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     // GET /media/:filename — servir arquivo de mídia recebida de cliente (fica no R2, ver
-    // comentário em "clientes/" acima — disco local não sobrevive a deploy/restart do Render)
+    // comentário em "clientes/" acima — disco local não sobrevive a deploy/restart do Render).
+    // Aceita token de mídia (?token=...) como alternativa ao Basic Auth — ver gerarTokenMedia:
+    // <img>/<audio> não conseguem mandar o header Authorization, só um fetch com header
+    // customizado consegue.
     const matchMedia = path_.match(/^\/media\/([a-zA-Z0-9_.-]+)$/);
     if (req.method === "GET" && matchMedia) {
-      if (!requireAuth(req, res)) return;
+      const token = url.searchParams.get("token");
+      if (!(token && validarTokenMedia(token)) && !requireAuth(req, res)) return;
       try {
         const { buffer } = await r2.baixarArquivo(`clientes/${matchMedia[1]}`);
         return send(res, 200, buffer, { "Content-Type": mimeDoArquivo(matchMedia[1]) });
@@ -6392,11 +6843,19 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`\n🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`   Webhook URL: https://SEU_DOMINIO/webhook`);
-  console.log(`   Painel:      https://SEU_DOMINIO/painel`);
-  console.log("─".repeat(50));
+// Carrega o cache de usuários (login por pessoa) ANTES de abrir a porta — isAuthorized precisa
+// ser síncrona, então a primeira requisição já precisa achar o array pronto, não vazio por uma
+// corrida com essa carga assíncrona. Se a tabela `usuarios` estiver vazia (ninguém cadastrado
+// ainda) ou o banco estiver fora do ar, recarregarUsuariosCache já loga e segue com array vazio
+// — PAINEL_USER/PAINEL_PASS continuam funcionando como fallback, o servidor nunca deixa de subir
+// por causa disso.
+recarregarUsuariosCache().then(() => {
+  server.listen(PORT, () => {
+    console.log(`\n🚀 Servidor rodando na porta ${PORT}`);
+    console.log(`   Webhook URL: https://SEU_DOMINIO/webhook`);
+    console.log(`   Painel:      https://SEU_DOMINIO/painel`);
+    console.log("─".repeat(50));
+  });
 });
 
 // ─── LIMPEZA DE MÍDIA TEMPORÁRIA DO PUBLIQUE IV ──────────────────────────────
@@ -6859,3 +7318,131 @@ setTimeout(() => {
     backup.rodarBackup().catch((err) => console.error("Erro no backup pra conta de reserva:", err.message));
   }, 24 * 60 * 60 * 1000);
 }, 2 * 60 * 1000);
+
+// ─── ALERTA DE ETAPA PARADA (nota interna gerada por IA) ────────────────────────────────────
+// Conversa aberta (não finalizada) com etapa de pipeline parada tempo demais ganha uma nota
+// interna gerada pelo Gemini (ver gemini.js analisarEtapaParada). Nunca manda mensagem pro
+// cliente, nunca muda a etapa sozinha — só grava uma nota que aparece na linha do tempo e no
+// painel de detalhes do contato, pro atendente decidir o que fazer. Limiar editável por etapa
+// (tela Pipeline, botão de relógio em cada coluna), guardado em `pipeline_alertas_config` (ver
+// seed inicial em db.js) — etapa sem linha na tabela = alerta desativado pra ela. Carregado de
+// novo a cada rodada do cron (30/30min, custo irrelevante) pra sempre refletir o que foi
+// configurado por último.
+// Mesmos ids/nomes de PIPELINE_ESTAGIOS em painel-web/src/lib/api.ts — mantido em sincronia na
+// mão (poucos itens, muda raramente) porque o backend não importa código do frontend.
+const NOME_ETAPA_PIPELINE = {
+  novo_lead: "Novo lead",
+  qualificacao: "Em qualificação",
+  documentos: "Documentos enviados",
+  analise: "Em análise",
+  aprovado: "Aprovado",
+  perdido: "Perdido",
+};
+setInterval(async () => {
+  try {
+    const [candidatas, limiaresConfig] = await Promise.all([db.conversasEtapaParada(), db.pipelineAlertasConfigListar()]);
+    const agora = Date.now();
+    for (const c of candidatas) {
+      const limiarMinutos = limiaresConfig[c.pipeline_estagio];
+      if (!limiarMinutos) continue;
+      const minutosParada = (agora - Number(c.pipeline_estagio_desde)) / (60 * 1000);
+      if (minutosParada < limiarMinutos) continue;
+      const horasParada = minutosParada / 60;
+      try {
+        const mensagens = await db.ultimasMensagens(c.phone, c.business_number_id, 20);
+        const dias = Math.round(horasParada / 24);
+        const nomeEtapa = NOME_ETAPA_PIPELINE[c.pipeline_estagio] || c.pipeline_estagio;
+        const { nota } = await gemini.analisarEtapaParada({ mensagens, estagioNome: nomeEtapa, dias });
+        if (nota) {
+          await db.notaAdicionar(c.business_number_id, c.phone, `🤖 ${nota}`);
+          await db.iaFeedbackRegistrar({ businessId: c.business_number_id, phone: c.phone, tipo: "alerta_etapa_parada", evento: "mostrada" });
+          // Também vira sugestão pendente na tela Retornos — antes só a nota na conversa, fácil
+          // de nunca ser vista.
+          await db.sugestaoRetornoCriar({ businessId: c.business_number_id, phone: c.phone, tipo: "etapa_parada", motivo: nota });
+        }
+        await db.marcarAlertaEtapaEnviado(c.phone, c.business_number_id);
+        console.log(`🤖 Alerta de etapa parada gerado para ${c.phone} (${nomeEtapa}, ${dias}d)`);
+      } catch (err) {
+        // IA não configurada (sem GEMINI_API_KEY) — tenta de novo na próxima rodada, sem logar
+        // erro repetido a cada 30min pra cada conversa parada enquanto isso não for resolvido.
+        if (err.code === "SEM_CHAVE") break;
+        console.error(`Erro ao gerar alerta de etapa parada (${c.phone}):`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no verificador de etapa parada:", err.message);
+  }
+}, 30 * 60 * 1000);
+
+// ─── COPILOTO DE VENDAS — pré-cálculo em background ─────────────────────────────────────────
+// Um cron roda a cada 90s, acha conversas com mensagem nova do cliente sem fluxo automático
+// ativo (ver conversasParaPrecomputarCopiloto em db.js) e já deixa o rascunho/insight prontos em
+// `conversations.copiloto_*`; o painel lê esse cache instantaneamente ao abrir a conversa.
+// Reaproveita a MESMA função/prompt do endpoint sob demanda (GET .../sugestao-resposta) — não
+// duplica lógica de IA nenhuma, só troca QUANDO ela roda.
+//
+// Guard de reentrância — sem isso, se processar o lote de candidatas demorasse mais que 90s
+// (plausível com retry do Gemini em horário de pico), o PRÓXIMO disparo do setInterval
+// começaria uma 2ª rodada em cima da MESMA lista de candidatas (o cache delas só grava no fim de
+// cada uma, ainda não gravou) — dobrando chamada à IA à toa pro mesmo contato. Com o guard, uma
+// rodada atrasada simplesmente pula a próxima vez e retoma no ciclo seguinte livre, nunca roda 2
+// em paralelo. LIMIT baixo (15, ver conversasParaPrecomputarCopiloto em db.js) + esse guard
+// juntos garantem que o volume de chamada à IA cresce com o RITMO de mensagem nova chegando, não
+// com o TOTAL de conversas existentes no banco.
+let precomputandoCopiloto = false;
+setInterval(async () => {
+  if (precomputandoCopiloto) return;
+  precomputandoCopiloto = true;
+  try {
+    const candidatas = await db.conversasParaPrecomputarCopiloto();
+    for (const c of candidatas) {
+      try {
+        const [mensagens, campos, valoresAtuais, respostasProntas] = await Promise.all([
+          db.ultimasMensagens(c.phone, c.business_number_id, 20),
+          db.camposPersonalizadosListar(c.business_number_id),
+          db.conversationCamposObter(c.business_number_id, c.phone),
+          db.respostasProntasListar(),
+        ]);
+        const sugestao = await gemini.sugerirResposta({ mensagens, campos, valoresAtuais, respostasProntas });
+        await db.copilotoCacheSalvar(c.phone, c.business_number_id, sugestao.texto, sugestao.insight, c.last_message_at);
+      } catch (err) {
+        // Sem GEMINI_API_KEY — tenta de novo na próxima rodada, sem logar erro repetido a cada
+        // 90s pra cada conversa candidata enquanto isso não for resolvido (mesmo padrão do
+        // alerta de etapa parada acima).
+        if (err.code === "SEM_CHAVE") break;
+        console.error(`Erro ao pré-calcular copiloto (${c.phone}):`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no pré-cálculo do copiloto de vendas:", err.message);
+  } finally {
+    precomputandoCopiloto = false;
+  }
+}, 90 * 1000);
+
+// ─── RADAR DE CLIENTES INATIVOS ──────────────────────────────────────────────────────────────
+// 1x/dia, limiar de 60 dias sem nenhuma mensagem (consignado tem ciclo de decisão mais curto que
+// clínica — ajustável aqui se precisar) — gera uma sugestão de retorno tipo "reativação", sem
+// precisar de IA (é só tempo parado, não tem nada pra "pensar" aqui) — mesma fila de sugestões
+// pendentes do alerta de etapa parada (tela Retornos).
+const LIMIAR_INATIVIDADE_DIAS = 60;
+setInterval(async () => {
+  try {
+    const inativas = await db.conversasInativas(LIMIAR_INATIVIDADE_DIAS * 24 * 60 * 60 * 1000);
+    for (const c of inativas) {
+      try {
+        const dias = Math.round((Date.now() - Number(c.last_message_at)) / (24 * 60 * 60 * 1000));
+        await db.sugestaoRetornoCriar({
+          businessId: c.business_number_id,
+          phone: c.phone,
+          tipo: "inatividade",
+          motivo: `Sem nenhuma mensagem há ${dias} dias — pode valer reativar o contato.`,
+        });
+      } catch (err) {
+        console.error(`Erro ao avaliar inatividade de ${c.phone}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no radar de clientes inativos:", err.message);
+  }
+}, 24 * 60 * 60 * 1000);

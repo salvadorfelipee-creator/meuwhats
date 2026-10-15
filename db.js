@@ -1,4 +1,5 @@
 const { createClient } = require("@libsql/client");
+const crypto = require("crypto");
 
 const client = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -176,6 +177,44 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "pipeline_estagio")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN pipeline_estagio TEXT`);
   }
+  // pipeline_estagio_desde = quando a conversa ENTROU na etapa atual (não quando a conversa foi
+  // criada) — é o que permite alertar "estagnado há X" por etapa (ver pipeline_alertas_config
+  // mais abaixo) sem confundir com tempo total de conversa.
+  if (!infoConversations.rows.some((r) => r.name === "pipeline_estagio_desde")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN pipeline_estagio_desde INTEGER`);
+  }
+  // foto_url = foto de perfil definida manualmente pela equipe (a API do WhatsApp Cloud não
+  // expõe a foto real de perfil de quem manda mensagem pra número de empresa) — servida em
+  // /media/:filename como qualquer mídia recebida.
+  if (!infoConversations.rows.some((r) => r.name === "foto_url")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN foto_url TEXT`);
+  }
+  // copiloto_* = sugestão de resposta da IA pré-computada em background (cron, ver server.js) e
+  // cacheada na própria linha da conversa — cache só é considerado válido quando
+  // copiloto_cache_em === last_message_at (ver sugestaoResposta em api.ts), senão a sugestão
+  // apareceria desatualizada depois de mensagens novas. Pré-computar em vez de gerar na hora
+  // que o painel abre a conversa é o que permite aparecer instantâneo, sem spinner.
+  if (!infoConversations.rows.some((r) => r.name === "copiloto_texto")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN copiloto_texto TEXT`);
+    await client.execute(`ALTER TABLE conversations ADD COLUMN copiloto_insight TEXT`);
+    await client.execute(`ALTER TABLE conversations ADD COLUMN copiloto_cache_em INTEGER`);
+  }
+  // pipeline_alerta_em = quando o alerta de "parado na etapa" já foi disparado pra essa conversa
+  // (ver conversasEtapaParada/marcarAlertaEtapaEnviado) — evita repetir o mesmo alerta/nota toda
+  // vez que o cron roda; é zerado de volta a NULL sempre que a etapa muda (ver atualização de
+  // pipeline_estagio) pra poder alertar de novo se estagnar numa etapa diferente depois.
+  if (!infoConversations.rows.some((r) => r.name === "pipeline_alerta_em")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN pipeline_alerta_em INTEGER`);
+  }
+  // google_contact_resource_name = id do contato já criado no Google Contacts (evita duplicar ao
+  // importar/sincronizar de novo). brevo_contato_sync_em = última vez que o contato foi
+  // sincronizado com o Brevo (envio de e-mail).
+  if (!infoConversations.rows.some((r) => r.name === "google_contact_resource_name")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN google_contact_resource_name TEXT`);
+  }
+  if (!infoConversations.rows.some((r) => r.name === "brevo_contato_sync_em")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN brevo_contato_sync_em INTEGER`);
+  }
 
   const infoMessagesOrigem = await client.execute(`PRAGMA table_info(messages)`);
   // origem = 'humano' só na mensagem que sai pelo reply do painel (ver POST .../reply em
@@ -243,6 +282,12 @@ const ready = (async () => {
     created_at INTEGER NOT NULL
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_atividades_conversa_conversa ON atividades_conversa(business_id, phone, created_at)`);
+  // origem = quem fez a ação ('automatico' pra tag/etapa aplicada por automação, NULL pra ação
+  // humana no painel) — deixa a timeline distinguir as duas coisas em vez de parecer tudo manual.
+  const infoAtividades = await client.execute(`PRAGMA table_info(atividades_conversa)`);
+  if (!infoAtividades.rows.some((r) => r.name === "origem")) {
+    await client.execute(`ALTER TABLE atividades_conversa ADD COLUMN origem TEXT`);
+  }
 
   // Motor de fluxo dinâmico (dado no banco, não código) — usado só por número que NÃO tem
   // fluxo fixo escrito em server.js (ver getFluxo). V1: nó 'mensagem' (com botões via
@@ -364,12 +409,97 @@ const ready = (async () => {
   if (!infoRetornos.rows.some((r) => r.name === "fluxo_id")) {
     await client.execute(`ALTER TABLE retornos ADD COLUMN fluxo_id INTEGER`);
   }
+  // reforco_criado = esse retorno de reativação (1º toque) já foi avaliado pro 2º toque (ver
+  // retornosReativacaoElegiveisPara2Toque) — marca 1 sempre, respondendo ou não, pra nunca
+  // reavaliar o mesmo envio duas vezes.
+  if (!infoRetornos.rows.some((r) => r.name === "reforco_criado")) {
+    await client.execute(`ALTER TABLE retornos ADD COLUMN reforco_criado INTEGER NOT NULL DEFAULT 0`);
+  }
 
   await client.execute(`CREATE TABLE IF NOT EXISTS respostas_prontas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     atalho TEXT NOT NULL,
     texto TEXT NOT NULL,
     created_at INTEGER NOT NULL
+  )`);
+  // uso_count = quantas vezes o atalho foi efetivamente CLICADO pra usar o texto (não quando só
+  // abre a lista) — alimenta ordenação "mais usados" no painel.
+  const infoRespostasProntas = await client.execute(`PRAGMA table_info(respostas_prontas)`);
+  if (!infoRespostasProntas.rows.some((r) => r.name === "uso_count")) {
+    await client.execute(`ALTER TABLE respostas_prontas ADD COLUMN uso_count INTEGER NOT NULL DEFAULT 0`);
+  }
+
+  // Login por pessoa (ver seção "Usuários" mais abaixo) — substitui o login único
+  // PAINEL_USER/PAINEL_PASS compartilhado por toda a equipe. Esse par de env vars continua
+  // funcionando como fallback de bootstrap/recuperação mesmo depois de cadastrar usuários reais
+  // (ver isAuthorized em server.js), nunca é removido.
+  await client.execute(`CREATE TABLE IF NOT EXISTS usuarios (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome TEXT NOT NULL,
+    usuario TEXT NOT NULL UNIQUE,
+    senha_hash TEXT NOT NULL,
+    papel TEXT NOT NULL DEFAULT 'atendente',
+    canais_padrao TEXT,
+    etapas_notificacao TEXT,
+    ativo INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL
+  )`);
+  const infoUsuarios = await client.execute(`PRAGMA table_info(usuarios)`);
+  if (!infoUsuarios.rows.some((r) => r.name === "etapas_notificacao")) {
+    await client.execute(`ALTER TABLE usuarios ADD COLUMN etapas_notificacao TEXT`);
+  }
+
+  // Limiar de alerta de "parado na etapa" por etapa do pipeline, editável pelo painel (cada
+  // etapa pode ter um tempo-limite diferente antes de virar alerta — ex. "perdido" não precisa
+  // alerta, "novo lead" pode ser rápido). Guardado em MINUTOS. Etapa sem linha aqui = alerta
+  // desativado pra ela. Seed com os estágios do funil da Felizcred (PIPELINE_ESTAGIOS em
+  // painel-web/src/lib/api.ts) — valores iniciais conservadores, ajustáveis depois em
+  // Configurações.
+  await client.execute(`CREATE TABLE IF NOT EXISTS pipeline_alertas_config (
+    estagio_id TEXT PRIMARY KEY,
+    minutos INTEGER NOT NULL
+  )`);
+  await client.execute(`INSERT OR IGNORE INTO pipeline_alertas_config (estagio_id, minutos) VALUES
+    ('novo_lead', 1440), ('qualificacao', 2880), ('documentos', 1440), ('analise', 4320)`);
+
+  // Feedback/aceitação da IA — pra medir se uma sugestão é útil de verdade (não só impressão).
+  // `evento` ('mostrada'/'aceita'/'descartada'/'comentario') + `tipo`
+  // ('copiloto_resposta'/'corretor'/'alerta_etapa_parada'/'comentario_livre') dá pra calcular taxa
+  // de aceitação por funcionalidade (aceita/mostrada).
+  await client.execute(`CREATE TABLE IF NOT EXISTS ia_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT,
+    phone TEXT,
+    tipo TEXT NOT NULL,
+    evento TEXT NOT NULL,
+    comentario TEXT,
+    usuario TEXT,
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_ia_feedback_tipo ON ia_feedback(tipo, evento, created_at)`);
+
+  // Sugestões de retorno pendentes — junta num lugar só (tela Retornos) tudo que o radar acha
+  // que vale um retorno: etapa do pipeline parada demais, ou cliente inativo há muito tempo.
+  // "Aprovar" NUNCA envia nada sozinho — só abre a conversa pra um humano decidir canal/texto.
+  await client.execute(`CREATE TABLE IF NOT EXISTS sugestoes_retorno (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    motivo TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pendente',
+    created_at INTEGER NOT NULL
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_sugestoes_retorno_status ON sugestoes_retorno(status, created_at)`);
+
+  // Dedupe de campanha de aniversário (1x por pessoa por ano) — usado pelo assistente de
+  // campanha do WhatsApp (segmentação "aniversário nos próximos N dias").
+  await client.execute(`CREATE TABLE IF NOT EXISTS aniversarios_enviados (
+    business_id TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    ano INTEGER NOT NULL,
+    enviado_em INTEGER NOT NULL,
+    PRIMARY KEY (business_id, phone, ano)
   )`);
 
   await client.execute(`CREATE TABLE IF NOT EXISTS instagram_dm_contacts (
@@ -892,12 +1022,12 @@ async function atualizarStatusConversa(phone, businessNumberId, status) {
 // próprias funções de mutação (tag/etapa/campo/retorno) pra nunca esquecer de logar não importa
 // se quem chamou foi uma rota REST ou uma ferramenta MCP. Nunca derruba a mutação principal se
 // o log falhar (é auxiliar, não crítico).
-async function atividadeRegistrar({ businessId, phone, tipo, descricao }) {
+async function atividadeRegistrar({ businessId, phone, tipo, descricao, origem }) {
   try {
     await ready;
     await client.execute({
-      sql: `INSERT INTO atividades_conversa (business_id, phone, tipo, descricao, created_at) VALUES (?, ?, ?, ?, ?)`,
-      args: [businessId, phone, tipo, descricao, Date.now()],
+      sql: `INSERT INTO atividades_conversa (business_id, phone, tipo, descricao, created_at, origem) VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [businessId, phone, tipo, descricao, Date.now(), origem || null],
     });
   } catch (err) {
     console.error("Erro ao registrar atividade:", err.message);
@@ -921,6 +1051,18 @@ async function campoPersonalizadoCriar(businessId, nome) {
     args: [businessId, nome, Date.now()],
   });
   return Number(result.lastInsertRowid);
+}
+
+// Usado pelo CSV de importação de contatos (coluna livre vira campo personalizado automático)
+// e por qualquer automação que precisa garantir que um campo existe antes de gravar valor nele.
+async function campoPersonalizadoEncontrarOuCriar(businessId, nome) {
+  await ready;
+  const existente = await client.execute({
+    sql: `SELECT id FROM campos_personalizados WHERE business_id = ? AND nome = ? LIMIT 1`,
+    args: [businessId, nome],
+  });
+  if (existente.rows[0]) return Number(existente.rows[0].id);
+  return campoPersonalizadoCriar(businessId, nome);
 }
 
 async function camposPersonalizadosListar(businessId) {
@@ -1038,14 +1180,27 @@ async function apagarTag(businessNumberId, tagId) {
   });
 }
 
-async function adicionarTagConversa(businessNumberId, phone, tagId) {
+// Acha a tag pelo nome (sem diferenciar maiúsculas) ou cria — usado pra marcar automaticamente
+// de qual anúncio/campanha um lead veio, onde o mesmo gatilho gera várias conversas e não pode
+// criar uma tag duplicada por vez.
+async function tagEncontrarOuCriar(businessNumberId, nome, cor) {
+  await ready;
+  const existente = await client.execute({
+    sql: `SELECT id FROM tags WHERE business_number_id = ? AND nome = ? COLLATE NOCASE LIMIT 1`,
+    args: [businessNumberId, nome.trim()],
+  });
+  if (existente.rows[0]) return existente.rows[0].id;
+  return criarTag(businessNumberId, nome, cor);
+}
+
+async function adicionarTagConversa(businessNumberId, phone, tagId, origem) {
   await ready;
   await client.execute({
     sql: `INSERT OR IGNORE INTO conversation_tags (business_number_id, phone, tag_id, created_at) VALUES (?, ?, ?, ?)`,
     args: [businessNumberId, phone, tagId, Date.now()],
   });
   const tag = await client.execute({ sql: `SELECT nome FROM tags WHERE id = ?`, args: [tagId] });
-  await atividadeRegistrar({ businessId: businessNumberId, phone, tipo: "tag_add", descricao: `Tag "${tag.rows[0]?.nome || tagId}" adicionada` });
+  await atividadeRegistrar({ businessId: businessNumberId, phone, tipo: "tag_add", descricao: `Tag "${tag.rows[0]?.nome || tagId}" adicionada`, origem });
 }
 
 async function removerTagConversa(businessNumberId, phone, tagId) {
@@ -1275,6 +1430,139 @@ async function respostaProntaExcluir(id) {
   await client.execute({ sql: `DELETE FROM respostas_prontas WHERE id = ?`, args: [id] });
 }
 
+// Edição direta (em vez de apagar e recriar, que perdia o id).
+async function respostaProntaAtualizar(id, atalho, texto) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE respostas_prontas SET atalho = ?, texto = ? WHERE id = ?`,
+    args: [atalho, texto, id],
+  });
+}
+
+// Chamada toda vez que a pessoa CLICA num atalho pra usar o texto (não quando só abre a lista)
+// — alimenta a ordenação "mais usados" dos chips acima do campo de digitar.
+async function respostaProntaRegistrarUso(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE respostas_prontas SET uso_count = uso_count + 1 WHERE id = ?`, args: [id] });
+}
+
+// ─── Usuários (login por pessoa) ──────────────────────────────────────────────────────────
+// Formato do hash: "scrypt:<salt-hex>:<hash-hex>" — autodescritivo (facilita trocar o algoritmo
+// no futuro sem migrar senha antiga), usa só crypto nativo do Node (sem dependência nova).
+function hashSenha(senha) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(senha), salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+}
+
+// Cache de verificação de senha (achado real de performance): sem isso, scryptSync (CPU-bound,
+// proposital lento) rodava a cada chamada autenticada da API — o painel reenvia a mesma
+// credencial (Basic Auth) em toda requisição, inclusive o poll de alguns segundos — então trocar
+// de aba/abrir conversa disparava várias chamadas em paralelo, cada uma pagando esse custo em
+// série (Node é single-thread). Chave inclui o HASH (não só o usuário): quando a senha é trocada,
+// o hash muda, a chave muda, e as entradas antigas simplesmente nunca mais são lidas — não
+// precisa de invalidação manual nenhuma. TTL curto (30s) cobre o caso comum (mesma pessoa
+// navegando) sem guardar nada por muito tempo.
+const CACHE_SENHA_TTL_MS = 30 * 1000;
+const cacheVerificacaoSenha = new Map(); // chave: `${senhaHash}:${senha}` -> { ok, expira }
+setInterval(() => {
+  const agora = Date.now();
+  for (const [chave, v] of cacheVerificacaoSenha) {
+    if (v.expira <= agora) cacheVerificacaoSenha.delete(chave);
+  }
+}, 5 * 60 * 1000);
+
+// Sem `await ready` de propósito — não toca o banco, só compara bytes. Isso deixa quem chama
+// (isAuthorized em server.js, que PRECISA ser síncrono) usar essa função direto em cima do array
+// em memória, sem depender de Promise nenhuma.
+function verificarSenha(senha, senhaHash) {
+  if (!senhaHash || typeof senhaHash !== "string") return false;
+  const partes = senhaHash.split(":");
+  if (partes.length !== 3 || partes[0] !== "scrypt") return false;
+  const chaveCache = `${senhaHash}:${senha}`;
+  const agora = Date.now();
+  const cache = cacheVerificacaoSenha.get(chaveCache);
+  if (cache && cache.expira > agora) return cache.ok;
+  const [, salt, hashHex] = partes;
+  let ok = false;
+  try {
+    const esperado = Buffer.from(hashHex, "hex");
+    const recebido = crypto.scryptSync(String(senha || ""), salt, esperado.length);
+    ok = esperado.length === recebido.length && crypto.timingSafeEqual(esperado, recebido);
+  } catch {
+    ok = false;
+  }
+  cacheVerificacaoSenha.set(chaveCache, { ok, expira: agora + CACHE_SENHA_TTL_MS });
+  return ok;
+}
+
+async function usuarioCriar({ nome, usuario, senha, papel = "atendente", canaisPadrao = null, etapasNotificacao = null }) {
+  await ready;
+  const ja = await client.execute({ sql: `SELECT id FROM usuarios WHERE usuario = ?`, args: [usuario] });
+  if (ja.rows.length) throw new Error("Já existe um usuário com esse login.");
+  const result = await client.execute({
+    sql: `INSERT INTO usuarios (nome, usuario, senha_hash, papel, canais_padrao, etapas_notificacao, ativo, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, 1, ?)`,
+    args: [
+      nome,
+      usuario,
+      hashSenha(senha),
+      papel,
+      canaisPadrao && canaisPadrao.length ? JSON.stringify(canaisPadrao) : null,
+      etapasNotificacao && etapasNotificacao.length ? JSON.stringify(etapasNotificacao) : null,
+      Date.now(),
+    ],
+  });
+  return Number(result.lastInsertRowid);
+}
+
+// Todos os usuários (ativos e inativos) — usado tanto pela tela de administração (Equipe) quanto
+// pra recarregar o cache em memória que o server.js usa pra autenticar de forma síncrona (ver
+// isAuthorized). Inclui senha_hash de propósito (o cache precisa dele pra conferir senha sem
+// voltar ao banco) — quem expõe isso pro frontend (rota /painel/api/usuarios) tira o campo antes.
+async function usuarioListar() {
+  await ready;
+  const result = await client.execute(`SELECT * FROM usuarios ORDER BY nome ASC`);
+  return result.rows;
+}
+
+async function usuarioObterPorUsuario(usuario) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM usuarios WHERE usuario = ?`, args: [usuario] });
+  return result.rows[0] || null;
+}
+
+async function usuarioObterPorId(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM usuarios WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+async function usuarioAtualizar(id, { nome, papel, canaisPadrao, etapasNotificacao, ativo }) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE usuarios SET nome = ?, papel = ?, canais_padrao = ?, etapas_notificacao = ?, ativo = ? WHERE id = ?`,
+    args: [
+      nome,
+      papel,
+      canaisPadrao && canaisPadrao.length ? JSON.stringify(canaisPadrao) : null,
+      etapasNotificacao && etapasNotificacao.length ? JSON.stringify(etapasNotificacao) : null,
+      ativo ? 1 : 0,
+      id,
+    ],
+  });
+}
+
+async function usuarioRedefinirSenha(id, novaSenha) {
+  await ready;
+  await client.execute({ sql: `UPDATE usuarios SET senha_hash = ? WHERE id = ?`, args: [hashSenha(novaSenha), id] });
+}
+
+async function usuarioDesativar(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE usuarios SET ativo = 0 WHERE id = ?`, args: [id] });
+}
+
 async function insertMessage(msg) {
   await ready;
   const {
@@ -1416,8 +1704,10 @@ async function listConversations(businessNumberId, { incluirFinalizadas = false 
         lm.type AS last_type,
         lm.body AS last_body,
         lm.direction AS last_direction,
+        lm.origem AS last_origem,
         (c.last_inbound_at IS NOT NULL AND (c.last_read_at IS NULL OR c.last_inbound_at > c.last_read_at)) AS nao_lida,
-        tg.tags_json AS tags_json
+        tg.tags_json AS tags_json,
+        cf.campos_json AS campos_json
       FROM conversations c
       LEFT JOIN messages lm ON lm.id = (
         SELECT m.id FROM messages m
@@ -1432,19 +1722,41 @@ async function listConversations(businessNumberId, { incluirFinalizadas = false 
         WHERE ct.business_number_id = ?
         GROUP BY ct.business_number_id, ct.phone
       ) tg ON tg.business_number_id = c.business_number_id AND tg.phone = c.phone
+      LEFT JOIN (
+        SELECT cv.business_id, cv.phone,
+          '{' || GROUP_CONCAT('"' || REPLACE(cp.nome, '"', '\\"') || '":"' || REPLACE(cv.valor, '"', '\\"') || '"') || '}' AS campos_json
+        FROM conversation_campos_valores cv
+        JOIN campos_personalizados cp ON cp.id = cv.campo_id
+        WHERE cv.business_id = ? AND cv.valor IS NOT NULL AND cv.valor != ''
+        GROUP BY cv.business_id, cv.phone
+      ) cf ON cf.business_id = c.business_number_id AND cf.phone = c.phone
       WHERE c.business_number_id = ? ${incluirFinalizadas ? "" : "AND c.status != 'resolvido'"}
       ORDER BY c.last_message_at DESC
     `,
-    args: [businessNumberId, businessNumberId],
+    args: [businessNumberId, businessNumberId, businessNumberId],
   });
   return result.rows;
 }
 
-async function listMessages(phone, businessNumberId) {
+// `desde`/`ate` (epoch ms, opcionais) — carregamento por janela de dias no painel: sem eles,
+// continua devolvendo o histórico inteiro (usado por /exportar, que precisa de tudo). Com eles,
+// limita a consulta a um intervalo — evita reler e retransmitir a conversa inteira a cada
+// abertura/poll pra contato com meses de histórico.
+async function listMessages(phone, businessNumberId, { desde, ate } = {}) {
   await ready;
+  const condicoes = ["phone = ?", "business_number_id = ?"];
+  const args = [phone, businessNumberId];
+  if (desde != null) {
+    condicoes.push("created_at >= ?");
+    args.push(desde);
+  }
+  if (ate != null) {
+    condicoes.push("created_at < ?");
+    args.push(ate);
+  }
   const result = await client.execute({
-    sql: `SELECT * FROM messages WHERE phone = ? AND business_number_id = ? ORDER BY created_at ASC`,
-    args: [phone, businessNumberId],
+    sql: `SELECT * FROM messages WHERE ${condicoes.join(" AND ")} ORDER BY created_at ASC`,
+    args,
   });
   return result.rows;
 }
@@ -2679,7 +2991,456 @@ async function whatsappFalhasRecentes(businessNumberId, desdeMs) {
   return { agrupado: agrupado.rows, detalhe: detalhe.rows };
 }
 
+// ─── CRM/IA/Retornos (portado do painel da Especitá, partes gerais — ver README) ────────────
+
+async function renomearConversa(phone, businessNumberId, nome) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET name = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [nome || null, phone, businessNumberId],
+  });
+}
+
+// Foto do contato, escolhida manualmente no painel ("Salvar contato") — fotoUrl já vem como
+// caminho persistente (/media/:filename), igual qualquer outra mídia recebida.
+async function definirFotoContato(phone, businessNumberId, fotoUrl) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET foto_url = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [fotoUrl || null, phone, businessNumberId],
+  });
+}
+
+// Propaga nome/foto pros OUTROS canais que tiverem o mesmo telefone (o mesmo contato pode
+// escrever pro número Principal E pro de outra campanha) — só identidade (nome/foto);
+// pipeline/tags/notas/e-mail continuam por canal de propósito (pode ser um funil diferente em
+// cada número). `businessNumberId` passado é excluído (já foi gravado direto na própria ação).
+async function propagarIdentidadeContato(phone, businessNumberId, { nome, fotoUrl } = {}) {
+  await ready;
+  if (nome === undefined && fotoUrl === undefined) return;
+  const sets = [];
+  const args = [];
+  if (nome !== undefined) {
+    sets.push("name = ?");
+    args.push(nome || null);
+  }
+  if (fotoUrl !== undefined) {
+    sets.push("foto_url = ?");
+    args.push(fotoUrl || null);
+  }
+  args.push(phone, businessNumberId);
+  await client.execute({
+    sql: `UPDATE conversations SET ${sets.join(", ")} WHERE phone = ? AND business_number_id != ?`,
+    args,
+  });
+}
+
+async function salvarGoogleContactResourceName(phone, businessNumberId, resourceName) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET google_contact_resource_name = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [resourceName, phone, businessNumberId],
+  });
+}
+
+// Dedup de contato Google por TELEFONE — o mesmo telefone pode ter mais de uma linha em
+// `conversations` (1 por número de WhatsApp — cada canal mantém sua própria thread, não mescla
+// no CRM), mas o Google Contatos é 1 contato só por pessoa de verdade. Antes de criar um contato
+// novo, quem sincroniza usa isto pra achar se ALGUMA OUTRA linha desse telefone já tem um
+// google_contact_resource_name pra reaproveitar em vez de duplicar.
+async function googleContactResourceNamePorTelefone(phone, excluirBusinessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT google_contact_resource_name FROM conversations
+          WHERE phone = ? AND business_number_id != ? AND google_contact_resource_name IS NOT NULL
+          LIMIT 1`,
+    args: [phone, excluirBusinessNumberId],
+  });
+  return result.rows[0]?.google_contact_resource_name || null;
+}
+
+async function marcarBrevoContatoSync(phone, businessNumberId) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET brevo_contato_sync_em = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [Date.now(), phone, businessNumberId],
+  });
+}
+
+// Mesmo telefone, canal(is) DIFERENTE(S) — pra um atendente notar (sem precisar adivinhar) que
+// esse contato também tem conversa aberta em outro número/canal, e poder saltar pra lá.
+// Puramente informativo (não mescla nada) — devolve só o essencial pra montar o link.
+async function conversasDoTelefoneEmOutrosCanais(phone, excluirBusinessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT business_number_id, name, last_message_at FROM conversations
+          WHERE phone = ? AND business_number_id != ? ORDER BY last_message_at DESC`,
+    args: [phone, excluirBusinessNumberId],
+  });
+  return result.rows;
+}
+
+// Cria/atualiza um contato SEM mandar mensagem (importação CSV/Google Contacts) — de propósito
+// não mexe em last_message_at (ficaria parecendo "conversa recente" sem nunca ter conversado).
+async function importarContato(phone, businessNumberId, { nome, email, googleResourceName } = {}) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO conversations (phone, business_number_id, name, email, google_contact_resource_name)
+          VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(phone, business_number_id) DO UPDATE SET
+            name = COALESCE(excluded.name, conversations.name),
+            email = COALESCE(excluded.email, conversations.email),
+            google_contact_resource_name = COALESCE(excluded.google_contact_resource_name, conversations.google_contact_resource_name)`,
+    args: [phone, businessNumberId, nome || null, email || null, googleResourceName || null],
+  });
+}
+
+// Só mídia (imagem/vídeo) da conversa inteira, sem limite de janela — alimenta a Galeria do
+// painel, que precisa ver tudo mesmo quando o histórico de texto carrega por partes (ver
+// listMessages com desde/até). Colunas enxutas de propósito (sem `body`, que não interessa aqui).
+async function listMidiasDaConversa(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT id, type, media_path, media_mime, created_at FROM messages
+          WHERE phone = ? AND business_number_id = ? AND media_path IS NOT NULL AND type IN ('image', 'video')
+          ORDER BY created_at ASC`,
+    args: [phone, businessNumberId],
+  });
+  return result.rows;
+}
+
+// ─── Alerta de "parado na etapa" do pipeline (ver pipeline_alertas_config) ──────────────────
+async function conversasEtapaParada() {
+  await ready;
+  const result = await client.execute(
+    `SELECT phone, business_number_id, pipeline_estagio, pipeline_estagio_desde
+     FROM conversations
+     WHERE status != 'resolvido'
+       AND pipeline_estagio IS NOT NULL
+       AND pipeline_estagio_desde IS NOT NULL
+       AND pipeline_alerta_em IS NULL`,
+  );
+  return result.rows;
+}
+
+async function marcarAlertaEtapaEnviado(phone, businessNumberId) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET pipeline_alerta_em = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [Date.now(), phone, businessNumberId],
+  });
+}
+
+async function pipelineAlertasConfigListar() {
+  await ready;
+  const result = await client.execute(`SELECT estagio_id, minutos FROM pipeline_alertas_config`);
+  const mapa = {};
+  for (const row of result.rows) mapa[row.estagio_id] = Number(row.minutos);
+  return mapa;
+}
+
+// minutos null/0 remove a linha (desativa o alerta pra essa etapa); valor positivo cria/atualiza.
+async function pipelineAlertaConfigDefinir(estagioId, minutos) {
+  await ready;
+  if (!minutos) {
+    await client.execute({ sql: `DELETE FROM pipeline_alertas_config WHERE estagio_id = ?`, args: [estagioId] });
+    return;
+  }
+  await client.execute({
+    sql: `INSERT INTO pipeline_alertas_config (estagio_id, minutos) VALUES (?, ?)
+          ON CONFLICT(estagio_id) DO UPDATE SET minutos = excluded.minutos`,
+    args: [estagioId, minutos],
+  });
+}
+
+// ─── Copiloto de vendas pré-calculado ────────────────────────────────────────────────────────
+// Candidatas: conversa aberta (não finalizada), cuja ÚLTIMA mensagem de verdade é do cliente
+// (last_inbound_at = last_message_at — mesma lógica de last_direction === "in" sem precisar de
+// JOIN em messages), SEM fluxo automático esperando resposta dela agora (fluxo_passo IS NULL —
+// nesse caso é o bot, não um humano, que vai responder em seguida) e com cache ausente ou
+// desatualizado (mensagem nova chegou depois do último cálculo). LIMIT baixo de propósito: cada
+// candidata custa 1 chamada à IA (cota diária compartilhada com corretor/alerta de etapa) — ritmo
+// suficiente pra acompanhar tráfego real sem estourar limite de requisições por minuto da API
+// gratuita. Se sobrar backlog, a rodada seguinte pega o resto — nunca processa a mesma conversa 2x
+// ao mesmo tempo (guard no lado do server.js).
+async function conversasParaPrecomputarCopiloto() {
+  await ready;
+  const result = await client.execute(
+    `SELECT phone, business_number_id, last_message_at
+     FROM conversations
+     WHERE status != 'resolvido'
+       AND last_inbound_at IS NOT NULL
+       AND last_inbound_at = last_message_at
+       AND fluxo_passo IS NULL
+       AND (copiloto_cache_em IS NULL OR copiloto_cache_em != last_message_at)
+     LIMIT 15`,
+  );
+  return result.rows;
+}
+
+async function copilotoCacheSalvar(phone, businessNumberId, texto, insight, lastMessageAt) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET copiloto_texto = ?, copiloto_insight = ?, copiloto_cache_em = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [texto || null, insight || null, lastMessageAt, phone, businessNumberId],
+  });
+}
+
+// ─── Feedback/aceitação da IA ────────────────────────────────────────────────────────────────
+async function iaFeedbackRegistrar({ businessId, phone, tipo, evento, comentario, usuario }) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO ia_feedback (business_id, phone, tipo, evento, comentario, usuario, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    args: [businessId || null, phone || null, tipo, evento, comentario || null, usuario || null, Date.now()],
+  });
+}
+
+async function iaFeedbackListarComentarios(limite = 50) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM ia_feedback WHERE evento = 'comentario' ORDER BY created_at DESC LIMIT ?`,
+    args: [limite],
+  });
+  return result.rows;
+}
+
+// Taxa de aceitação por tipo — agrupa mostrada/aceita/descartada, usado na tela de IA pra
+// responder com número em vez de impressão "a IA é útil?".
+async function iaFeedbackResumoPorTipo() {
+  await ready;
+  const result = await client.execute(
+    `SELECT tipo, evento, COUNT(*) as total FROM ia_feedback WHERE evento != 'comentario' GROUP BY tipo, evento`,
+  );
+  return result.rows;
+}
+
+// ─── Sugestões de retorno pendentes (radar: etapa parada / cliente inativo) ─────────────────
+// Junta num lugar só (tela Retornos) tudo que o radar acha que vale um retorno. "Aprovar" NUNCA
+// envia nada sozinho — só abre a conversa pra um humano decidir canal/texto.
+async function sugestaoRetornoCriar({ businessId, phone, tipo, motivo }) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO sugestoes_retorno (business_id, phone, tipo, motivo, status, created_at) VALUES (?, ?, ?, ?, 'pendente', ?)`,
+    args: [businessId, phone, tipo, motivo, Date.now()],
+  });
+}
+
+async function sugestaoRetornoPendenteExiste(businessId, phone) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT 1 FROM sugestoes_retorno WHERE business_id = ? AND phone = ? AND status = 'pendente'`,
+    args: [businessId, phone],
+  });
+  return result.rows.length > 0;
+}
+
+async function sugestoesRetornoPendentes() {
+  await ready;
+  const result = await client.execute(
+    `SELECT sr.*, c.name FROM sugestoes_retorno sr
+     LEFT JOIN conversations c ON c.business_number_id = sr.business_id AND c.phone = sr.phone
+     WHERE sr.status = 'pendente' ORDER BY sr.created_at ASC`,
+  );
+  return result.rows;
+}
+
+async function sugestaoRetornoMarcarStatus(id, status) {
+  await ready;
+  await client.execute({ sql: `UPDATE sugestoes_retorno SET status = ? WHERE id = ?`, args: [status, id] });
+}
+
+// Candidatos a sugestão de "cliente inativo há muito tempo" (radar de reativação) — exclui quem
+// já está "perdido" no pipeline, quem já tem a tag "Não enviar campanha" e quem já tem uma
+// sugestão pendente pra não duplicar.
+async function conversasInativas(limiarMs) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT c.phone, c.business_number_id, c.name, c.last_message_at
+          FROM conversations c
+          WHERE c.last_message_at IS NOT NULL
+            AND c.last_message_at < ?
+            AND (c.pipeline_estagio IS NULL OR c.pipeline_estagio != 'perdido')
+            AND NOT EXISTS (
+              SELECT 1 FROM conversation_tags ctx
+              JOIN tags tx ON tx.id = ctx.tag_id
+              WHERE ctx.business_number_id = c.business_number_id AND ctx.phone = c.phone
+                AND tx.nome = ? COLLATE NOCASE
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM sugestoes_retorno sr
+              WHERE sr.business_id = c.business_number_id AND sr.phone = c.phone AND sr.status = 'pendente'
+            )`,
+    args: [Date.now() - limiarMs, TAG_NAO_ENVIAR_CAMPANHA],
+  });
+  return result.rows;
+}
+
+// ─── Reativação — 2º toque ───────────────────────────────────────────────────────────────────
+// Candidatos: retorno de reativação (1º toque) já ENVIADO de verdade há `diasAntesMs` ou mais,
+// ainda não avaliado pro 2º toque (reforco_criado = 0) — quem chama decide, pra cada um, se a
+// pessoa respondeu desde então (não precisa de 2º toque) ou não (cria sugestão), e sempre marca
+// reforco_criado = 1 no final pra nunca reavaliar o mesmo retorno de novo. `templateNome` é o
+// nome do template de WhatsApp usado no 1º toque (configurável por quem chama, não fixo aqui).
+async function retornosReativacaoElegiveisPara2Toque(templateNome, antesDe) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM retornos
+          WHERE whatsapp_template = ? AND status = 'sent'
+            AND enviado_em IS NOT NULL AND enviado_em <= ?
+            AND reforco_criado = 0`,
+    args: [templateNome, antesDe],
+  });
+  return result.rows;
+}
+
+async function retornoMarcarReforcoCriado(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE retornos SET reforco_criado = 1 WHERE id = ?`, args: [id] });
+}
+
+// ─── Segmentação pra campanha de WhatsApp (assistente de 3 passos) ──────────────────────────
+// Combina em E (AND) só os filtros informados: etapa exata do pipeline, 1 tag, e/ou aniversário
+// nos próximos N dias. Sempre exclui conversa finalizada, mesmo critério do listConversations.
+// Sem nenhum filtro, devolve todo contato ativo do número (equivalente a "selecionar todos").
+// Nome EXATO da tag que marca "nunca mais incluir esse contato numa campanha" — SEMPRE exclui,
+// não é opcional (risco de reputação/LGPD, não só detalhe de UX).
+const TAG_NAO_ENVIAR_CAMPANHA = "Não enviar campanha";
+
+// Verdadeiro se a Data de nascimento (string ISO "YYYY-MM-DD...") cai dentro dos próximos `dias`
+// dias, comparando só dia-mês (o ano de nascimento não importa) — cobre virada de ano.
+function aniversarioNosProximosDias(nascimentoIso, dias, agora = new Date()) {
+  if (!nascimentoIso) return false;
+  const m = /^\d{4}-(\d{2})-(\d{2})/.exec(String(nascimentoIso));
+  if (!m) return false;
+  const mes = Number(m[1]);
+  const dia = Number(m[2]);
+  if (!mes || !dia || mes < 1 || mes > 12 || dia < 1 || dia > 31) return false;
+  const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+  let alvo = new Date(hoje.getFullYear(), mes - 1, dia);
+  if (alvo < hoje) alvo = new Date(hoje.getFullYear() + 1, mes - 1, dia);
+  const diffDias = Math.round((alvo.getTime() - hoje.getTime()) / 86400000);
+  return diffDias >= 0 && diffDias <= dias;
+}
+
+async function conversasParaCampanha(businessId, { estagio, tagId, aniversarioDias } = {}) {
+  await ready;
+  const condicoes = [
+    "c.business_number_id = ?",
+    "c.status != 'resolvido'",
+    `NOT EXISTS (
+      SELECT 1 FROM conversation_tags ctx
+      JOIN tags tx ON tx.id = ctx.tag_id
+      WHERE ctx.business_number_id = c.business_number_id AND ctx.phone = c.phone
+        AND tx.nome = ? COLLATE NOCASE
+    )`,
+  ];
+  const args = [businessId, TAG_NAO_ENVIAR_CAMPANHA];
+  let joins = "";
+  if (estagio) {
+    condicoes.push("c.pipeline_estagio = ?");
+    args.push(estagio);
+  }
+  if (tagId) {
+    joins +=
+      " JOIN conversation_tags ct ON ct.business_number_id = c.business_number_id AND ct.phone = c.phone AND ct.tag_id = ?";
+    args.push(Number(tagId));
+  }
+  if (aniversarioDias != null) {
+    joins += ` LEFT JOIN conversation_campos_valores cvn
+      ON cvn.business_id = c.business_number_id AND cvn.phone = c.phone
+      AND cvn.campo_id = (SELECT id FROM campos_personalizados WHERE business_id = c.business_number_id AND nome = 'Data de nascimento' LIMIT 1)`;
+  }
+  const sql = `
+    SELECT c.phone, c.name${aniversarioDias != null ? ", cvn.valor AS nascimento" : ""}
+    FROM conversations c
+    ${joins}
+    WHERE ${condicoes.join(" AND ")}
+    ORDER BY c.last_message_at DESC
+  `;
+  const result = await client.execute({ sql, args });
+  let linhas = result.rows;
+  if (aniversarioDias != null) {
+    linhas = linhas.filter((r) => aniversarioNosProximosDias(r.nascimento, Number(aniversarioDias)));
+  }
+  return linhas.map((r) => ({ phone: r.phone, name: r.name || null }));
+}
+
+// ─── Aniversário do contato (campanha automática) ───────────────────────────────────────────
+// `mmdd` = "MM-DD" de hoje (calculado em BRT por quem chama) — substr(valor, 6, 5) pega o
+// "MM-DD" de dentro de um "YYYY-MM-DD" guardado pelo <input type="date">.
+async function aniversariantesHoje(mmdd) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT c.business_number_id AS business_id, c.phone, c.name
+          FROM conversation_campos_valores cv
+          JOIN campos_personalizados cp ON cp.id = cv.campo_id AND cp.nome = 'Data de nascimento'
+          JOIN conversations c ON c.business_number_id = cv.business_id AND c.phone = cv.phone
+          WHERE cv.valor IS NOT NULL AND cv.valor != '' AND substr(cv.valor, 6, 5) = ?`,
+    args: [mmdd],
+  });
+  return result.rows;
+}
+
+async function aniversarioJaEnviado(businessId, phone, ano) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT 1 FROM aniversarios_enviados WHERE business_id = ? AND phone = ? AND ano = ?`,
+    args: [businessId, phone, ano],
+  });
+  return result.rows.length > 0;
+}
+
+async function aniversarioMarcarEnviado(businessId, phone, ano) {
+  await ready;
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO aniversarios_enviados (business_id, phone, ano, enviado_em) VALUES (?, ?, ?, ?)`,
+    args: [businessId, phone, ano, Date.now()],
+  });
+}
+
 module.exports = {
+  hashSenha,
+  verificarSenha,
+  usuarioCriar,
+  usuarioListar,
+  usuarioObterPorUsuario,
+  usuarioObterPorId,
+  usuarioAtualizar,
+  usuarioRedefinirSenha,
+  usuarioDesativar,
+  respostaProntaAtualizar,
+  respostaProntaRegistrarUso,
+  tagEncontrarOuCriar,
+  campoPersonalizadoEncontrarOuCriar,
+  renomearConversa,
+  definirFotoContato,
+  propagarIdentidadeContato,
+  salvarGoogleContactResourceName,
+  googleContactResourceNamePorTelefone,
+  marcarBrevoContatoSync,
+  conversasDoTelefoneEmOutrosCanais,
+  importarContato,
+  listMidiasDaConversa,
+  conversasEtapaParada,
+  marcarAlertaEtapaEnviado,
+  pipelineAlertasConfigListar,
+  pipelineAlertaConfigDefinir,
+  conversasParaPrecomputarCopiloto,
+  copilotoCacheSalvar,
+  iaFeedbackRegistrar,
+  iaFeedbackListarComentarios,
+  iaFeedbackResumoPorTipo,
+  sugestaoRetornoCriar,
+  sugestaoRetornoPendenteExiste,
+  sugestoesRetornoPendentes,
+  sugestaoRetornoMarcarStatus,
+  conversasInativas,
+  retornosReativacaoElegiveisPara2Toque,
+  retornoMarcarReforcoCriado,
+  conversasParaCampanha,
+  aniversariantesHoje,
+  aniversarioJaEnviado,
+  aniversarioMarcarEnviado,
   fluxoDinamicoCriar,
   fluxoDinamicoAtivo,
   fluxoDinamicoListar,

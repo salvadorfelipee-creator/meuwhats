@@ -1,8 +1,101 @@
-// Integração com a API gratuita do Google Gemini — usada só pra LER o contexto de uma conversa
-// e SUGERIR etapa do pipeline + valores de campos personalizados. Nunca aplica nada sozinha: a
-// pessoa sempre confirma com um clique no painel (ver POST .../sugestao-ia em server.js). Chave
-// gratuita em https://aistudio.google.com/apikey — sem cartão, com cota diária generosa.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
+// Integração com a API gratuita do Google Gemini — usada pra LER o contexto de uma conversa e
+// SUGERIR (nunca aplicar/enviar sozinha): etapa do pipeline + campos personalizados
+// (sugerirPipeline), um rascunho de resposta pro cliente (sugerirResposta, "copiloto de vendas"),
+// uma nota interna quando uma conversa fica parada demais numa etapa (analisarEtapaParada) e
+// correção de ortografia por trecho (corrigirTexto). A pessoa sempre confirma com um clique no
+// painel. Chave gratuita em https://aistudio.google.com/apikey — sem cartão, com cota diária
+// generosa.
+// Dois modelos de propósito: `GEMINI_MODEL` (barato) pro corretor de texto (tarefa mecânica, não
+// precisa raciocinar, só corrigir ortografia) e `GEMINI_MODEL_PRO` pra sugestão de
+// pipeline/resposta (precisa interpretar a conversa inteira e decidir).
+const GEMINI_MODEL_LITE = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
+const GEMINI_MODEL_PRO = process.env.GEMINI_MODEL_PRO || "gemini-3.8-flash";
+
+// Rotação de chave gratuita — `GEMINI_API_KEY_2` é opcional, vem de um projeto Google Cloud
+// separado, então tem cota diária PRÓPRIA. Só troca de chave quando a atual estourou cota (HTTP
+// 429) — nunca por round-robin, já que isso desperdiçaria a cota da 1ª chave à toa em dias de uso
+// normal. Com as 2 (se configuradas), a cota diária efetiva pras funcionalidades que dependem do
+// Gemini dobra sem precisar escolher qual delas "perde" quando o tráfego crescer.
+const GEMINI_API_KEYS = [process.env.GEMINI_API_KEY, process.env.GEMINI_API_KEY_2].filter(Boolean);
+
+// Chama o Gemini com um prompt pronto e devolve o JSON já parseado — compartilhado por todas as
+// funções deste arquivo. Lança com `.code` pra quem chamou decidir a mensagem de erro certa.
+async function chamarGemini(prompt, modelo = GEMINI_MODEL_LITE) {
+  if (!GEMINI_API_KEYS.length) {
+    const err = new Error("GEMINI_API_KEY não configurada");
+    err.code = "SEM_CHAVE";
+    throw err;
+  }
+
+  // O modelo "flash" mais recente devolve 503 (sobrecarregado) com alguma frequência em horário
+  // de pico — transitório, some sozinho em poucos segundos. Vale a pena tentar de novo 1x antes
+  // de mostrar erro pra pessoa, em vez de fazer ela clicar de novo na mão.
+  async function chamar(apiKey, comThinking) {
+    let r;
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.3,
+              // Essas tarefas não precisam do modo "thinking" do modelo — desligar corta o custo
+              // em tokens sem perder qualidade. Alguns modelos "lite" não aceitam esse campo
+              // (derruba a chamada inteira com 400 INVALID_ARGUMENT) — por isso o retry sem
+              // thinkingConfig logo abaixo.
+              ...(comThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+            },
+          }),
+        },
+      );
+      if (r.ok || r.status !== 503) break;
+      await new Promise((res) => setTimeout(res, 1500));
+    }
+    return r;
+  }
+
+  let resp;
+  for (let i = 0; i < GEMINI_API_KEYS.length; i++) {
+    const apiKey = GEMINI_API_KEYS[i];
+    resp = await chamar(apiKey, true);
+    if (resp.status === 400) {
+      resp = await chamar(apiKey, false);
+    }
+    const temProximaChave = i < GEMINI_API_KEYS.length - 1;
+    if (resp.status === 429 && temProximaChave) {
+      console.warn(`[gemini] chave ${i + 1} estourou cota (429), tentando a próxima`);
+      continue;
+    }
+    break;
+  }
+
+  if (!resp.ok) {
+    const texto = await resp.text().catch(() => "");
+    const err = new Error(`Gemini respondeu ${resp.status}: ${texto.slice(0, 300)}`);
+    err.code = "ERRO_API";
+    throw err;
+  }
+
+  const data = await resp.json();
+  const textoResposta = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!textoResposta) {
+    const err = new Error("Gemini não retornou texto (resposta pode ter sido bloqueada por segurança)");
+    err.code = "SEM_RESPOSTA";
+    throw err;
+  }
+
+  try {
+    return JSON.parse(textoResposta);
+  } catch {
+    const err = new Error("Gemini retornou um JSON inválido");
+    err.code = "JSON_INVALIDO";
+    throw err;
+  }
+}
 
 function montarPrompt({ mensagens, estagios, campos, valoresAtuais }) {
   const transcricao = mensagens
@@ -39,12 +132,6 @@ ${transcricao}`;
 }
 
 async function sugerirPipeline({ mensagens, estagios, campos, valoresAtuais }) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    const err = new Error("GEMINI_API_KEY não configurada");
-    err.code = "SEM_CHAVE";
-    throw err;
-  }
   if (!estagios.length) {
     const err = new Error("Nenhuma etapa de pipeline informada");
     err.code = "SEM_ETAPAS";
@@ -52,56 +139,7 @@ async function sugerirPipeline({ mensagens, estagios, campos, valoresAtuais }) {
   }
 
   const prompt = montarPrompt({ mensagens, estagios, campos, valoresAtuais });
-
-  // O modelo "flash" mais recente devolve 503 (sobrecarregado) com alguma frequência em
-  // horário de pico — transitório, some sozinho em poucos segundos. Vale a pena tentar de novo
-  // 1x antes de mostrar erro pra pessoa, em vez de fazer ela clicar "analisar" de novo na mão.
-  let resp;
-  for (let tentativa = 0; tentativa < 2; tentativa++) {
-    resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.2,
-            // Classificação simples não precisa do modo "thinking" do modelo — desligar corta
-            // o custo em tokens de forma significativa sem perder qualidade pra essa tarefa.
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      },
-    );
-    if (resp.ok || resp.status !== 503) break;
-    await new Promise((r) => setTimeout(r, 1500));
-  }
-
-  if (!resp.ok) {
-    const texto = await resp.text().catch(() => "");
-    const err = new Error(`Gemini respondeu ${resp.status}: ${texto.slice(0, 300)}`);
-    err.code = "ERRO_API";
-    throw err;
-  }
-
-  const data = await resp.json();
-  const textoResposta = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!textoResposta) {
-    const err = new Error("Gemini não retornou texto (resposta pode ter sido bloqueada por segurança)");
-    err.code = "SEM_RESPOSTA";
-    throw err;
-  }
-
-  let json;
-  try {
-    json = JSON.parse(textoResposta);
-  } catch {
-    const err = new Error("Gemini retornou um JSON inválido");
-    err.code = "JSON_INVALIDO";
-    throw err;
-  }
+  const json = await chamarGemini(prompt, GEMINI_MODEL_PRO);
 
   // Validação defensiva: só aceita etapa_id que existe de verdade na lista enviada, e só aceita
   // campos que existem de verdade no CRM desse negócio — nunca confia cegamente no texto que a
@@ -128,4 +166,128 @@ async function sugerirPipeline({ mensagens, estagios, campos, valoresAtuais }) {
   };
 }
 
-module.exports = { sugerirPipeline };
+// Copiloto de vendas (bloco lilás acima do campo de digitar). Duas partes: `insight` (a LEITURA
+// da conversa — sinal de compra, objeção, urgência, o que um vendedor experiente notaria e a
+// atendente pode não estar vendo) e `texto` (o rascunho em si, pra copiar/editar). A atendente
+// usa o insight pra entender o "porquê" e decide com as próprias palavras; o texto é só um ponto
+// de partida, não obrigação de copiar igual. Nunca manda nada sozinho — só devolve, quem envia é
+// a pessoa.
+function montarPromptResposta({ mensagens, campos, valoresAtuais, respostasProntas }) {
+  const transcricao = mensagens
+    .map((m) => {
+      const quem = m.direction === "in" ? "Cliente" : "Atendimento";
+      const corpo = m.body || `[${m.type || "mídia"}]`;
+      return `${quem}: ${corpo}`;
+    })
+    .join("\n");
+
+  const dadosCliente = campos
+    .map((c) => {
+      const v = valoresAtuais.find((x) => x.campo_id === c.id)?.valor;
+      return v ? `- ${c.nome}: ${v}` : null;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  const modelos = respostasProntas.length
+    ? respostasProntas.map((r) => `- ${r.texto}`).join("\n")
+    : "(nenhuma cadastrada)";
+
+  return `Você é um copiloto de vendas/atendimento experiente (nível SDR/closer de verdade, não um bot genérico) ajudando o atendimento de uma correspondente bancária (Felizcred, empréstimo consignado) a responder um cliente pelo WhatsApp. Leia a conversa inteira com atenção a sinais que um vendedor treinado notaria: pergunta de valor/parcela repetida, hesitação, urgência, comparação com concorrente, objeção não resolvida, silêncio depois de uma proposta, etc. Responda SOMENTE com um JSON válido, sem texto antes ou depois, neste formato:
+
+{"insight": "1-2 frases dizendo o que está realmente acontecendo nessa conversa e por que isso importa agora — a leitura estratégica, não um resumo do que já foi dito", "texto": "a resposta sugerida, pronta pra copiar/editar"}
+
+Regras importantes pro "insight":
+- Não repita o que já está óbvio no texto da conversa — aponte o que tem POR TRÁS (ex.: "já é a 2ª vez que pergunta o valor da parcela sem resposta — sinal de decisão perto, não deixe esfriar" é útil; "o cliente perguntou o valor" não é).
+- Se não houver nada estratégico a notar (conversa simples, sem sinal relevante), devolva "insight": "".
+
+Regras importantes pro "texto":
+- Não invente valor, taxa, prazo ou aprovação que não esteja na conversa ou nos dados abaixo.
+- Se não houver informação suficiente pra responder com segurança, sugira pedir mais detalhes (CPF, valor desejado, se é CLT/aposentado/etc.) ou encaminhar pra um atendente humano.
+- Tom caloroso e profissional, frases curtas, sem emoji em excesso (no máximo 1).
+- Pode se inspirar nos modelos de resposta pronta abaixo, mas adapte ao contexto — não copie se não fizer sentido.
+- Se a última mensagem já é nossa (não do cliente), devolva {"insight": "", "texto": ""}.
+
+Dados já conhecidos desse cliente:
+${dadosCliente || "(nenhum ainda)"}
+
+Modelos de resposta pronta (referência de tom/conteúdo):
+${modelos}
+
+Conversa (mais antiga primeiro):
+${transcricao}`;
+}
+
+async function sugerirResposta({ mensagens, campos, valoresAtuais, respostasProntas }) {
+  const prompt = montarPromptResposta({ mensagens, campos, valoresAtuais, respostasProntas });
+  const json = await chamarGemini(prompt, GEMINI_MODEL_PRO);
+  return {
+    texto: typeof json.texto === "string" ? json.texto.trim().slice(0, 1000) : "",
+    insight: typeof json.insight === "string" ? json.insight.trim().slice(0, 400) : "",
+  };
+}
+
+// Alerta de etapa parada — um cron encontra conversa aberta há tempo demais numa etapa do
+// pipeline e pede pra IA escrever uma nota interna curta explicando o possível motivo + próximo
+// passo sugerido. Nunca manda mensagem pro cliente, nunca muda a etapa — só grava uma nota
+// (conversation_notas) que aparece na linha do tempo, pro atendente decidir o que fazer.
+function montarPromptEtapaParada({ mensagens, estagioNome, dias }) {
+  const transcricao = mensagens
+    .map((m) => {
+      const quem = m.direction === "in" ? "Cliente" : "Atendimento";
+      const corpo = m.body || `[${m.type || "mídia"}]`;
+      return `${quem}: ${corpo}`;
+    })
+    .join("\n");
+
+  return `Você é um copiloto de CRM de uma correspondente bancária (empréstimo consignado). Esta conversa está na etapa "${estagioNome}" há ${dias} dia(s) sem mudar. Leia o histórico e escreva uma nota interna curta (1-2 frases, direta, sem jargão) pro atendente humano ler: o possível motivo de estar parada e o que fazer a seguir. Nunca sugira mandar mensagem automática pro cliente — a nota é só pro atendente decidir. Responda SOMENTE com um JSON válido, sem texto antes ou depois:
+
+{"nota": "a nota interna"}
+
+Conversa (mais antiga primeiro, pode ser curta ou vazia):
+${transcricao || "(sem mensagens ainda)"}`;
+}
+
+async function analisarEtapaParada({ mensagens, estagioNome, dias }) {
+  const prompt = montarPromptEtapaParada({ mensagens, estagioNome, dias });
+  const json = await chamarGemini(prompt, GEMINI_MODEL_PRO);
+  return { nota: typeof json.nota === "string" ? json.nota.trim().slice(0, 500) : "" };
+}
+
+// Corretor de texto por-trecho — a pessoa digita rápido no meio do atendimento, erra português,
+// aqui só sugere a correção (nunca troca sozinha) pro composer mostrar como balão posicionado em
+// cima do trecho errado. Separado de sugerirResposta de propósito — aqui o INSUMO é o que a
+// pessoa já escreveu, não a conversa.
+async function corrigirTexto(texto) {
+  const prompt = `Corrija ortografia, acentuação e gramática do texto abaixo, em português do Brasil, SEM mudar o sentido, o tom nem o tamanho — é uma mensagem de WhatsApp de atendimento, mantenha informal se já for informal. Aponte CADA erro separadamente (um por trecho), não reescreva a frase inteira. Responda SOMENTE com um JSON válido, sem texto antes ou depois, neste formato:
+
+{"correcoes": [{"errado": "trecho exatamente como está no texto original — uma palavra ou expressão curta, nunca a frase inteira", "certo": "a correção desse trecho"}]}
+
+Regras importantes:
+- "errado" precisa ser uma cópia EXATA (mesmas letras, maiúsculas/minúsculas, acentos, espaços) de um trecho que existe de verdade no texto abaixo — nunca invente, nunca parafraseie, só recorte o pedaço errado.
+- Prefira apontar só a palavra (ou expressão curta de poucas palavras) com erro, não a oração inteira em volta.
+- Se o texto já estiver correto, devolva {"correcoes": []}.
+- Nunca adicione informação nova, nunca reescreva o estilo nem o tom.
+
+Texto:
+${texto}`;
+  const json = await chamarGemini(prompt);
+  const bruto = Array.isArray(json.correcoes) ? json.correcoes : [];
+  // Validação defensiva: só aceita correção cujo "errado" existe de verdade, caractere por
+  // caractere, no texto original — sem esse match exato não dá pra posicionar o balãozinho em
+  // cima da palavra certa no textarea, e uma correção mal localizada seria pior que nenhuma.
+  const correcoes = bruto
+    .filter(
+      (c) =>
+        c &&
+        typeof c.errado === "string" &&
+        typeof c.certo === "string" &&
+        c.errado.trim() &&
+        texto.includes(c.errado),
+    )
+    .map((c) => ({ errado: c.errado, certo: c.certo.trim() }))
+    .slice(0, 8);
+  return { correcoes };
+}
+
+module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto };

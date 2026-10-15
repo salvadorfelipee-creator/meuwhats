@@ -1,5 +1,5 @@
 import * as React from "react"
-import { api } from "@/lib/api"
+import { api, conversaSemRespostaHaMuitoTempo } from "@/lib/api"
 import { useChannel } from "@/lib/channel-context"
 
 // Mesma lógica do painel.html antigo (verificarNovasMensagens): 1 fetch na caixa unificada
@@ -14,6 +14,9 @@ import { useChannel } from "@/lib/channel-context"
 type UnreadContextValue = {
   unreadChannels: Set<string>
   unreadConversations: Set<string>
+  // Conversa não lida há 30min+ sem NENHUMA resposta (bot ou humano) — universal, não depende
+  // de quem está logado nem de etapa/Responsável (ver conversaSemRespostaHaMuitoTempo em api.ts).
+  overdueConversations: Set<string>
   hasAnyUnread: boolean
   markSeen: (channelId: string) => void
   markConversationSeen: (channelId: string, phone: string) => void
@@ -74,6 +77,7 @@ function tocarSomNotificacao() {
 export function UnreadProvider({ children }: { children: React.ReactNode }) {
   const { setCurrent, channels } = useChannel()
   const [unreadConversations, setUnreadConversations] = React.useState<Set<string>>(new Set())
+  const [overdueConversations, setOverdueConversations] = React.useState<Set<string>>(new Set())
   const [alvoAbrir, setAlvoAbrir] = React.useState<{ channelId: string; phone: string } | null>(null)
   const limparAlvoAbrir = React.useCallback(() => setAlvoAbrir(null), [])
   const abrirConversa = React.useCallback(
@@ -89,6 +93,8 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
   const activeRef = React.useRef<{ channelId: string | null; phone: string | null }>({ channelId: null, phone: null })
   const unreadConversationsRef = React.useRef(unreadConversations)
   unreadConversationsRef.current = unreadConversations
+  const overdueConversationsRef = React.useRef(overdueConversations)
+  overdueConversationsRef.current = overdueConversations
   const channelsRef = React.useRef(channels)
   channelsRef.current = channels
 
@@ -119,13 +125,19 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       // db.js/listConversations) — não mais "a última mensagem é de entrada", que sumia
       // assim que o fluxo automático respondia sozinho logo depois do cliente.
       const next = new Set<string>()
+      const nextOverdue = new Set<string>()
       const recemNaoLidas: typeof lista = []
+      const recemAtrasadas: typeof lista = []
       for (const c of lista) {
         if (!c.nao_lida) continue
         const chId = c.channel === "instagram" ? "instagram" : c.business_number_id
         const chave = chaveConversa(chId, c.phone)
         next.add(chave)
         if (firstCheckRef.current && !unreadConversationsRef.current.has(chave)) recemNaoLidas.push(c)
+        if (conversaSemRespostaHaMuitoTempo(c)) {
+          nextOverdue.add(chave)
+          if (firstCheckRef.current && !overdueConversationsRef.current.has(chave)) recemAtrasadas.push(c)
+        }
       }
       firstCheckRef.current = true
 
@@ -156,9 +168,40 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // Alerta universal de "sem resposta há 30min+" — independente de etapa/status/quem está
+      // logado. Dispara só na TRANSIÇÃO pra atrasada (não a cada poll de 5s), com som +
+      // notificação própria (tag separada da de "nova mensagem" acima, pra não colidir/substituir
+      // uma pela outra no navegador).
+      for (const c of recemAtrasadas) {
+        const chId = c.channel === "instagram" ? "instagram" : c.business_number_id
+        const chave = chaveConversa(chId, c.phone)
+        const olhandoAgora = activeRef.current.channelId === chId && activeRef.current.phone === c.phone && document.hasFocus()
+        if (olhandoAgora) continue
+        if (!tocouSom) {
+          tocarSomNotificacao()
+          tocouSom = true
+        }
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          const canal = channelsRef.current.find((ch) => ch.id === chId)
+          const notif = new Notification(`⚠️ Sem resposta há 30min+ · ${canal?.label || chId}`, {
+            body: `${c.name || c.phone}: ${c.last_body || "mensagem sem resposta"}`,
+            tag: `overdue-${chave}`,
+          })
+          notif.onclick = () => {
+            window.focus()
+            if (canal) setCurrent(canal)
+            setAlvoAbrir({ channelId: chId, phone: c.phone })
+          }
+        }
+      }
+
       setUnreadConversations((prev) => {
         if (prev.size === next.size && [...prev].every((k) => next.has(k))) return prev
         return next
+      })
+      setOverdueConversations((prev) => {
+        if (prev.size === nextOverdue.size && [...prev].every((k) => nextOverdue.has(k))) return prev
+        return nextOverdue
       })
     }
 
@@ -182,11 +225,28 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       }
       return mudou ? next : prev
     })
+    setOverdueConversations((prev) => {
+      let mudou = false
+      const next = new Set(prev)
+      for (const chave of prev) {
+        if (chave.startsWith(`${channelId}|`)) {
+          next.delete(chave)
+          mudou = true
+        }
+      }
+      return mudou ? next : prev
+    })
   }, [])
 
   const markConversationSeen = React.useCallback((channelId: string, phone: string) => {
     const chave = chaveConversa(channelId, phone)
     setUnreadConversations((prev) => {
+      if (!prev.has(chave)) return prev
+      const next = new Set(prev)
+      next.delete(chave)
+      return next
+    })
+    setOverdueConversations((prev) => {
       if (!prev.has(chave)) return prev
       const next = new Set(prev)
       next.delete(chave)
@@ -204,6 +264,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
     () => ({
       unreadChannels,
       unreadConversations,
+      overdueConversations,
       hasAnyUnread: unreadConversations.size > 0,
       markSeen,
       markConversationSeen,
@@ -217,6 +278,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
     [
       unreadChannels,
       unreadConversations,
+      overdueConversations,
       markSeen,
       markConversationSeen,
       setActiveConversation,
