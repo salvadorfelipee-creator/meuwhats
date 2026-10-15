@@ -64,8 +64,9 @@ function getApiKey() {
 
 // Lança um erro com .invalidFields anexado (quando a API manda detalhe de validação) — mesmo
 // padrão de .codigo no unnotech.js, pra quem chama poder tratar sem fazer parsing de mensagem.
-function erroComDetalhe(prefixo, body) {
+function erroComDetalhe(prefixo, body, status) {
   const err = new Error(`${prefixo}: ${JSON.stringify(body)}`);
+  err.httpStatus = status || null;
   err.invalidFields = body?.invalid_fields || null;
   err.novoSaqueError = body?.error || null;
   return err;
@@ -79,7 +80,7 @@ async function criarSimulacaoClt(cpf) {
     query: { document: cpf },
     apiKey: getApiKey(),
   });
-  if (status >= 400 || !body?.success) throw erroComDetalhe("Falha ao abrir simulação CLT (Novo Saque)", body);
+  if (status >= 400 || !body?.success) throw erroComDetalhe("Falha ao abrir simulação CLT (Novo Saque)", body, status);
   // Achado em teste real: o campo que a API devolve é "contract", não "transaction_id" como a
   // doc descreve — aceita os dois nomes por segurança, sem travar se corrigirem a API depois.
   const transactionId = body.contract || body.transaction_id;
@@ -96,7 +97,7 @@ async function resimularClt(transactionId, installmentValue) {
     query: { installment_value: installmentValue },
     apiKey: getApiKey(),
   });
-  if (status >= 400 || !body?.success) throw erroComDetalhe("Falha ao re-simular CLT (Novo Saque)", body);
+  if (status >= 400 || !body?.success) throw erroComDetalhe("Falha ao re-simular CLT (Novo Saque)", body, status);
   return body.contract || body.transaction_id || transactionId;
 }
 
@@ -104,7 +105,7 @@ async function consultarContratoClt(transactionId) {
   const { status, body } = await novoSaqueRequest("GET", `${NOVOSAQUE_BASE_PATH}/CLT/contract/${transactionId}`, {
     apiKey: getApiKey(),
   });
-  if (status >= 400 || !body?.success) throw erroComDetalhe("Falha ao consultar contrato CLT (Novo Saque)", body);
+  if (status >= 400 || !body?.success) throw erroComDetalhe("Falha ao consultar contrato CLT (Novo Saque)", body, status);
   return body.contract;
 }
 
@@ -117,7 +118,7 @@ async function enviarFormalizacaoClt(transactionId, simulationId, customerData) 
       body: { transaction_id: transactionId, simulation_id: simulationId, customer_data: customerData },
     }
   );
-  if (status >= 400 || !body?.success) throw erroComDetalhe("Falha ao enviar formalização CLT (Novo Saque)", body);
+  if (status >= 400 || !body?.success) throw erroComDetalhe("Falha ao enviar formalização CLT (Novo Saque)", body, status);
   return body;
 }
 

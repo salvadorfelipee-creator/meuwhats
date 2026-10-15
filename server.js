@@ -5251,6 +5251,7 @@ const server = http.createServer(async (req, res) => {
           return send(res, 502, {
             error: configurationError ? "A integração bancária ainda não está configurada no servidor." : "Não conseguimos avançar agora. Continue pelo chat com nossa equipe.",
             code: configurationError ? "NOVOSAQUE_CONFIG_MISSING" : "NOVOSAQUE_REQUEST_FAILED",
+            providerStatus: Number(err.httpStatus) || null,
           }, corsHeaders);
         }
       }
