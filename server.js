@@ -5185,7 +5185,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
-      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|resimulate|formalize)$/i);
+      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|resimulate|formalize|assistant)$/i);
       if (cltMatch) {
         const id = cltMatch[1];
         const action = cltMatch[2].toLowerCase();
@@ -5200,6 +5200,19 @@ const server = http.createServer(async (req, res) => {
         if (!siteChatRateLimit(req)) return send(res, 429, { error: "Muitas tentativas. Aguarde um instante." }, corsHeaders);
         const body = await parseBody(req);
         try {
+          if (action === "assistant") {
+            const mensagem = String(body.message || "").trim().slice(0, 1000);
+            if (!mensagem) return send(res, 400, { error: "Mensagem vazia." }, corsHeaders);
+            const row = await db.siteChatCltObter(id);
+            const mensagemMascarada = mensagem
+              .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[e-mail]")
+              .replace(/\b\d{11}\b/g, "[documento ou telefone]")
+              .replace(/\b\d{10}\b/g, "[telefone]")
+              .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, "[CPF]");
+            const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses" });
+            if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
+            return send(res, 200, { resposta }, corsHeaders);
+          }
           if (action === "start") {
             if (await db.siteChatCltObter(id)) return send(res, 409, { error: "A simulação já foi iniciada." }, corsHeaders);
             const cpf = String(body.cpf || "").replace(/\D/g, "");

@@ -311,4 +311,27 @@ Mensagem: ${String(texto || "").slice(0, 300)}`;
   return Number.isFinite(valor) && valor > 0 ? valor : null;
 }
 
-module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite, interpretarValorParcela };
+async function responderConversaCltSite({ mensagem, etapa }) {
+  const prompt = `Você atende clientes da FelizCred sobre consignado CLT no chat do site.
+Escreva como Felipe: português brasileiro simples, acolhedor, direto e curto. Use "Perfeito", "Show" e um emoji leve apenas quando combinar. Faça uma pergunta por vez.
+
+REGRAS INVIOLÁVEIS:
+- Você é somente a camada de conversa. Nunca altere etapa, aprove cadastro, escolha oferta ou diga que executou uma ação.
+- Nunca invente valor, prazo, taxa, margem, aprovação, tempo de pagamento ou regra bancária.
+- Não mencione nem estime valores, parcelas, taxas ou prazos. Oriente o cliente a consultar os cartões de oferta exibidos na tela.
+- Para iniciar a simulação, a Novo Saque exige somente CPF. O celular é coletado pela FelizCred para identificação e aviso final.
+- A elegibilidade informada pela FelizCred exige mais de 3 meses de registro no emprego atual.
+- Para formalização, os campos do formulário são: nome, CPF, nascimento, gênero, profissão, celular, e-mail, endereço completo, e-mail da empresa/RH e forma de recebimento PIX ou conta.
+- Se o cliente quiser avançar, oriente a usar o botão ou formulário visível da etapa atual.
+- Se faltar contexto, diga que precisa da informação na tela; não adivinhe.
+- Não peça todos os dados pelo campo de mensagem e nunca peça senha, foto de documento ou código recebido.
+
+ETAPA ATUAL: ${String(etapa || "início")}
+MENSAGEM DO CLIENTE: ${String(mensagem || "").slice(0, 1000)}
+
+Responda somente JSON: {"resposta":"texto curto para o cliente"}`;
+  const json = await chamarGemini(prompt, GEMINI_MODEL_LITE);
+  return typeof json.resposta === "string" ? json.resposta.trim().slice(0, 700) : "";
+}
+
+module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite, interpretarValorParcela, responderConversaCltSite };
