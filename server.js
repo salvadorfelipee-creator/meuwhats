@@ -5219,6 +5219,12 @@ const server = http.createServer(async (req, res) => {
           if (action === "resimulate") {
             const installment = Number(String(body.installmentValue || "").replace(",", "."));
             if (!Number.isFinite(installment) || installment <= 0) return send(res, 400, { error: "Informe uma parcela válida." }, corsHeaders);
+            let offers = [];
+            try { offers = JSON.parse(atual.offers_json || "[]"); } catch {}
+            const maximum = Math.max(0, ...offers.map((offer) => Number(offer.installment_value || 0)));
+            if (maximum && installment > maximum) {
+              return send(res, 400, { error: `Essa parcela ultrapassa o máximo permitido de R$ ${maximum.toFixed(2).replace(".", ",")}.` }, corsHeaders);
+            }
             await novosaque.resimularClt(atual.transaction_id, installment);
             const row = await db.siteChatCltAtualizar(id, { etapa: "simulando", offers_json: null, error_message: null });
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
@@ -5230,13 +5236,16 @@ const server = http.createServer(async (req, res) => {
             if (!offer) return send(res, 400, { error: "Escolha uma oferta válida." }, corsHeaders);
             const cpf = String(body.cpf || "").replace(/\D/g, "");
             const customer = body.customer || {};
-            const obrigatorios = ["nome", "data_nascimento", "genero", "profissao", "email", "celular", "cep", "rua", "numero", "bairro", "cidade", "uf", "email_rh", "telefone_rh", "forma_desembolso"];
+            const obrigatorios = ["nome", "data_nascimento", "genero", "profissao", "email", "celular", "cep", "rua", "numero", "bairro", "cidade", "uf", "email_rh", "forma_desembolso"];
             if (!novosaque.cpfValido(cpf) || obrigatorios.some((campo) => !String(customer[campo] || "").trim())) {
               return send(res, 400, { error: "Revise os dados obrigatórios antes de gerar o contrato." }, corsHeaders);
             }
             if (customer.forma_desembolso === "CONTA" && ["banco", "tipo_conta", "agencia", "conta", "digito_conta"].some((campo) => !String(customer[campo] || "").trim())) {
               return send(res, 400, { error: "Preencha todos os dados da conta bancária." }, corsHeaders);
             }
+            // A API exige employer_phone, mas o cliente não precisa procurar o telefone do RH:
+            // usamos o próprio celular informado como contato de referência da proposta.
+            customer.telefone_rh = customer.telefone_rh || customer.celular;
             const customerData = novosaque.montarCustomerData(cpf, customer);
             await novosaque.enviarFormalizacaoClt(atual.transaction_id, offer.simulation_id, customerData);
             await db.siteChatDefinirPipeline(id, "documentos_enviados");

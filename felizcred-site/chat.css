@@ -74,6 +74,7 @@
   transition: opacity .18s ease, transform .22s cubic-bezier(.2, .8, .2, 1);
 }
 .fc-chat-root.is-open .fc-chat { opacity: 1; pointer-events: auto; transform: none; }
+.fc-chat-root.is-contracting .fc-chat { width: min(720px, calc(100vw - 28px)); height: min(760px, calc(100vh - 36px)); }
 
 .fc-chat-head {
   display: flex;
@@ -172,6 +173,9 @@
 .fc-clt-consent input { width: 16px; height: 16px; }
 .fc-clt-loading { color: var(--fc-muted); font-size: 12px; animation: fc-pulse 1.2s ease-in-out infinite; }
 .fc-clt-card > .fc-chat-primary { text-decoration: none; }
+.fc-clt-actions { display: grid; gap: 8px; }
+.fc-clt-secondary { min-height: 44px; border: 1px solid #d8e0e7; border-radius: 12px; background: #fff; color: var(--fc-ink); cursor: pointer; font: 650 13px "Sora", sans-serif; }
+.fc-clt-inline-error { color: #b42318 !important; font-weight: 650; }
 @keyframes fc-pulse { 50% { opacity: .45; } }
 .fc-chat-compose textarea { min-height: 42px; max-height: 104px; flex: 1; padding: 10px 12px; }
 .fc-chat-tool { display: grid; width: 34px; height: 42px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 10px; background: transparent; color: #667085; cursor: pointer; font: 700 18px/1 sans-serif; }
