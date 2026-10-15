@@ -14,10 +14,14 @@ import { PipelinePage } from "@/pages/pipeline"
 import { AnalyticsPage } from "@/pages/analytics"
 import { IaPage } from "@/pages/ia"
 import { EmailPage } from "@/pages/email"
+import { HojePage } from "@/pages/hoje"
+import { ContatosPage } from "@/pages/contatos"
+import { RetornosPage } from "@/pages/retornos"
+import { ConfiguracoesPage } from "@/pages/configuracoes"
 
 function Shell() {
-  const [screen, setScreen] = React.useState<Screen>("chats")
-  const { current } = useChannel()
+  const [screen, setScreen] = React.useState<Screen>("hoje")
+  const { current, channels, setCurrent } = useChannel()
   const { abrirConversa } = useUnread()
 
   function abrirConversaDoPipeline(phone: string) {
@@ -26,19 +30,33 @@ function Shell() {
     setScreen("chats")
   }
 
+  // "Hoje"/Contatos/Retornos cobrem todos os canais ao mesmo tempo (não só o selecionado na
+  // barra lateral) — abrir uma conversa a partir delas precisa trocar pro canal certo primeiro
+  // (setCurrent), só então navegar pra Conversas, senão o ChatsPage abriria o canal errado.
+  function abrirConversaCrossCanal(channelId: string, phone: string) {
+    const canal = channels.find((c) => c.id === channelId)
+    if (canal) setCurrent(canal)
+    abrirConversa(channelId, phone)
+    setScreen("chats")
+  }
+
   return (
     <SidebarProvider defaultOpen={false}>
       <AppSidebar screen={screen} onScreenChange={setScreen} />
       <SidebarInset>
+        {screen === "hoje" && <HojePage onAbrirConversa={abrirConversaCrossCanal} onIrParaConversas={() => setScreen("chats")} />}
         {screen === "chats" && <ChatsPage />}
         {screen === "agenda" && <AgendaPage />}
         {screen === "publicar" && <PublicarPage />}
         {screen === "reels" && <ReelsPage />}
         {screen === "funil" && <FunilPage />}
         {screen === "pipeline" && <PipelinePage onAbrirConversa={abrirConversaDoPipeline} />}
+        {screen === "contatos" && <ContatosPage onAbrirConversa={abrirConversaCrossCanal} />}
+        {screen === "retornos" && <RetornosPage onAbrirConversa={abrirConversaCrossCanal} />}
         {screen === "analytics" && <AnalyticsPage />}
         {screen === "ia" && <IaPage />}
         {screen === "email" && <EmailPage />}
+        {screen === "config" && <ConfiguracoesPage />}
       </SidebarInset>
     </SidebarProvider>
   )

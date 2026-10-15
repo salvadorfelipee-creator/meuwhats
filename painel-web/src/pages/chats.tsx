@@ -19,6 +19,7 @@ import {
   type FluxoDinamico,
   type SugestaoIa,
   pipelineEstagiosPara,
+  mediaUrl,
 } from "@/lib/api"
 import { GerenciarTags } from "@/pages/analytics"
 import { Button } from "@/components/ui/button"
@@ -74,6 +75,14 @@ import {
   History,
   Sparkles,
   Loader2,
+  Images,
+  Pencil,
+  Camera,
+  ThumbsUp,
+  ThumbsDown,
+  Wand2,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react"
 
 const STATUS_LABEL: Record<string, string> = {
@@ -777,21 +786,21 @@ export function ChatsPage() {
                   >
                     {m.type === "image" && m.media_path && (
                       <img
-                        src={m.media_path}
+                        src={mediaUrl(m.media_path)}
                         alt=""
                         className="rounded mb-1 max-w-[280px] max-h-[360px] w-auto h-auto object-contain cursor-pointer"
-                        onClick={() => window.open(m.media_path!, "_blank")}
+                        onClick={() => window.open(mediaUrl(m.media_path), "_blank")}
                       />
                     )}
                     {m.type === "video" && m.media_path && (
-                      <video src={m.media_path} controls className="rounded mb-1 max-w-[280px] max-h-[360px] w-auto h-auto" />
+                      <video src={mediaUrl(m.media_path)} controls className="rounded mb-1 max-w-[280px] max-h-[360px] w-auto h-auto" />
                     )}
                     {m.type === "audio" && m.media_path && (
-                      <audio src={m.media_path} controls className="mb-1 max-w-[280px] w-full" />
+                      <audio src={mediaUrl(m.media_path)} controls className="mb-1 max-w-[280px] w-full" />
                     )}
                     {m.type === "document" && m.media_path && (
                       <a
-                        href={m.media_path}
+                        href={mediaUrl(m.media_path)}
                         target="_blank"
                         rel="noreferrer"
                         className="flex items-center gap-2 mb-1 rounded bg-black/10 px-3 py-2 hover:bg-black/20"
@@ -911,6 +920,7 @@ export function ChatsPage() {
               businessId={current.id}
               mostrarPipelineTags={current.id !== "instagram"}
               onSaved={carregarConversas}
+              onUsarTexto={setTexto}
             />
           </div>
         </div>
@@ -1485,13 +1495,17 @@ function ContactDetails({
   businessId,
   mostrarPipelineTags,
   onSaved,
+  onUsarTexto,
 }: {
   conversation: Conversation
   businessId: string
   mostrarPipelineTags: boolean
   onSaved: () => void
+  // Deixa o "copiloto de vendas" (bloco lilás abaixo) colocar o rascunho sugerido direto no
+  // campo de digitar da conversa, sem a pessoa precisar copiar/colar.
+  onUsarTexto: (texto: string) => void
 }) {
-  const { current } = useChannel()
+  const { current, channels, setCurrent } = useChannel()
   const estagios = pipelineEstagiosPara(current?.label)
 
   const [nota, setNota] = React.useState(conversation.nota || "")
@@ -1612,23 +1626,213 @@ function ContactDetails({
     }
   }
 
+  // ── Renomear/foto/e-mail do contato direto da conversa ("Salvar contato") ─────────────────
+  const [editandoNome, setEditandoNome] = React.useState(false)
+  const [nomeEdit, setNomeEdit] = React.useState(conversation.name || "")
+  const [salvandoNome, setSalvandoNome] = React.useState(false)
+
+  async function salvarNome() {
+    const valor = nomeEdit.trim()
+    if (!valor || salvandoNome) return
+    setSalvandoNome(true)
+    try {
+      await api.renomearContato(businessId, conversation.phone, valor)
+      onSaved()
+      setEditandoNome(false)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao renomear")
+    } finally {
+      setSalvandoNome(false)
+    }
+  }
+
+  const [emailEdit, setEmailEdit] = React.useState(conversation.email || "")
+  const [salvandoContato, setSalvandoContato] = React.useState(false)
+  const fotoInputRef = React.useRef<HTMLInputElement>(null)
+
+  async function escolherFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = e.target.files?.[0]
+    e.target.value = ""
+    if (!arquivo) return
+    setSalvandoContato(true)
+    try {
+      const fotoBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(arquivo)
+      })
+      await api.salvarFotoContato(businessId, conversation.phone, fotoBase64)
+      onSaved()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao salvar foto")
+    } finally {
+      setSalvandoContato(false)
+    }
+  }
+
+  async function salvarEmail() {
+    const valor = emailEdit.trim()
+    setSalvandoContato(true)
+    try {
+      await api.salvarEmailContato(businessId, conversation.phone, valor)
+      onSaved()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao salvar e-mail")
+    } finally {
+      setSalvandoContato(false)
+    }
+  }
+
+  // ── Galeria de mídia (imagem/vídeo da conversa inteira, sem limite de janela) ─────────────
+  const [galeriaAberta, setGaleriaAberta] = React.useState(false)
+  const [midias, setMidias] = React.useState<Pick<Message, "id" | "type" | "media_path" | "media_mime" | "created_at">[]>([])
+  const [carregandoMidias, setCarregandoMidias] = React.useState(false)
+
+  function abrirGaleria() {
+    setGaleriaAberta(true)
+    setCarregandoMidias(true)
+    api
+      .midias(businessId, conversation.phone)
+      .then(setMidias)
+      .catch(() => {})
+      .finally(() => setCarregandoMidias(false))
+  }
+
+  // ── Mesmo telefone em outro canal (outro número de WhatsApp, ou Instagram) ────────────────
+  const [outrosCanais, setOutrosCanais] = React.useState<{ business_number_id: string; name: string | null; last_message_at: number | null }[]>([])
+  React.useEffect(() => {
+    api.outrosCanais(businessId, conversation.phone).then(setOutrosCanais).catch(() => {})
+  }, [businessId, conversation.phone])
+
+  function nomeDoCanal(businessNumberId: string) {
+    if (businessNumberId === "instagram") return "Instagram"
+    return channels.find((c) => c.id === businessNumberId)?.label || businessNumberId
+  }
+
+  // ── Copiloto de vendas (IA) — lê o cache pré-computado em background pelo servidor; some sem
+  // erro se ainda não tiver rodado pra essa conversa (ou sem IA configurada), nunca trava a tela.
+  const [copiloto, setCopiloto] = React.useState<{ texto: string | null; insight: string | null } | null>(null)
+  const [feedbackDado, setFeedbackDado] = React.useState<"aceita" | "descartada" | null>(null)
+
+  const carregarCopiloto = React.useCallback(() => {
+    api
+      .sugestaoResposta(businessId, conversation.phone)
+      .then((r) => {
+        setCopiloto(r)
+        setFeedbackDado(null)
+        if (r.texto) {
+          api.iaFeedbackRegistrar({ businessId, phone: conversation.phone, tipo: "copiloto_resposta", evento: "mostrada" }).catch(() => {})
+        }
+      })
+      .catch(() => setCopiloto(null))
+  }, [businessId, conversation.phone])
+
+  React.useEffect(() => {
+    carregarCopiloto()
+  }, [carregarCopiloto])
+
+  function usarSugestaoCopiloto() {
+    if (!copiloto?.texto) return
+    onUsarTexto(copiloto.texto)
+    setFeedbackDado("aceita")
+    api.iaFeedbackRegistrar({ businessId, phone: conversation.phone, tipo: "copiloto_resposta", evento: "aceita" }).catch(() => {})
+  }
+
+  function descartarSugestaoCopiloto() {
+    setFeedbackDado("descartada")
+    api.iaFeedbackRegistrar({ businessId, phone: conversation.phone, tipo: "copiloto_resposta", evento: "descartada" }).catch(() => {})
+  }
+
   const corContato = corAvatarContato(conversation.phone)
   const estagioAtual = estagios.find((e) => e.id === estagio)
 
   return (
     <div className="mt-4 flex flex-col gap-3">
       <div className="flex items-center gap-2.5">
-        <div
-          className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
-          style={{ background: corContato }}
+        <button
+          className="relative h-9 w-9 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0 overflow-hidden group"
+          style={{ background: conversation.foto_url ? undefined : corContato }}
+          onClick={() => fotoInputRef.current?.click()}
+          title="Salvar foto do contato"
+          disabled={salvandoContato}
         >
-          {iniciaisContato(conversation.name, conversation.phone)}
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium truncate">{conversation.name || "Sem nome"}</p>
+          {conversation.foto_url ? (
+            <img src={mediaUrl(conversation.foto_url)} alt="" className="h-full w-full object-cover" />
+          ) : (
+            iniciaisContato(conversation.name, conversation.phone)
+          )}
+          <span className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+            <Camera className="h-3.5 w-3.5 text-white" />
+          </span>
+        </button>
+        <input ref={fotoInputRef} type="file" accept="image/*" className="hidden" onChange={escolherFoto} />
+        <div className="min-w-0 flex-1">
+          {editandoNome ? (
+            <div className="flex items-center gap-1">
+              <input
+                autoFocus
+                value={nomeEdit}
+                onChange={(e) => setNomeEdit(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") salvarNome()
+                  if (e.key === "Escape") setEditandoNome(false)
+                }}
+                className="h-7 flex-1 min-w-0 rounded-md border border-input bg-background px-2 text-sm"
+              />
+              <Button size="sm" className="h-7 px-2 text-xs" onClick={salvarNome} disabled={salvandoNome}>
+                Ok
+              </Button>
+            </div>
+          ) : (
+            <button
+              className="flex items-center gap-1 text-sm font-medium truncate hover:underline"
+              onClick={() => {
+                setNomeEdit(conversation.name || "")
+                setEditandoNome(true)
+              }}
+              title="Renomear contato"
+            >
+              <span className="truncate">{conversation.name || "Sem nome"}</span>
+              <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
+            </button>
+          )}
           <p className="text-xs text-muted-foreground">{conversation.phone}</p>
         </div>
+        <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" title="Galeria de mídia" onClick={abrirGaleria}>
+          <Images className="h-3.5 w-3.5" />
+        </Button>
       </div>
+
+      <div className="flex items-center gap-1.5">
+        <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
+        <input
+          value={emailEdit}
+          onChange={(e) => setEmailEdit(e.target.value)}
+          onBlur={salvarEmail}
+          onKeyDown={(e) => e.key === "Enter" && salvarEmail()}
+          placeholder="E-mail do contato"
+          className="h-6 flex-1 min-w-0 rounded-md border border-transparent hover:border-input focus:border-input bg-transparent px-1.5 text-xs"
+        />
+      </div>
+
+      {outrosCanais.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {outrosCanais.map((c) => (
+            <button
+              key={c.business_number_id}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-dashed text-muted-foreground hover:bg-accent"
+              title="Também conversou por esse canal"
+              onClick={() => {
+                const canal = channels.find((ch) => ch.id === c.business_number_id)
+                if (canal) setCurrent(canal)
+              }}
+            >
+              <ExternalLink className="h-2.5 w-2.5" /> {nomeDoCanal(c.business_number_id)}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Nota fixada primeiro — é o "resumo de 1 olhada", por isso tem que ser mesmo a 1ª
           coisa visível, não a última (bug de ordem da versão anterior: o texto já dizia
@@ -1648,6 +1852,38 @@ function ContactDetails({
           {salvando ? "Salvando..." : "Salvar nota"}
         </Button>
       </div>
+
+      {/* Copiloto de vendas (IA) — rascunho de resposta + leitura estratégica da conversa,
+          pré-computado em background pelo servidor (ver /sugestao-resposta). Nunca manda nada
+          sozinho: só preenche o campo de digitar quando a pessoa clica "Usar". */}
+      {businessId !== "instagram" && copiloto?.texto && (
+        <div className="rounded-xl border border-violet-300/60 bg-violet-50 dark:bg-violet-950/20 dark:border-violet-900/50 p-3 flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-violet-800 dark:text-violet-400 uppercase tracking-wide">
+              <Wand2 className="h-3.5 w-3.5" /> Copiloto de vendas
+            </div>
+            <button onClick={carregarCopiloto} className="text-muted-foreground hover:text-foreground" title="Atualizar">
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {copiloto.insight && <p className="text-xs italic text-violet-900/80 dark:text-violet-300/80">{copiloto.insight}</p>}
+          <p className="text-sm bg-background/70 rounded-md p-2 whitespace-pre-wrap">{copiloto.texto}</p>
+          {feedbackDado ? (
+            <p className="text-[11px] text-muted-foreground">
+              {feedbackDado === "aceita" ? "Colocado no campo de digitar." : "Sugestão descartada."}
+            </p>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button size="sm" className="h-7 text-xs gap-1" onClick={usarSugestaoCopiloto}>
+                <ThumbsUp className="h-3 w-3" /> Usar
+              </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={descartarSugestaoCopiloto}>
+                <ThumbsDown className="h-3 w-3" /> Não agora
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {mostrarPipelineTags && (
         <div className="rounded-xl border p-3 flex flex-col gap-2">
@@ -1864,6 +2100,31 @@ function ContactDetails({
           {reabrirMsg && <p className="text-xs">{reabrirMsg}</p>}
         </div>
       )}
+
+      <Dialog open={galeriaAberta} onOpenChange={setGaleriaAberta}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Mídia da conversa</DialogTitle>
+          </DialogHeader>
+          {carregandoMidias ? (
+            <p className="text-xs text-muted-foreground text-center py-6">Carregando...</p>
+          ) : midias.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-6">Nenhuma imagem ou vídeo nessa conversa ainda.</p>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-[60vh] overflow-y-auto">
+              {midias.map((m) => (
+                <a key={m.id} href={mediaUrl(m.media_path) || "#"} target="_blank" rel="noreferrer" className="block rounded-md overflow-hidden border aspect-square bg-muted">
+                  {m.type === "video" ? (
+                    <video src={mediaUrl(m.media_path) || undefined} className="w-full h-full object-cover" muted />
+                  ) : (
+                    <img src={mediaUrl(m.media_path) || undefined} alt="" className="w-full h-full object-cover" />
+                  )}
+                </a>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

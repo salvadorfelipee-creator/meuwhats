@@ -24,6 +24,7 @@ export function ChannelProvider({ children }: { children: React.ReactNode }) {
         setNumbers(list)
         if (list.length) setCurrent({ id: list[0].id, label: list[0].label, kind: "whatsapp" })
       })
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 

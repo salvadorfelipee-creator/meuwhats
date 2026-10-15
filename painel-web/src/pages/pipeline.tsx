@@ -1,6 +1,6 @@
 import * as React from "react"
 import { KanbanBoard, type KanbanColumn, type KanbanTask } from "@/components/ui/kanban-board"
-import { api, pipelineEstagiosPara, type Conversation, type Message, type Tag } from "@/lib/api"
+import { api, pipelineEstagiosPara, mediaUrl, type Conversation, type Message, type Tag } from "@/lib/api"
 import { useChannel } from "@/lib/channel-context"
 import { useUnread } from "@/lib/unread-context"
 import { Button } from "@/components/ui/button"
@@ -203,14 +203,14 @@ function PainelConversa({
                 }`}
               >
                 {m.type === "image" && m.media_path && (
-                  <img src={m.media_path} alt="" className="rounded mb-1 max-w-[240px] max-h-[280px] w-auto h-auto object-contain" />
+                  <img src={mediaUrl(m.media_path)} alt="" className="rounded mb-1 max-w-[240px] max-h-[280px] w-auto h-auto object-contain" />
                 )}
                 {m.type === "audio" && m.media_path && (
-                  <audio src={m.media_path} controls className="mb-1 max-w-[240px] w-full" />
+                  <audio src={mediaUrl(m.media_path)} controls className="mb-1 max-w-[240px] w-full" />
                 )}
                 {m.type === "document" && m.media_path && (
                   <a
-                    href={m.media_path}
+                    href={mediaUrl(m.media_path)}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-1.5 mb-1 rounded bg-black/10 px-2 py-1.5 hover:bg-black/20"

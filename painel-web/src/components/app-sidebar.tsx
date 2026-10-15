@@ -20,6 +20,7 @@ import {
 import { useChannel, type Channel } from "@/lib/channel-context"
 import { useUnread } from "@/lib/unread-context"
 import { useAuth } from "@/lib/auth-context"
+import { RetornosNavItem } from "@/components/retornos-nav-item"
 import {
   MessageCircle,
   CalendarDays,
@@ -34,21 +35,43 @@ import {
   Sparkles,
   Mail,
   Columns3,
+  Home,
+  Contact,
+  Settings,
 } from "lucide-react"
 
-export type Screen = "chats" | "agenda" | "publicar" | "reels" | "funil" | "pipeline" | "analytics" | "ia" | "email"
+export type Screen =
+  | "chats"
+  | "agenda"
+  | "publicar"
+  | "reels"
+  | "funil"
+  | "pipeline"
+  | "analytics"
+  | "ia"
+  | "email"
+  | "hoje"
+  | "contatos"
+  | "retornos"
+  | "config"
 
 // "reels" fica fora do menu por enquanto (edição em massa parada) — a rota em
 // App.tsx continua existindo, só reativar aqui quando voltar a usar.
-const NAV_ITEMS: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
+const NAV_ITEMS_ANTES: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
+  { id: "hoje", title: "Hoje", icon: Home },
   { id: "chats", title: "Conversas", icon: MessageCircle },
+  { id: "pipeline", title: "Pipeline", icon: Columns3 },
+  { id: "contatos", title: "Contatos", icon: Contact },
+]
+
+const NAV_ITEMS_DEPOIS: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
   { id: "agenda", title: "Agenda", icon: CalendarDays },
   { id: "publicar", title: "Publicar", icon: Send },
-  { id: "pipeline", title: "Pipeline", icon: Columns3 },
   { id: "funil", title: "Funil", icon: Filter },
   { id: "analytics", title: "Analytics", icon: BarChart3 },
   { id: "email", title: "Email", icon: Mail },
   { id: "ia", title: "IA", icon: Sparkles },
+  { id: "config", title: "Configurações", icon: Settings },
 ]
 
 // Bolinha vermelha "tem mensagem nova" — usada tanto ao lado do nome do canal (dropdown
@@ -93,7 +116,22 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              {NAV_ITEMS.map((item) => (
+              {NAV_ITEMS_ANTES.map((item) => (
+                <SidebarMenuItem key={item.id}>
+                  <SidebarMenuButton
+                    isActive={screen === item.id}
+                    tooltip={item.title}
+                    onClick={() => onScreenChange(item.id)}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+
+              <RetornosNavItem screen={screen} onScreenChange={onScreenChange} />
+
+              {NAV_ITEMS_DEPOIS.map((item) => (
                 <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                     isActive={screen === item.id}
