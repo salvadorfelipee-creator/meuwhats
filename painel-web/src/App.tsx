@@ -42,7 +42,7 @@ function Shell() {
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <AppSidebar screen={screen} onScreenChange={setScreen} />
+      <AppSidebar screen={screen} onScreenChange={setScreen} onAbrirConversa={abrirConversaCrossCanal} />
       <SidebarInset>
         {screen === "hoje" && <HojePage onAbrirConversa={abrirConversaCrossCanal} onIrParaConversas={() => setScreen("chats")} />}
         {screen === "chats" && <ChatsPage />}

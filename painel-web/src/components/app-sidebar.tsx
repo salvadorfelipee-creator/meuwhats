@@ -21,6 +21,7 @@ import { useChannel, type Channel } from "@/lib/channel-context"
 import { useUnread } from "@/lib/unread-context"
 import { useAuth } from "@/lib/auth-context"
 import { RetornosNavItem } from "@/components/retornos-nav-item"
+import { MinhasConversasMenuItem } from "@/components/minhas-conversas-menu"
 import {
   MessageCircle,
   CalendarDays,
@@ -91,9 +92,11 @@ function UnreadDot({ blink = false }: { blink?: boolean }) {
 export function AppSidebar({
   screen,
   onScreenChange,
+  onAbrirConversa,
 }: {
   screen: Screen
   onScreenChange: (screen: Screen) => void
+  onAbrirConversa: (channelId: string, phone: string) => void
 }) {
   const { toggleSidebar } = useSidebar()
   const { channels, current, setCurrent } = useChannel()
@@ -128,6 +131,8 @@ export function AppSidebar({
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              <MinhasConversasMenuItem onAbrirConversa={onAbrirConversa} />
 
               <RetornosNavItem screen={screen} onScreenChange={onScreenChange} />
 
