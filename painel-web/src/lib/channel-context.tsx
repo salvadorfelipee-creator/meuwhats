@@ -1,7 +1,21 @@
 import * as React from "react"
 import { api, type PhoneNumber } from "@/lib/api"
 
-export type Channel = { id: string; label: string; kind: "whatsapp" | "instagram" }
+export type CompanyId = "felizcred" | "cotacerta" | "ciahot"
+export type Channel = { id: string; label: string; kind: "whatsapp" | "instagram" | "site"; company: CompanyId }
+
+export function companyForLabel(label: string): CompanyId {
+  const value = label.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ")
+  if (value.includes("cota certa")) return "cotacerta"
+  if (value.includes("ciahot") || value.includes("cia hot")) return "ciahot"
+  return "felizcred"
+}
+
+export const COMPANY_LABELS: Record<CompanyId, string> = {
+  felizcred: "FelizCred",
+  cotacerta: "Cota Certa Seguros",
+  ciahot: "Cia Hot",
+}
 
 type ChannelContextValue = {
   channels: Channel[]
@@ -22,7 +36,7 @@ export function ChannelProvider({ children }: { children: React.ReactNode }) {
       .numbers()
       .then((list) => {
         setNumbers(list)
-        if (list.length) setCurrent({ id: list[0].id, label: list[0].label, kind: "whatsapp" })
+        if (list.length) setCurrent({ id: list[0].id, label: list[0].label, kind: "whatsapp", company: companyForLabel(list[0].label) })
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -30,8 +44,9 @@ export function ChannelProvider({ children }: { children: React.ReactNode }) {
 
   const channels = React.useMemo<Channel[]>(
     () => [
-      ...numbers.map((n) => ({ id: n.id, label: n.label, kind: "whatsapp" as const })),
-      { id: "instagram", label: "Instagram", kind: "instagram" as const },
+      ...numbers.map((n) => ({ id: n.id, label: n.label, kind: "whatsapp" as const, company: companyForLabel(n.label) })),
+      { id: "instagram", label: "Instagram", kind: "instagram" as const, company: "felizcred" as const },
+      { id: "site", label: "Site FelizCred", kind: "site" as const, company: "felizcred" as const },
     ],
     [numbers],
   )

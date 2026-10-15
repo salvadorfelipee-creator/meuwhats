@@ -18,10 +18,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useChannel, type Channel } from "@/lib/channel-context"
+import { COMPANY_LABELS, useChannel, type Channel } from "@/lib/channel-context"
 import { useUnread } from "@/lib/unread-context"
 import { useAuth } from "@/lib/auth-context"
-import { api } from "@/lib/api"
 import { RetornosNavItem } from "@/components/retornos-nav-item"
 import { MinhasConversasMenuItem } from "@/components/minhas-conversas-menu"
 import {
@@ -41,7 +40,7 @@ import {
   Contact,
   Settings,
   Workflow,
-  MessagesSquare,
+  Globe2,
 } from "lucide-react"
 
 export type Screen =
@@ -59,14 +58,12 @@ export type Screen =
   | "retornos"
   | "fluxos"
   | "config"
-  | "site-chat"
 
 // "reels" fica fora do menu por enquanto (edição em massa parada) — a rota em
 // App.tsx continua existindo, só reativar aqui quando voltar a usar.
 const NAV_ITEMS_ANTES: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
   { id: "hoje", title: "Hoje", icon: Home },
   { id: "chats", title: "Conversas", icon: MessageCircle },
-  { id: "site-chat", title: "Chat do site", icon: MessagesSquare },
   { id: "pipeline", title: "Pipeline", icon: Columns3 },
   { id: "contatos", title: "Contatos", icon: Contact },
 ]
@@ -111,27 +108,6 @@ export function AppSidebar({
   const { channels, current, setCurrent } = useChannel()
   const { unreadChannels, hasAnyUnread } = useUnread()
   const { logout } = useAuth()
-  const [siteChatUnread, setSiteChatUnread] = React.useState(0)
-
-  React.useEffect(() => {
-    let ativo = true
-    async function atualizar() {
-      try {
-        const conversas = await api.siteChatConversas()
-        if (ativo) setSiteChatUnread(conversas.filter((c) => Boolean(c.unread)).length)
-      } catch {
-        // O menu continua utilizável se o backend estiver acordando ou temporariamente offline.
-      }
-    }
-    atualizar()
-    const id = window.setInterval(() => {
-      if (!document.hidden) atualizar()
-    }, 6000)
-    return () => {
-      ativo = false
-      window.clearInterval(id)
-    }
-  }, [])
 
   function selecionarCanal(c: Channel) {
     setCurrent(c)
@@ -158,11 +134,6 @@ export function AppSidebar({
                   >
                     <item.icon />
                     <span>{item.title}</span>
-                    {item.id === "site-chat" && siteChatUnread > 0 && (
-                      <span className="ml-auto flex min-w-5 h-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">
-                        {siteChatUnread > 99 ? "99+" : siteChatUnread}
-                      </span>
-                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -195,7 +166,7 @@ export function AppSidebar({
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton tooltip="Trocar canal" className="text-destructive hover:text-destructive font-medium">
                   <span className="relative inline-flex">
-                    {current?.kind === "instagram" ? <InstagramIcon /> : <Phone />}
+                    {current?.kind === "instagram" ? <InstagramIcon /> : current?.kind === "site" ? <Globe2 /> : <Phone />}
                     {hasAnyUnread && (
                       <span className="absolute -top-1 -right-1">
                         <UnreadDot blink />
@@ -206,26 +177,22 @@ export function AppSidebar({
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" className="w-[var(--radix-popper-anchor-width)] min-w-56">
-                <DropdownMenuLabel>WhatsApp</DropdownMenuLabel>
-                {channels
-                  .filter((c) => c.kind === "whatsapp")
-                  .map((c) => (
-                    <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
-                      <Phone /> <span className="flex-1">{c.label}</span>
-                      {unreadChannels.has(c.id) && <UnreadDot />}
-                    </DropdownMenuItem>
-                  ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Instagram</DropdownMenuLabel>
-                {channels
-                  .filter((c) => c.kind === "instagram")
-                  .map((c) => (
-                    <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
-                      <InstagramIcon /> <span className="flex-1">{c.label}</span>
-                      {unreadChannels.has(c.id) && <UnreadDot />}
-                    </DropdownMenuItem>
-                  ))}
+              <DropdownMenuContent side="top" className="w-[var(--radix-popper-anchor-width)] min-w-64">
+                {(["felizcred", "cotacerta", "ciahot"] as const).map((company, index) => {
+                  const items = channels.filter((c) => c.company === company)
+                  if (!items.length) return null
+                  return <React.Fragment key={company}>
+                    {index > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuLabel>{COMPANY_LABELS[company]}</DropdownMenuLabel>
+                    {items.map((c) => (
+                      <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
+                        {c.kind === "instagram" ? <InstagramIcon /> : c.kind === "site" ? <Globe2 /> : <Phone />}
+                        <span className="flex-1">{c.label}</span>
+                        {unreadChannels.has(c.id) && <UnreadDot />}
+                      </DropdownMenuItem>
+                    ))}
+                  </React.Fragment>
+                })}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout}>
                   <LogOut /> Sair

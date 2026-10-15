@@ -128,6 +128,13 @@ const ready = (async () => {
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_site_chat_updated ON site_chat_conversations(updated_at DESC)`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_site_chat_messages ON site_chat_messages(conversation_id, created_at)`);
+  const infoSiteChat = await client.execute(`PRAGMA table_info(site_chat_conversations)`);
+  if (!infoSiteChat.rows.some((r) => r.name === "pipeline_estagio")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN pipeline_estagio TEXT`);
+  }
+  if (!infoSiteChat.rows.some((r) => r.name === "pipeline_estagio_desde")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN pipeline_estagio_desde INTEGER`);
+  }
 
   const infoMessages = await client.execute(`PRAGMA table_info(messages)`);
   if (!infoMessages.rows.some((r) => r.name === "error_message")) {
@@ -3583,6 +3590,14 @@ async function siteChatDefinirStatus(id, status) {
   await client.execute({ sql: `UPDATE site_chat_conversations SET status = ?, updated_at = ? WHERE id = ?`, args: [status, Date.now(), id] });
 }
 
+async function siteChatDefinirPipeline(id, estagio) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE site_chat_conversations SET pipeline_estagio = ?, pipeline_estagio_desde = ? WHERE id = ?`,
+    args: [estagio, Date.now(), id],
+  });
+}
+
 module.exports = {
   hashSenha,
   verificarSenha,
@@ -3636,6 +3651,7 @@ module.exports = {
   siteChatListar,
   siteChatMarcarLida,
   siteChatDefinirStatus,
+  siteChatDefinirPipeline,
   fluxoDinamicoCriar,
   fluxoDinamicoAtivo,
   fluxoDinamicoListar,

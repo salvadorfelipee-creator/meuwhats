@@ -129,7 +129,7 @@ function chaveTask(conversa: Conversation): string {
 }
 
 function corCanal(kind: Channel["kind"]): string {
-  return kind === "instagram" ? "#C13584" : "#25D366"
+  return kind === "instagram" ? "#C13584" : kind === "site" ? "#0F766E" : "#25D366"
 }
 
 // Nomes de campo personalizado priorizados no cartão — mesma lista canônica de contatos.tsx
@@ -165,8 +165,9 @@ function conversaParaTask(
 
   // Canal sempre visível no cartão — agora que o Pipeline cruza TODOS os canais num quadro só,
   // é a única forma de saber de qual número/canal veio cada contato.
+  const simboloCanal = canal?.kind === "site" ? "🌐" : canal?.kind === "instagram" ? "◎" : "☎"
   const chips: { id: string; nome: string; cor: string }[] = [
-    { id: "canal", nome: canal?.label || conversa.business_number_id, cor: corCanal(canal?.kind || "whatsapp") },
+    { id: "canal", nome: `${simboloCanal} ${canal?.label || conversa.business_number_id}`, cor: corCanal(canal?.kind || "whatsapp") },
   ]
   for (const tag of tagsDe(conversa)) chips.push({ id: `tag-${tag.id}`, nome: tag.nome, cor: tag.cor })
   if (campos["Responsável"]) chips.push({ id: "responsavel", nome: campos["Responsável"], cor: "#475569" })
@@ -496,7 +497,7 @@ function EditarAlertaDialog({
 }
 
 export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId: string, phone: string) => void }) {
-  const { current, channels } = useChannel()
+  const { current, channels, setCurrent } = useChannel()
   const { setActiveConversation, markConversationSeen, unreadConversations } = useUnread()
   const { identidade } = useAuth()
   const [conversas, setConversas] = React.useState<Conversation[]>([])
@@ -505,7 +506,10 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
   const [alertasConfig, setAlertasConfig] = React.useState<Record<string, number>>({})
   const [editandoAlertaEstagio, setEditandoAlertaEstagio] = React.useState<string | null>(null)
 
-  const estagios = pipelineEstagiosPara(current?.label)
+  const labelFunil = current?.company === "felizcred"
+    ? channels.find((c) => c.company === "felizcred" && c.kind === "whatsapp")?.label
+    : current?.label
+  const estagios = pipelineEstagiosPara(labelFunil)
 
   React.useEffect(() => {
     api.pipelineAlertasConfig().then(setAlertasConfig).catch(() => {})
@@ -516,12 +520,23 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
   // selecionado na barra lateral, e junta num quadro só. `chaveTask` (acima) evita colisão quando
   // o mesmo telefone aparece em mais de um canal.
   const carregar = React.useCallback(() => {
-    if (!channels.length) return
+    if (!channels.length || !current) return
+    const canaisDaEmpresa = channels.filter((c) => c.company === current.company && c.kind !== "site")
     setCarregando(true)
-    Promise.all(channels.map((c) => api.conversations(c.id).catch(() => [])))
+    const site = current.company === "felizcred"
+      ? api.siteChatConversas().then((lista) => lista.map((c): Conversation => ({
+          phone: c.id, business_number_id: "site", name: c.name, email: c.contact,
+          status: c.status === "closed" ? "resolvido" : "novo", last_message_at: c.updated_at,
+          last_body: c.last_message || null,
+          last_direction: c.last_visitor_at && (!c.last_agent_at || c.last_visitor_at > c.last_agent_at) ? "in" : "out",
+          nota: null, fluxo_passo: null, pipeline_estagio: c.pipeline_estagio,
+          pipeline_estagio_desde: c.pipeline_estagio_desde, channel: "site", nao_lida: c.unread,
+        }))).catch(() => [])
+      : Promise.resolve([] as Conversation[])
+    Promise.all([...canaisDaEmpresa.map((c) => api.conversations(c.id).catch(() => [])), site])
       .then((listas) => setConversas(listas.flat()))
       .finally(() => setCarregando(false))
-  }, [channels])
+  }, [channels, current])
 
   React.useEffect(() => {
     carregar()
@@ -560,7 +575,14 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
 
   function abrirPorId(chave: string) {
     const conversa = conversas.find((c) => chaveTask(c) === chave)
-    if (conversa) setSelecionada(conversa)
+    if (!conversa) return
+    if (conversa.business_number_id === "site") {
+      const canalSite = channels.find((c) => c.id === "site")
+      if (canalSite) setCurrent(canalSite)
+      onAbrirConversa("site", conversa.phone)
+      return
+    }
+    setSelecionada(conversa)
   }
 
   const primeiraEtapaId = estagios[0]?.id ?? "novo"
@@ -580,7 +602,10 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
           setConversas((prev) =>
             prev.map((c) => (chaveTask(c) === task.id ? { ...c, pipeline_estagio: col.id, pipeline_estagio_desde: Date.now() } : c)),
           )
-          api.setPipeline(conversa.business_number_id, conversa.phone, col.id).catch(() => carregar())
+          const salvar = conversa.business_number_id === "site"
+            ? api.siteChatPipeline(conversa.phone, col.id)
+            : api.setPipeline(conversa.business_number_id, conversa.phone, col.id)
+          salvar.catch(() => carregar())
           return
         }
       }

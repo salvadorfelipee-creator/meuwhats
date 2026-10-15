@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { SidebarTrigger } from "@/components/blocks/sidebar"
 
 function hora(ms: number) {
   return new Date(ms).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
@@ -17,7 +18,7 @@ function dataLista(ms: number) {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
 }
 
-export function SiteChatPage() {
+export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
   const [conversas, setConversas] = React.useState<SiteChatConversation[]>([])
   const [selecionada, setSelecionada] = React.useState<SiteChatConversation | null>(null)
   const [mensagens, setMensagens] = React.useState<SiteChatMessage[]>([])
@@ -94,14 +95,17 @@ export function SiteChatPage() {
   }
 
   return (
-    <div className="h-screen min-h-0 bg-muted/25 p-2 sm:p-3">
+    <div className={cn("h-screen min-h-0 bg-muted/25", embedded ? "p-0" : "p-2 sm:p-3")}>
       <div className="mx-auto flex h-full max-w-[1500px] overflow-hidden rounded-2xl border bg-background shadow-sm">
         <aside className={cn("w-full shrink-0 border-r md:flex md:w-[340px] md:flex-col", selecionada ? "hidden" : "flex flex-col")}>
           <div className="border-b px-4 pb-3 pt-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-base font-semibold tracking-tight">Chat do site</h1>
-                <p className="mt-0.5 text-xs text-muted-foreground">Atendimento direto da FelizCred</p>
+              <div className="flex min-w-0 items-center gap-2">
+                {embedded && <SidebarTrigger />}
+                <div>
+                <h1 className="text-base font-semibold tracking-tight">Conversas</h1>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"><Globe2 className="h-3 w-3" /> Site FelizCred</p>
+                </div>
               </div>
               <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
                 {conversas.filter((c) => c.status === "open").length} abertas

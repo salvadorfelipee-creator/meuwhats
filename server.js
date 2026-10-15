@@ -5092,8 +5092,9 @@ const server = http.createServer(async (req, res) => {
         const contact = String(body.contact || "").trim().slice(0, 160);
         const message = String(body.message || "").trim().slice(0, 2000);
         const pageUrl = String(body.pageUrl || "").trim().slice(0, 500);
-        if (name.length < 2 || !message) {
-          return send(res, 400, { error: "Informe seu nome e escreva uma mensagem." }, corsHeaders);
+        const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+        if (name.length < 2 || !emailValido || !message) {
+          return send(res, 400, { error: "Informe seu nome, um e-mail válido e escolha um assunto." }, corsHeaders);
         }
         const id = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
@@ -5156,6 +5157,16 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const status = body.status === "closed" ? "closed" : "open";
       await db.siteChatDefinirStatus(painelSiteChatStatusMatch[1], status);
+      return send(res, 200, { ok: true });
+    }
+
+    const painelSiteChatPipelineMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)\/pipeline$/i);
+    if (painelSiteChatPipelineMatch && req.method === "PATCH") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const estagio = String(body.estagio || "").trim().slice(0, 80);
+      if (!estagio) return send(res, 400, { error: "Etapa inválida" });
+      await db.siteChatDefinirPipeline(painelSiteChatPipelineMatch[1], estagio);
       return send(res, 200, { ok: true });
     }
 

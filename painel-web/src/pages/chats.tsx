@@ -1,5 +1,6 @@
 import * as React from "react"
-import { useChannel, type Channel } from "@/lib/channel-context"
+import { COMPANY_LABELS, useChannel, type Channel } from "@/lib/channel-context"
+import { SiteChatPage } from "@/pages/site-chat"
 import { useUnread } from "@/lib/unread-context"
 import {
   api,
@@ -89,6 +90,7 @@ import {
   Maximize2,
   MapPin,
   User,
+  Globe2,
 } from "lucide-react"
 
 // Emoji picker — dataset grande (emoji-picker-react), carregado só quando alguém de fato abre o
@@ -189,6 +191,12 @@ const TIPO_SEM_DADOS_LABEL: Record<string, string> = {
 }
 
 export function ChatsPage() {
+  const { current } = useChannel()
+  if (current?.kind === "site") return <SiteChatPage embedded />
+  return <ChannelChatsPage />
+}
+
+function ChannelChatsPage() {
   const { channels, current, setCurrent } = useChannel()
   const {
     notifPermission,
@@ -697,26 +705,22 @@ export function ChatsPage() {
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <DropdownMenuLabel>WhatsApp</DropdownMenuLabel>
-                {channels
-                  .filter((c) => c.kind === "whatsapp")
-                  .map((c) => (
-                    <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
-                      <Phone className="h-4 w-4" /> <span className="flex-1">{c.label}</span>
-                      {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
-                    </DropdownMenuItem>
-                  ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Instagram</DropdownMenuLabel>
-                {channels
-                  .filter((c) => c.kind === "instagram")
-                  .map((c) => (
-                    <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
-                      <InstagramIcon className="h-4 w-4" /> <span className="flex-1">{c.label}</span>
-                      {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
-                    </DropdownMenuItem>
-                  ))}
+              <DropdownMenuContent align="start" className="w-64">
+                {(["felizcred", "cotacerta", "ciahot"] as const).map((company, index) => {
+                  const items = channels.filter((c) => c.company === company)
+                  if (!items.length) return null
+                  return <React.Fragment key={company}>
+                    {index > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuLabel>{COMPANY_LABELS[company]}</DropdownMenuLabel>
+                    {items.map((c) => (
+                      <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
+                        {c.kind === "instagram" ? <InstagramIcon className="h-4 w-4" /> : c.kind === "site" ? <Globe2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
+                        <span className="flex-1">{c.label}</span>
+                        {unreadChannels.has(c.id) && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </React.Fragment>
+                })}
               </DropdownMenuContent>
               </DropdownMenu>
             </div>

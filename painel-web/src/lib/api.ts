@@ -17,7 +17,7 @@ export type Conversation = {
   last_type?: string | null
   last_body?: string | null
   last_direction?: "in" | "out" | null
-  channel?: "whatsapp" | "instagram"
+  channel?: "whatsapp" | "instagram" | "site"
   last_inbound_at?: number | null
   last_read_at?: number | null
   last_seen_at?: number | null
@@ -88,6 +88,8 @@ export type SiteChatConversation = {
   last_read_at: number | null
   last_message?: string | null
   unread?: number | boolean
+  pipeline_estagio?: string | null
+  pipeline_estagio_desde?: number | null
 }
 
 export type SiteChatMessage = {
@@ -521,6 +523,11 @@ export const api = {
     request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    }),
+  siteChatPipeline: (id: string, estagio: string) =>
+    request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/pipeline`, {
+      method: "PATCH",
+      body: JSON.stringify({ estagio }),
     }),
 
   usuarios: () => request<Usuario[]>("/painel/api/usuarios"),
