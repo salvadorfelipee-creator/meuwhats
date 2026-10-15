@@ -5313,6 +5313,7 @@ const server = http.createServer(async (req, res) => {
         else if (!conversation.produto_tag && message) {
           gemini.classificarProdutoSite(message).then((produto) => produto && db.siteChatDefinirProduto(id, produto)).catch(() => {});
         }
+        let cltStep = null;
         if (message && conversaClt) {
           try {
             let row = await db.siteChatCltObter(id);
@@ -5336,10 +5337,13 @@ const server = http.createServer(async (req, res) => {
             // livre e não pode voltar a qualificação depois da confirmação nem confundir CPF.
             if (!row && confirmouTempo) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Perfeito! Agora digite seu CPF para iniciarmos a simulação.");
+              cltStep = "start";
             } else if (!row && semTempoMinimo) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Entendi. Assim que completar 3 meses no trabalho atual, volte aqui para fazermos sua simulação.");
+              cltStep = "ineligible";
             } else if (!row && pareceCpfInvalido) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Esse CPF não parece válido. Confira os 11 números e envie novamente, por favor.");
+              cltStep = "start";
             } else if (!row && cpfInformado) {
               const transactionId = await novosaque.criarSimulacaoClt(cpfInformado);
               row = await db.siteChatCltCriar(id, transactionId, null);
@@ -5352,6 +5356,7 @@ const server = http.createServer(async (req, res) => {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", orientacao);
             } else if (!row && pediuSimulacao && !jaPerguntouTempo) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
+              cltStep = "eligibility";
             } else {
               const mensagemMascarada = message
                 .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[e-mail]")
@@ -5366,7 +5371,7 @@ const server = http.createServer(async (req, res) => {
             await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Recebi seus dados. Não consegui concluir a consulta automática agora, mas nossa equipe continuará o atendimento por aqui.").catch(() => {});
           }
         }
-        return send(res, 201, { ok: true, clt: conversaClt }, corsHeaders);
+        return send(res, 201, { ok: true, clt: conversaClt, cltStep }, corsHeaders);
       }
     }
 
