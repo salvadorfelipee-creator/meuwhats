@@ -56,7 +56,7 @@ async function enviar(page, texto) {
     }
     {
       const { context, page } = await abrirConversa(browser, "FGTS", `mudanca-${Date.now()}`)
-      const entrada = await enviar(page, "Quero simular o crédito para trabalhador com carteira assinada")
+      const entrada = await enviar(page, "Sou registrado e queria ver quanto libera pra mim")
       assert.match(entrada, /mais de 3 meses/i)
       const resposta = await enviar(page, "Já passei da experiência, tenho 6 meses")
       assert.match(resposta, /CPF/i)
