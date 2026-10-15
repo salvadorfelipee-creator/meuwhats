@@ -5309,9 +5309,16 @@ const server = http.createServer(async (req, res) => {
           const recentes = (await db.siteChatMensagens(id)).slice(-10);
           conversaClt = recentes.some((m) => m.direction === "visitor" && /\b(clt|consignado(?:\s+clt)?)\b/i.test(m.body || ""));
         }
+        // Fora das expressões inequívocas acima, o Gemini só classifica a intenção. Se detectar
+        // CLT, entrega imediatamente ao fluxo determinístico; ele não escreve nem escolhe etapa.
+        let produtoDetectado = null;
+        if (!conversaClt && message) {
+          try { produtoDetectado = await gemini.classificarProdutoSite(message); } catch {}
+          if (produtoDetectado === "Empréstimo CLT") conversaClt = true;
+        }
         if (conversaClt && conversation.produto_tag !== "Empréstimo CLT") await db.siteChatDefinirProduto(id, "Empréstimo CLT");
-        else if (!conversation.produto_tag && message) {
-          gemini.classificarProdutoSite(message).then((produto) => produto && db.siteChatDefinirProduto(id, produto)).catch(() => {});
+        else if (!conversation.produto_tag && produtoDetectado) {
+          await db.siteChatDefinirProduto(id, produtoDetectado);
         }
         let cltStep = null;
         if (message && conversaClt) {
@@ -5361,7 +5368,7 @@ const server = http.createServer(async (req, res) => {
                 ? `CPF recebido. Para consultar suas condições, faça a autorização segura neste link:\n${row.terms_link}`
                 : "CPF recebido. Estamos preparando sua autorização segura de consulta.";
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", orientacao);
-            } else if (!row && pediuSimulacao && !jaPerguntouTempo) {
+            } else if (!row && (pediuSimulacao || produtoDetectado === "Empréstimo CLT") && !jaPerguntouTempo) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
               cltStep = "eligibility";
             } else {
