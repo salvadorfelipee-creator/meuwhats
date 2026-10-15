@@ -519,6 +519,15 @@ export const api = {
 
   googleContatos: () => request<GoogleContato[]>("/painel/api/google/contatos"),
 
+  // ── Roteador em código (fluxos hardcoded de cada número, tela Fluxos) ───────────────────
+  roteadorRevisadoListar: () => request<Record<string, boolean>>("/painel/api/roteador/revisado"),
+
+  roteadorRevisadoDefinir: (chave: string, revisado: boolean) =>
+    request<{ ok: true }>(`/painel/api/roteador/revisado/${encodeURIComponent(chave)}`, {
+      method: "POST",
+      body: JSON.stringify({ revisado }),
+    }),
+
   // "Qual conta Google está conectada" — mostrado antes da lista de importar, pra nunca ficar
   // na dúvida se os contatos que aparecem são da conta certa.
   googleConta: () => request<{ email: string | null; nome: string | null }>("/painel/api/google/conta"),

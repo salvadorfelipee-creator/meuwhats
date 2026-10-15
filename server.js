@@ -6110,6 +6110,23 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { whatsapp, r2: r2Status });
     }
 
+    // GET /painel/api/roteador/revisado — status de revisão do roteador em CÓDIGO (os fluxos
+    // hardcoded de cada número — FLUXO_FELIZCRED, FLUXO_COTACERTA, FLUXO_CIAHOT, FLUXO_CAMPANHA_CLT
+    // etc. — ver tela Fluxos). Mapa { chave: boolean }.
+    if (req.method === "GET" && path_ === "/painel/api/roteador/revisado") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.roteadorRevisadoListar());
+    }
+
+    // POST /painel/api/roteador/revisado/:chave — marca/desmarca { revisado: boolean }
+    const matchRoteadorRevisado = path_.match(/^\/painel\/api\/roteador\/revisado\/([^/]+)$/);
+    if (req.method === "POST" && matchRoteadorRevisado) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await db.roteadorRevisadoDefinir(decodeURIComponent(matchRoteadorRevisado[1]), Boolean(body.revisado));
+      return send(res, 200, { ok: true });
+    }
+
     // GET /painel/api/google/contatos — lista os contatos da conta Google autorizada. Devolve a
     // lista crua pra pessoa ESCOLHER quem importar no painel — nunca importa tudo de uma vez
     // sozinho: a conta Google autorizada é pessoal, pode ter gente que não tem nada a ver com o

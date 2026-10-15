@@ -289,6 +289,17 @@ const ready = (async () => {
     await client.execute(`ALTER TABLE atividades_conversa ADD COLUMN origem TEXT`);
   }
 
+  // "Revisado" do ROTEADOR EM CÓDIGO — acompanha o roteador real que está no ar (os fluxos
+  // hardcoded em server.js: FLUXO_FELIZCRED, FLUXO_COTACERTA, FLUXO_CIAHOT, FLUXO_CAMPANHA_CLT
+  // etc.), que não tem representação nenhuma no banco. Chave livre definida só no frontend
+  // (painel-web/src/lib/roteador-producao.ts) — esta tabela só guarda o status marcado
+  // manualmente, é o selo da tela Fluxos.
+  await client.execute(`CREATE TABLE IF NOT EXISTS roteador_revisado (
+    chave TEXT PRIMARY KEY,
+    revisado INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL
+  )`);
+
   // Motor de fluxo dinâmico (dado no banco, não código) — usado só por número que NÃO tem
   // fluxo fixo escrito em server.js (ver getFluxo). V1: nó 'mensagem' (com botões via
   // fluxo_opcoes) e 'acao' (tag/pipeline); gatilho por palavra-chave ou primeiro contato.
@@ -3402,6 +3413,26 @@ async function aniversarioMarcarEnviado(businessId, phone, ano) {
   });
 }
 
+// Status de revisão do ROTEADOR EM CÓDIGO — mapa { chave: boolean }, só com as chaves que já
+// foram tocadas alguma vez (chave nunca marcada ainda não aparece aqui; o frontend trata isso
+// como "pendente" por padrão).
+async function roteadorRevisadoListar() {
+  await ready;
+  const result = await client.execute(`SELECT chave, revisado FROM roteador_revisado`);
+  const mapa = {};
+  for (const r of result.rows) mapa[r.chave] = Boolean(r.revisado);
+  return mapa;
+}
+
+async function roteadorRevisadoDefinir(chave, revisado) {
+  await ready;
+  await client.execute({
+    sql: `INSERT INTO roteador_revisado (chave, revisado, updated_at) VALUES (?, ?, ?)
+          ON CONFLICT(chave) DO UPDATE SET revisado = excluded.revisado, updated_at = excluded.updated_at`,
+    args: [chave, revisado ? 1 : 0, Date.now()],
+  });
+}
+
 module.exports = {
   hashSenha,
   verificarSenha,
@@ -3445,6 +3476,8 @@ module.exports = {
   aniversariantesHoje,
   aniversarioJaEnviado,
   aniversarioMarcarEnviado,
+  roteadorRevisadoListar,
+  roteadorRevisadoDefinir,
   fluxoDinamicoCriar,
   fluxoDinamicoAtivo,
   fluxoDinamicoListar,

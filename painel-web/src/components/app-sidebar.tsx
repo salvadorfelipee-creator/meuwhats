@@ -39,6 +39,7 @@ import {
   Home,
   Contact,
   Settings,
+  Workflow,
 } from "lucide-react"
 
 export type Screen =
@@ -54,6 +55,7 @@ export type Screen =
   | "hoje"
   | "contatos"
   | "retornos"
+  | "fluxos"
   | "config"
 
 // "reels" fica fora do menu por enquanto (edição em massa parada) — a rota em
@@ -72,6 +74,7 @@ const NAV_ITEMS_DEPOIS: { id: Screen; title: string; icon: typeof MessageCircle 
   { id: "analytics", title: "Analytics", icon: BarChart3 },
   { id: "email", title: "Email", icon: Mail },
   { id: "ia", title: "IA", icon: Sparkles },
+  { id: "fluxos", title: "Fluxos", icon: Workflow },
   { id: "config", title: "Configurações", icon: Settings },
 ]
 
