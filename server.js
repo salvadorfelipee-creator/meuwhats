@@ -5182,6 +5182,9 @@ const server = http.createServer(async (req, res) => {
         try { produtoTag = await gemini.classificarProdutoSite(message); }
         catch { produtoTag = /fgts/i.test(message) ? "FGTS" : /clt/i.test(message) ? "Empréstimo CLT" : /carro/i.test(message) ? "Carro em garantia" : null; }
         const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, pageUrl, message, produtoTag });
+        if (produtoTag === "Empréstimo CLT") {
+          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
+        }
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
@@ -5313,12 +5316,16 @@ const server = http.createServer(async (req, res) => {
         if (message && conversaClt) {
           try {
             let row = await db.siteChatCltObter(id);
+            const recentes = (await db.siteChatMensagens(id)).slice(-20);
             const somenteDigitos = message.replace(/\D/g, "");
             const cpfInformado = somenteDigitos.length === 11 && novosaque.cpfValido(somenteDigitos)
               ? somenteDigitos
               : null;
+            const pareceCpfInvalido = somenteDigitos.length === 11 && !cpfInformado;
             const confirmouTempo = /^(sim|tenho|tenho sim|mais de 3 meses|3 meses ou mais)[!. ]*$/i.test(message.trim());
             const semTempoMinimo = /^(n[aã]o|ainda n[aã]o|n[aã]o tenho|menos de 3 meses)[!. ]*$/i.test(message.trim());
+            const pediuSimulacao = /\b(clt|consignado|simula(?:r|ção)|empr[eé]stimo)\b/i.test(message);
+            const jaPerguntouTempo = recentes.some((m) => m.direction === "agent" && /mais de 3 meses/i.test(m.body || ""));
 
             // As etapas obrigatórias são determinísticas. O Gemini cuida apenas da linguagem
             // livre e não pode voltar a qualificação depois da confirmação nem confundir CPF.
@@ -5326,6 +5333,8 @@ const server = http.createServer(async (req, res) => {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Perfeito! Agora digite seu CPF para iniciarmos a simulação.");
             } else if (!row && semTempoMinimo) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Entendi. Assim que completar 3 meses no trabalho atual, volte aqui para fazermos sua simulação.");
+            } else if (!row && pareceCpfInvalido) {
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Esse CPF não parece válido. Confira os 11 números e envie novamente, por favor.");
             } else if (!row && cpfInformado) {
               const transactionId = await novosaque.criarSimulacaoClt(cpfInformado);
               row = await db.siteChatCltCriar(id, transactionId, null);
@@ -5336,6 +5345,8 @@ const server = http.createServer(async (req, res) => {
                 ? `CPF recebido. Para consultar suas condições, faça a autorização segura neste link:\n${row.terms_link}`
                 : "CPF recebido. Estamos preparando sua autorização segura de consulta.";
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", orientacao);
+            } else if (!row && pediuSimulacao && !jaPerguntouTempo) {
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
             } else {
               const mensagemMascarada = message
                 .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[e-mail]")

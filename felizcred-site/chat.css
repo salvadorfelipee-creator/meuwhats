@@ -148,6 +148,7 @@
 .fc-chat-bubble.visitor { align-self: flex-end; border-bottom-right-radius: 5px; background: var(--fc-green); color: var(--fc-navy); }
 .fc-chat-bubble.agent { align-self: flex-start; border: 1px solid var(--fc-line); border-bottom-left-radius: 5px; background: #fff; }
 .fc-chat-bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; }
+.fc-chat-bubble p a { display: inline-flex; margin-top: 8px; color: #06753a; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .fc-chat-bubble small { display: block; margin-top: 5px; color: rgba(20,32,51,.55); font-size: 10px; text-align: right; }
 .fc-chat-bubble.agent small { text-align: left; }
 .fc-chat-compose { display: flex; align-items: flex-end; gap: 5px; border-top: 1px solid var(--fc-line); padding: 11px; background: #fff; }
