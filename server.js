@@ -5324,12 +5324,16 @@ const server = http.createServer(async (req, res) => {
               : null;
             const pareceCpfInvalido = somenteDigitos.length === 11 && !cpfInformado;
             const respostaNormalizada = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-            const semTempoMinimo = /\b(ainda nao|nao tenho|menos de (?:tres|3) meses|so tenho (?:um|dois|1|2) meses?)\b/.test(respostaNormalizada)
-              || /^(nao|n|negativo)[!. ]*$/.test(respostaNormalizada);
-            const confirmouTempo = !semTempoMinimo && (
-              /^(sim|s|tenho|tenho sim|positivo)[!,. ]*$/.test(respostaNormalizada)
-              || /\b(mais de (?:tres|3) meses|(?:tres|3) meses ou mais|(?:4|5|6|7|8|9|10|11|12) meses|[1-9]\d+ meses|ja (?:completei|passei)|passei da experiencia)\b/.test(respostaNormalizada)
+            const normalizarResposta = (texto) => String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const respostaEhNegativa = (texto) => /\b(ainda nao|nao tenho|menos de (?:tres|3) meses|so tenho (?:um|dois|1|2) meses?)\b/.test(texto)
+              || /^(nao|n|negativo)[!. ]*$/.test(texto);
+            const respostaEhPositiva = (texto) => !respostaEhNegativa(texto) && (
+              /^(sim|s|tenho|tenho sim|positivo)[!,. ]*$/.test(texto)
+              || /\b(mais de (?:tres|3) meses|(?:tres|3) meses ou mais|(?:4|5|6|7|8|9|10|11|12) meses|[1-9]\d+ meses|ja (?:completei|passei)|passei da experiencia)\b/.test(texto)
             );
+            const semTempoMinimo = respostaEhNegativa(respostaNormalizada);
+            const confirmouTempo = respostaEhPositiva(respostaNormalizada);
+            const confirmouTempoAntes = recentes.slice(0, -1).some((m) => m.direction === "visitor" && respostaEhPositiva(normalizarResposta(m.body)));
             const pediuSimulacao = /\b(clt|consignado|simula(?:r|ção)|empr[eé]stimo)\b/i.test(message);
             const jaPerguntouTempo = recentes.some((m) => m.direction === "agent" && /mais de 3 meses/i.test(m.body || ""));
 
@@ -5344,6 +5348,9 @@ const server = http.createServer(async (req, res) => {
             } else if (!row && pareceCpfInvalido) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Esse CPF não parece válido. Confira os 11 números e envie novamente, por favor.");
               cltStep = "start";
+            } else if (!row && cpfInformado && !confirmouTempoAntes) {
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Antes da consulta, preciso confirmar: você tem mais de 3 meses de registro no trabalho atual?");
+              cltStep = "eligibility";
             } else if (!row && cpfInformado) {
               const transactionId = await novosaque.criarSimulacaoClt(cpfInformado);
               row = await db.siteChatCltCriar(id, transactionId, null);

@@ -1,5 +1,6 @@
 node_modules/
 painel-web/dist/
+test-results/
 .env
 CHAVES-LOCAL.md
 data.db
