@@ -1,6 +1,14 @@
 import * as React from "react"
 import { useChannel } from "@/lib/channel-context"
-import { api, type AnalyticsResumo, type Tag, type Conversation, type Retorno, pipelineEstagiosPara } from "@/lib/api"
+import {
+  api,
+  type AnalyticsResumo,
+  type Tag,
+  type Conversation,
+  type Retorno,
+  pipelineEstagiosPara,
+  PIPELINE_ESTAGIOS_GENERICO,
+} from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -11,7 +19,7 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { MessagesSquare, UserPlus, CheckCircle2, Timer, Tag as TagIcon, Trash2, Plus, Download } from "lucide-react"
+import { MessagesSquare, UserPlus, CheckCircle2, Timer, MessageCircle, Tag as TagIcon, Trash2, Plus, Download } from "lucide-react"
 
 const PERIODOS = [7, 30, 90] as const
 
@@ -57,8 +65,8 @@ function StatCard({
   )
 }
 
-// Barra horizontal simples (mesmo padrão visual do FunilPage) — usada nos 3 painéis de
-// distribuição (status/tag/estágio). Sem biblioteca de gráfico nova, só SVG/CSS.
+// Barra horizontal simples — usada nos painéis de distribuição (status/tag/estágio/canal). Sem
+// biblioteca de gráfico nova, só SVG/CSS.
 function BarraDistribuicao({ itens }: { itens: { label: string; total: number; cor?: string }[] }) {
   const max = Math.max(...itens.map((i) => i.total), 1)
   if (itens.length === 0) {
@@ -267,7 +275,9 @@ export function GerenciarTags({ businessId, tags, onChange }: { businessId: stri
 
 // Tabela de contatos (visão tipo CRM) — junta o que já existe espalhado por conversa (tags,
 // etapa, retorno agendado, nota) numa lista só, filtrável e exportável em CSV, pra dar pra tirar
-// um "relatório completo de atendimento" sem precisar abrir conversa por conversa.
+// um "relatório completo de atendimento" sem precisar abrir conversa por conversa. O Kanban de
+// arrastar já existe de verdade na página Pipeline — aqui fica só a leitura/relatório, pra não
+// duplicar onde a pessoa deveria ir mexer no funil.
 function TabelaContatos({ businessId, canalLabel }: { businessId: string; canalLabel: string }) {
   const [contatos, setContatos] = React.useState<Conversation[]>([])
   const [retornos, setRetornos] = React.useState<Retorno[]>([])
@@ -469,149 +479,74 @@ function TabelaContatos({ businessId, canalLabel }: { businessId: string; canalL
   )
 }
 
-// Quadro Kanban — mesmo espírito do "Quadro de Conversas" do Octadesk: 1 coluna por etapa,
-// arrasta o card pra mudar a etapa (nativo, sem biblioteca de drag-and-drop nova). Otimista:
-// move o card na hora, só confirma com o servidor depois — sem isso o arrastar pareceria travado.
-function KanbanContatos({ businessId, canalLabel, onChanged }: { businessId: string; canalLabel: string; onChanged: () => void }) {
-  const [contatos, setContatos] = React.useState<Conversation[]>([])
-  const [carregando, setCarregando] = React.useState(true)
-  const [arrastando, setArrastando] = React.useState<string | null>(null)
-  const [sobreColuna, setSobreColuna] = React.useState<string | null>(null)
+// Distribuição por hora do dia (0-23h) — mesma ideia de BarraDistribuicao, só que em colunas
+// verticais finas (padrão "heatmap de volume" que ferramenta de atendimento profissional usa
+// pra decidir horário de plantão/equipe). Sem biblioteca nova, só CSS.
+function BarrasPorHora({ dados }: { dados: { hora: number; total: number }[] }) {
+  const porHora = React.useMemo(() => {
+    const mapa = new Map(dados.map((d) => [d.hora, d.total]))
+    return Array.from({ length: 24 }, (_, h) => ({ hora: h, total: mapa.get(h) || 0 }))
+  }, [dados])
+  const max = Math.max(...porHora.map((h) => h.total), 1)
+  const totalGeral = porHora.reduce((acc, h) => acc + h.total, 0)
 
-  const estagios = pipelineEstagiosPara(canalLabel)
-  const colunas = React.useMemo(() => [{ id: "", nome: "Sem etapa", cor: "#94a3b8" }, ...estagios], [estagios])
-
-  const carregar = React.useCallback(() => {
-    setCarregando(true)
-    api
-      .conversations(businessId, { finalizadas: true })
-      .then(setContatos)
-      .finally(() => setCarregando(false))
-  }, [businessId])
-
-  React.useEffect(() => {
-    carregar()
-  }, [carregar])
-
-  const porEstagio = React.useMemo(() => {
-    const mapa: Record<string, Conversation[]> = {}
-    for (const col of colunas) mapa[col.id] = []
-    for (const c of contatos) {
-      const chave = c.pipeline_estagio && mapa[c.pipeline_estagio] ? c.pipeline_estagio : ""
-      mapa[chave].push(c)
-    }
-    return mapa
-  }, [contatos, colunas])
-
-  async function soltarEm(estagioId: string) {
-    if (!arrastando) return
-    const phone = arrastando
-    setArrastando(null)
-    setSobreColuna(null)
-    const anterior = contatos.find((c) => c.phone === phone)?.pipeline_estagio || null
-    if (anterior === (estagioId || null)) return
-    setContatos((prev) => prev.map((c) => (c.phone === phone ? { ...c, pipeline_estagio: estagioId || null } : c)))
-    try {
-      await api.setPipeline(businessId, phone, estagioId || null)
-      onChanged()
-    } catch {
-      setContatos((prev) => prev.map((c) => (c.phone === phone ? { ...c, pipeline_estagio: anterior } : c)))
-    }
-  }
-
-  if (carregando) {
-    return (
-      <div className="rounded-xl border p-5">
-        <p className="text-sm text-muted-foreground">Carregando quadro...</p>
-      </div>
-    )
+  if (totalGeral === 0) {
+    return <p className="text-sm text-muted-foreground">Sem mensagens recebidas nesse período ainda.</p>
   }
 
   return (
-    <div className="rounded-xl border p-5">
-      <p className="font-medium mb-3">Quadro (arraste os cartões entre as colunas)</p>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {colunas.map((col) => (
+    <div className="flex items-end gap-[3px] h-28">
+      {porHora.map((h) => (
+        <div key={h.hora} className="flex-1 flex flex-col items-center justify-end gap-1 group relative">
           <div
-            key={col.id}
-            onDragOver={(e) => {
-              e.preventDefault()
-              setSobreColuna(col.id)
-            }}
-            onDragLeave={() => setSobreColuna((v) => (v === col.id ? null : v))}
-            onDrop={(e) => {
-              e.preventDefault()
-              soltarEm(col.id)
-            }}
-            className={`w-60 shrink-0 rounded-lg border flex flex-col transition-colors ${
-              sobreColuna === col.id ? "border-primary bg-primary/5" : ""
-            }`}
-          >
-            <div className="px-3 py-2 border-b flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: col.cor }} />
-              <span className="text-sm font-medium truncate">{col.nome}</span>
-              <span className="text-xs text-muted-foreground ml-auto">{(porEstagio[col.id] || []).length}</span>
-            </div>
-            <div className="flex flex-col gap-2 p-2 min-h-[80px] max-h-[520px] overflow-y-auto">
-              {(porEstagio[col.id] || []).map((c) => {
-                const tags = c.tags_json ? (JSON.parse(c.tags_json) as { id: number; nome: string; cor: string }[]) : []
-                return (
-                  <div
-                    key={c.phone}
-                    draggable
-                    onDragStart={() => setArrastando(c.phone)}
-                    onDragEnd={() => setArrastando(null)}
-                    className="rounded-lg border bg-card p-2.5 text-xs cursor-grab active:cursor-grabbing shadow-sm"
-                  >
-                    <p className="font-medium truncate">{c.name || "Sem nome"}</p>
-                    <p className="text-muted-foreground truncate">{c.phone}</p>
-                    {tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {tags.map((t) => (
-                          <span key={t.id} className="px-1.5 py-0.5 rounded-full text-[9px] text-white" style={{ background: t.cor }}>
-                            {t.nome}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-              {(porEstagio[col.id] || []).length === 0 && (
-                <p className="text-[11px] text-muted-foreground text-center py-4">Arraste um cartão aqui</p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+            className="w-full rounded-sm bg-primary/70 group-hover:bg-primary transition-colors min-h-[2px]"
+            style={{ height: `${Math.max((h.total / max) * 100, h.total > 0 ? 4 : 2)}%` }}
+            title={`${String(h.hora).padStart(2, "0")}h — ${h.total} mensagem(ns)`}
+          />
+          {h.hora % 3 === 0 && <span className="text-[9px] text-muted-foreground">{h.hora}h</span>}
+        </div>
+      ))}
     </div>
   )
 }
 
+const STATUS_LABEL: Record<string, string> = { novo: "Novo", andamento: "Em andamento", resolvido: "Finalizada" }
+
 export function AnalyticsPage() {
-  const { current: canal } = useChannel()
+  const { current: canal, channels } = useChannel()
   const [dias, setDias] = React.useState<(typeof PERIODOS)[number]>(30)
   const [dados, setDados] = React.useState<AnalyticsResumo | null>(null)
   const [tags, setTags] = React.useState<Tag[]>([])
-  const [visao, setVisao] = React.useState<"lista" | "kanban">("kanban")
+  // "todos" soma todos os canais; um id isola só aquele — escolher de fazer a análise no total,
+  // ou só de um canal (WhatsApp de um número específico, Instagram, etc.).
+  const [canalMetrica, setCanalMetrica] = React.useState<string>("todos")
+
+  const idsSelecionados = React.useMemo(
+    () => (canalMetrica === "todos" ? channels.map((c) => c.id) : [canalMetrica]),
+    [canalMetrica, channels],
+  )
 
   const carregar = React.useCallback(() => {
-    if (!canal) return
-    api.analytics(canal.id, dias).then(setDados).catch(() => {})
-    api.tags(canal.id).then(setTags).catch(() => {})
-  }, [canal, dias])
+    if (!idsSelecionados.length) return
+    const alvo = canalMetrica === "todos" ? idsSelecionados : canalMetrica
+    api.analytics(alvo, dias).then(setDados).catch(() => {})
+  }, [idsSelecionados, canalMetrica, dias])
 
   React.useEffect(() => {
     carregar()
   }, [carregar])
+
+  React.useEffect(() => {
+    if (canal) api.tags(canal.id).then(setTags).catch(() => {})
+  }, [canal])
 
   if (!canal) {
     return <div className="h-screen flex items-center justify-center text-sm text-muted-foreground">Carregando canal...</div>
   }
 
-  const estagiosMap = Object.fromEntries(pipelineEstagiosPara(canal.label).map((e) => [e.id, e]))
+  const estagiosMap = Object.fromEntries(PIPELINE_ESTAGIOS_GENERICO.map((e) => [e.id, e]))
   const porStatusFmt = (dados?.porStatus || []).map((s) => ({
-    label: { novo: "Novo", andamento: "Em andamento", resolvido: "Finalizada" }[s.status] || s.status,
+    label: STATUS_LABEL[s.status] || s.status,
     total: s.total,
   }))
   const porTagFmt = (dados?.porTag || []).map((t) => ({ label: t.nome, total: t.total, cor: t.cor }))
@@ -619,23 +554,52 @@ export function AnalyticsPage() {
     const meta = estagiosMap[e.estagio]
     return { label: meta?.nome || e.estagio, total: e.total, cor: meta?.cor }
   })
+  const porCanalFmt = (dados?.porCanal || []).map((c) => ({ label: c.label, total: c.totalConversas }))
 
   return (
     <div className="h-screen overflow-y-auto">
-      <div className="h-14 px-4 flex items-center justify-between border-b shrink-0 sticky top-0 bg-background z-10">
-        <div>
-          <p className="font-semibold text-sm">Analytics</p>
-          <p className="text-xs text-muted-foreground">{canal.label}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <GerenciarTags businessId={canal.id} tags={tags} onChange={carregar} />
-          <div className="flex gap-1">
-            {PERIODOS.map((p) => (
-              <Button key={p} size="sm" variant={dias === p ? "default" : "outline"} onClick={() => setDias(p)}>
-                {p} dias
-              </Button>
-            ))}
+      <div className="px-4 py-3 border-b shrink-0 sticky top-0 bg-background z-10 flex flex-col gap-2.5">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <p className="font-semibold text-sm">Analytics</p>
+            <p className="text-xs text-muted-foreground">Métricas de atendimento</p>
           </div>
+          <div className="flex items-center gap-2">
+            <GerenciarTags businessId={canal.id} tags={tags} onChange={carregar} />
+            <div className="flex gap-1">
+              {PERIODOS.map((p) => (
+                <Button key={p} size="sm" variant={dias === p ? "default" : "outline"} onClick={() => setDias(p)}>
+                  {p} dias
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+        {/* Seletor de escopo — "Todos os canais" soma tudo; cada pill isola 1 canal só. */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => setCanalMetrica("todos")}
+            className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+              canalMetrica === "todos"
+                ? "bg-primary text-primary-foreground border-transparent"
+                : "border-input text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            Todos os canais
+          </button>
+          {channels.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCanalMetrica(c.id)}
+              className={`text-xs font-medium px-2.5 py-1 rounded-full border transition-colors ${
+                canalMetrica === c.id
+                  ? "bg-primary text-primary-foreground border-transparent"
+                  : "border-input text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -669,12 +633,31 @@ export function AnalyticsPage() {
                 : "Sem amostra suficiente ainda"
             }
           />
+          <StatCard
+            icon={MessageCircle}
+            label="Mensagens por conversa"
+            value={dados && dados.totalConversas > 0 ? (dados.porDia.reduce((acc, d) => acc + d.mensagens, 0) / dados.totalConversas).toFixed(1) : "—"}
+            sub="Profundidade média do atendimento"
+          />
         </div>
 
         <div className="rounded-xl border p-5">
           <p className="font-medium mb-1">Conversas por dia</p>
           <p className="text-xs text-muted-foreground mb-2">Últimos {dias} dias</p>
           <GraficoArea dados={(dados?.porDia || []).map((d) => ({ dia: d.dia, conversas: d.conversas }))} />
+        </div>
+
+        <div className={`grid grid-cols-1 gap-4 ${canalMetrica === "todos" && channels.length > 1 ? "md:grid-cols-2" : ""}`}>
+          <div className="rounded-xl border p-5">
+            <p className="font-medium mb-3">Horário de pico (mensagens recebidas)</p>
+            <BarrasPorHora dados={dados?.porHora || []} />
+          </div>
+          {canalMetrica === "todos" && channels.length > 1 && (
+            <div className="rounded-xl border p-5">
+              <p className="font-medium mb-3">Por canal</p>
+              <BarraDistribuicao itens={porCanalFmt} />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -692,30 +675,52 @@ export function AnalyticsPage() {
           </div>
         </div>
 
+        {/* Por atendente — cada mensagem enviada já grava quem está logado (nome da pessoa, ou
+            "humano" pra quem ainda usa o login antigo compartilhado). Fica mais completo conforme
+            a equipe for passando a logar com conta individual. */}
+        <div className="rounded-xl border p-5">
+          <p className="font-medium mb-1">Por atendente</p>
+          <p className="text-xs text-muted-foreground mb-3">Mensagens enviadas e conversas distintas por pessoa no período.</p>
+          {!dados || dados.porAtendente.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sem mensagem humana registrada nesse período ainda.</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b">
+                  <th className="py-2 pr-2">Atendente</th>
+                  <th className="py-2 pr-2">Mensagens enviadas</th>
+                  <th className="py-2 pr-2">Conversas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dados.porAtendente.map((a) => (
+                  <tr key={a.atendente} className="border-b last:border-0">
+                    <td className="py-2 pr-2 font-medium">{a.atendente}</td>
+                    <td className="py-2 pr-2 tabular-nums">{a.mensagens}</td>
+                    <td className="py-2 pr-2 tabular-nums">{a.conversas}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
         <div className="flex items-center justify-between">
           <p className="font-medium">CRM de contatos</p>
-          <div className="flex gap-1">
-            <Button size="sm" variant={visao === "kanban" ? "default" : "outline"} onClick={() => setVisao("kanban")}>
-              Kanban
-            </Button>
-            <Button size="sm" variant={visao === "lista" ? "default" : "outline"} onClick={() => setVisao("lista")}>
-              Lista
-            </Button>
-          </div>
+          <p className="text-xs text-muted-foreground">{canal.label} — mesmo canal selecionado na barra lateral</p>
         </div>
-        {visao === "kanban" ? (
-          <KanbanContatos businessId={canal.id} canalLabel={canal.label} onChanged={carregar} />
-        ) : (
-          <TabelaContatos businessId={canal.id} canalLabel={canal.label} />
-        )}
+        {/* Sem Kanban aqui — o quadro de arrastar de verdade é a página Pipeline (mesmas colunas,
+            mesma ação). Essa lista é só leitura + exportar CSV, não compete com o Pipeline. */}
+        <TabelaContatos businessId={canal.id} canalLabel={canal.label} />
 
         <p className="text-xs text-muted-foreground pb-6">
           Tempo de resolução médio no período: {dados ? formatMs(dados.tempoMedioResolucaoMs) : "—"}
           {dados && dados.amostrasResolucao > 0 ? ` (${dados.amostrasResolucao} conversa(s))` : ""}.
-          Duas métricas comuns em ferramentas como a Octadesk ainda não dá pra medir aqui:{" "}
+          Uma métrica comum em ferramentas como a Octadesk ainda não dá pra medir aqui:{" "}
           <b>satisfação do cliente (CSAT)</b> — precisaria de uma pergunta de avaliação no fim do
-          atendimento, que não existe hoje — e <b>produtividade por atendente</b> — precisaria de
-          login individual por pessoa (hoje o painel usa um usuário só, compartilhado).
+          atendimento, que não existe hoje. A produtividade por atendente (seção acima) fica mais
+          completa conforme a equipe for logando com conta individual, em vez do login antigo
+          compartilhado.
         </p>
       </div>
     </div>

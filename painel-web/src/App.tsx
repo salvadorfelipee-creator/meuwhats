@@ -22,16 +22,10 @@ import { FluxosPage } from "@/pages/fluxos"
 
 function Shell() {
   const [screen, setScreen] = React.useState<Screen>("hoje")
-  const { current, channels, setCurrent } = useChannel()
+  const { channels, setCurrent } = useChannel()
   const { abrirConversa } = useUnread()
 
-  function abrirConversaDoPipeline(phone: string) {
-    if (!current) return
-    abrirConversa(current.id, phone)
-    setScreen("chats")
-  }
-
-  // "Hoje"/Contatos/Retornos cobrem todos os canais ao mesmo tempo (não só o selecionado na
+  // "Hoje"/Pipeline/Contatos/Retornos cobrem todos os canais ao mesmo tempo (não só o selecionado na
   // barra lateral) — abrir uma conversa a partir delas precisa trocar pro canal certo primeiro
   // (setCurrent), só então navegar pra Conversas, senão o ChatsPage abriria o canal errado.
   function abrirConversaCrossCanal(channelId: string, phone: string) {
@@ -51,7 +45,7 @@ function Shell() {
         {screen === "publicar" && <PublicarPage />}
         {screen === "reels" && <ReelsPage />}
         {screen === "funil" && <FunilPage />}
-        {screen === "pipeline" && <PipelinePage onAbrirConversa={abrirConversaDoPipeline} />}
+        {screen === "pipeline" && <PipelinePage onAbrirConversa={abrirConversaCrossCanal} />}
         {screen === "contatos" && <ContatosPage onAbrirConversa={abrirConversaCrossCanal} />}
         {screen === "retornos" && <RetornosPage onAbrirConversa={abrirConversaCrossCanal} />}
         {screen === "analytics" && <AnalyticsPage />}

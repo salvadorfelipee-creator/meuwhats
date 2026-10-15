@@ -25,7 +25,6 @@ import { MinhasConversasMenuItem } from "@/components/minhas-conversas-menu"
 import {
   MessageCircle,
   CalendarDays,
-  Send,
   Menu,
   ChevronUp,
   AtSign as InstagramIcon,
@@ -67,9 +66,11 @@ const NAV_ITEMS_ANTES: { id: Screen; title: string; icon: typeof MessageCircle }
   { id: "contatos", title: "Contatos", icon: Contact },
 ]
 
+// "publicar" saiu do menu: virou parte da tela "Agenda" (painel de novo post publica agora OU
+// agenda, paridade com o painel de referência da Especitá) — a rota em App.tsx continua
+// existindo, só não tem mais entrada própria aqui.
 const NAV_ITEMS_DEPOIS: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
   { id: "agenda", title: "Agenda", icon: CalendarDays },
-  { id: "publicar", title: "Publicar", icon: Send },
   { id: "funil", title: "Funil", icon: Filter },
   { id: "analytics", title: "Analytics", icon: BarChart3 },
   { id: "email", title: "Email", icon: Mail },

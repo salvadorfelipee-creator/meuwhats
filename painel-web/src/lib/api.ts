@@ -29,7 +29,9 @@ export type Conversation = {
   campos_json?: string | null
   email?: string | null
   foto_url?: string | null
-  last_origem?: "humano" | null
+  // Nome de quem respondeu por último pelo painel (ou "humano", login único antigo) — null/vazio
+  // = resposta automática (fluxo/template), não um atendente.
+  last_origem?: string | null
   // Sugestão de resposta da IA ("copiloto de vendas") pré-computada em background pelo servidor
   // e cacheada na linha da conversa — só é considerada válida quando copiloto_cache_em bate com
   // last_message_at (ver api.sugestaoResposta), senão apareceria desatualizada.
@@ -213,6 +215,14 @@ export type AnalyticsResumo = {
   porEstagio: { estagio: string; total: number }[]
   porDia: { dia: string; mensagens: number; conversas: number }[]
   porDirecao: { direction: "in" | "out"; total: number }[]
+  // Histograma de hora do dia (0-23, horário de Brasília) — staffing/plantão.
+  porHora: { hora: number; total: number }[]
+  // Mensagens enviadas por atendente (origem = nome de quem está logado, ver lib/api.ts
+  // identidade) — só aparece volume de verdade depois que a equipe estiver logando por pessoa.
+  porAtendente: { atendente: string; mensagens: number; conversas: number }[]
+  // Só presente quando mais de 1 canal foi pedido de uma vez (ver `api.analytics` com array) —
+  // divisão do total de conversas por canal, pra mostrar a barra "Todos os canais".
+  porCanal?: { id: string; label: string; totalConversas: number }[]
   dias: number
   desde: number
   ate: number
@@ -230,6 +240,10 @@ export type Message = {
   status: string | null
   error_message: string | null
   wa_message_id: string | null
+  // wa_message_id de uma mensagem anterior citada ("reply" em cima dela) — null na maioria.
+  context_wa_id?: string | null
+  // Quem mandou (nome de quem estava logado no painel) — null/ausente = resposta automática.
+  origem?: string | null
   created_at: number
 }
 
@@ -617,15 +631,18 @@ export const api = {
     URL.revokeObjectURL(url)
   },
 
+  // `replyToWaId` (opcional) = wa_message_id de uma mensagem anterior pra "citar" (reply), só
+  // tem efeito em mensagem de texto puro (sem mídia) no WhatsApp.
   reply: (
     businessId: string,
     phone: string,
     text: string,
     midia?: { imagemBase64?: string; videoBase64?: string; audioBase64?: string; documentBase64?: string; documentNome?: string },
+    replyToWaId?: string | null,
   ) =>
     request<{ ok: true }>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/reply`,
-      { method: "POST", body: JSON.stringify({ text, ...midia }) },
+      { method: "POST", body: JSON.stringify({ text, ...midia, replyToWaId: replyToWaId || undefined }) },
     ),
 
   reabrirFluxo: (businessId: string, phone: string) =>
@@ -930,8 +947,12 @@ export const api = {
     ),
 
   // ── Analytics (só o número principal da Felizcred, ver chats.tsx/analytics.tsx) ─────────
-  analytics: (businessId: string, dias: number) =>
-    request<AnalyticsResumo>(`/painel/api/analytics/${encodeURIComponent(businessId)}?dias=${dias}`),
+  // Aceita 1 canal (string) ou vários de uma vez (array, "Todos os canais") — o backend soma/
+  // mescla os resultados quando é mais de um (ver mesclarAnalytics em server.js).
+  analytics: (businessIds: string | string[], dias: number) =>
+    request<AnalyticsResumo>(
+      `/painel/api/analytics/${encodeURIComponent(Array.isArray(businessIds) ? businessIds.join(",") : businessIds)}?dias=${dias}`,
+    ),
 
   // ── IA (conector MCP — ver ia.tsx) ────────────────────────────────────────────────────────
   mcpInfo: () => request<{ configurado: boolean; url?: string }>("/painel/api/mcp-info"),

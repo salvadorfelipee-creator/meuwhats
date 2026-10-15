@@ -1,6 +1,6 @@
 import * as React from "react";
 import { AnimatePresence, LayoutGroup, motion, useMotionValue, useReducedMotion } from "framer-motion";
-import { CalendarDays, Flag, Plus } from "lucide-react";
+import { CalendarDays, Flag, Plus, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ==========================================================================
@@ -87,6 +87,12 @@ export interface KanbanTask {
   due?: string;
   /** Pinta a data em âmbar — use pra "precisa de atenção". */
   dueSoon?: boolean;
+  /** Pinta o cartão inteiro (fundo + borda âmbar) — "parado há muito tempo nessa etapa". */
+  stale?: boolean;
+  /** Conversa não lida — mostra uma bolinha vermelha ao lado do título. */
+  unread?: boolean;
+  /** Com `unread`, pisca (ping) em vez de ficar sólida — "urgente" pra quem está vendo o quadro. */
+  unreadBlink?: boolean;
 }
 
 export interface KanbanColumn {
@@ -95,6 +101,13 @@ export interface KanbanColumn {
   accent?: Accent;
   /** Cor exata (hex) da bolinha de status — tem prioridade sobre `accent` quando os dois vêm. */
   dotColor?: string;
+  /** Texto curto à direita do cabeçalho da coluna, ex. soma de valores ("R$ 9.800"). */
+  subtitle?: string;
+  /** Nota informativa no rodapé da coluna (ex. "⚡ Avisa se parado..."). */
+  footerNote?: string;
+  /** Quando presente, `footerNote` vira clicável (botão + ícone de lápis) — usado pelo Pipeline
+   * pra editar o limiar de alerta "parado na etapa" direto ali. */
+  onFooterNoteClick?: () => void;
   tasks: KanbanTask[];
 }
 
@@ -523,6 +536,32 @@ export const KanbanBoard = React.forwardRef<HTMLDivElement, KanbanBoardProps>(
                       Adicionar
                     </button>
                   )}
+
+                  {col.footerNote && !col.onFooterNoteClick && (
+                    <div
+                      className={cn(
+                        "mt-2 rounded-[10px] border border-dashed px-2.5 py-2 text-[11px] leading-snug",
+                        "border-neutral-300 text-neutral-500 dark:border-white/15 dark:text-neutral-400",
+                      )}
+                    >
+                      {col.footerNote}
+                    </div>
+                  )}
+                  {col.footerNote && col.onFooterNoteClick && (
+                    <button
+                      type="button"
+                      onClick={col.onFooterNoteClick}
+                      className={cn(
+                        "mt-2 flex items-start gap-1.5 rounded-[10px] border border-dashed px-2.5 py-2 text-left text-[11px] leading-snug transition-colors",
+                        "border-neutral-300 text-neutral-500 hover:border-neutral-400 hover:bg-black/[0.02]",
+                        "dark:border-white/15 dark:text-neutral-400 dark:hover:bg-white/[0.04]",
+                      )}
+                      title="Editar quando avisar"
+                    >
+                      <span className="flex-1">{col.footerNote}</span>
+                      <Pencil aria-hidden className="h-3 w-3 shrink-0 mt-0.5 opacity-60" />
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -655,6 +694,11 @@ function ColumnHeader({ col, count }: { col: KanbanColumn; count: number }) {
       >
         {count}
       </motion.span>
+      {col.subtitle && (
+        <span className="ml-auto text-[11.5px] font-medium tabular-nums text-neutral-500 dark:text-neutral-400">
+          {col.subtitle}
+        </span>
+      )}
     </div>
   );
 }
@@ -726,7 +770,9 @@ function CardShell({ task, floating }: { task: KanbanTask; floating?: boolean })
     <div
       className={cn(
         "rounded-[12px] border p-3",
-        "border-black/[0.06] bg-white dark:border-white/[0.08] dark:bg-neutral-900",
+        task.stale
+          ? "border-amber-300 bg-amber-50/60 dark:border-amber-700/50 dark:bg-amber-950/20"
+          : "border-black/[0.06] bg-white dark:border-white/[0.08] dark:bg-neutral-900",
         floating ? "shadow-[0_16px_32px_-12px_rgb(0_0_0/0.28)]" : "shadow-[0_1px_2px_rgb(0_0_0/0.05)]",
         SQUIRCLE,
       )}
@@ -747,7 +793,25 @@ function CardShell({ task, floating }: { task: KanbanTask; floating?: boolean })
         </div>
       )}
 
-      <p className="m-0 mt-2.5 text-[14px] font-medium leading-snug tracking-[-0.005em]">{task.title}</p>
+      <div className="flex items-center gap-1.5 mt-2.5">
+        {task.unread && (
+          <span className={task.unreadBlink ? "relative flex h-2 w-2 shrink-0" : "flex h-2 w-2 shrink-0"}>
+            {task.unreadBlink && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+            )}
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+          </span>
+        )}
+        {/* Parado além do limiar configurado pisca em âmbar — distinto do ponto vermelho
+            (mensagem não lida), os dois podem aparecer juntos sem se confundir. */}
+        {task.stale && (
+          <span className="relative flex h-2 w-2 shrink-0" title="Parado além do tempo configurado pra essa etapa">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          </span>
+        )}
+        <p className="m-0 text-[14px] font-medium leading-snug tracking-[-0.005em] truncate">{task.title}</p>
+      </div>
 
       {task.note && (
         <p className="m-0 mt-1 text-[12px] font-normal leading-snug text-neutral-500 dark:text-neutral-400 line-clamp-2">

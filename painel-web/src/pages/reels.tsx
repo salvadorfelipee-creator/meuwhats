@@ -52,7 +52,10 @@ export function ReelsPage() {
 
   React.useEffect(() => {
     carregar()
-    const id = setInterval(carregar, 15000)
+    // Pausa com a aba em segundo plano (mesmo princípio de chats.tsx).
+    const id = setInterval(() => {
+      if (!document.hidden) carregar()
+    }, 15000)
     return () => clearInterval(id)
   }, [carregar])
 

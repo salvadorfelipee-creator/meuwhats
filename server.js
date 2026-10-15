@@ -4518,7 +4518,7 @@ async function processarEntry(entry) {
               console.error("Erro ao enviar passo do fluxo de botões:", err.message);
             }
           }
-        } else if (tipo === "image" || tipo === "audio" || tipo === "video" || tipo === "document") {
+        } else if (tipo === "image" || tipo === "audio" || tipo === "video" || tipo === "document" || tipo === "sticker") {
           const media = msg[tipo];
           try {
             const { buffer, mimeType } = await wa.downloadMedia(media.id);
@@ -4538,6 +4538,38 @@ async function processarEntry(entry) {
             console.error("Erro ao baixar mídia:", err.message);
             await db.insertMessage({ ...base, type: tipo, body: "[mídia indisponível]" });
           }
+        } else if (tipo === "location") {
+          // body guarda JSON {latitude, longitude, name?, address?} — o painel usa isso pra
+          // montar o link do Google Maps (ver chats.tsx).
+          const loc = msg.location || {};
+          await db.insertMessage({
+            ...base,
+            type: "location",
+            body: JSON.stringify({
+              latitude: loc.latitude,
+              longitude: loc.longitude,
+              name: loc.name || null,
+              address: loc.address || null,
+            }),
+          });
+        } else if (tipo === "contacts") {
+          // WhatsApp manda um array (pode compartilhar vários contatos de uma vez) — guarda só
+          // nome + telefone de cada um, já simplificado (não o vCard inteiro).
+          const lista = Array.isArray(msg.contacts) ? msg.contacts : [];
+          const simplificados = lista.map((c) => ({
+            nome: c.name?.formatted_name || null,
+            telefone: c.phones?.[0]?.phone || null,
+          }));
+          await db.insertMessage({ ...base, type: "contacts", body: JSON.stringify(simplificados) });
+        } else if (tipo === "reaction") {
+          // context_wa_id aqui aponta pra mensagem REAGIDA (reaproveita a mesma coluna da
+          // citação/reply) — body guarda só o emoji (vazio = reação removida).
+          await db.insertMessage({
+            ...base,
+            type: "reaction",
+            body: msg.reaction?.emoji || "",
+            context_wa_id: msg.reaction?.message_id || null,
+          });
         } else {
           await db.insertMessage({ ...base, type: tipo, body: `[mensagem do tipo ${tipo}]` });
         }
@@ -5482,12 +5514,14 @@ const server = http.createServer(async (req, res) => {
     // (salvarImagemPublicar/salvarVideoPublicar/... + /publicar-media/).
     const matchReply = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/reply$/);
     if (req.method === "POST" && matchReply) {
-      if (!requireAuth(req, res)) return;
+      const usuarioAtual = requireAuth(req, res);
+      if (!usuarioAtual) return;
       const businessId = decodeURIComponent(matchReply[1]);
       const phoneParam = decodeURIComponent(matchReply[2]);
       const phone = businessId === "instagram" ? phoneParam : normalizarTelefoneBR(phoneParam);
       const body = await parseBody(req);
       const texto = (body.text || "").trim();
+      const replyToWaId = typeof body.replyToWaId === "string" ? body.replyToWaId : null;
       if (!texto && !body.imagemBase64 && !body.videoBase64 && !body.audioBase64 && !body.documentBase64) {
         return send(res, 400, { error: "Mensagem vazia" });
       }
@@ -5550,7 +5584,7 @@ const server = http.createServer(async (req, res) => {
           ? await wa.sendAudio(businessId, phone, audioUrl)
           : documentUrl
           ? await wa.sendDocument(businessId, phone, documentUrl, body.documentNome || undefined, texto || undefined)
-          : await wa.sendText(businessId, phone, texto);
+          : await wa.sendText(businessId, phone, texto, replyToWaId || undefined);
       } catch (err) {
         return send(res, 502, { error: `Falha ao enviar pelo WhatsApp: ${err.message}` });
       }
@@ -5568,10 +5602,13 @@ const server = http.createServer(async (req, res) => {
         media_path: imagemUrl || videoUrl || audioUrl || documentUrl,
         wa_message_id: waId,
         status: "sent",
-        // origem 'humano' = veio do reply do painel (uma pessoa digitou) — usado pra medir
-        // "tempo até resposta humana" no Analytics, sem confundir com resposta automática do
-        // fluxo (ver comentário na migração de messages.origem em db.js).
-        origem: "humano",
+        // origem = nome de quem está logado (veio do reply do painel, uma pessoa digitou) —
+        // usado pra medir "tempo até resposta humana" no Analytics (qualquer valor não-nulo conta
+        // como humano, ver exportação de conversa) e pra montar o "Por atendente" (mensagens por
+        // pessoa). "humano" como fallback cobre o login único antigo (PAINEL_USER/PAINEL_PASS),
+        // que não tem nome de pessoa associado.
+        origem: usuarioAtual.nome || "humano",
+        context_wa_id: replyToWaId,
         created_at: now,
       });
       return send(res, 200, { ok: true });
@@ -5784,15 +5821,84 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, await db.atividadesDaConversa(decodeURIComponent(matchAtividades[1]), decodeURIComponent(matchAtividades[2])));
     }
 
-    // GET /painel/api/analytics/:businessId?dias=7 — métricas de atendimento (ver db.analyticsResumo)
+    // Mescla o resultado de db.analyticsResumo de vários canais num resumo só — somas pra
+    // contagens, média PONDERADA (pelo nº de amostras de cada canal, não média simples) pros
+    // tempos, e listas (porStatus/porTag/porEstagio/porDirecao/porHora/porAtendente/porDia)
+    // agrupadas por chave somando os totais. `porCanal` é novo aqui: dá o total de conversas de
+    // cada canal separado, pra mostrar a barra de "Todos os canais" (ver analytics.tsx).
+    function mesclarAnalytics(porCanalLista) {
+      const soma = (campo) => porCanalLista.reduce((acc, c) => acc + (c.dados[campo] || 0), 0);
+      const mediaPonderada = (campoMedia, campoAmostras) => {
+        const totalAmostras = soma(campoAmostras);
+        if (!totalAmostras) return null;
+        const somaPonderada = porCanalLista.reduce(
+          (acc, c) => acc + (c.dados[campoMedia] || 0) * (c.dados[campoAmostras] || 0),
+          0,
+        );
+        return somaPonderada / totalAmostras;
+      };
+      function mesclarListaPorChave(campo, chave) {
+        const mapa = new Map();
+        for (const c of porCanalLista) {
+          for (const item of c.dados[campo] || []) {
+            const k = item[chave];
+            const atual = mapa.get(k) || { ...item };
+            if (mapa.has(k)) {
+              for (const campoNum of Object.keys(item)) {
+                if (campoNum === chave) continue;
+                if (typeof item[campoNum] === "number") atual[campoNum] = (atual[campoNum] || 0) + item[campoNum];
+              }
+            }
+            mapa.set(k, atual);
+          }
+        }
+        return Array.from(mapa.values());
+      }
+      const totalConversas = soma("totalConversas");
+      const conversasResolvidas = soma("conversasResolvidas");
+      return {
+        totalConversas,
+        novasConversas: soma("novasConversas"),
+        conversasResolvidas,
+        taxaResolucao: totalConversas > 0 ? conversasResolvidas / totalConversas : null,
+        tempoMedioRespostaHumanaMs: mediaPonderada("tempoMedioRespostaHumanaMs", "amostrasRespostaHumana"),
+        amostrasRespostaHumana: soma("amostrasRespostaHumana"),
+        tempoMedioResolucaoMs: mediaPonderada("tempoMedioResolucaoMs", "amostrasResolucao"),
+        amostrasResolucao: soma("amostrasResolucao"),
+        porStatus: mesclarListaPorChave("porStatus", "status"),
+        porTag: mesclarListaPorChave("porTag", "nome"),
+        porEstagio: mesclarListaPorChave("porEstagio", "estagio"),
+        porDia: mesclarListaPorChave("porDia", "dia"),
+        porDirecao: mesclarListaPorChave("porDirecao", "direction"),
+        porHora: mesclarListaPorChave("porHora", "hora"),
+        porAtendente: mesclarListaPorChave("porAtendente", "atendente"),
+        porCanal: porCanalLista.map((c) => ({
+          id: c.id,
+          label: PHONE_NUMBERS.find((n) => n.id === c.id)?.label || (c.id === "instagram" ? "Instagram" : c.id),
+          totalConversas: c.dados.totalConversas || 0,
+        })),
+      };
+    }
+
+    // GET /painel/api/analytics/:businessIds?dias=7 — métricas de atendimento (ver
+    // db.analyticsResumo). `:businessIds` aceita 1 ou vários ids separados por vírgula (ver
+    // "Todos os canais" no Analytics) — cada um é consultado separado (analyticsResumo continua
+    // por canal, mais simples e mais barato de ler no Turso) e os resultados são somados/
+    // mesclados aqui, sem duplicar a lógica de SQL por canal.
     const matchAnalytics = path_.match(/^\/painel\/api\/analytics\/([^/]+)$/);
     if (req.method === "GET" && matchAnalytics) {
       if (!requireAuth(req, res)) return;
       const dias = Math.max(1, Math.min(365, Number(url.searchParams.get("dias")) || 30));
       const ate = Date.now();
       const desde = ate - dias * 24 * 60 * 60 * 1000;
-      const dados = await db.analyticsResumo(decodeURIComponent(matchAnalytics[1]), desde, ate);
-      return send(res, 200, { ...dados, dias, desde, ate });
+      const ids = decodeURIComponent(matchAnalytics[1]).split(",").filter(Boolean);
+      const porCanalLista = await Promise.all(
+        ids.map(async (id) => ({ id, dados: await db.analyticsResumo(id, desde, ate) })),
+      );
+      if (porCanalLista.length === 1) {
+        return send(res, 200, { ...porCanalLista[0].dados, dias, desde, ate });
+      }
+      return send(res, 200, { ...mesclarAnalytics(porCanalLista), dias, desde, ate });
     }
 
     // GET /painel/api/conversations/:businessId/buscar?q=... — busca texto dentro das mensagens
@@ -6457,7 +6563,7 @@ const server = http.createServer(async (req, res) => {
         const nomeContato = conversa?.name || phone;
         const linhas = mensagens.map((m) => {
           const quando = new Date(m.created_at).toLocaleString("pt-BR");
-          const quem = m.direction === "in" ? nomeContato : m.origem === "humano" ? "Atendente" : "Automático";
+          const quem = m.direction === "in" ? nomeContato : m.origem ? `Atendente (${m.origem === "humano" ? "painel" : m.origem})` : "Automático";
           const corpo = (m.body || `[${m.type}]`).replace(/</g, "&lt;").replace(/\n/g, "<br>");
           return `<p style="margin:0 0 10px"><strong>${quem}</strong> <span style="color:#888">${quando}</span><br>${corpo}</p>`;
         });

@@ -44,7 +44,9 @@ function graphRequest(method, hostname, requestPath, { headers = {}, body } = {}
   });
 }
 
-async function sendText(fromPhoneNumberId, to, text) {
+// `contextMessageId` (opcional) = wa_message_id de uma mensagem anterior — citada/"reply" no
+// WhatsApp, igual responder em cima de uma mensagem específica no app oficial.
+async function sendText(fromPhoneNumberId, to, text, contextMessageId) {
   garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
@@ -56,6 +58,7 @@ async function sendText(fromPhoneNumberId, to, text) {
         to,
         type: "text",
         text: { body: text },
+        ...(contextMessageId ? { context: { message_id: contextMessageId } } : {}),
       },
     }
   );

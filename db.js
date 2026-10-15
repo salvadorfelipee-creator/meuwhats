@@ -224,6 +224,11 @@ const ready = (async () => {
   if (!infoMessagesOrigem.rows.some((r) => r.name === "origem")) {
     await client.execute(`ALTER TABLE messages ADD COLUMN origem TEXT`);
   }
+  // context_wa_id = wa_message_id da mensagem CITADA ("reply" em cima de uma mensagem
+  // específica, igual o app oficial do WhatsApp) — null na imensa maioria das mensagens.
+  if (!infoMessagesOrigem.rows.some((r) => r.name === "context_wa_id")) {
+    await client.execute(`ALTER TABLE messages ADD COLUMN context_wa_id TEXT`);
+  }
 
   // Tags (etiquetas) — livres, criadas pelo time, várias por conversa. Só usadas hoje no
   // número principal da Felizcred, mas a tabela já é multi-canal (business_number_id) pra
@@ -1591,12 +1596,13 @@ async function insertMessage(msg) {
     status = null,
     wa_message_id = null,
     origem = null,
+    context_wa_id = null,
     created_at,
   } = msg;
   const result = await client.execute({
-    sql: `INSERT INTO messages (phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, origem, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, origem, created_at],
+    sql: `INSERT INTO messages (phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, origem, context_wa_id, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [phone, business_number_id, direction, type, body, media_path, media_mime, status, wa_message_id, origem, context_wa_id, created_at],
   });
   if (direction === "in") {
     // Marca a hora da mensagem DO CLIENTE, separado de last_message_at (que conta qualquer
@@ -2953,6 +2959,32 @@ async function analyticsResumo(businessNumberId, desde, ate) {
     args: [businessNumberId, desde, ate],
   });
 
+  // Histograma de hora do dia (0-23h, horário de Brasília) — pra decisão de plantão/escala:
+  // em que horas o movimento de mensagem é maior.
+  const porHoraQ = await client.execute({
+    sql: `
+      SELECT CAST(strftime('%H', (created_at / 1000) - ${TZ_BRASIL_OFFSET_SEGUNDOS}, 'unixepoch') AS INTEGER) AS hora,
+        COUNT(*) AS total
+      FROM messages
+      WHERE business_number_id = ? AND created_at BETWEEN ? AND ?
+      GROUP BY hora ORDER BY hora
+    `,
+    args: [businessNumberId, desde, ate],
+  });
+
+  // Mensagens enviadas por atendente (messages.origem = nome de quem respondeu pelo painel, ver
+  // POST .../reply) — precisa do login por pessoa pra fazer sentido; quem usa só o login único
+  // antigo aparece agrupado como "humano".
+  const porAtendenteQ = await client.execute({
+    sql: `
+      SELECT origem AS atendente, COUNT(*) AS mensagens, COUNT(DISTINCT phone) AS conversas
+      FROM messages
+      WHERE business_number_id = ? AND direction = 'out' AND origem IS NOT NULL AND created_at BETWEEN ? AND ?
+      GROUP BY origem ORDER BY mensagens DESC
+    `,
+    args: [businessNumberId, desde, ate],
+  });
+
   const totalConversas = totalConversasQ.rows[0]?.total || 0;
   const resolvidas = resolvidasQ.rows[0]?.total || 0;
 
@@ -2970,6 +3002,8 @@ async function analyticsResumo(businessNumberId, desde, ate) {
     porEstagio: porEstagioQ.rows,
     porDia: porDiaQ.rows,
     porDirecao: porDirecaoQ.rows,
+    porHora: porHoraQ.rows,
+    porAtendente: porAtendenteQ.rows,
   };
 }
 

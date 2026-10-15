@@ -83,7 +83,17 @@ import {
   Wand2,
   RefreshCw,
   ExternalLink,
+  Reply,
+  Play,
+  Pause,
+  Maximize2,
+  MapPin,
+  User,
 } from "lucide-react"
+
+// Emoji picker — dataset grande (emoji-picker-react), carregado só quando alguém de fato abre o
+// seletor (clica no botão "😊"), nunca no carregamento inicial da tela de conversas.
+const EmojiPickerLazy = React.lazy(() => import("emoji-picker-react"))
 
 const STATUS_LABEL: Record<string, string> = {
   novo: "Novo",
@@ -161,6 +171,23 @@ function formatGravacao(segundos: number): string {
 const AUDIO_MIME_PREFERIDO = "audio/ogg;codecs=opus"
 const AUDIO_MIME_FALLBACK = "audio/webm;codecs=opus"
 
+// Janela padrão de histórico carregado por conversa (ver api.messages) — "Carregar mensagens
+// mais antigas" dobra essa janela a cada clique, em vez de reler a conversa inteira do zero.
+const JANELA_HISTORICO_MS = 60 * 24 * 60 * 60 * 1000
+
+// Tipos de mensagem que o backend só grava como texto genérico "[mensagem do tipo X]" (ver
+// server.js — só text/button/interactive/image/audio/video/document têm tratamento dedicado;
+// location/contacts/reaction/sticker caem no else e não guardam coordenada/vCard/alvo da
+// reação/mídia nenhuma). Sem esse dado real não dá pra desenhar mapa/vCard/indicador de reação
+// de verdade — só dá pra deixar o rótulo genérico um pouco mais legível que o texto em colchetes.
+const TIPO_SEM_DADOS_LABEL: Record<string, string> = {
+  location: "📍 Localização enviada",
+  contacts: "👤 Contato compartilhado",
+  reaction: "❤️ Reagiu a uma mensagem",
+  sticker: "🙂 Figurinha",
+  unsupported: "⚠️ Mensagem não suportada pelo WhatsApp",
+}
+
 export function ChatsPage() {
   const { channels, current, setCurrent } = useChannel()
   const {
@@ -180,6 +207,8 @@ export function ChatsPage() {
   const [texto, setTexto] = React.useState("")
   const [enviando, setEnviando] = React.useState(false)
   const [respostas, setRespostas] = React.useState<RespostaPronta[]>([])
+  const [respostasMenuOpen, setRespostasMenuOpen] = React.useState(false)
+  const [respostaEditando, setRespostaEditando] = React.useState<RespostaPronta | null>(null)
   // Painel de detalhes do contato fica FIXO ao lado da conversa por padrão (pedido do usuário —
   // antes era um Sheet que precisava clicar pra abrir toda vez); o ícone "i" só recolhe/expande
   // pra quem quiser mais espaço pra tela de chat.
@@ -187,6 +216,32 @@ export function ChatsPage() {
   const [broadcastOpen, setBroadcastOpen] = React.useState(false)
   const [mostrarFinalizadas, setMostrarFinalizadas] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
+
+  // Mensagem selecionada pra "responder" (reply citando, estilo WhatsApp) — ver api.reply
+  // (replyToWaId) e o strip de preview acima do composer.
+  const [replyTo, setReplyTo] = React.useState<Message | null>(null)
+
+  // Janela de histórico carregado (ver api.messages com desde/ate) — evita reler a conversa
+  // inteira em todo poll; "Carregar mensagens mais antigas" dobra a janela por clique.
+  const [janelaDesde, setJanelaDesde] = React.useState(() => Date.now() - JANELA_HISTORICO_MS)
+  const [carregandoAntigas, setCarregandoAntigas] = React.useState(false)
+  const [semMaisAntigas, setSemMaisAntigas] = React.useState(false)
+  // Guarda o scrollHeight de ANTES de prependar mensagens antigas, pra compensar o scroll depois
+  // que o DOM crescer (ver efeito de `messages` mais abaixo) — sem isso a rolagem "salta".
+  const scrollAjusteRef = React.useRef<number | null>(null)
+
+  // Visualizador em tela cheia pra imagem/vídeo (lightbox) — overlay próprio, não usa o Dialog
+  // (o Dialog tem padding/max-height pensados pra formulário, não pra mídia em tela cheia).
+  const [lightbox, setLightbox] = React.useState<{ url: string; tipo: "image" | "video" } | null>(null)
+
+  // Seletor de emoji (emoji-picker-react, lazy) — insere no textarea na posição do cursor.
+  const [emojiOpen, setEmojiOpen] = React.useState(false)
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+
+  // Corretor por-trecho (Gemini) — debounce de 900ms depois que a pessoa para de digitar.
+  const [correcoes, setCorrecoes] = React.useState<{ errado: string; certo: string }[]>([])
+  const [corretorErro, setCorretorErro] = React.useState<string | null>(null)
+  const corretorTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Gravação de áudio (nota de voz real, pelo microfone do navegador)
   const [gravando, setGravando] = React.useState(false)
@@ -200,9 +255,13 @@ export function ChatsPage() {
   const [buscaTexto, setBuscaTexto] = React.useState("")
   const [buscaIndex, setBuscaIndex] = React.useState(0)
 
-  React.useEffect(() => {
+  const carregarRespostas = React.useCallback(() => {
     api.respostasProntas().then(setRespostas).catch(() => {})
   }, [])
+
+  React.useEffect(() => {
+    carregarRespostas()
+  }, [carregarRespostas])
 
   const carregarConversas = React.useCallback(() => {
     if (!current) return
@@ -224,8 +283,36 @@ export function ChatsPage() {
 
   const carregarMensagens = React.useCallback(() => {
     if (!current || !selected) return
-    api.messages(current.id, selected).then(setMessages).catch(() => {})
-  }, [current, selected])
+    // Janela (não a conversa inteira) — ver JANELA_HISTORICO_MS acima. O poll de 5s (mais
+    // abaixo) chama essa mesma função, então ele também já respeita a janela atual, nunca relê
+    // tudo do início.
+    api.messages(current.id, selected, { desde: janelaDesde }).then(setMessages).catch(() => {})
+  }, [current, selected, janelaDesde])
+
+  // Busca o próximo bloco de mensagens mais antigas (dobra a janela) e prependa sem perder a
+  // posição de rolagem. Interrompe sozinho (semMaisAntigas) quando um bloco vem vazio.
+  async function carregarMensagensMaisAntigas() {
+    if (!current || !selected || carregandoAntigas || semMaisAntigas) return
+    setCarregandoAntigas(true)
+    const novoDesde = janelaDesde - JANELA_HISTORICO_MS
+    try {
+      const antigas = await api.messages(current.id, selected, { desde: novoDesde, ate: janelaDesde - 1 })
+      if (antigas.length === 0) {
+        setSemMaisAntigas(true)
+      } else {
+        scrollAjusteRef.current = scrollRef.current?.scrollHeight ?? null
+        setMessages((prev) => {
+          const idsExistentes = new Set(prev.map((m) => m.id))
+          return [...antigas.filter((m) => !idsExistentes.has(m.id)), ...prev]
+        })
+        setJanelaDesde(novoDesde)
+      }
+    } catch {
+      // silencioso — o botão continua visível pra tentar de novo
+    } finally {
+      setCarregandoAntigas(false)
+    }
+  }
 
   // Marca como lida no servidor SÓ quando a conversa está selecionada e a aba tem foco de
   // verdade — nunca a partir do polling de mensagens sozinho (ver comentário em server.js).
@@ -263,12 +350,22 @@ export function ChatsPage() {
     limparAlvoAbrir()
   }, [alvoAbrir, current, limparAlvoAbrir])
 
+  // Troca de conversa reseta a janela de histórico, a trava de "sem mais antigas" e qualquer
+  // reply pendente — nenhum desses estados deve sobreviver pra conversa seguinte.
+  React.useEffect(() => {
+    setJanelaDesde(Date.now() - JANELA_HISTORICO_MS)
+    setSemMaisAntigas(false)
+    setReplyTo(null)
+  }, [selected])
+
   React.useEffect(() => {
     carregarMensagens()
   }, [selected, carregarMensagens])
 
   React.useEffect(() => {
+    // Pausa com a aba em segundo plano (mesmo princípio usado em agenda.tsx/hoje.tsx/etc.).
     const id = setInterval(() => {
+      if (document.hidden) return
       carregarConversas()
       carregarMensagens()
       marcarLidaSeEmFoco()
@@ -308,8 +405,19 @@ export function ChatsPage() {
   }, [selected])
 
   React.useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    // "Carregar mensagens mais antigas" guardou o scrollHeight de antes de prependar — compensa
+    // exatamente o quanto o conteúdo cresceu lá em cima, em vez de rolar pro final ou ficar parado
+    // no topo (que empurraria visualmente a conversa pra baixo/cima sem o usuário pedir).
+    if (scrollAjusteRef.current != null) {
+      const diff = el.scrollHeight - scrollAjusteRef.current
+      el.scrollTop += diff
+      scrollAjusteRef.current = null
+      return
+    }
     if (nearBottomRef.current) {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+      el.scrollTo({ top: el.scrollHeight })
     }
   }, [messages])
 
@@ -324,8 +432,12 @@ export function ChatsPage() {
     if (!current || !selected || !texto.trim()) return
     setEnviando(true)
     try {
-      await api.reply(current.id, selected, texto.trim())
+      // replyTo (citar mensagem) só tem efeito de verdade pro WhatsApp em texto puro, sem mídia —
+      // ver api.reply. Limpa de qualquer forma depois de enviar (sucesso ou não faz sentido
+      // manter citando a mesma mensagem indefinidamente).
+      await api.reply(current.id, selected, texto.trim(), undefined, replyTo?.wa_message_id ?? null)
       setTexto("")
+      setReplyTo(null)
       carregarMensagens()
       carregarConversas()
     } catch (err) {
@@ -364,6 +476,61 @@ export function ChatsPage() {
     } finally {
       setEnviando(false)
     }
+  }
+
+  // Insere o emoji escolhido na posição do cursor do textarea (cursor-aware) — cai pra "só
+  // concatenar no fim" se por algum motivo não tiver a ref do textarea ainda.
+  function inserirEmoji(emoji: string) {
+    const el = textareaRef.current
+    if (!el) {
+      setTexto((t) => t + emoji)
+      return
+    }
+    const inicio = el.selectionStart ?? texto.length
+    const fim = el.selectionEnd ?? texto.length
+    setTexto(texto.slice(0, inicio) + emoji + texto.slice(fim))
+    requestAnimationFrame(() => {
+      el.focus()
+      const novaPos = inicio + emoji.length
+      el.setSelectionRange(novaPos, novaPos)
+    })
+  }
+
+  // Corretor por-trecho (Gemini) — dispara ~900ms depois que a pessoa para de digitar. Nunca
+  // tenta de novo sozinho em caso de erro (ex.: GEMINI_API_KEY não configurada): só mostra um
+  // aviso curto e espera a próxima mudança de texto pra tentar outra vez.
+  React.useEffect(() => {
+    if (corretorTimerRef.current) clearTimeout(corretorTimerRef.current)
+    if (!texto.trim()) {
+      setCorrecoes([])
+      setCorretorErro(null)
+      return
+    }
+    corretorTimerRef.current = setTimeout(() => {
+      api
+        .corrigirTexto(texto)
+        .then((r) => {
+          setCorrecoes(r.correcoes || [])
+          setCorretorErro(null)
+        })
+        .catch(() => {
+          setCorrecoes([])
+          setCorretorErro("corretor indisponível")
+        })
+    }, 900)
+    return () => {
+      if (corretorTimerRef.current) clearTimeout(corretorTimerRef.current)
+    }
+  }, [texto])
+
+  // Aplica uma correção clicada — troca só a 1ª ocorrência exata do trecho errado (é a mesma
+  // ocorrência que foi medida/posicionada pelo balão, ver CorretorBaloes).
+  function aplicarCorrecao(correcao: { errado: string; certo: string }) {
+    setTexto((t) => {
+      const idx = t.indexOf(correcao.errado)
+      if (idx === -1) return t
+      return t.slice(0, idx) + correcao.certo + t.slice(idx + correcao.errado.length)
+    })
   }
 
   // Solta o microfone se a página fechar/trocar de tela com uma gravação em andamento —
@@ -493,6 +660,16 @@ export function ChatsPage() {
     if (status === "resolvido" && !mostrarFinalizadas) setSelected(null)
     carregarConversas()
   }
+
+  // Esc fecha o lightbox de mídia em tela cheia.
+  React.useEffect(() => {
+    if (!lightbox) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setLightbox(null)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [lightbox])
 
   if (!current) {
     return (
@@ -771,60 +948,175 @@ export function ChatsPage() {
 
             {/* Mensagens */}
             <div ref={scrollRef} onScroll={handleScrollMensagens} className="flex-1 overflow-y-auto px-4 py-3">
-              <div className="flex flex-col gap-2">
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    id={`msg-${m.id}`}
-                    className={`max-w-[70%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${
-                      m.direction === "out"
-                        ? "bg-primary text-primary-foreground self-end"
-                        : "bg-secondary text-secondary-foreground self-start"
-                    } ${
-                      mensagensEncontradas[buscaIndex] === m.id ? "ring-2 ring-yellow-400 ring-offset-1" : ""
-                    }`}
+              {messages.length > 0 && !semMaisAntigas && (
+                <div className="flex justify-center pb-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground"
+                    disabled={carregandoAntigas}
+                    onClick={carregarMensagensMaisAntigas}
                   >
-                    {m.type === "image" && m.media_path && (
-                      <img
-                        src={mediaUrl(m.media_path)}
-                        alt=""
-                        className="rounded mb-1 max-w-[280px] max-h-[360px] w-auto h-auto object-contain cursor-pointer"
-                        onClick={() => window.open(mediaUrl(m.media_path), "_blank")}
-                      />
-                    )}
-                    {m.type === "video" && m.media_path && (
-                      <video src={mediaUrl(m.media_path)} controls className="rounded mb-1 max-w-[280px] max-h-[360px] w-auto h-auto" />
-                    )}
-                    {m.type === "audio" && m.media_path && (
-                      <audio src={mediaUrl(m.media_path)} controls className="mb-1 max-w-[280px] w-full" />
-                    )}
-                    {m.type === "document" && m.media_path && (
-                      <a
-                        href={mediaUrl(m.media_path)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center gap-2 mb-1 rounded bg-black/10 px-3 py-2 hover:bg-black/20"
+                    {carregandoAntigas ? "Carregando..." : "Carregar mensagens mais antigas"}
+                  </Button>
+                </div>
+              )}
+              <div className="flex flex-col gap-2">
+                {messages.map((m) => {
+                  const original = m.context_wa_id
+                    ? messages.find((o) => o.wa_message_id === m.context_wa_id)
+                    : null
+                  const semDadosLabel = TIPO_SEM_DADOS_LABEL[m.type]
+                  return (
+                    <div
+                      key={m.id}
+                      id={`msg-${m.id}`}
+                      className={`group relative max-w-[70%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${
+                        m.direction === "out"
+                          ? "bg-primary text-primary-foreground self-end"
+                          : "bg-secondary text-secondary-foreground self-start"
+                      } ${
+                        mensagensEncontradas[buscaIndex] === m.id ? "ring-2 ring-yellow-400 ring-offset-1" : ""
+                      }`}
+                    >
+                      {/* Responder — só mostra no hover, pra não poluir a tela toda. */}
+                      <button
+                        type="button"
+                        title="Responder"
+                        onClick={() => setReplyTo(m)}
+                        className={`absolute -top-2.5 ${
+                          m.direction === "out" ? "-left-2.5" : "-right-2.5"
+                        } h-5 w-5 rounded-full border bg-background shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground`}
                       >
-                        <FileText className="h-5 w-5 shrink-0" />
-                        <span className="truncate underline min-w-0 flex-1">{m.body || "Documento"}</span>
-                      </a>
-                    )}
-                    {(m.type !== "document" || !m.media_path) &&
-                      (m.body && buscaTexto.trim() ? destacarTexto(m.body, buscaTexto) : m.body)}
-                    {m.status === "failed" && (
-                      <div className="text-[11px] mt-1 text-red-200 flex items-start gap-1">
-                        <span>⚠️</span>
-                        <span>Não entregue{m.error_message ? `: ${m.error_message}` : ""}</span>
+                        <Reply className="h-3 w-3" />
+                      </button>
+
+                      {original && (
+                        <div
+                          className={`mb-1 rounded-md border-l-2 px-2 py-1 text-xs truncate opacity-80 ${
+                            m.direction === "out" ? "bg-black/10 border-white/50" : "bg-black/5 border-foreground/30"
+                          }`}
+                        >
+                          {(original.body || "Mídia").split("\n")[0].slice(0, 80)}
+                        </div>
+                      )}
+
+                      {(m.type === "image" || m.type === "sticker") && m.media_path && (
+                        <img
+                          src={mediaUrl(m.media_path)}
+                          alt=""
+                          className={`rounded mb-1 object-contain cursor-pointer ${
+                            m.type === "sticker" ? "max-w-[140px] max-h-[140px] w-auto h-auto" : "max-w-[280px] max-h-[360px] w-auto h-auto"
+                          }`}
+                          onClick={() => setLightbox({ url: mediaUrl(m.media_path), tipo: "image" })}
+                        />
+                      )}
+                      {m.type === "location" &&
+                        (() => {
+                          let loc: { latitude?: number; longitude?: number; name?: string | null; address?: string | null } = {}
+                          try {
+                            loc = m.body ? JSON.parse(m.body) : {}
+                          } catch {
+                            // body não era o JSON esperado — cai no rótulo genérico abaixo
+                          }
+                          if (loc.latitude == null || loc.longitude == null) return semDadosLabel
+                          return (
+                            <a
+                              href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-2 mb-1 rounded bg-black/10 px-3 py-2 hover:bg-black/20"
+                            >
+                              <MapPin className="h-5 w-5 shrink-0" />
+                              <span className="truncate underline min-w-0 flex-1">{loc.name || loc.address || "Ver localização"}</span>
+                            </a>
+                          )
+                        })()}
+                      {m.type === "contacts" &&
+                        (() => {
+                          let lista: { nome: string | null; telefone: string | null }[] = []
+                          try {
+                            lista = m.body ? JSON.parse(m.body) : []
+                          } catch {
+                            // body não era o JSON esperado
+                          }
+                          if (!lista.length) return semDadosLabel
+                          return (
+                            <div className="flex flex-col gap-1">
+                              {lista.map((c, i) => (
+                                <div key={i} className="flex items-center gap-2 rounded bg-black/10 px-3 py-2">
+                                  <User className="h-4 w-4 shrink-0" />
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium">{c.nome || "Contato"}</p>
+                                    {c.telefone && <p className="text-xs opacity-80">{c.telefone}</p>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        })()}
+                      {m.type === "reaction" && (m.body ? `${m.body} reagiu a uma mensagem` : "Reação removida")}
+                      {m.type === "video" && m.media_path && (
+                        <div className="relative mb-1 w-fit">
+                          <video src={mediaUrl(m.media_path)} controls className="rounded max-w-[280px] max-h-[360px] w-auto h-auto" />
+                          <button
+                            type="button"
+                            title="Ver em tela cheia"
+                            onClick={() => setLightbox({ url: mediaUrl(m.media_path), tipo: "video" })}
+                            className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70"
+                          >
+                            <Maximize2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                      {m.type === "audio" && m.media_path && <AudioPlayerMensagem src={mediaUrl(m.media_path)} />}
+                      {m.type === "document" && m.media_path && (
+                        <a
+                          href={mediaUrl(m.media_path)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2 mb-1 rounded bg-black/10 px-3 py-2 hover:bg-black/20"
+                        >
+                          <FileText className="h-5 w-5 shrink-0" />
+                          <span className="truncate underline min-w-0 flex-1">{m.body || "Documento"}</span>
+                        </a>
+                      )}
+                      {(m.type !== "document" || !m.media_path) &&
+                        !["sticker", "location", "contacts", "reaction"].includes(m.type) &&
+                        (semDadosLabel
+                          ? semDadosLabel
+                          : m.body && buscaTexto.trim()
+                          ? destacarTexto(m.body, buscaTexto)
+                          : m.body)}
+                      {m.status === "failed" && (
+                        <div className="text-[11px] mt-1 text-red-200 flex items-start gap-1">
+                          <span>⚠️</span>
+                          <span>Não entregue{m.error_message ? `: ${m.error_message}` : ""}</span>
+                        </div>
+                      )}
+                      <div className="text-[10px] opacity-70 mt-1 text-right">
+                        {formatTime(m.created_at)}
+                        {m.direction === "out" && ` · ${m.origem || "Automático"}`}
+                        {m.direction === "out" && m.status && ` · ${m.status}`}
                       </div>
-                    )}
-                    <div className="text-[10px] opacity-70 mt-1 text-right">
-                      {formatTime(m.created_at)}
-                      {m.direction === "out" && m.status && ` · ${m.status}`}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
+
+            {/* Preview de "respondendo a" — some ao enviar ou ao cancelar (X). */}
+            {replyTo && (
+              <div className="flex items-center gap-2 px-4 py-1.5 border-t bg-muted/40 text-xs shrink-0">
+                <Reply className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="truncate flex-1 text-muted-foreground">
+                  Respondendo: {(replyTo.body || "Mídia").split("\n")[0].slice(0, 80)}
+                </span>
+                <button onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground shrink-0">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Composer */}
             {gravando ? (
@@ -842,67 +1134,121 @@ export function ChatsPage() {
                 </Button>
               </div>
             ) : (
-              <div className="flex items-end gap-1 p-2 border-t shrink-0">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <Smile className="h-4 w-4" />
+              <div className="flex flex-col border-t shrink-0">
+                <div className="flex items-end gap-1 p-2">
+                  <DropdownMenu open={respostasMenuOpen} onOpenChange={setRespostasMenuOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" title="Respostas prontas">
+                        <Smile className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto w-64">
+                      <DropdownMenuLabel>Respostas prontas</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {respostas.length === 0 && (
+                        <DropdownMenuItem disabled>Nenhuma cadastrada</DropdownMenuItem>
+                      )}
+                      {respostas.map((r) => (
+                        <DropdownMenuItem
+                          key={r.id}
+                          onSelect={(e) => e.preventDefault()}
+                          className="flex items-center justify-between gap-1"
+                        >
+                          <button
+                            className="flex-1 min-w-0 truncate text-left"
+                            onClick={() => {
+                              setTexto(r.texto)
+                              api.registrarUsoRespostaPronta(r.id).catch(() => {})
+                              setRespostasMenuOpen(false)
+                            }}
+                          >
+                            {r.atalho}
+                          </button>
+                          <button
+                            className="shrink-0 p-0.5 text-muted-foreground hover:text-foreground"
+                            title="Editar"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setRespostaEditando(r)
+                              setRespostasMenuOpen(false)
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <div className="relative">
+                    <Button variant="ghost" size="icon" title="Emoji" onClick={() => setEmojiOpen((v) => !v)}>
+                      <span className="text-base leading-none">😊</span>
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
-                    <DropdownMenuLabel>Respostas prontas</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {respostas.length === 0 && (
-                      <DropdownMenuItem disabled>Nenhuma cadastrada</DropdownMenuItem>
+                    {emojiOpen && (
+                      <>
+                        {/* Clique fora fecha o seletor — cobre a tela inteira atrás do picker. */}
+                        <div className="fixed inset-0 z-40" onClick={() => setEmojiOpen(false)} />
+                        <div className="absolute bottom-full left-0 z-50 mb-1">
+                          <React.Suspense
+                            fallback={<div className="h-10 w-10 flex items-center justify-center text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /></div>}
+                          >
+                            <EmojiPickerLazy
+                              onEmojiClick={(data) => {
+                                inserirEmoji(data.emoji)
+                              }}
+                            />
+                          </React.Suspense>
+                        </div>
+                      </>
                     )}
-                    {respostas.map((r) => (
-                      <DropdownMenuItem key={r.id} onClick={() => setTexto(r.texto)}>
-                        {r.atalho}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  </div>
 
-                <label>
-                  <input
-                    type="file"
-                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) enviarMidia(file)
-                      e.target.value = ""
-                    }}
-                  />
-                  <Button variant="ghost" size="icon" asChild>
-                    <span>
-                      <Paperclip className="h-4 w-4" />
-                    </span>
-                  </Button>
-                </label>
+                  <label>
+                    <input
+                      type="file"
+                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) enviarMidia(file)
+                        e.target.value = ""
+                      }}
+                    />
+                    <Button variant="ghost" size="icon" asChild>
+                      <span>
+                        <Paperclip className="h-4 w-4" />
+                      </span>
+                    </Button>
+                  </label>
 
-                <Textarea
-                  value={texto}
-                  onChange={(e) => setTexto(e.target.value)}
-                  placeholder="Digite uma mensagem"
-                  className="min-h-9 flex-1 resize-none"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      enviar()
-                    }
-                  }}
-                />
-                {texto.trim() ? (
-                  <Button size="icon" onClick={enviar} disabled={enviando}>
-                    <Send className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button size="icon" variant="ghost" onClick={iniciarGravacao} disabled={enviando} title="Gravar áudio">
-                    <Mic className="h-4 w-4" />
-                  </Button>
-                )}
+                  <div className="relative flex-1">
+                    <Textarea
+                      ref={textareaRef}
+                      value={texto}
+                      onChange={(e) => setTexto(e.target.value)}
+                      placeholder="Digite uma mensagem"
+                      className="min-h-9 w-full resize-none"
+                      rows={1}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          enviar()
+                        }
+                      }}
+                    />
+                    <CorretorBaloes textareaRef={textareaRef} texto={texto} correcoes={correcoes} onAplicar={aplicarCorrecao} />
+                  </div>
+                  {texto.trim() ? (
+                    <Button size="icon" onClick={enviar} disabled={enviando}>
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button size="icon" variant="ghost" onClick={iniciarGravacao} disabled={enviando} title="Gravar áudio">
+                      <Mic className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {corretorErro && <p className="text-[10px] text-muted-foreground px-3 pb-1.5">{corretorErro}</p>}
               </div>
             )}
           </div>
@@ -927,7 +1273,290 @@ export function ChatsPage() {
       )}
 
       <BroadcastDialog open={broadcastOpen} onOpenChange={setBroadcastOpen} />
+      <EditarRespostaProntaDialog
+        resposta={respostaEditando}
+        onOpenChange={(open) => !open && setRespostaEditando(null)}
+        onSaved={carregarRespostas}
+      />
+
+      {/* Lightbox — overlay próprio (não é o componente Dialog) pra ocupar a tela inteira sem
+          disputar com o padding/max-height pensados pra formulário. */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/80 hover:text-white"
+            onClick={() => setLightbox(null)}
+            title="Fechar"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          {lightbox.tipo === "image" ? (
+            <img
+              src={lightbox.url}
+              alt=""
+              className="max-w-full max-h-full object-contain"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <video
+              src={lightbox.url}
+              controls
+              autoPlay
+              className="max-w-full max-h-full"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
+      )}
     </div>
+  )
+}
+
+// Editar (renomear atalho/retexto) uma resposta pronta já existente — antes só dava pra
+// criar/excluir. Dialog controlado separado do DropdownMenu (ver uso em ChatsPage): fechar o
+// menu de respostas e abrir esse dialog evita a complicação de um botão dentro de um item de
+// menu do Radix fechar a coisa errada.
+function EditarRespostaProntaDialog({
+  resposta,
+  onOpenChange,
+  onSaved,
+}: {
+  resposta: RespostaPronta | null
+  onOpenChange: (open: boolean) => void
+  onSaved: () => void
+}) {
+  const [atalho, setAtalho] = React.useState("")
+  const [texto, setTexto] = React.useState("")
+  const [salvando, setSalvando] = React.useState(false)
+  const [erro, setErro] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (resposta) {
+      setAtalho(resposta.atalho)
+      setTexto(resposta.texto)
+      setErro(null)
+    }
+  }, [resposta])
+
+  async function salvar() {
+    if (!resposta || !atalho.trim() || !texto.trim()) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      await api.atualizarRespostaPronta(resposta.id, atalho.trim(), texto.trim())
+      onSaved()
+      onOpenChange(false)
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Erro ao salvar")
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Dialog open={!!resposta} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Editar resposta pronta</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Atalho</label>
+            <Input value={atalho} onChange={(e) => setAtalho(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Texto</label>
+            <Textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={4} />
+          </div>
+          {erro && <p className="text-sm text-destructive">{erro}</p>}
+        </div>
+        <DialogFooter>
+          <Button onClick={salvar} disabled={salvando || !atalho.trim() || !texto.trim()}>
+            {salvando ? "Salvando..." : "Salvar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Player de áudio simples (play/pause + barra de progresso) no lugar do <audio controls> nativo
+// do navegador — só estética, o <audio> real por baixo continua sendo o mesmo elemento que já
+// funciona com mediaUrl() (Basic Auth via token).
+function AudioPlayerMensagem({ src }: { src: string }) {
+  const audioRef = React.useRef<HTMLAudioElement>(null)
+  const [tocando, setTocando] = React.useState(false)
+  const [duracao, setDuracao] = React.useState(0)
+  const [atual, setAtual] = React.useState(0)
+
+  function alternar() {
+    const a = audioRef.current
+    if (!a) return
+    if (a.paused) a.play().catch(() => {})
+    else a.pause()
+  }
+
+  const restante = Math.max(0, Math.round(duracao - atual))
+
+  return (
+    <div className="flex items-center gap-2 mb-1 w-full max-w-[260px]">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onPlay={() => setTocando(true)}
+        onPause={() => setTocando(false)}
+        onEnded={() => setTocando(false)}
+        onLoadedMetadata={(e) => setDuracao(e.currentTarget.duration || 0)}
+        onTimeUpdate={(e) => setAtual(e.currentTarget.currentTime || 0)}
+        className="hidden"
+      />
+      <button
+        type="button"
+        onClick={alternar}
+        className="h-7 w-7 shrink-0 rounded-full bg-black/10 hover:bg-black/20 flex items-center justify-center"
+      >
+        {tocando ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+      </button>
+      <div className="flex-1 h-1 rounded-full bg-black/15 overflow-hidden">
+        <div
+          className="h-full bg-current opacity-70"
+          style={{ width: duracao ? `${Math.min(100, (atual / duracao) * 100)}%` : "0%" }}
+        />
+      </div>
+      <span className="text-[10px] opacity-70 tabular-nums shrink-0">{formatGravacao(restante)}</span>
+    </div>
+  )
+}
+
+// ── Corretor por-trecho: balões posicionados em cima da palavra/expressão errada ──────────────
+//
+// Técnica: um <div> "espelho" invisível, absolutamente posicionado em cima do próprio textarea
+// (mesmo left/top/width/height, mesma fonte/padding/borda — copiados do computed style), com o
+// MESMO texto quebrando exatamente do mesmo jeito. Insere um <span> marcador em volta de cada
+// trecho "errado" e mede a posição desse span (getBoundingClientRect) relativa ao espelho — como
+// o espelho ocupa o mesmo retângulo de tela que o textarea de verdade, essa posição relativa já
+// é a posição certa pra desenhar o balão por cima do textarea real.
+function CorretorBaloes({
+  textareaRef,
+  texto,
+  correcoes,
+  onAplicar,
+}: {
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>
+  texto: string
+  correcoes: { errado: string; certo: string }[]
+  onAplicar: (correcao: { errado: string; certo: string }) => void
+}) {
+  const mirrorRef = React.useRef<HTMLDivElement>(null)
+  const [posicoes, setPosicoes] = React.useState<
+    { correcao: { errado: string; certo: string }; top: number; left: number }[]
+  >([])
+
+  const medir = React.useCallback(() => {
+    const ta = textareaRef.current
+    const mirror = mirrorRef.current
+    if (!ta || !mirror || correcoes.length === 0) {
+      setPosicoes([])
+      return
+    }
+    const cs = window.getComputedStyle(ta)
+    const propriedades = [
+      "fontFamily",
+      "fontSize",
+      "fontWeight",
+      "fontStyle",
+      "lineHeight",
+      "letterSpacing",
+      "paddingTop",
+      "paddingRight",
+      "paddingBottom",
+      "paddingLeft",
+      "borderTopWidth",
+      "borderRightWidth",
+      "borderBottomWidth",
+      "borderLeftWidth",
+      "boxSizing",
+      "textIndent",
+    ] as const
+    for (const prop of propriedades) {
+      mirror.style[prop as any] = cs[prop as any]
+    }
+    mirror.style.position = "absolute"
+    mirror.style.top = "0"
+    mirror.style.left = "0"
+    mirror.style.width = `${ta.offsetWidth}px`
+    mirror.style.height = `${ta.offsetHeight}px`
+    mirror.style.whiteSpace = "pre-wrap"
+    mirror.style.wordWrap = "break-word"
+    mirror.style.overflowWrap = "break-word"
+    mirror.style.overflow = "hidden"
+    mirror.scrollTop = ta.scrollTop
+
+    // Monta os trechos (texto comum / trecho marcado) na ordem em que aparecem, sem overlap —
+    // se duas correções caírem em cima da mesma faixa do texto, a 2ª é ignorada.
+    const ocorrencias = correcoes
+      .map((c) => ({ c, idx: texto.indexOf(c.errado) }))
+      .filter((o) => o.idx !== -1 && o.c.errado.length > 0)
+      .sort((a, b) => a.idx - b.idx)
+
+    mirror.innerHTML = ""
+    let cursor = 0
+    const spans: { el: HTMLSpanElement; correcao: { errado: string; certo: string } }[] = []
+    for (const { c, idx } of ocorrencias) {
+      if (idx < cursor) continue
+      if (idx > cursor) mirror.appendChild(document.createTextNode(texto.slice(cursor, idx)))
+      const span = document.createElement("span")
+      span.textContent = c.errado
+      mirror.appendChild(span)
+      spans.push({ el: span, correcao: c })
+      cursor = idx + c.errado.length
+    }
+    if (cursor < texto.length) mirror.appendChild(document.createTextNode(texto.slice(cursor)))
+
+    const mirrorRect = mirror.getBoundingClientRect()
+    setPosicoes(
+      spans.map(({ el, correcao }) => {
+        const r = el.getBoundingClientRect()
+        return { correcao, top: r.top - mirrorRect.top, left: r.left - mirrorRect.left }
+      }),
+    )
+  }, [texto, correcoes, textareaRef])
+
+  React.useLayoutEffect(() => {
+    medir()
+  }, [medir])
+
+  // Textarea com scroll (texto maior que a caixa) muda a posição relativa das linhas — mantém o
+  // espelho e os balões sincronizados ao rolar.
+  React.useEffect(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.addEventListener("scroll", medir)
+    return () => ta.removeEventListener("scroll", medir)
+  }, [textareaRef, medir])
+
+  if (posicoes.length === 0) return <div ref={mirrorRef} className="invisible pointer-events-none" aria-hidden />
+
+  return (
+    <>
+      <div ref={mirrorRef} className="invisible pointer-events-none" aria-hidden />
+      {posicoes.map((p, i) => (
+        <button
+          key={i}
+          type="button"
+          title={`Trocar por "${p.correcao.certo}"`}
+          onClick={() => onAplicar(p.correcao)}
+          className="absolute z-10 -translate-y-full rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 shadow-sm hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800"
+          style={{ top: p.top, left: p.left }}
+        >
+          {p.correcao.certo}
+        </button>
+      ))}
+    </>
   )
 }
 
@@ -1332,6 +1961,102 @@ function CamposPersonalizadosSecao({
         })}
       </div>
     </div>
+  )
+}
+
+// Mesma lista "campos prioritários" já usada em pages/contatos.tsx (CAMPOS_PRIORIDADE) — reusa
+// os mesmos api.camposPersonalizados/api.camposDaConversa/api.definirCampoConversa que
+// CamposPersonalizadosSecao (acima) já usa, só apresentados como um checklist compacto de
+// "quão completa está essa ficha" em vez da lista cheia de todos os campos.
+const CAMPOS_PRIORIDADE = ["Responsável", "Produto", "Valor solicitado", "Origem"]
+
+function FichaCompletaSecao({
+  businessId,
+  phone,
+  refreshKey,
+  onChanged,
+}: {
+  businessId: string
+  phone: string
+  refreshKey: number
+  onChanged?: () => void
+}) {
+  const [campos, setCampos] = React.useState<CampoPersonalizado[]>([])
+  const [valores, setValores] = React.useState<CampoValor[]>([])
+  const [editandoId, setEditandoId] = React.useState<number | null>(null)
+  const [valorEdit, setValorEdit] = React.useState("")
+  const [salvando, setSalvando] = React.useState(false)
+
+  const carregar = React.useCallback(() => {
+    api.camposPersonalizados(businessId).then(setCampos).catch(() => {})
+    api.camposDaConversa(businessId, phone).then(setValores).catch(() => {})
+  }, [businessId, phone])
+
+  React.useEffect(() => {
+    carregar()
+  }, [carregar, refreshKey])
+
+  const itens = CAMPOS_PRIORIDADE.map((nome) => {
+    const campo = campos.find((c) => c.nome === nome) || null
+    const valor = campo ? valores.find((v) => v.campo_id === campo.id)?.valor || "" : ""
+    return { nome, campo, valor }
+  })
+  const preenchidos = itens.filter((i) => i.valor).length
+  const percentual = Math.round((preenchidos / itens.length) * 100)
+
+  async function salvar(campoId: number) {
+    setSalvando(true)
+    try {
+      await api.definirCampoConversa(businessId, phone, campoId, valorEdit)
+      setEditandoId(null)
+      carregar()
+      onChanged?.()
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <Secao icon={CircleCheck} titulo={`Ficha completa · ${percentual}%`}>
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className="h-full bg-primary transition-all" style={{ width: `${percentual}%` }} />
+      </div>
+      <div className="flex flex-col gap-1.5 mt-2">
+        {itens.map((item) => (
+          <div key={item.nome} className="flex items-center gap-2 text-xs">
+            <span
+              className={`h-1.5 w-1.5 rounded-full shrink-0 ${item.valor ? "bg-green-500" : "bg-muted-foreground/40"}`}
+            />
+            <span className="w-28 shrink-0 text-muted-foreground">{item.nome}</span>
+            {!item.campo ? (
+              <span className="text-muted-foreground/60 italic truncate">campo não criado</span>
+            ) : editandoId === item.campo.id ? (
+              <div className="flex items-center gap-1 flex-1 min-w-0">
+                <Input
+                  autoFocus
+                  value={valorEdit}
+                  onChange={(e) => setValorEdit(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && salvar(item.campo!.id)}
+                  onBlur={() => salvar(item.campo!.id)}
+                  className="h-6 text-xs flex-1"
+                />
+                {salvando && <span className="text-[10px] text-muted-foreground shrink-0">salvando</span>}
+              </div>
+            ) : (
+              <button
+                className="truncate flex-1 min-w-0 text-left hover:underline"
+                onClick={() => {
+                  setEditandoId(item.campo!.id)
+                  setValorEdit(item.valor)
+                }}
+              >
+                {item.valor || <span className="text-muted-foreground/60">clique p/ preencher</span>}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </Secao>
   )
 }
 
@@ -2030,6 +2755,15 @@ function ContactDetails({
         <div className="rounded-xl border p-3">
           <CamposPersonalizadosSecao businessId={businessId} phone={conversation.phone} refreshKey={ativRefresh} />
         </div>
+      )}
+
+      {businessId !== "instagram" && (
+        <FichaCompletaSecao
+          businessId={businessId}
+          phone={conversation.phone}
+          refreshKey={ativRefresh}
+          onChanged={() => setAtivRefresh((v) => v + 1)}
+        />
       )}
 
       {businessId !== "instagram" && (
