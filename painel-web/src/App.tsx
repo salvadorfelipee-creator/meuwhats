@@ -19,6 +19,7 @@ import { ContatosPage } from "@/pages/contatos"
 import { RetornosPage } from "@/pages/retornos"
 import { ConfiguracoesPage } from "@/pages/configuracoes"
 import { FluxosPage } from "@/pages/fluxos"
+import { SiteChatPage } from "@/pages/site-chat"
 
 function Shell() {
   const [screen, setScreen] = React.useState<Screen>("hoje")
@@ -53,6 +54,7 @@ function Shell() {
         {screen === "email" && <EmailPage />}
         {screen === "config" && <ConfiguracoesPage />}
         {screen === "fluxos" && <FluxosPage />}
+        {screen === "site-chat" && <SiteChatPage />}
       </SidebarInset>
     </SidebarProvider>
   )

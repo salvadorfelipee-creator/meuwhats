@@ -1,3 +1,4 @@
+import * as React from "react"
 import {
   Sidebar,
   SidebarContent,
@@ -20,6 +21,7 @@ import {
 import { useChannel, type Channel } from "@/lib/channel-context"
 import { useUnread } from "@/lib/unread-context"
 import { useAuth } from "@/lib/auth-context"
+import { api } from "@/lib/api"
 import { RetornosNavItem } from "@/components/retornos-nav-item"
 import { MinhasConversasMenuItem } from "@/components/minhas-conversas-menu"
 import {
@@ -39,6 +41,7 @@ import {
   Contact,
   Settings,
   Workflow,
+  MessagesSquare,
 } from "lucide-react"
 
 export type Screen =
@@ -56,12 +59,14 @@ export type Screen =
   | "retornos"
   | "fluxos"
   | "config"
+  | "site-chat"
 
 // "reels" fica fora do menu por enquanto (edição em massa parada) — a rota em
 // App.tsx continua existindo, só reativar aqui quando voltar a usar.
 const NAV_ITEMS_ANTES: { id: Screen; title: string; icon: typeof MessageCircle }[] = [
   { id: "hoje", title: "Hoje", icon: Home },
   { id: "chats", title: "Conversas", icon: MessageCircle },
+  { id: "site-chat", title: "Chat do site", icon: MessagesSquare },
   { id: "pipeline", title: "Pipeline", icon: Columns3 },
   { id: "contatos", title: "Contatos", icon: Contact },
 ]
@@ -106,6 +111,27 @@ export function AppSidebar({
   const { channels, current, setCurrent } = useChannel()
   const { unreadChannels, hasAnyUnread } = useUnread()
   const { logout } = useAuth()
+  const [siteChatUnread, setSiteChatUnread] = React.useState(0)
+
+  React.useEffect(() => {
+    let ativo = true
+    async function atualizar() {
+      try {
+        const conversas = await api.siteChatConversas()
+        if (ativo) setSiteChatUnread(conversas.filter((c) => Boolean(c.unread)).length)
+      } catch {
+        // O menu continua utilizável se o backend estiver acordando ou temporariamente offline.
+      }
+    }
+    atualizar()
+    const id = window.setInterval(() => {
+      if (!document.hidden) atualizar()
+    }, 6000)
+    return () => {
+      ativo = false
+      window.clearInterval(id)
+    }
+  }, [])
 
   function selecionarCanal(c: Channel) {
     setCurrent(c)
@@ -132,6 +158,11 @@ export function AppSidebar({
                   >
                     <item.icon />
                     <span>{item.title}</span>
+                    {item.id === "site-chat" && siteChatUnread > 0 && (
+                      <span className="ml-auto flex min-w-5 h-5 items-center justify-center rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">
+                        {siteChatUnread > 99 ? "99+" : siteChatUnread}
+                      </span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}

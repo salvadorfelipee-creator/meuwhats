@@ -32,6 +32,42 @@ const TELEGRAM_WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const PAINEL_USER = process.env.PAINEL_USER || "admin";
 const PAINEL_PASS = process.env.PAINEL_PASS || "admin";
 
+const SITE_CHAT_ORIGINS = new Set([
+  "https://www.felizcred.com.br",
+  "https://felizcred.com.br",
+  ...(process.env.NODE_ENV === "production" ? [] : ["http://localhost:8000", "http://127.0.0.1:8000"]),
+]);
+const siteChatRate = new Map();
+
+function siteChatCors(req) {
+  const origin = req.headers.origin || "";
+  return SITE_CHAT_ORIGINS.has(origin)
+    ? {
+        "Access-Control-Allow-Origin": origin,
+        Vary: "Origin",
+        "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, X-Chat-Token",
+      }
+    : {};
+}
+
+function siteChatRateLimit(req) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const now = Date.now();
+  const recent = (siteChatRate.get(ip) || []).filter((time) => now - time < 60_000);
+  if (recent.length >= 12) return false;
+  recent.push(now);
+  siteChatRate.set(ip, recent);
+  return true;
+}
+
+function siteChatTokenValido(conversation, token) {
+  if (!conversation || !token) return false;
+  const recebido = crypto.createHash("sha256").update(token).digest();
+  const esperado = Buffer.from(String(conversation.visitor_token_hash), "hex");
+  return recebido.length === esperado.length && crypto.timingSafeEqual(recebido, esperado);
+}
+
 // Cache em memória dos usuários do painel (login por pessoa) — isAuthorized precisa ser síncrona
 // (Node só tem 1 thread, e toda requisição autenticada passa por ali), então não dá pra consultar
 // o banco a cada chamada. Recarregado sempre que um usuário é criado/editado/desativado/tem senha
@@ -5036,6 +5072,91 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       await processarUpdateTelegram(body);
       return send(res, 200, "OK");
+    }
+
+    // Chat próprio do site FelizCred. A parte pública usa um segredo aleatório por conversa;
+    // atendentes acessam a caixa de entrada pelas rotas autenticadas do painel.
+    if (path_.startsWith("/site-chat/")) {
+      const corsHeaders = siteChatCors(req);
+      if (req.method === "OPTIONS") {
+        if (!corsHeaders["Access-Control-Allow-Origin"]) return send(res, 403, { error: "Origem não permitida" });
+        res.writeHead(204, corsHeaders);
+        return res.end();
+      }
+      if (!corsHeaders["Access-Control-Allow-Origin"]) return send(res, 403, { error: "Origem não permitida" });
+
+      if (req.method === "POST" && path_ === "/site-chat/conversations") {
+        if (!siteChatRateLimit(req)) return send(res, 429, { error: "Muitas mensagens. Aguarde um instante." }, corsHeaders);
+        const body = await parseBody(req);
+        const name = String(body.name || "").trim().slice(0, 80);
+        const contact = String(body.contact || "").trim().slice(0, 160);
+        const message = String(body.message || "").trim().slice(0, 2000);
+        const pageUrl = String(body.pageUrl || "").trim().slice(0, 500);
+        if (name.length < 2 || !message) {
+          return send(res, 400, { error: "Informe seu nome e escreva uma mensagem." }, corsHeaders);
+        }
+        const id = crypto.randomUUID();
+        const token = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, pageUrl, message });
+        return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
+      }
+
+      const publicMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)$/i);
+      if (publicMatch && (req.method === "GET" || req.method === "POST")) {
+        const id = publicMatch[1];
+        const conversation = await db.siteChatObter(id);
+        const token = String(req.headers["x-chat-token"] || "");
+        if (!siteChatTokenValido(conversation, token)) return send(res, 404, { error: "Conversa não encontrada" }, corsHeaders);
+        if (req.method === "GET") {
+          return send(res, 200, {
+            conversation: { id: conversation.id, name: conversation.name, status: conversation.status, updated_at: conversation.updated_at },
+            messages: await db.siteChatMensagens(id),
+          }, corsHeaders);
+        }
+        if (!siteChatRateLimit(req)) return send(res, 429, { error: "Muitas mensagens. Aguarde um instante." }, corsHeaders);
+        const body = await parseBody(req);
+        const message = String(body.message || "").trim().slice(0, 2000);
+        if (!message) return send(res, 400, { error: "Escreva uma mensagem." }, corsHeaders);
+        await db.siteChatMensagemVisitante(id, conversation.name, message);
+        return send(res, 201, { ok: true }, corsHeaders);
+      }
+    }
+
+    if (req.method === "GET" && path_ === "/painel/api/site-chat/conversations") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.siteChatListar());
+    }
+
+    const painelSiteChatMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)$/i);
+    if (painelSiteChatMatch && req.method === "GET") {
+      if (!requireAuth(req, res)) return;
+      const conversation = await db.siteChatObter(painelSiteChatMatch[1]);
+      if (!conversation) return send(res, 404, { error: "Conversa não encontrada" });
+      await db.siteChatMarcarLida(conversation.id);
+      return send(res, 200, { conversation, messages: await db.siteChatMensagens(conversation.id) });
+    }
+
+    const painelSiteChatReplyMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)\/reply$/i);
+    if (painelSiteChatReplyMatch && req.method === "POST") {
+      const usuario = requireAuth(req, res);
+      if (!usuario) return;
+      const conversation = await db.siteChatObter(painelSiteChatReplyMatch[1]);
+      if (!conversation) return send(res, 404, { error: "Conversa não encontrada" });
+      const body = await parseBody(req);
+      const message = String(body.message || "").trim().slice(0, 2000);
+      if (!message) return send(res, 400, { error: "Escreva uma mensagem." });
+      await db.siteChatMensagemAtendente(conversation.id, usuario.nome || "Atendimento FelizCred", message);
+      return send(res, 201, { ok: true });
+    }
+
+    const painelSiteChatStatusMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)\/status$/i);
+    if (painelSiteChatStatusMatch && req.method === "PATCH") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const status = body.status === "closed" ? "closed" : "open";
+      await db.siteChatDefinirStatus(painelSiteChatStatusMatch[1], status);
+      return send(res, 200, { ok: true });
     }
 
     // POST /cotacerta/lead — form do site cotacertaseguros.com.br: salva o lead e avisa

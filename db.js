@@ -102,6 +102,33 @@ const ready = (async () => {
   // Turso (504M linhas lidas/mês) mesmo sem nenhum pico de tráfego incomum.
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_phone_created ON messages(phone, business_number_id, created_at DESC)`);
 
+  // Chat próprio do site FelizCred. Fica separado dos canais da Meta para que uma conversa web
+  // não finja ser um telefone e possa evoluir depois com fluxos específicos do site.
+  await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_conversations (
+    id TEXT PRIMARY KEY,
+    visitor_token_hash TEXT NOT NULL,
+    name TEXT NOT NULL,
+    contact TEXT,
+    page_url TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    last_visitor_at INTEGER,
+    last_agent_at INTEGER,
+    last_read_at INTEGER
+  )`);
+  await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    body TEXT NOT NULL,
+    sender_name TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES site_chat_conversations(id) ON DELETE CASCADE
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_site_chat_updated ON site_chat_conversations(updated_at DESC)`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_site_chat_messages ON site_chat_messages(conversation_id, created_at)`);
+
   const infoMessages = await client.execute(`PRAGMA table_info(messages)`);
   if (!infoMessages.rows.some((r) => r.name === "error_message")) {
     await client.execute(`ALTER TABLE messages ADD COLUMN error_message TEXT`);
@@ -3467,6 +3494,95 @@ async function roteadorRevisadoDefinir(chave, revisado) {
   });
 }
 
+async function siteChatCriar({ id, tokenHash, name, contact, pageUrl, message }) {
+  await ready;
+  const now = Date.now();
+  await client.batch([
+    {
+      sql: `INSERT INTO site_chat_conversations
+            (id, visitor_token_hash, name, contact, page_url, status, created_at, updated_at, last_visitor_at)
+            VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
+      args: [id, tokenHash, name, contact || null, pageUrl || null, now, now, now],
+    },
+    {
+      sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)
+            VALUES (?, 'visitor', ?, ?, ?)`,
+      args: [id, message, name, now],
+    },
+  ]);
+  return { id, status: "open", created_at: now, updated_at: now };
+}
+
+async function siteChatObter(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM site_chat_conversations WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+async function siteChatMensagens(id) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT id, conversation_id, direction, body, sender_name, created_at
+          FROM site_chat_messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
+    args: [id],
+  });
+  return result.rows;
+}
+
+async function siteChatMensagemVisitante(id, name, body) {
+  await ready;
+  const now = Date.now();
+  await client.batch([
+    {
+      sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)
+            VALUES (?, 'visitor', ?, ?, ?)`,
+      args: [id, body, name, now],
+    },
+    {
+      sql: `UPDATE site_chat_conversations SET status = 'open', updated_at = ?, last_visitor_at = ? WHERE id = ?`,
+      args: [now, now, id],
+    },
+  ]);
+}
+
+async function siteChatMensagemAtendente(id, senderName, body) {
+  await ready;
+  const now = Date.now();
+  await client.batch([
+    {
+      sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)
+            VALUES (?, 'agent', ?, ?, ?)`,
+      args: [id, body, senderName, now],
+    },
+    {
+      sql: `UPDATE site_chat_conversations SET status = 'open', updated_at = ?, last_agent_at = ? WHERE id = ?`,
+      args: [now, now, id],
+    },
+  ]);
+}
+
+async function siteChatListar() {
+  await ready;
+  const result = await client.execute(`
+    SELECT c.*,
+      (SELECT body FROM site_chat_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message,
+      CASE WHEN c.last_visitor_at IS NOT NULL AND c.last_visitor_at > COALESCE(c.last_read_at, 0) THEN 1 ELSE 0 END AS unread
+    FROM site_chat_conversations c
+    ORDER BY CASE WHEN c.status = 'open' THEN 0 ELSE 1 END, c.updated_at DESC
+  `);
+  return result.rows;
+}
+
+async function siteChatMarcarLida(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE site_chat_conversations SET last_read_at = ? WHERE id = ?`, args: [Date.now(), id] });
+}
+
+async function siteChatDefinirStatus(id, status) {
+  await ready;
+  await client.execute({ sql: `UPDATE site_chat_conversations SET status = ?, updated_at = ? WHERE id = ?`, args: [status, Date.now(), id] });
+}
+
 module.exports = {
   hashSenha,
   verificarSenha,
@@ -3512,6 +3628,14 @@ module.exports = {
   aniversarioMarcarEnviado,
   roteadorRevisadoListar,
   roteadorRevisadoDefinir,
+  siteChatCriar,
+  siteChatObter,
+  siteChatMensagens,
+  siteChatMensagemVisitante,
+  siteChatMensagemAtendente,
+  siteChatListar,
+  siteChatMarcarLida,
+  siteChatDefinirStatus,
   fluxoDinamicoCriar,
   fluxoDinamicoAtivo,
   fluxoDinamicoListar,

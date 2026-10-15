@@ -75,6 +75,30 @@ export type MinhaConversa = {
   pipeline_estagio: string | null
 }
 
+export type SiteChatConversation = {
+  id: string
+  name: string
+  contact: string | null
+  page_url: string | null
+  status: "open" | "closed"
+  created_at: number
+  updated_at: number
+  last_visitor_at: number | null
+  last_agent_at: number | null
+  last_read_at: number | null
+  last_message?: string | null
+  unread?: number | boolean
+}
+
+export type SiteChatMessage = {
+  id: number
+  conversation_id: string
+  direction: "visitor" | "agent"
+  body: string
+  sender_name: string | null
+  created_at: number
+}
+
 export type Tag = { id: number; business_number_id: string; nome: string; cor: string; created_at: number }
 
 export type CampoPersonalizado = { id: number; business_id: string; nome: string; created_at: number }
@@ -482,6 +506,22 @@ export const api = {
 
   // ── Identidade e usuários (login por pessoa) ─────────────────────────────────────────────
   me: () => request<Identidade>("/painel/api/me"),
+
+  siteChatConversas: () => request<SiteChatConversation[]>("/painel/api/site-chat/conversations"),
+  siteChatConversa: (id: string) =>
+    request<{ conversation: SiteChatConversation; messages: SiteChatMessage[] }>(
+      `/painel/api/site-chat/conversations/${encodeURIComponent(id)}`,
+    ),
+  siteChatResponder: (id: string, message: string) =>
+    request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+  siteChatStatus: (id: string, status: "open" | "closed") =>
+    request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }),
 
   usuarios: () => request<Usuario[]>("/painel/api/usuarios"),
 

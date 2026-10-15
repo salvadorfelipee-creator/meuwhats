@@ -95,6 +95,7 @@ footer a{color:var(--green)}
 @media(max-width:1024px){.blog-wrap{grid-template-columns:1fr}.sidebar{display:none}}
 @media(max-width:768px){nav.topnav{padding:0 18px}.nav-links{display:none}.blog-hero{padding:48px 18px 40px}.filters{padding:0 18px}.blog-wrap{padding:32px 18px 60px}.articles-grid{grid-template-columns:1fr}}
 </style>
+<link rel="stylesheet" href="/chat.css"/>
 </head>
 <body>
 <nav class="topnav">
@@ -987,5 +988,6 @@ function atualizar(v,q){
 }
 document.getElementById('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')buscar();});
 </script>
+<script src="/chat.js" defer></script>
 </body>
 </html>
