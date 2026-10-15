@@ -465,6 +465,19 @@ function salvarDocumentoPublicar(dataUrl) {
   return filename;
 }
 
+function salvarMidiaSite(req, body) {
+  const dataUrl = body.imagemBase64 || body.videoBase64 || body.audioBase64 || body.documentBase64;
+  if (dataUrl && String(dataUrl).length > 21_000_000) throw new Error("O arquivo deve ter no máximo 15 MB");
+  let filename = null;
+  let type = "text";
+  let mime = "";
+  if (body.imagemBase64) { filename = salvarImagemPublicar(body.imagemBase64); type = "image"; mime = String(body.imagemBase64).slice(5).split(";")[0]; }
+  else if (body.videoBase64) { filename = salvarVideoPublicar(body.videoBase64); type = "video"; mime = String(body.videoBase64).slice(5).split(";")[0]; }
+  else if (body.audioBase64) { filename = salvarAudioPublicar(body.audioBase64); type = "audio"; mime = String(body.audioBase64).slice(5).split(";")[0]; }
+  else if (body.documentBase64) { filename = salvarDocumentoPublicar(body.documentBase64); type = "document"; mime = String(body.documentBase64).slice(5).split(";")[0]; }
+  return filename ? { type, mime, fileName: String(body.fileName || "").slice(0, 180), url: `https://${req.headers.host}/publicar-media/${filename}` } : {};
+}
+
 // Igual a salvarImagemPublicar, mas devolve o buffer decodificado em vez de gravar em disco —
 // usado pela agenda de publicações, que guarda a imagem no R2 (precisa sobreviver a um
 // deploy/restart do Render, diferente da publicação imediata que só precisa durar segundos).
@@ -5099,7 +5112,10 @@ const server = http.createServer(async (req, res) => {
         const id = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
         const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-        const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, pageUrl, message });
+        let produtoTag = null;
+        try { produtoTag = await gemini.classificarProdutoSite(message); }
+        catch { produtoTag = /fgts/i.test(message) ? "FGTS" : /clt/i.test(message) ? "Empréstimo CLT" : /carro/i.test(message) ? "Carro em garantia" : null; }
+        const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, pageUrl, message, produtoTag });
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
@@ -5118,8 +5134,13 @@ const server = http.createServer(async (req, res) => {
         if (!siteChatRateLimit(req)) return send(res, 429, { error: "Muitas mensagens. Aguarde um instante." }, corsHeaders);
         const body = await parseBody(req);
         const message = String(body.message || "").trim().slice(0, 2000);
-        if (!message) return send(res, 400, { error: "Escreva uma mensagem." }, corsHeaders);
-        await db.siteChatMensagemVisitante(id, conversation.name, message);
+        let media;
+        try { media = salvarMidiaSite(req, body); } catch (err) { return send(res, 400, { error: err.message }, corsHeaders); }
+        if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." }, corsHeaders);
+        await db.siteChatMensagemVisitante(id, conversation.name, message, media);
+        if (!conversation.produto_tag && message) {
+          gemini.classificarProdutoSite(message).then((produto) => produto && db.siteChatDefinirProduto(id, produto)).catch(() => {});
+        }
         return send(res, 201, { ok: true }, corsHeaders);
       }
     }
@@ -5146,8 +5167,10 @@ const server = http.createServer(async (req, res) => {
       if (!conversation) return send(res, 404, { error: "Conversa não encontrada" });
       const body = await parseBody(req);
       const message = String(body.message || "").trim().slice(0, 2000);
-      if (!message) return send(res, 400, { error: "Escreva uma mensagem." });
-      await db.siteChatMensagemAtendente(conversation.id, usuario.nome || "Atendimento FelizCred", message);
+      let media;
+      try { media = salvarMidiaSite(req, body); } catch (err) { return send(res, 400, { error: err.message }); }
+      if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." });
+      await db.siteChatMensagemAtendente(conversation.id, usuario.nome || "Atendimento FelizCred", message, media);
       return send(res, 201, { ok: true });
     }
 

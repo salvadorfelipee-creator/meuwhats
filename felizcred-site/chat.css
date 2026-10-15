@@ -149,8 +149,17 @@
 .fc-chat-bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; }
 .fc-chat-bubble small { display: block; margin-top: 5px; color: rgba(20,32,51,.55); font-size: 10px; text-align: right; }
 .fc-chat-bubble.agent small { text-align: left; }
-.fc-chat-compose { display: flex; align-items: flex-end; gap: 8px; border-top: 1px solid var(--fc-line); padding: 11px; background: #fff; }
+.fc-chat-compose { display: flex; align-items: flex-end; gap: 5px; border-top: 1px solid var(--fc-line); padding: 11px; background: #fff; }
 .fc-chat-compose textarea { min-height: 42px; max-height: 104px; flex: 1; padding: 10px 12px; }
+.fc-chat-tool { display: grid; width: 34px; height: 42px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 10px; background: transparent; color: #667085; cursor: pointer; font: 700 18px/1 sans-serif; }
+.fc-chat-tool:hover { background: #f0f4f6; color: var(--fc-navy); }
+.fc-chat-tool.recording { background: #fee2e2; color: #dc2626; animation: fc-record 1s infinite; }
+.fc-chat-emoji-menu { position: absolute; right: 48px; bottom: 66px; z-index: 3; display: none; gap: 5px; padding: 8px; border: 1px solid var(--fc-line); border-radius: 13px; background: #fff; box-shadow: 0 12px 28px rgba(16,24,40,.16); }
+.fc-chat-emoji-menu.show { display: flex; }
+.fc-chat-emoji-menu button { border: 0; padding: 3px; background: transparent; cursor: pointer; font-size: 19px; }
+.fc-chat-media { display: block; max-width: 100%; max-height: 230px; margin-bottom: 7px; border-radius: 10px; }
+a.fc-chat-media { color: inherit; text-decoration: underline; }
+@keyframes fc-record { 50% { opacity: .55; } }
 .fc-chat-send { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 13px; background: var(--fc-green); color: var(--fc-navy); cursor: pointer; }
 .fc-chat-send svg { width: 18px; height: 18px; }
 .fc-chat-send:disabled { opacity: .45; }

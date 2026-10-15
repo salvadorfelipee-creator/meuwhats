@@ -135,6 +135,15 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "pipeline_estagio_desde")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN pipeline_estagio_desde INTEGER`);
   }
+  if (!infoSiteChat.rows.some((r) => r.name === "produto_tag")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN produto_tag TEXT`);
+  }
+  const infoSiteMessages = await client.execute(`PRAGMA table_info(site_chat_messages)`);
+  for (const [nome, tipo] of [["type", "TEXT"], ["media_url", "TEXT"], ["media_mime", "TEXT"], ["file_name", "TEXT"]]) {
+    if (!infoSiteMessages.rows.some((r) => r.name === nome)) {
+      await client.execute(`ALTER TABLE site_chat_messages ADD COLUMN ${nome} ${tipo}`);
+    }
+  }
 
   const infoMessages = await client.execute(`PRAGMA table_info(messages)`);
   if (!infoMessages.rows.some((r) => r.name === "error_message")) {
@@ -3501,15 +3510,15 @@ async function roteadorRevisadoDefinir(chave, revisado) {
   });
 }
 
-async function siteChatCriar({ id, tokenHash, name, contact, pageUrl, message }) {
+async function siteChatCriar({ id, tokenHash, name, contact, pageUrl, message, produtoTag }) {
   await ready;
   const now = Date.now();
   await client.batch([
     {
       sql: `INSERT INTO site_chat_conversations
-            (id, visitor_token_hash, name, contact, page_url, status, created_at, updated_at, last_visitor_at)
-            VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)`,
-      args: [id, tokenHash, name, contact || null, pageUrl || null, now, now, now],
+            (id, visitor_token_hash, name, contact, page_url, status, created_at, updated_at, last_visitor_at, produto_tag)
+            VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)`,
+      args: [id, tokenHash, name, contact || null, pageUrl || null, now, now, now, produtoTag || null],
     },
     {
       sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)
@@ -3529,21 +3538,23 @@ async function siteChatObter(id) {
 async function siteChatMensagens(id) {
   await ready;
   const result = await client.execute({
-    sql: `SELECT id, conversation_id, direction, body, sender_name, created_at
+    sql: `SELECT id, conversation_id, direction, body, sender_name, created_at,
+                 COALESCE(type, 'text') AS type, media_url, media_mime, file_name
           FROM site_chat_messages WHERE conversation_id = ? ORDER BY created_at ASC, id ASC`,
     args: [id],
   });
   return result.rows;
 }
 
-async function siteChatMensagemVisitante(id, name, body) {
+async function siteChatMensagemVisitante(id, name, body, media = {}) {
   await ready;
   const now = Date.now();
   await client.batch([
     {
-      sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)
-            VALUES (?, 'visitor', ?, ?, ?)`,
-      args: [id, body, name, now],
+      sql: `INSERT INTO site_chat_messages
+            (conversation_id, direction, body, sender_name, created_at, type, media_url, media_mime, file_name)
+            VALUES (?, 'visitor', ?, ?, ?, ?, ?, ?, ?)`,
+      args: [id, body || "", name, now, media.type || "text", media.url || null, media.mime || null, media.fileName || null],
     },
     {
       sql: `UPDATE site_chat_conversations SET status = 'open', updated_at = ?, last_visitor_at = ? WHERE id = ?`,
@@ -3552,14 +3563,15 @@ async function siteChatMensagemVisitante(id, name, body) {
   ]);
 }
 
-async function siteChatMensagemAtendente(id, senderName, body) {
+async function siteChatMensagemAtendente(id, senderName, body, media = {}) {
   await ready;
   const now = Date.now();
   await client.batch([
     {
-      sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)
-            VALUES (?, 'agent', ?, ?, ?)`,
-      args: [id, body, senderName, now],
+      sql: `INSERT INTO site_chat_messages
+            (conversation_id, direction, body, sender_name, created_at, type, media_url, media_mime, file_name)
+            VALUES (?, 'agent', ?, ?, ?, ?, ?, ?, ?)`,
+      args: [id, body || "", senderName, now, media.type || "text", media.url || null, media.mime || null, media.fileName || null],
     },
     {
       sql: `UPDATE site_chat_conversations SET status = 'open', updated_at = ?, last_agent_at = ? WHERE id = ?`,
@@ -3595,6 +3607,14 @@ async function siteChatDefinirPipeline(id, estagio) {
   await client.execute({
     sql: `UPDATE site_chat_conversations SET pipeline_estagio = ?, pipeline_estagio_desde = ? WHERE id = ?`,
     args: [estagio, Date.now(), id],
+  });
+}
+
+async function siteChatDefinirProduto(id, produtoTag) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE site_chat_conversations SET produto_tag = ? WHERE id = ?`,
+    args: [produtoTag || null, id],
   });
 }
 
@@ -3652,6 +3672,7 @@ module.exports = {
   siteChatMarcarLida,
   siteChatDefinirStatus,
   siteChatDefinirPipeline,
+  siteChatDefinirProduto,
   fluxoDinamicoCriar,
   fluxoDinamicoAtivo,
   fluxoDinamicoListar,

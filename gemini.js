@@ -290,4 +290,14 @@ ${texto}`;
   return { correcoes };
 }
 
-module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto };
+async function classificarProdutoSite(texto) {
+  const permitidos = ["FGTS", "Empréstimo CLT", "Carro em garantia"];
+  const prompt = `Classifique a mensagem de um cliente da FelizCred em exatamente um produto.
+Produtos permitidos: FGTS, Empréstimo CLT, Carro em garantia.
+Responda somente JSON: {"produto":"nome exato ou null"}.
+Mensagem: ${String(texto || "").slice(0, 2000)}`;
+  const json = await chamarGemini(prompt, GEMINI_MODEL_LITE);
+  return permitidos.includes(json.produto) ? json.produto : null;
+}
+
+module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite };

@@ -25,6 +25,7 @@ export type Conversation = {
   resolvido_em?: number | null
   pipeline_estagio?: string | null
   pipeline_estagio_desde?: number | null
+  produto_tag?: string | null
   tags_json?: string | null
   campos_json?: string | null
   email?: string | null
@@ -90,6 +91,7 @@ export type SiteChatConversation = {
   unread?: number | boolean
   pipeline_estagio?: string | null
   pipeline_estagio_desde?: number | null
+  produto_tag?: string | null
 }
 
 export type SiteChatMessage = {
@@ -99,6 +101,10 @@ export type SiteChatMessage = {
   body: string
   sender_name: string | null
   created_at: number
+  type: "text" | "image" | "video" | "audio" | "document"
+  media_url: string | null
+  media_mime: string | null
+  file_name: string | null
 }
 
 export type Tag = { id: number; business_number_id: string; nome: string; cor: string; created_at: number }
@@ -514,10 +520,17 @@ export const api = {
     request<{ conversation: SiteChatConversation; messages: SiteChatMessage[] }>(
       `/painel/api/site-chat/conversations/${encodeURIComponent(id)}`,
     ),
-  siteChatResponder: (id: string, message: string) =>
+  siteChatResponder: (id: string, payload: string | {
+    message?: string
+    imagemBase64?: string
+    videoBase64?: string
+    audioBase64?: string
+    documentBase64?: string
+    fileName?: string
+  }) =>
     request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/reply`, {
       method: "POST",
-      body: JSON.stringify({ message }),
+      body: JSON.stringify(typeof payload === "string" ? { message: payload } : payload),
     }),
   siteChatStatus: (id: string, status: "open" | "closed") =>
     request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/status`, {

@@ -128,10 +128,6 @@ function chaveTask(conversa: Conversation): string {
   return `${conversa.business_number_id}|${conversa.phone}`
 }
 
-function corCanal(kind: Channel["kind"]): string {
-  return kind === "instagram" ? "#C13584" : kind === "site" ? "#0F766E" : "#25D366"
-}
-
 // Nomes de campo personalizado priorizados no cartão — mesma lista canônica de contatos.tsx
 // (CAMPOS_PRIORIDADE), menos "Responsável"/"Produto"/"Origem" que já ganham chip próprio aqui e
 // "Valor solicitado" que tem parse/formatação de moeda dedicados.
@@ -165,10 +161,7 @@ function conversaParaTask(
 
   // Canal sempre visível no cartão — agora que o Pipeline cruza TODOS os canais num quadro só,
   // é a única forma de saber de qual número/canal veio cada contato.
-  const simboloCanal = canal?.kind === "site" ? "🌐" : canal?.kind === "instagram" ? "◎" : "☎"
-  const chips: { id: string; nome: string; cor: string }[] = [
-    { id: "canal", nome: `${simboloCanal} ${canal?.label || conversa.business_number_id}`, cor: corCanal(canal?.kind || "whatsapp") },
-  ]
+  const chips: { id: string; nome: string; cor: string }[] = []
   for (const tag of tagsDe(conversa)) chips.push({ id: `tag-${tag.id}`, nome: tag.nome, cor: tag.cor })
   if (campos["Responsável"]) chips.push({ id: "responsavel", nome: campos["Responsável"], cor: "#475569" })
   if (campos["Origem"]) chips.push({ id: "origem", nome: campos["Origem"], cor: "#6B7F7A" })
@@ -187,6 +180,7 @@ function conversaParaTask(
     stale: parado,
     unread: notificacao.naoLida,
     unreadBlink: notificacao.urgente,
+    channelKind: canal?.kind || "whatsapp",
   }
 }
 
@@ -531,6 +525,7 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
           last_direction: c.last_visitor_at && (!c.last_agent_at || c.last_visitor_at > c.last_agent_at) ? "in" : "out",
           nota: null, fluxo_passo: null, pipeline_estagio: c.pipeline_estagio,
           pipeline_estagio_desde: c.pipeline_estagio_desde, channel: "site", nao_lida: c.unread,
+          tags_json: c.produto_tag ? JSON.stringify([{ id: -1, nome: c.produto_tag, cor: "#15803D" }]) : null,
         }))).catch(() => [])
       : Promise.resolve([] as Conversation[])
     Promise.all([...canaisDaEmpresa.map((c) => api.conversations(c.id).catch(() => [])), site])

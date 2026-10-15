@@ -1,6 +1,6 @@
 import * as React from "react";
 import { AnimatePresence, LayoutGroup, motion, useMotionValue, useReducedMotion } from "framer-motion";
-import { CalendarDays, Flag, Plus, Pencil } from "lucide-react";
+import { CalendarDays, Flag, Plus, Pencil, Globe2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ==========================================================================
@@ -93,6 +93,7 @@ export interface KanbanTask {
   unread?: boolean;
   /** Com `unread`, pisca (ping) em vez de ficar sólida — "urgente" pra quem está vendo o quadro. */
   unreadBlink?: boolean;
+  channelKind?: "whatsapp" | "instagram" | "site";
 }
 
 export interface KanbanColumn {
@@ -777,8 +778,15 @@ function CardShell({ task, floating }: { task: KanbanTask; floating?: boolean })
         SQUIRCLE,
       )}
     >
-      {(task.priority || (task.tags && task.tags.length > 0)) && (
+      {(task.channelKind || task.priority || (task.tags && task.tags.length > 0)) && (
         <div className="flex flex-wrap items-center gap-1.5">
+          {task.channelKind && (
+            <span className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-full bg-neutral-100 text-neutral-700" title={task.channelKind === "site" ? "Site" : task.channelKind === "instagram" ? "Instagram" : "WhatsApp"}>
+              {task.channelKind === "site" ? <Globe2 className="h-3.5 w-3.5" /> : task.channelKind === "instagram" ? <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-none stroke-[#C13584]" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#C13584" stroke="none"/></svg> : (
+                <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-[#25D366]" aria-label="WhatsApp"><path d="M12 2a9.7 9.7 0 0 0-8.4 14.55L2.2 21.8l5.37-1.4A9.8 9.8 0 1 0 12 2Zm0 17.8a7.8 7.8 0 0 1-3.98-1.09l-.29-.17-3.18.83.85-3.1-.19-.31A7.8 7.8 0 1 1 12 19.8Zm4.28-5.84c-.23-.12-1.39-.69-1.6-.76-.22-.08-.38-.12-.54.12-.16.23-.61.76-.75.92-.14.15-.28.17-.52.05-.23-.12-.99-.36-1.88-1.16a7.08 7.08 0 0 1-1.3-1.62c-.14-.23-.02-.36.1-.47.11-.1.24-.27.35-.4.12-.14.16-.24.24-.4.08-.15.04-.29-.02-.4-.06-.12-.53-1.28-.73-1.75-.2-.46-.4-.4-.54-.4h-.46c-.16 0-.41.06-.63.3-.22.23-.83.81-.83 1.98s.85 2.3.97 2.46c.12.15 1.67 2.55 4.05 3.58.57.24 1.01.39 1.35.5.57.18 1.08.15 1.49.09.45-.07 1.39-.57 1.59-1.12.2-.55.2-1.02.14-1.12-.06-.1-.22-.16-.45-.28Z"/></svg>
+              )}
+            </span>
+          )}
           {task.priority && (
             <span className={cn(CHIP, "font-medium", PRIORITY_STYLES[task.priority], SQUIRCLE)}>
               <Flag aria-hidden className="h-3 w-3 shrink-0" strokeWidth={2.25} />

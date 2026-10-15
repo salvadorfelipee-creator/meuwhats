@@ -114,8 +114,9 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
 
     async function tick() {
       let lista
+      let siteLista
       try {
-        lista = await api.inbox()
+        ;[lista, siteLista] = await Promise.all([api.inbox(), api.siteChatConversas()])
       } catch {
         return
       }
@@ -138,6 +139,13 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
           nextOverdue.add(chave)
           if (firstCheckRef.current && !overdueConversationsRef.current.has(chave)) recemAtrasadas.push(c)
         }
+      }
+      const recemSite = []
+      for (const c of siteLista) {
+        if (!c.unread) continue
+        const chave = chaveConversa("site", c.id)
+        next.add(chave)
+        if (firstCheckRef.current && !unreadConversationsRef.current.has(chave)) recemSite.push(c)
       }
       firstCheckRef.current = true
 
@@ -164,6 +172,25 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
             window.focus()
             if (canal) setCurrent(canal)
             setAlvoAbrir({ channelId: chId, phone: c.phone })
+          }
+        }
+      }
+
+      for (const c of recemSite) {
+        const chave = chaveConversa("site", c.id)
+        const olhandoAgora = activeRef.current.channelId === "site" && activeRef.current.phone === c.id && document.hasFocus()
+        if (olhandoAgora) continue
+        if (!tocouSom) { tocarSomNotificacao(); tocouSom = true }
+        if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+          const canal = channelsRef.current.find((ch) => ch.id === "site")
+          const notif = new Notification(`Site FelizCred · ${c.name}`, {
+            body: c.last_message || "Nova mensagem pelo site",
+            tag: `inbox-${chave}`,
+          })
+          notif.onclick = () => {
+            window.focus()
+            if (canal) setCurrent(canal)
+            setAlvoAbrir({ channelId: "site", phone: c.id })
           }
         }
       }
