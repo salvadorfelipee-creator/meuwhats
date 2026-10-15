@@ -5303,7 +5303,7 @@ const server = http.createServer(async (req, res) => {
         try { media = salvarMidiaSite(req, body); } catch (err) { return send(res, 400, { error: err.message }, corsHeaders); }
         if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." }, corsHeaders);
         await db.siteChatMensagemVisitante(id, conversation.name, message, media);
-        const pediuClt = /\b(clt|consignado(?:\s+clt)?)\b/i.test(message);
+        const pediuClt = /\b(clt|consignado(?:\s+(?:clt|privado))?|carteira assinada|cr[eé]dito (?:do |para o )?trabalhador)\b/i.test(message);
         let conversaClt = pediuClt || conversation.produto_tag === "Empréstimo CLT";
         if (!conversaClt && message) {
           const recentes = (await db.siteChatMensagens(id)).slice(-10);
@@ -5322,8 +5322,13 @@ const server = http.createServer(async (req, res) => {
               ? somenteDigitos
               : null;
             const pareceCpfInvalido = somenteDigitos.length === 11 && !cpfInformado;
-            const confirmouTempo = /^(sim|tenho|tenho sim|mais de 3 meses|3 meses ou mais)[!. ]*$/i.test(message.trim());
-            const semTempoMinimo = /^(n[aã]o|ainda n[aã]o|n[aã]o tenho|menos de 3 meses)[!. ]*$/i.test(message.trim());
+            const respostaNormalizada = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const semTempoMinimo = /\b(ainda nao|nao tenho|menos de (?:tres|3) meses|so tenho (?:um|dois|1|2) meses?)\b/.test(respostaNormalizada)
+              || /^(nao|n|negativo)[!. ]*$/.test(respostaNormalizada);
+            const confirmouTempo = !semTempoMinimo && (
+              /^(sim|s|tenho|tenho sim|positivo)[!,. ]*$/.test(respostaNormalizada)
+              || /\b(mais de (?:tres|3) meses|(?:tres|3) meses ou mais|(?:4|5|6|7|8|9|10|11|12) meses|[1-9]\d+ meses|ja (?:completei|passei)|passei da experiencia)\b/.test(respostaNormalizada)
+            );
             const pediuSimulacao = /\b(clt|consignado|simula(?:r|ção)|empr[eé]stimo)\b/i.test(message);
             const jaPerguntouTempo = recentes.some((m) => m.direction === "agent" && /mais de 3 meses/i.test(m.body || ""));
 
