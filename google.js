@@ -176,6 +176,41 @@ function requestJson(method, hostname, path, { accessToken, bodyObj } = {}) {
   });
 }
 
+// Qual conta Google está autorizada agora (e-mail/nome) — pra mostrar na tela de importar
+// contatos, sem isso não tem como saber se a conta conectada é a certa só olhando os contatos
+// que aparecem.
+async function obterContaConectada() {
+  const accessToken = await obterAccessToken();
+  const params = new URLSearchParams({ personFields: "emailAddresses,names" });
+  const json = await requestJson("GET", "people.googleapis.com", `/v1/people/me?${params.toString()}`, { accessToken });
+  return {
+    email: json.emailAddresses?.[0]?.value || null,
+    name: json.names?.[0]?.displayName || null,
+  };
+}
+
+// Lista os contatos da conta Google autorizada ("importar contato pelo Google Contatos"). O
+// escopo já configurado é leitura+escrita, então não precisa reautorizar nada pra isso. pageSize
+// máximo da People API é 1000 — paginação real só valeria a pena pra conta com mais contatos
+// pessoais do que isso; se um dia precisar, dá pra seguir o `nextPageToken` que a resposta traz.
+async function listarContatosGoogle() {
+  const accessToken = await obterAccessToken();
+  const params = new URLSearchParams({
+    personFields: "names,phoneNumbers,emailAddresses",
+    pageSize: "1000",
+  });
+  const json = await requestJson("GET", "people.googleapis.com", `/v1/people/me/connections?${params.toString()}`, { accessToken });
+  const pessoas = Array.isArray(json.connections) ? json.connections : [];
+  return pessoas
+    .map((p) => ({
+      resourceName: p.resourceName,
+      nome: p.names?.[0]?.displayName || null,
+      telefone: p.phoneNumbers?.[0]?.value || null,
+      email: p.emailAddresses?.[0]?.value || null,
+    }))
+    .filter((p) => p.telefone); // sem telefone não dá pra virar conversa/contato no painel
+}
+
 // ─── Google Calendar (agenda de horários disponíveis) ───────────────────────────────────────
 // Mesma conta/autorização do Google Contacts (mesmo refresh_token, escopo do Calendar
 // adicionado no SCOPE) — usado pelo motor de fluxo dinâmico (nó tipo 'horarios', ver server.js)
@@ -250,4 +285,12 @@ async function criarEvento({ calendarioId = "primary", titulo, descricao, inicio
   });
 }
 
-module.exports = { urlAutorizacao, trocarCodigoPorToken, criarContato, horariosDisponiveis, criarEvento };
+module.exports = {
+  urlAutorizacao,
+  trocarCodigoPorToken,
+  criarContato,
+  horariosDisponiveis,
+  criarEvento,
+  obterContaConectada,
+  listarContatosGoogle,
+};

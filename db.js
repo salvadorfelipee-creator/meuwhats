@@ -1136,17 +1136,21 @@ async function notaApagar(id) {
   await client.execute({ sql: `DELETE FROM conversation_notas WHERE id = ?`, args: [id] });
 }
 
-async function atualizarPipelineConversa(phone, businessNumberId, estagio) {
+async function atualizarPipelineConversa(phone, businessNumberId, estagio, origem) {
   await ready;
+  // pipeline_alerta_em volta a NULL aqui — mudou de etapa (manual ou automático), então o
+  // "tempo parado" começa a contar do zero de novo, e o alerta de etapa parada (ver
+  // conversasEtapaParada) pode disparar outra vez se ficar parada na etapa nova.
   await client.execute({
-    sql: `UPDATE conversations SET pipeline_estagio = ? WHERE phone = ? AND business_number_id = ?`,
-    args: [estagio || null, phone, businessNumberId],
+    sql: `UPDATE conversations SET pipeline_estagio = ?, pipeline_estagio_desde = ?, pipeline_alerta_em = NULL WHERE phone = ? AND business_number_id = ?`,
+    args: [estagio || null, Date.now(), phone, businessNumberId],
   });
   await atividadeRegistrar({
     businessId: businessNumberId,
     phone,
     tipo: "etapa",
     descricao: estagio ? `Etapa alterada para "${estagio}"` : "Etapa removida",
+    origem,
   });
 }
 

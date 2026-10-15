@@ -233,6 +233,38 @@ export type Message = {
   created_at: number
 }
 
+// Diretório de contatos cross-canal (tela Contatos) — reaproveita os mesmos dados de
+// Conversas, só agregado e filtrável.
+export type Contato = {
+  phone: string
+  name: string | null
+  business_number_id: string
+  channel: "whatsapp" | "instagram"
+  last_message_at: number | null
+  pipeline_estagio: string | null
+  tags_json: string | null
+  email: string | null
+  foto_url: string | null
+  // CRM de verdade — mesmos campos personalizados que já aparecem nos Detalhes do contato
+  // (Interesse, Origem, Valor solicitado, Responsável etc.). google_sincronizado: tem
+  // google_contact_resource_name salvo (já foi sincronizado com o Google Contatos em algum
+  // momento).
+  campos: Record<string, string>
+  google_sincronizado: boolean
+}
+
+export type ImportarContatoLinha = {
+  nome?: string
+  telefone: string
+  email?: string
+  etapa?: string
+  tags?: string[]
+  campos?: Record<string, string>
+  googleResourceName?: string
+}
+
+export type GoogleContato = { resourceName: string; nome: string | null; telefone: string | null; email: string | null }
+
 export type RespostaPronta = { id: number; atalho: string; texto: string; uso_count?: number }
 
 // Mesmo telefone, conversa em outro canal — ver ContactDetails em chats.tsx, só informativo.
@@ -464,6 +496,59 @@ export const api = {
 
   // ── "Atribuídas a mim" entre canais (handoff SDR → fechamento) ───────────────────────────
   minhasConversas: () => request<MinhaConversa[]>("/painel/api/minhas-conversas"),
+
+  // ── Contatos (diretório cross-canal, busca por nome/telefone/etapa) ─────────────────────
+  contatos: (opts?: { q?: string; estagio?: string; tag?: string; email?: "com" | "sem" }) => {
+    const params = new URLSearchParams()
+    if (opts?.q) params.set("q", opts.q)
+    if (opts?.estagio) params.set("estagio", opts.estagio)
+    if (opts?.tag) params.set("tag", opts.tag)
+    if (opts?.email) params.set("email", opts.email)
+    const qs = params.toString()
+    return request<Contato[]>(`/painel/api/contatos${qs ? `?${qs}` : ""}`)
+  },
+
+  // Importação em massa (CSV ou Google Contatos — mesma rota, o painel monta a lista diferente
+  // conforme a origem). Nunca sobrescreve etapa/campo que já tem valor com algo vazio — só
+  // preenche o que a linha importada de fato trouxe.
+  importarContatos: (businessId: string, contatos: ImportarContatoLinha[]) =>
+    request<{ importados: number; erros: { linha: number; motivo: string }[] }>(
+      `/painel/api/contatos/importar/${encodeURIComponent(businessId)}`,
+      { method: "POST", body: JSON.stringify({ contatos }) },
+    ),
+
+  googleContatos: () => request<GoogleContato[]>("/painel/api/google/contatos"),
+
+  // "Qual conta Google está conectada" — mostrado antes da lista de importar, pra nunca ficar
+  // na dúvida se os contatos que aparecem são da conta certa.
+  googleConta: () => request<{ email: string | null; nome: string | null }>("/painel/api/google/conta"),
+
+  // Passo 1 (segmentação) do assistente de Campanha de WhatsApp — filtros combinam em E; omitir
+  // um filtro é "não restringir por ele" (ver db.conversasParaCampanha no backend).
+  campanhaContatos: (
+    businessId: string,
+    filtros: { estagio?: string; tagId?: number; aniversarioDias?: number },
+  ) => {
+    const params = new URLSearchParams()
+    if (filtros.estagio) params.set("estagio", filtros.estagio)
+    if (filtros.tagId) params.set("tagId", String(filtros.tagId))
+    if (filtros.aniversarioDias != null) params.set("aniversarioDias", String(filtros.aniversarioDias))
+    const qs = params.toString()
+    return request<{ contacts: BroadcastContact[]; total: number }>(
+      `/painel/api/campanha-contatos/${encodeURIComponent(businessId)}${qs ? `?${qs}` : ""}`,
+    )
+  },
+
+  // Visão consolidada de uso/limite das integrações externas (tela Configurações >
+  // Integrações) — só traz o que dá pra consultar com as credenciais que já existem hoje.
+  integracoesStatus: () =>
+    request<{
+      whatsapp: Array<
+        | { label: string; ok: true; display_phone_number: string | null; quality_rating: string | null; messaging_limit_tier: string | null }
+        | { label: string; ok: false; erro: string }
+      >
+      r2: { usedBytes: number; limiteBytes: number } | null
+    }>("/painel/api/integracoes/status"),
 
   inbox: () => request<Conversation[]>("/painel/api/inbox"),
 

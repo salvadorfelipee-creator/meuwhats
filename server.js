@@ -5946,6 +5946,195 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
+    // GET /painel/api/contatos?q=&estagio=&tag=&email=com|sem — diretório de contatos de
+    // verdade, cross-canal. Não é um cadastro à parte — reaproveita db.listConversations (mesma
+    // função de Conversas/Minhas/Retornos) e só agrega os canais + filtra. Filtro de tag é por
+    // NOME (não id): a mesma tag tem um id diferente em cada número (tabela `tags` é por
+    // business_number_id) — filtrar por nome é o que faz sentido numa tela que já junta todos os
+    // canais numa lista só.
+    if (req.method === "GET" && path_ === "/painel/api/contatos") {
+      if (!requireAuth(req, res)) return;
+      const q = normalizar(url.searchParams.get("q") || "");
+      const estagio = url.searchParams.get("estagio") || "";
+      const tagFiltro = normalizar(url.searchParams.get("tag") || "");
+      const emailFiltro = url.searchParams.get("email") || ""; // "com" | "sem" | ""
+      const listas = await Promise.all([
+        ...PHONE_NUMBERS.map((n) => db.listConversations(n.id)),
+        db.listConversations("instagram"),
+      ]);
+      const contatos = [];
+      for (const c of listas.flat()) {
+        if (q && !normalizar(`${c.name || ""} ${c.phone || ""}`).includes(q)) continue;
+        if (estagio && c.pipeline_estagio !== estagio) continue;
+        if (tagFiltro) {
+          let tagsDoContato = [];
+          try {
+            tagsDoContato = c.tags_json ? JSON.parse(c.tags_json) : [];
+          } catch {
+            tagsDoContato = [];
+          }
+          if (!tagsDoContato.some((t) => normalizar(t.nome || "") === tagFiltro)) continue;
+        }
+        if (emailFiltro === "com" && !c.email) continue;
+        if (emailFiltro === "sem" && c.email) continue;
+        let campos = {};
+        try {
+          campos = c.campos_json ? JSON.parse(c.campos_json) : {};
+        } catch {
+          campos = {};
+        }
+        contatos.push({
+          phone: c.phone,
+          name: c.name,
+          business_number_id: c.business_number_id,
+          channel: c.business_number_id === "instagram" ? "instagram" : "whatsapp",
+          last_message_at: c.last_message_at,
+          pipeline_estagio: c.pipeline_estagio,
+          tags_json: c.tags_json || null,
+          email: c.email || null,
+          foto_url: c.foto_url || null,
+          campos,
+          google_sincronizado: !!c.google_contact_resource_name,
+        });
+      }
+      contatos.sort((a, b) => (b.last_message_at || 0) - (a.last_message_at || 0));
+      return send(res, 200, contatos);
+    }
+
+    // POST /painel/api/contatos/importar/:businessId — importação em massa (CSV OU Google
+    // Contatos — mesma rota pras duas origens, o painel só monta a lista diferente antes de
+    // mandar). Nunca mexe em last_message_at (ver db.importarContato) — contato importado não
+    // "conversou agora", só passa a existir no CRM esperando a primeira mensagem de verdade.
+    // Campo personalizado só é gravado se o NOME bater com um já cadastrado nesse número — não
+    // cria campo novo sozinho a partir de uma coluna de planilha desconhecida.
+    const matchContatosImportar = path_.match(/^\/painel\/api\/contatos\/importar\/([^/]+)$/);
+    if (req.method === "POST" && matchContatosImportar) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchContatosImportar[1]);
+      const body = await parseBody(req);
+      const linhas = Array.isArray(body.contatos) ? body.contatos : [];
+      if (!linhas.length) return send(res, 400, { error: "Nenhum contato pra importar" });
+
+      const camposCadastrados = await db.camposPersonalizadosListar(businessId);
+      const campoPorNome = new Map(camposCadastrados.map((c) => [normalizar(c.nome), c]));
+
+      let importados = 0;
+      const erros = [];
+      for (let i = 0; i < linhas.length; i++) {
+        const linha = linhas[i] || {};
+        const telefone = normalizarTelefoneBR(linha.telefone || "");
+        if (!/^55\d{10,11}$/.test(telefone)) {
+          erros.push({ linha: i + 1, motivo: `Telefone inválido: "${linha.telefone || ""}"` });
+          continue;
+        }
+        try {
+          await db.importarContato(telefone, businessId, {
+            nome: linha.nome ? String(linha.nome).trim().slice(0, 120) : null,
+            email: linha.email ? String(linha.email).trim().slice(0, 200) : null,
+            googleResourceName: linha.googleResourceName || null,
+          });
+          if (linha.etapa) {
+            await db.atualizarPipelineConversa(telefone, businessId, String(linha.etapa).trim(), "importacao");
+          }
+          if (Array.isArray(linha.tags)) {
+            for (const nomeTag of linha.tags) {
+              if (!nomeTag || !String(nomeTag).trim()) continue;
+              const tagId = await db.tagEncontrarOuCriar(businessId, String(nomeTag).trim(), "#6B7280");
+              await db.adicionarTagConversa(businessId, telefone, tagId, "importacao");
+            }
+          }
+          if (linha.campos && typeof linha.campos === "object") {
+            for (const [nomeCampo, valor] of Object.entries(linha.campos)) {
+              if (!valor || !String(valor).trim()) continue;
+              const campo = campoPorNome.get(normalizar(nomeCampo));
+              if (!campo) continue;
+              await db.conversationCampoDefinir(businessId, telefone, campo.id, String(valor).trim(), "importacao");
+            }
+          }
+          importados++;
+        } catch (err) {
+          erros.push({ linha: i + 1, motivo: err.message });
+        }
+      }
+      return send(res, 200, { importados, erros });
+    }
+
+    // GET /painel/api/campanha-contatos/:businessId?estagio=&tagId=&aniversarioDias= — passo 1
+    // (segmentação) do assistente de Campanha de WhatsApp: combina em E só os filtros presentes
+    // na query string e devolve a lista de contatos que bate, pra contar destinatários (passo 1)
+    // e já alimentar o `contacts` do POST /broadcast (passo 3). Sem filtro nenhum, devolve todo
+    // contato ativo do número (ver db.conversasParaCampanha).
+    const matchCampanhaContatos = path_.match(/^\/painel\/api\/campanha-contatos\/([^/]+)$/);
+    if (req.method === "GET" && matchCampanhaContatos) {
+      if (!requireAuth(req, res)) return;
+      const businessId = decodeURIComponent(matchCampanhaContatos[1]);
+      const estagio = url.searchParams.get("estagio") || undefined;
+      const tagId = url.searchParams.get("tagId") ? Number(url.searchParams.get("tagId")) : undefined;
+      const aniversarioDiasRaw = url.searchParams.get("aniversarioDias");
+      const aniversarioDias = aniversarioDiasRaw ? Number(aniversarioDiasRaw) : undefined;
+      const contacts = await db.conversasParaCampanha(businessId, { estagio, tagId, aniversarioDias });
+      return send(res, 200, { contacts, total: contacts.length });
+    }
+
+    // GET /painel/api/integracoes/status — visão consolidada de uso/limite das integrações
+    // externas que o painel depende (tela Configurações > Integrações). Só traz o que dá pra
+    // consultar com as credenciais que já existem hoje — WhatsApp (limite de mensagem/qualidade,
+    // via wa.checarNumero) e R2 (soma de bytes de verdade no bucket, r2.usoTotalBytes). Outras
+    // integrações não têm token de consulta de uso guardado ainda (seriam credenciais NOVAS,
+    // diferentes das que já usamos pra conectar) — o frontend mostra como pendência em vez de
+    // inventar número.
+    if (req.method === "GET" && path_ === "/painel/api/integracoes/status") {
+      if (!requireAuth(req, res)) return;
+      const [whatsapp, r2UsedBytes] = await Promise.all([
+        Promise.all(
+          PHONE_NUMBERS.map(async (n) => {
+            try {
+              const info = await wa.checarNumero(n.id);
+              return {
+                label: n.label,
+                ok: true,
+                display_phone_number: info.display_phone_number || null,
+                quality_rating: info.quality_rating || null,
+                messaging_limit_tier: info.messaging_limit_tier || null,
+              };
+            } catch (err) {
+              return { label: n.label, ok: false, erro: err.message };
+            }
+          }),
+        ),
+        r2.usoTotalBytes().catch(() => null),
+      ]);
+      // 10GB é o teto do plano gratuito do R2 hoje (Cloudflare) — não vem de nenhuma API, é a
+      // regra do plano free documentada pela própria Cloudflare.
+      const r2Status = r2UsedBytes == null ? null : { usedBytes: r2UsedBytes, limiteBytes: 10 * 1024 * 1024 * 1024 };
+      return send(res, 200, { whatsapp, r2: r2Status });
+    }
+
+    // GET /painel/api/google/contatos — lista os contatos da conta Google autorizada. Devolve a
+    // lista crua pra pessoa ESCOLHER quem importar no painel — nunca importa tudo de uma vez
+    // sozinho: a conta Google autorizada é pessoal, pode ter gente que não tem nada a ver com o
+    // negócio.
+    if (req.method === "GET" && path_ === "/painel/api/google/contatos") {
+      if (!requireAuth(req, res)) return;
+      try {
+        return send(res, 200, await google.listarContatosGoogle());
+      } catch (err) {
+        return send(res, 502, { error: err.message });
+      }
+    }
+
+    // GET /painel/api/google/conta — qual conta Google está autorizada agora (e-mail), pra
+    // mostrar na tela de importar contatos.
+    if (req.method === "GET" && path_ === "/painel/api/google/conta") {
+      if (!requireAuth(req, res)) return;
+      try {
+        const info = await google.obterContaConectada();
+        return send(res, 200, { email: info.email || null, nome: info.name || null });
+      } catch (err) {
+        return send(res, 502, { error: err.message });
+      }
+    }
+
     // POST /painel/api/template-criar/:businessId — cria um template de texto simples na WABA
     // desse número (body: { name, text, language?, category? }). Ação administrativa, sem botão.
     const matchTemplateCriar = path_.match(/^\/painel\/api\/template-criar\/([^/]+)$/);
