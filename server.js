@@ -68,6 +68,72 @@ function siteChatTokenValido(conversation, token) {
   return recebido.length === esperado.length && crypto.timingSafeEqual(recebido, esperado);
 }
 
+function siteChatCltPublico(row) {
+  if (!row) return null;
+  let offers = [];
+  try { offers = JSON.parse(row.offers_json || "[]"); } catch {}
+  return {
+    etapa: row.etapa,
+    status: row.status_novosaque || null,
+    termsLink: row.terms_link || null,
+    contractLink: row.contract_link || null,
+    offers: offers.map((o) => ({
+      simulationId: o.simulation_id,
+      installments: o.installments,
+      installmentValue: o.installment_value,
+      disbursedAmount: o.disbursed_amount,
+      interestRateMonthly: o.interest_rate_monthly,
+      cetMonthlyRate: o.cet_monthly_rate,
+      firstPaymentDate: o.first_payment_date,
+    })),
+    error: row.error_message || null,
+  };
+}
+
+async function notificarContratoCltNoWhatsApp(row) {
+  if (!row?.contract_link || !row.phone || row.whatsapp_notified_at) return;
+  if (row.whatsapp_notify_attempt_at && Date.now() - Number(row.whatsapp_notify_attempt_at) < 60 * 60 * 1000) return;
+  await db.siteChatCltAtualizar(row.conversation_id, { whatsapp_notify_attempt_at: Date.now() });
+  const phone = normalizarTelefoneBR(row.phone);
+  const businessId = process.env.NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID || "1335976862924566";
+  const template = process.env.NOVOSAQUE_SITE_WHATSAPP_TEMPLATE || "contrato_clt_em_andamento";
+  try {
+    const result = await wa.sendTemplate(businessId, phone, template, "pt_BR");
+    const now = Date.now();
+    await db.upsertConversation(phone, businessId, null, now);
+    await db.insertMessage({ phone, business_number_id: businessId, direction: "out", type: "template", body: "Sua contratação CLT está em andamento. Continue pelo chat seguro no site.", status: "sent", wa_message_id: result.messages?.[0]?.id || null, created_at: now });
+    await db.siteChatCltAtualizar(row.conversation_id, { whatsapp_notified_at: now });
+  } catch (err) {
+    console.error(`Template CLT do site ainda não enviado (${row.conversation_id}):`, err.message);
+  }
+}
+
+async function sincronizarSiteChatClt(row) {
+  if (!row?.transaction_id || ["concluido", "sem_oferta", "erro"].includes(row.etapa)) return row;
+  try {
+    const contract = await novosaque.consultarContratoClt(row.transaction_id);
+    const changes = { status_novosaque: contract.summary_status || null };
+    if (contract.terms_link) changes.terms_link = contract.terms_link;
+    if (contract.contract_link) {
+      changes.contract_link = contract.contract_link;
+      changes.etapa = "aguardando_assinatura";
+    }
+    const offers = (contract.simulation_results || []).filter((o) => o.success !== false && o.simulation_id);
+    if (offers.length && !["formalizando", "aguardando_assinatura"].includes(row.etapa)) {
+      changes.offers_json = JSON.stringify(offers);
+      changes.etapa = "oferta_disponivel";
+    }
+    if (contract.summary_status === "Offer unavailable") changes.etapa = "sem_oferta";
+    if (["Contract paid", "Collateral sended"].includes(contract.summary_status)) changes.etapa = "concluido";
+    const updated = await db.siteChatCltAtualizar(row.conversation_id, changes);
+    if (updated.contract_link) notificarContratoCltNoWhatsApp(updated).catch(() => {});
+    return updated;
+  } catch (err) {
+    console.error(`Erro ao sincronizar CLT do site (${row.conversation_id}):`, err.message);
+    return row;
+  }
+}
+
 // Cache em memória dos usuários do painel (login por pessoa) — isAuthorized precisa ser síncrona
 // (Node só tem 1 thread, e toda requisição autenticada passa por ali), então não dá pra consultar
 // o banco a cada chamada. Recarregado sempre que um usuário é criado/editado/desativado/tem senha
@@ -5117,6 +5183,72 @@ const server = http.createServer(async (req, res) => {
         catch { produtoTag = /fgts/i.test(message) ? "FGTS" : /clt/i.test(message) ? "Empréstimo CLT" : /carro/i.test(message) ? "Carro em garantia" : null; }
         const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, pageUrl, message, produtoTag });
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
+      }
+
+      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|resimulate|formalize)$/i);
+      if (cltMatch) {
+        const id = cltMatch[1];
+        const action = cltMatch[2].toLowerCase();
+        const conversation = await db.siteChatObter(id);
+        const token = String(req.headers["x-chat-token"] || "");
+        if (!siteChatTokenValido(conversation, token)) return send(res, 404, { error: "Conversa não encontrada" }, corsHeaders);
+        if (action === "status" && req.method === "GET") {
+          const row = await sincronizarSiteChatClt(await db.siteChatCltObter(id));
+          return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+        }
+        if (req.method !== "POST") return send(res, 405, { error: "Método não permitido" }, corsHeaders);
+        if (!siteChatRateLimit(req)) return send(res, 429, { error: "Muitas tentativas. Aguarde um instante." }, corsHeaders);
+        const body = await parseBody(req);
+        try {
+          if (action === "start") {
+            if (await db.siteChatCltObter(id)) return send(res, 409, { error: "A simulação já foi iniciada." }, corsHeaders);
+            const cpf = String(body.cpf || "").replace(/\D/g, "");
+            const phone = String(body.phone || "").replace(/\D/g, "");
+            if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
+            if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
+            const transactionId = await novosaque.criarSimulacaoClt(cpf);
+            let row = await db.siteChatCltCriar(id, transactionId, phone);
+            await db.siteChatDefinirProduto(id, "Empréstimo CLT");
+            await db.siteChatDefinirPipeline(id, "em_qualificacao");
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Simulação iniciada. Agora vamos gerar a autorização segura de consulta.");
+            row = await sincronizarSiteChatClt(row);
+            return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          const atual = await db.siteChatCltObter(id);
+          if (!atual) return send(res, 409, { error: "Inicie a simulação primeiro." }, corsHeaders);
+          if (action === "resimulate") {
+            const installment = Number(String(body.installmentValue || "").replace(",", "."));
+            if (!Number.isFinite(installment) || installment <= 0) return send(res, 400, { error: "Informe uma parcela válida." }, corsHeaders);
+            await novosaque.resimularClt(atual.transaction_id, installment);
+            const row = await db.siteChatCltAtualizar(id, { etapa: "simulando", offers_json: null, error_message: null });
+            return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          if (action === "formalize") {
+            let offers = [];
+            try { offers = JSON.parse(atual.offers_json || "[]"); } catch {}
+            const offer = offers.find((o) => String(o.simulation_id) === String(body.simulationId));
+            if (!offer) return send(res, 400, { error: "Escolha uma oferta válida." }, corsHeaders);
+            const cpf = String(body.cpf || "").replace(/\D/g, "");
+            const customer = body.customer || {};
+            const obrigatorios = ["nome", "data_nascimento", "genero", "profissao", "email", "celular", "cep", "rua", "numero", "bairro", "cidade", "uf", "email_rh", "telefone_rh", "forma_desembolso"];
+            if (!novosaque.cpfValido(cpf) || obrigatorios.some((campo) => !String(customer[campo] || "").trim())) {
+              return send(res, 400, { error: "Revise os dados obrigatórios antes de gerar o contrato." }, corsHeaders);
+            }
+            if (customer.forma_desembolso === "CONTA" && ["banco", "tipo_conta", "agencia", "conta", "digito_conta"].some((campo) => !String(customer[campo] || "").trim())) {
+              return send(res, 400, { error: "Preencha todos os dados da conta bancária." }, corsHeaders);
+            }
+            const customerData = novosaque.montarCustomerData(cpf, customer);
+            await novosaque.enviarFormalizacaoClt(atual.transaction_id, offer.simulation_id, customerData);
+            await db.siteChatDefinirPipeline(id, "documentos_enviados");
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Dados recebidos. Estamos gerando seu contrato para assinatura.");
+            const row = await db.siteChatCltAtualizar(id, { simulation_id: offer.simulation_id, etapa: "formalizando", error_message: null });
+            return send(res, 202, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+        } catch (err) {
+          console.error(`Erro no fluxo CLT do site (${id}/${action}):`, err.message);
+          await db.siteChatCltAtualizar(id, { error_message: "Não conseguimos avançar automaticamente. A equipe já pode continuar pelo chat." }).catch(() => {});
+          return send(res, 502, { error: "Não conseguimos avançar agora. Continue pelo chat com nossa equipe." }, corsHeaders);
+        }
       }
 
       const publicMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)$/i);

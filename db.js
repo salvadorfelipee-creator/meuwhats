@@ -128,6 +128,27 @@ const ready = (async () => {
   )`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_site_chat_updated ON site_chat_conversations(updated_at DESC)`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_site_chat_messages ON site_chat_messages(conversation_id, created_at)`);
+  await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_clt (
+    conversation_id TEXT PRIMARY KEY,
+    transaction_id TEXT,
+    simulation_id TEXT,
+    etapa TEXT NOT NULL DEFAULT 'inicio',
+    status_novosaque TEXT,
+    terms_link TEXT,
+    contract_link TEXT,
+    offers_json TEXT,
+    phone TEXT,
+    whatsapp_notified_at INTEGER,
+    whatsapp_notify_attempt_at INTEGER,
+    error_message TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES site_chat_conversations(id) ON DELETE CASCADE
+  )`);
+  const infoSiteChatClt = await client.execute(`PRAGMA table_info(site_chat_clt)`);
+  for (const nome of ["whatsapp_notified_at", "whatsapp_notify_attempt_at"]) {
+    if (!infoSiteChatClt.rows.some((r) => r.name === nome)) await client.execute(`ALTER TABLE site_chat_clt ADD COLUMN ${nome} INTEGER`);
+  }
   const infoSiteChat = await client.execute(`PRAGMA table_info(site_chat_conversations)`);
   if (!infoSiteChat.rows.some((r) => r.name === "pipeline_estagio")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN pipeline_estagio TEXT`);
@@ -3618,6 +3639,38 @@ async function siteChatDefinirProduto(id, produtoTag) {
   });
 }
 
+async function siteChatCltObter(conversationId) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT * FROM site_chat_clt WHERE conversation_id = ?`, args: [conversationId] });
+  return result.rows[0] || null;
+}
+
+async function siteChatCltCriar(conversationId, transactionId, phone) {
+  await ready;
+  const now = Date.now();
+  await client.execute({
+    sql: `INSERT INTO site_chat_clt (conversation_id, transaction_id, phone, etapa, created_at, updated_at)
+          VALUES (?, ?, ?, 'aguardando_autorizacao', ?, ?)
+          ON CONFLICT(conversation_id) DO UPDATE SET transaction_id = excluded.transaction_id,
+            phone = excluded.phone, etapa = 'aguardando_autorizacao', error_message = NULL, updated_at = excluded.updated_at`,
+    args: [conversationId, transactionId, phone || null, now, now],
+  });
+  return siteChatCltObter(conversationId);
+}
+
+async function siteChatCltAtualizar(conversationId, campos) {
+  await ready;
+  const permitidos = ["transaction_id", "simulation_id", "etapa", "status_novosaque", "terms_link", "contract_link", "offers_json", "phone", "whatsapp_notified_at", "whatsapp_notify_attempt_at", "error_message"];
+  const entradas = Object.entries(campos).filter(([k]) => permitidos.includes(k));
+  if (!entradas.length) return siteChatCltObter(conversationId);
+  const sets = entradas.map(([k]) => `${k} = ?`).join(", ");
+  await client.execute({
+    sql: `UPDATE site_chat_clt SET ${sets}, updated_at = ? WHERE conversation_id = ?`,
+    args: [...entradas.map(([, v]) => v), Date.now(), conversationId],
+  });
+  return siteChatCltObter(conversationId);
+}
+
 module.exports = {
   hashSenha,
   verificarSenha,
@@ -3673,6 +3726,9 @@ module.exports = {
   siteChatDefinirStatus,
   siteChatDefinirPipeline,
   siteChatDefinirProduto,
+  siteChatCltObter,
+  siteChatCltCriar,
+  siteChatCltAtualizar,
   fluxoDinamicoCriar,
   fluxoDinamicoAtivo,
   fluxoDinamicoListar,
