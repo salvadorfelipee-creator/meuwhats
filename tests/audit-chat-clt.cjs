@@ -43,8 +43,11 @@ async function enviar(page, texto) {
       const banco = await enviar(page, "083.619.439-00")
       assert.doesNotMatch(banco, /mais de 3 meses/i)
       assert.match(banco, /(autorização|equipe continuará)/i)
+      await page.locator(".fc-chat-clt.show").waitFor({ timeout: 30000 })
+      const estadoAutorizacao = await page.locator(".fc-chat-clt").innerText()
+      assert.match(estadoAutorizacao, /(autorização|banco|consulta)/i)
       await page.screenshot({ path: "test-results/chat-clt-direto.png", fullPage: true })
-      resultados.push({ caminho: "CLT direto, confirmação, CPF inválido e CPF válido", ok: true, respostaBanco: banco })
+      resultados.push({ caminho: "CLT direto, confirmação, CPF inválido e CPF válido", ok: true, respostaBanco: banco, estadoAutorizacao })
       await context.close()
     }
     {

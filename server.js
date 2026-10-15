@@ -113,7 +113,7 @@ async function sincronizarSiteChatClt(row) {
   if (!row?.transaction_id || ["concluido", "sem_oferta", "erro"].includes(row.etapa)) return row;
   try {
     const contract = await novosaque.consultarContratoClt(row.transaction_id);
-    const changes = { status_novosaque: contract.summary_status || null };
+    const changes = { status_novosaque: contract.summary_status || null, error_message: null };
     if (contract.terms_link) changes.terms_link = contract.terms_link;
     if (contract.contract_link) {
       changes.contract_link = contract.contract_link;
@@ -131,7 +131,9 @@ async function sincronizarSiteChatClt(row) {
     return updated;
   } catch (err) {
     console.error(`Erro ao sincronizar CLT do site (${row.conversation_id}):`, err.message);
-    return row;
+    return db.siteChatCltAtualizar(row.conversation_id, {
+      error_message: "O ambiente do banco ainda não liberou a autorização. Tente novamente em alguns instantes.",
+    }).catch(() => row);
   }
 }
 

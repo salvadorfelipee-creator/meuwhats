@@ -1,7 +1,7 @@
 (() => {
   const API = "https://meuwhats.onrender.com/site-chat/conversations";
   const STORAGE = "felizcred_site_chat_v1";
-  const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null };
+  const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false };
   const iconChat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></svg>';
   const iconClose = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
   const iconSend = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>';
@@ -73,7 +73,11 @@
     }
     if (["aguardando_autorizacao", "simulando"].includes(c.etapa)) {
       const demorando = !c.termsLink && c.waitingSince && Date.now() - Number(c.waitingSince) > 90_000;
-      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">2 de 5 · Autorização</span><h3>${c.termsLink ? "Autorize a consulta" : demorando ? "O banco ainda está preparando o link" : "Preparando sua autorização…"}</h3><p>${c.termsLink ? "Para simular e ver as condições, clique no link e faça a autorização." : demorando ? "Pode demorar um pouco no ambiente de testes. Continue nesta conversa; o botão aparecerá automaticamente assim que o banco liberar." : "Isso costuma levar poucos segundos."}</p>${c.termsLink ? `<a class="fc-chat-primary" href="${c.termsLink}" target="_blank" rel="noopener">Abrir autorização segura</a>` : '<span class="fc-clt-loading">Consultando o banco…</span>'}</div>`;
+      const termsLink = c.termsLink ? String(c.termsLink).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : "";
+      const authorizationCopy = state.authorizationOpened
+        ? "Conclua o formulário na janela do banco. Depois, feche essa janela e volte aqui: suas ofertas aparecerão automaticamente."
+        : "A autorização abrirá em uma janela segura do banco. Depois de enviar o formulário, volte a este chat para ver suas ofertas.";
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">2 de 5 · Autorização</span><h3>${c.termsLink ? state.authorizationOpened ? "Aguardando a autorização do banco" : "Autorize a consulta" : c.error ? "Não recebemos o link do banco" : demorando ? "O banco ainda está preparando o link" : "Preparando sua autorização…"}</h3><p>${c.termsLink ? authorizationCopy : c.error ? c.error : demorando ? "Pode demorar um pouco no ambiente de testes. Continue nesta conversa; o botão aparecerá automaticamente assim que o banco liberar." : "Isso costuma levar poucos segundos."}</p>${c.termsLink ? `<a class="fc-chat-primary" href="${termsLink}" target="_blank" rel="noopener" data-open-authorization>${state.authorizationOpened ? "Abrir novamente" : "Autorizar no banco"}</a>` : c.error ? '<button type="button" class="fc-chat-primary" data-refresh-clt>Tentar novamente</button>' : '<span class="fc-clt-loading">Consultando o banco…</span>'}</div>`;
       return;
     }
     if (c.etapa === "sem_oferta") { cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Consulta concluída</span><h3>Não há uma oferta disponível agora</h3><p>Você poderá tentar novamente quando sua margem mudar.</p></div>`; return; }
@@ -100,11 +104,29 @@
   startForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && state.step < 2) { e.preventDefault(); goTo(state.step + 1); } if (state.step === 2 && ["a","b","c"].includes(e.key.toLowerCase())) startForm.elements.topic[["a","b","c"].indexOf(e.key.toLowerCase())].checked = true; });
   startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const data = await api("", { method: "POST", body: JSON.stringify({ name: form.get("name"), contact: form.get("contact"), message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
   cltEl.addEventListener("click", async (e) => {
+    const authorizationLink = e.target.closest("[data-open-authorization]");
+    if (authorizationLink) {
+      const width = Math.min(720, Math.max(360, window.screen.availWidth - 32));
+      const height = Math.min(820, Math.max(600, window.screen.availHeight - 80));
+      const left = Math.max(0, Math.round((window.screen.availWidth - width) / 2));
+      const top = Math.max(0, Math.round((window.screen.availHeight - height) / 2));
+      const popup = window.open("", "felizcred_autorizacao", `popup=yes,width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+      if (popup) {
+        e.preventDefault();
+        popup.opener = null;
+        popup.location.href = authorizationLink.href;
+        popup.focus();
+        state.authorizationOpened = true;
+        renderClt();
+      }
+      return;
+    }
     const tenure = e.target.closest("[data-tenure]");
     if (tenure) { tenure.disabled = true; await sendPayload({ message: tenure.dataset.tenure === "yes" ? "Sim, tenho mais de 3 meses" : "Ainda não tenho 3 meses" }); return; }
     const offerButton = e.target.closest("[data-offer]");
     if (offerButton) { state.selectedOffer = state.clt.offers.find((o) => String(o.simulationId) === offerButton.dataset.offer); renderClt(); return; }
     if (e.target.closest("[data-lower]")) { cltEl.querySelector(".fc-clt-resim").hidden = false; }
+    if (e.target.closest("[data-refresh-clt]")) { const retry = e.target.closest("[data-refresh-clt]"); retry.disabled = true; await refreshClt(); }
   });
   cltEl.addEventListener("submit", async (e) => {
     e.preventDefault(); const form = new FormData(e.target), button = e.target.querySelector('button[type="submit"],button:not([type])'); if (button) button.disabled = true;
