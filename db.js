@@ -159,6 +159,15 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "produto_tag")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN produto_tag TEXT`);
   }
+  // Mantém conversas antigas do site visíveis no mesmo funil da FelizCred. Versões anteriores
+  // gravavam nomes que não existem nas colunas do painel, deixando esses cards invisíveis.
+  await client.execute(`UPDATE site_chat_conversations
+    SET pipeline_estagio = CASE pipeline_estagio
+      WHEN 'em_qualificacao' THEN 'qualificacao'
+      WHEN 'documentos_enviados' THEN 'documentos'
+      ELSE COALESCE(pipeline_estagio, 'novo_lead')
+    END,
+    pipeline_estagio_desde = COALESCE(pipeline_estagio_desde, created_at)`);
   const infoSiteMessages = await client.execute(`PRAGMA table_info(site_chat_messages)`);
   for (const [nome, tipo] of [["type", "TEXT"], ["media_url", "TEXT"], ["media_mime", "TEXT"], ["file_name", "TEXT"]]) {
     if (!infoSiteMessages.rows.some((r) => r.name === nome)) {
@@ -3537,9 +3546,10 @@ async function siteChatCriar({ id, tokenHash, name, contact, pageUrl, message, p
   await client.batch([
     {
       sql: `INSERT INTO site_chat_conversations
-            (id, visitor_token_hash, name, contact, page_url, status, created_at, updated_at, last_visitor_at, produto_tag)
-            VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)`,
-      args: [id, tokenHash, name, contact || null, pageUrl || null, now, now, now, produtoTag || null],
+            (id, visitor_token_hash, name, contact, page_url, status, created_at, updated_at, last_visitor_at,
+             produto_tag, pipeline_estagio, pipeline_estagio_desde)
+            VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, 'novo_lead', ?)`,
+      args: [id, tokenHash, name, contact || null, pageUrl || null, now, now, now, produtoTag || null, now],
     },
     {
       sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)

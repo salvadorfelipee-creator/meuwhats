@@ -5222,7 +5222,7 @@ const server = http.createServer(async (req, res) => {
             const transactionId = await novosaque.criarSimulacaoClt(cpf);
             let row = await db.siteChatCltCriar(id, transactionId, phone);
             await db.siteChatDefinirProduto(id, "Empréstimo CLT");
-            await db.siteChatDefinirPipeline(id, "em_qualificacao");
+            await db.siteChatDefinirPipeline(id, "qualificacao");
             await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Simulação iniciada. Agora vamos gerar a autorização segura de consulta.");
             row = await sincronizarSiteChatClt(row);
             return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
@@ -5264,7 +5264,7 @@ const server = http.createServer(async (req, res) => {
             customer.telefone_rh = customer.telefone_rh || customer.celular;
             const customerData = novosaque.montarCustomerData(cpf, customer);
             await novosaque.enviarFormalizacaoClt(atual.transaction_id, offer.simulation_id, customerData);
-            await db.siteChatDefinirPipeline(id, "documentos_enviados");
+            await db.siteChatDefinirPipeline(id, "documentos");
             await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Dados recebidos. Estamos gerando seu contrato para assinatura.");
             const row = await db.siteChatCltAtualizar(id, { simulation_id: offer.simulation_id, etapa: "formalizando", error_message: null });
             return send(res, 202, { clt: siteChatCltPublico(row) }, corsHeaders);
