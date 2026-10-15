@@ -1,0 +1,28 @@
+const { chromium } = require("playwright")
+const assert = require("node:assert/strict")
+
+;(async () => {
+  const browser = await chromium.launch({ headless: true })
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "pt-BR" })
+  const page = await context.newPage()
+  try {
+    await page.goto("https://www.felizcred.com.br/", { waitUntil: "domcontentloaded" })
+    await page.locator(".fc-chat-launcher").click()
+    await page.locator('[name="name"]').fill("Auditoria roteamento Gemini")
+    await page.locator('.fc-chat-step[data-step="0"] .fc-chat-next').click()
+    await page.locator('[name="contact"]').fill(`auditoria.gemini.${Date.now()}@example.com`)
+    await page.locator('.fc-chat-step[data-step="1"] .fc-chat-next').click()
+    await page.locator('input[value="FGTS"]').check({ force: true })
+    await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit())
+    await page.locator(".fc-chat-root.has-conversation").waitFor({ timeout: 30000 })
+    await page.locator(".fc-chat-compose textarea").fill("Sou registrado e queria ver quanto libera pra mim")
+    await page.locator(".fc-chat-compose").evaluate((form) => form.requestSubmit())
+    await page.locator('[data-tenure="yes"]').waitFor({ timeout: 45000 })
+    const resposta = await page.locator(".fc-chat-bubble.agent").last().innerText()
+    assert.match(resposta, /mais de 3 meses/i)
+    console.log(JSON.stringify({ fraseSemPalavraChave: true, roteadaParaClt: true, resposta }, null, 2))
+  } finally {
+    await context.close()
+    await browser.close()
+  }
+})().catch((error) => { console.error(error); process.exitCode = 1 })
