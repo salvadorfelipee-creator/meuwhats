@@ -77,6 +77,7 @@ function siteChatCltPublico(row) {
     status: row.status_novosaque || null,
     termsLink: row.terms_link || null,
     contractLink: row.contract_link || null,
+    waitingSince: row.created_at || null,
     offers: offers.map((o) => ({
       simulationId: o.simulation_id,
       installments: o.installments,

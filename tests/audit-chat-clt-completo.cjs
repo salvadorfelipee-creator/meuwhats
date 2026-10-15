@@ -35,6 +35,11 @@ function json(route, body, status = 200) {
     if (req.method() === "POST" && /\/conversations$/.test(url.pathname)) {
       return json(route, { conversation: { id: "audit-clt" }, token: "token-auditoria", messages }, 201)
     }
+    if (req.method() === "POST") {
+      const body = req.postDataJSON()
+      if (/sim, tenho/i.test(body.message || "")) return json(route, { ok: true, clt: true, cltStep: "start" }, 201)
+      if (/ainda não/i.test(body.message || "")) return json(route, { ok: true, clt: true, cltStep: "ineligible" }, 201)
+    }
     return json(route, { ok: true, clt: true })
   })
 
@@ -49,7 +54,11 @@ function json(route, body, status = 200) {
     await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit())
 
     await page.locator('[data-tenure="yes"]').waitFor()
+    const inicioResposta = Date.now()
     await page.locator('[data-tenure="yes"]').click()
+    await page.locator(".fc-chat-typing.show").waitFor()
+    await page.locator('.fc-clt-card[data-action="start"]').waitFor()
+    assert.ok(Date.now() - inicioResposta >= 1400, "a resposta deve respeitar o atraso de digitação")
     await page.locator('.fc-clt-card[data-action="start"] input[name="cpf"]').fill("083.619.439-00")
     await page.locator('.fc-clt-card[data-action="start"] input[name="phone"]').fill("(47) 99999-9999")
     await page.locator('.fc-clt-card[data-action="start"]').evaluate((form) => form.requestSubmit())

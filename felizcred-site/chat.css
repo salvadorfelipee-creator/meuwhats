@@ -151,6 +151,17 @@
 .fc-chat-bubble p a { display: inline-flex; margin-top: 8px; color: #06753a; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .fc-chat-bubble small { display: block; margin-top: 5px; color: rgba(20,32,51,.55); font-size: 10px; text-align: right; }
 .fc-chat-bubble.agent small { text-align: left; }
+.fc-chat-typing { display: none; align-self: flex-start; align-items: center; gap: 4px; padding: 9px 12px; border: 1px solid var(--fc-line); border-radius: 16px 16px 16px 5px; background: #fff; color: var(--fc-muted); }
+.fc-chat-typing.show { display: flex; }
+.fc-chat-typing > span { width: 5px; height: 5px; border-radius: 50%; background: #98a2b3; animation: fc-typing 1s infinite ease-in-out; }
+.fc-chat-typing > span:nth-child(2) { animation-delay: .12s; }
+.fc-chat-typing > span:nth-child(3) { animation-delay: .24s; }
+.fc-chat-typing small { margin-left: 3px; font-size: 11px; }
+@keyframes fc-typing { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-3px); opacity: 1; } }
+.fc-chat-quick-replies { display: none; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--fc-line); background: #fff; }
+.fc-chat-quick-replies:has(button) { display: flex; }
+.fc-chat-quick-replies button { min-width: 76px; min-height: 38px; padding: 0 16px; border: 1px solid var(--fc-green-dark); border-radius: 999px; background: #fff; color: var(--fc-green-dark); cursor: pointer; font: 700 13px "Sora", sans-serif; }
+.fc-chat-quick-replies button:hover { background: #edfff4; }
 .fc-chat-compose { display: flex; align-items: flex-end; gap: 5px; border-top: 1px solid var(--fc-line); padding: 11px; background: #fff; }
 .fc-chat-clt { display: none; max-height: 68%; overflow-y: auto; border-top: 1px solid var(--fc-line); background: #f5f7f9; padding: 12px; }
 .fc-chat-clt.show { display: block; }
@@ -203,4 +214,5 @@ a.fc-chat-media { color: inherit; text-decoration: underline; }
 
 @media (prefers-reduced-motion: reduce) {
   .fc-chat, .fc-chat-launcher { transition: none; }
+  .fc-chat-typing > span { animation: none; }
 }
