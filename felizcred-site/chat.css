@@ -92,7 +92,8 @@
 .fc-chat-close:hover { background: rgba(255,255,255,.15); }
 .fc-chat-close svg { width: 18px; height: 18px; }
 
-.fc-chat-welcome { padding: 24px 20px 12px; }
+.fc-chat-start { min-height: 0; flex: 1; overflow-y: auto; }
+.fc-chat-welcome { padding: 22px 20px 10px; }
 .fc-chat-welcome h2 { margin: 0; color: var(--fc-navy); font: 750 21px/1.25 "Sora", sans-serif; }
 .fc-chat-welcome p { margin: 9px 0 0; color: var(--fc-muted); font-size: 14px; line-height: 1.55; }
 .fc-chat-form { display: flex; flex: 1; flex-direction: column; gap: 12px; padding: 10px 20px 20px; }
@@ -102,6 +103,17 @@
 .fc-chat input { height: 44px; padding: 0 13px; }
 .fc-chat textarea { min-height: 92px; padding: 12px 13px; resize: none; line-height: 1.45; }
 .fc-chat input:focus, .fc-chat textarea:focus { border-color: rgba(0, 200, 83, .7); background: #fff; outline: 0; }
+.fc-chat-topics { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.fc-chat-topics legend { margin-bottom: 2px; color: #344054; font-size: 12px; font-weight: 600; }
+.fc-chat-topic { position: relative; display: block; cursor: pointer; }
+.fc-chat-topic input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.fc-chat-topic span { display: flex; min-height: 53px; flex-direction: column; justify-content: center; padding: 8px 12px; border: 1px solid var(--fc-line); border-radius: 12px; background: #f9fbfc; transition: border-color .15s ease, background .15s ease, box-shadow .15s ease; }
+.fc-chat-topic b { color: var(--fc-ink); font: 650 13px "Sora", sans-serif; }
+.fc-chat-topic small { margin-top: 2px; color: var(--fc-muted); font-size: 11px; }
+.fc-chat-topic:hover span { border-color: #b8d8c6; background: #fff; }
+.fc-chat-topic input:focus-visible + span { outline: 3px solid rgba(0, 200, 83, .2); outline-offset: 2px; }
+.fc-chat-topic input:checked + span { border-color: var(--fc-green-dark); background: #edfff4; box-shadow: 0 0 0 1px var(--fc-green-dark) inset; }
+.fc-chat-topic input:checked + span::after { position: absolute; right: 13px; color: var(--fc-green-dark); content: "✓"; font-size: 15px; font-weight: 800; }
 .fc-chat-primary { display: flex; min-height: 46px; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 13px; background: var(--fc-green); color: var(--fc-navy); cursor: pointer; font: 700 14px "Sora", sans-serif; }
 .fc-chat-primary svg { width: 18px; height: 18px; }
 .fc-chat-primary:hover { background: #2cdd78; }
@@ -128,14 +140,12 @@
 .fc-chat-send:disabled { opacity: .45; }
 
 /* O chat próprio é o canal principal; WhatsApp continua disponível como alternativa discreta. */
-.whatsapp-float { right: 25px !important; bottom: 94px !important; width: 44px !important; height: 44px !important; opacity: .78; }
-.whatsapp-float svg { width: 23px !important; height: 23px !important; }
+.whatsapp-float { display: none !important; }
 
 @media (max-width: 600px) {
   .fc-chat-root { right: 10px; bottom: 10px; }
   .fc-chat { position: fixed; inset: 8px; width: auto; height: auto; border-radius: 20px; transform-origin: bottom center; }
   .fc-chat-launcher { height: 54px; padding: 0 16px; border-radius: 17px; }
-  .whatsapp-float { right: 16px !important; bottom: 78px !important; }
 }
 
 @media (prefers-reduced-motion: reduce) {

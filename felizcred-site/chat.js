@@ -23,8 +23,13 @@
         <div class="fc-chat-welcome"><h2>Olá! Como podemos ajudar?</h2><p>Converse diretamente com nossa equipe sem sair do site.</p></div>
         <form class="fc-chat-form">
           <label class="fc-chat-label"><span>Seu nome</span><input name="name" maxlength="80" autocomplete="name" required placeholder="Como podemos chamar você?"/></label>
-          <label class="fc-chat-label"><span>Telefone ou e-mail <em>(opcional)</em></span><input name="contact" maxlength="160" autocomplete="email" placeholder="Para retornarmos se você sair"/></label>
-          <label class="fc-chat-label"><span>Sua mensagem</span><textarea name="message" maxlength="2000" required placeholder="Conte o que você precisa"></textarea></label>
+          <label class="fc-chat-label"><span>E-mail <em>(opcional)</em></span><input name="contact" type="email" maxlength="160" autocomplete="email" placeholder="Para continuarmos a conversa por e-mail"/></label>
+          <fieldset class="fc-chat-topics">
+            <legend>Sobre o que você quer falar?</legend>
+            <label class="fc-chat-topic"><input type="radio" name="topic" value="FGTS" required/><span><b>FGTS</b><small>Antecipação do saque-aniversário</small></span></label>
+            <label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo CLT" required/><span><b>Empréstimo CLT</b><small>Crédito para quem trabalha registrado</small></span></label>
+            <label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo com carro em garantia" required/><span><b>Carro em garantia</b><small>Empréstimo usando seu veículo</small></span></label>
+          </fieldset>
           <p class="fc-chat-error" role="alert"></p>
           <button class="fc-chat-primary" type="submit">Iniciar conversa ${iconSend}</button>
           <p class="fc-chat-privacy">Ao enviar, você concorda com o uso destes dados para responder ao seu atendimento.</p>
@@ -119,7 +124,12 @@
     try {
       const data = await api("", {
         method: "POST",
-        body: JSON.stringify({ name: form.get("name"), contact: form.get("contact"), message: form.get("message"), pageUrl: location.href }),
+        body: JSON.stringify({
+          name: form.get("name"),
+          contact: form.get("contact"),
+          message: `Tenho interesse em: ${form.get("topic")}`,
+          pageUrl: location.href,
+        }),
       });
       state.session = { id: data.conversation.id, token: data.token };
       state.messages = data.messages;
