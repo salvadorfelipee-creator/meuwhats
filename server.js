@@ -5300,10 +5300,31 @@ const server = http.createServer(async (req, res) => {
         try { media = salvarMidiaSite(req, body); } catch (err) { return send(res, 400, { error: err.message }, corsHeaders); }
         if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." }, corsHeaders);
         await db.siteChatMensagemVisitante(id, conversation.name, message, media);
-        if (!conversation.produto_tag && message) {
+        const pediuClt = /\b(clt|consignado(?:\s+clt)?)\b/i.test(message);
+        let conversaClt = pediuClt || conversation.produto_tag === "Empréstimo CLT";
+        if (!conversaClt && message) {
+          const recentes = (await db.siteChatMensagens(id)).slice(-10);
+          conversaClt = recentes.some((m) => m.direction === "visitor" && /\b(clt|consignado(?:\s+clt)?)\b/i.test(m.body || ""));
+        }
+        if (conversaClt && conversation.produto_tag !== "Empréstimo CLT") await db.siteChatDefinirProduto(id, "Empréstimo CLT");
+        else if (!conversation.produto_tag && message) {
           gemini.classificarProdutoSite(message).then((produto) => produto && db.siteChatDefinirProduto(id, produto)).catch(() => {});
         }
-        return send(res, 201, { ok: true }, corsHeaders);
+        if (message && conversaClt) {
+          try {
+            const row = await db.siteChatCltObter(id);
+            const mensagemMascarada = message
+              .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[e-mail]")
+              .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, "[CPF]")
+              .replace(/\b\d{11}\b/g, "[documento ou telefone]")
+              .replace(/\b\d{10}\b/g, "[telefone]");
+            const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses" });
+            if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
+          } catch (err) {
+            console.error(`Gemini não respondeu no chat CLT ${id}:`, err.message);
+          }
+        }
+        return send(res, 201, { ok: true, clt: conversaClt }, corsHeaders);
       }
     }
 

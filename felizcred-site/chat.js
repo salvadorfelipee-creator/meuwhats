@@ -128,7 +128,7 @@
       renderClt(); await refresh();
     } catch (error) { alert(error.message); } finally { if (button) button.disabled = false; }
   });
-  async function sendPayload(payload) { const button = $(".fc-chat-send"); button.disabled = true; try { await api(`/${state.session.id}`, { method: "POST", body: JSON.stringify(payload) }); composeText.value = ""; sound("out"); if (CLT_SANDBOX && payload.message && (/\b(clt|consignado)\b/i.test(payload.message) || state.clt)) { if (!state.clt) { state.clt = "eligibility"; renderClt(); } await api(`/${state.session.id}/clt/assistant`, { method: "POST", body: JSON.stringify({ message: payload.message }) }).catch(() => {}); } await refresh(); } finally { button.disabled = false; } }
+  async function sendPayload(payload) { const button = $(".fc-chat-send"); button.disabled = true; try { const result = await api(`/${state.session.id}`, { method: "POST", body: JSON.stringify(payload) }); composeText.value = ""; sound("out"); if (CLT_SANDBOX && result.clt && !state.clt) { state.clt = "eligibility"; renderClt(); } await refresh(); } finally { button.disabled = false; } }
   compose.addEventListener("submit", async (e) => { e.preventDefault(); const message = composeText.value.trim(); if (message) await sendPayload({ message }); });
   emojiButton.addEventListener("click", () => emojiMenu.classList.toggle("show"));
   emojiMenu.addEventListener("click", (e) => { if (e.target === emojiMenu) return; const emoji = e.target.textContent; composeText.value += emoji; emojiMenu.classList.remove("show"); composeText.focus(); });
