@@ -5312,16 +5312,42 @@ const server = http.createServer(async (req, res) => {
         }
         if (message && conversaClt) {
           try {
-            const row = await db.siteChatCltObter(id);
-            const mensagemMascarada = message
-              .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[e-mail]")
-              .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, "[CPF]")
-              .replace(/\b\d{11}\b/g, "[documento ou telefone]")
-              .replace(/\b\d{10}\b/g, "[telefone]");
-            const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses" });
-            if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
+            let row = await db.siteChatCltObter(id);
+            const somenteDigitos = message.replace(/\D/g, "");
+            const cpfInformado = somenteDigitos.length === 11 && novosaque.cpfValido(somenteDigitos)
+              ? somenteDigitos
+              : null;
+            const confirmouTempo = /^(sim|tenho|tenho sim|mais de 3 meses|3 meses ou mais)[!. ]*$/i.test(message.trim());
+            const semTempoMinimo = /^(n[aã]o|ainda n[aã]o|n[aã]o tenho|menos de 3 meses)[!. ]*$/i.test(message.trim());
+
+            // As etapas obrigatórias são determinísticas. O Gemini cuida apenas da linguagem
+            // livre e não pode voltar a qualificação depois da confirmação nem confundir CPF.
+            if (!row && confirmouTempo) {
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Perfeito! Agora digite seu CPF para iniciarmos a simulação.");
+            } else if (!row && semTempoMinimo) {
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Entendi. Assim que completar 3 meses no trabalho atual, volte aqui para fazermos sua simulação.");
+            } else if (!row && cpfInformado) {
+              const transactionId = await novosaque.criarSimulacaoClt(cpfInformado);
+              row = await db.siteChatCltCriar(id, transactionId, null);
+              await db.siteChatDefinirProduto(id, "Empréstimo CLT");
+              await db.siteChatDefinirPipeline(id, "qualificacao");
+              row = await sincronizarSiteChatClt(row);
+              const orientacao = row?.terms_link
+                ? `CPF recebido. Para consultar suas condições, faça a autorização segura neste link:\n${row.terms_link}`
+                : "CPF recebido. Estamos preparando sua autorização segura de consulta.";
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", orientacao);
+            } else {
+              const mensagemMascarada = message
+                .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[e-mail]")
+                .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, "[CPF]")
+                .replace(/\b\d{11}\b/g, "[documento ou telefone]")
+                .replace(/\b\d{10}\b/g, "[telefone]");
+              const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses" });
+              if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
+            }
           } catch (err) {
             console.error(`Gemini não respondeu no chat CLT ${id}:`, err.message);
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Recebi seus dados. Não consegui concluir a consulta automática agora, mas nossa equipe continuará o atendimento por aqui.").catch(() => {});
           }
         }
         return send(res, 201, { ok: true, clt: conversaClt }, corsHeaders);
