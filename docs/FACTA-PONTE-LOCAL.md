@@ -58,6 +58,7 @@ reescritos.
 - [x] Ponte local autenticada e lista fechada de endpoints.
 - [x] URL e segredo configurados no Render.
 - [x] Inicialização automática no login do Windows.
+- [x] Suspensão e hibernação automáticas desativadas para não interromper a ponte.
 - [x] Teste ponta a ponta com documento deliberadamente inválido (autenticação e IP aceitos).
 - [ ] Validar o formato das respostas com um CPF autorizado pelo titular.
 - [ ] Ligar o fluxo do chat à Facta depois dessa validação.
