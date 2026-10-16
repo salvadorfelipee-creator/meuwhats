@@ -2,6 +2,8 @@ node_modules/
 painel-web/dist/
 test-results/
 .env
+facta-bridge/.env
+facta-bridge/logs/
 CHAVES-LOCAL.md
 data.db
 data.db-journal
