@@ -1701,15 +1701,23 @@ function AudioPlayerMensagem({ src }: { src: string }) {
   const [tocando, setTocando] = React.useState(false)
   const [duracao, setDuracao] = React.useState(0)
   const [atual, setAtual] = React.useState(0)
+  const [erro, setErro] = React.useState(false)
+
+  function atualizarDuracao(audio: HTMLAudioElement) {
+    setDuracao(Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0)
+  }
 
   function alternar() {
     const a = audioRef.current
     if (!a) return
-    if (a.paused) a.play().catch(() => {})
+    setErro(false)
+    if (a.paused) a.play().catch(() => setErro(true))
     else a.pause()
   }
 
-  const restante = Math.max(0, Math.round(duracao - atual))
+  const restante = Number.isFinite(duracao) && Number.isFinite(atual)
+    ? Math.max(0, Math.round(duracao - atual))
+    : 0
 
   return (
     <div className="flex items-center gap-2 mb-1 w-full max-w-[260px]">
@@ -1720,8 +1728,14 @@ function AudioPlayerMensagem({ src }: { src: string }) {
         onPlay={() => setTocando(true)}
         onPause={() => setTocando(false)}
         onEnded={() => setTocando(false)}
-        onLoadedMetadata={(e) => setDuracao(e.currentTarget.duration || 0)}
-        onTimeUpdate={(e) => setAtual(e.currentTarget.currentTime || 0)}
+        onLoadedMetadata={(e) => atualizarDuracao(e.currentTarget)}
+        onDurationChange={(e) => atualizarDuracao(e.currentTarget)}
+        onTimeUpdate={(e) => {
+          const tempo = e.currentTarget.currentTime
+          setAtual(Number.isFinite(tempo) ? tempo : 0)
+          atualizarDuracao(e.currentTarget)
+        }}
+        onError={() => { setErro(true); setTocando(false) }}
         className="hidden"
       />
       <button
@@ -1737,7 +1751,9 @@ function AudioPlayerMensagem({ src }: { src: string }) {
           style={{ width: duracao ? `${Math.min(100, (atual / duracao) * 100)}%` : "0%" }}
         />
       </div>
-      <span className="text-[10px] opacity-70 tabular-nums shrink-0">{formatGravacao(restante)}</span>
+      <span className={`text-[10px] tabular-nums shrink-0 ${erro ? "text-red-600" : "opacity-70"}`}>
+        {erro ? "Erro" : duracao > 0 ? formatGravacao(restante) : "0:00"}
+      </span>
     </div>
   )
 }

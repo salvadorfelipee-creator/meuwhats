@@ -1,6 +1,6 @@
 import * as React from "react"
-import { ArrowLeft, AtSign, Bell, BellOff, Check, ChevronDown, FileText, Globe2, MessageCircle, Mic, Paperclip, Phone, RotateCcw, Search, Send, Smile, UserRound, X } from "lucide-react"
-import { api, type SiteChatConversation, type SiteChatMessage } from "@/lib/api"
+import { ArrowLeft, AtSign, Bell, BellOff, Check, ChevronDown, FileText, Globe2, Landmark, MessageCircle, Mic, Paperclip, Phone, RotateCcw, Search, Send, Smile, UserRound, X } from "lucide-react"
+import { api, type SiteChatClt, type SiteChatConversation, type SiteChatMessage } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -32,6 +32,7 @@ export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
   const [conversas, setConversas] = React.useState<SiteChatConversation[]>([])
   const [selecionada, setSelecionada] = React.useState<SiteChatConversation | null>(null)
   const [mensagens, setMensagens] = React.useState<SiteChatMessage[]>([])
+  const [clt, setClt] = React.useState<SiteChatClt | null>(null)
   const [busca, setBusca] = React.useState("")
   const [texto, setTexto] = React.useState("")
   const [enviando, setEnviando] = React.useState(false)
@@ -52,9 +53,10 @@ export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
       const dados = await api.siteChatConversa(id)
       setSelecionada(dados.conversation)
       setMensagens(dados.messages)
+      setClt(dados.clt)
       markConversationSeen("site", id)
       setConversas((prev) => prev.map((c) => c.id === id ? { ...c, ...dados.conversation, unread: false } : c))
-    } catch { if (!silencioso) setSelecionada(null) }
+    } catch { if (!silencioso) { setSelecionada(null); setClt(null) } }
   }, [markConversationSeen])
 
   React.useEffect(() => {
@@ -165,6 +167,9 @@ export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
           <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4"><Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelecionada(null)}><ArrowLeft className="h-4 w-4" /></Button><div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><UserRound className="h-4 w-4" /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{selecionada.name}</p><p className="truncate text-xs text-muted-foreground">{selecionada.contact}{selecionada.produto_tag ? ` · ${selecionada.produto_tag}` : ""}</p></div><Button variant="outline" size="sm" className="gap-1.5" onClick={alterarStatus}>{selecionada.status === "open" ? <Check className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}{selecionada.status === "open" ? "Encerrar" : "Reabrir"}</Button></header>
           <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-5"><div className="mx-auto flex max-w-3xl flex-col gap-3">
             <div className="mb-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground"><Globe2 className="h-3.5 w-3.5" /> Conversa iniciada em {new Date(selecionada.created_at).toLocaleString("pt-BR")}</div>
+            {clt?.provider === "facta" && <section className="mb-2 rounded-2xl border bg-background p-4 shadow-sm" aria-label="Andamento da proposta Facta">
+              <div className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><Landmark className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold">Proposta Facta</p><span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">{clt.etapa.replaceAll("_", " ")}</span></div><p className="mt-1 break-words text-xs text-muted-foreground">{clt.status || "Aguardando atualização"}{clt.proposalCode ? ` · Proposta ${clt.proposalCode}` : ""}</p>{clt.selectedOffer && <p className="mt-2 text-sm">Cliente recebe aproximadamente <strong>{clt.selectedOffer.disbursedAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong> em {clt.selectedOffer.installments}x de {clt.selectedOffer.installmentValue.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.</p>}{clt.error && <p className="mt-2 text-xs text-destructive">{clt.error}</p>}{clt.contractLink && <a href={clt.contractLink} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-9 items-center text-xs font-semibold text-emerald-700 underline underline-offset-4">Abrir assinatura segura</a>}</div></div>
+            </section>}
             {mensagens.map((m) => <div key={m.id} className={cn("flex", m.direction === "agent" ? "justify-end" : "justify-start")}><div className={cn("max-w-[78%] rounded-2xl px-3.5 py-2.5 shadow-sm", m.direction === "agent" ? "rounded-br-md bg-emerald-600 text-white" : "rounded-bl-md border bg-background")}>
               {m.type === "image" && m.media_url && <img src={m.media_url} alt={m.file_name || "Imagem"} className="mb-2 max-h-72 rounded-lg object-contain" />}
               {m.type === "video" && m.media_url && <video src={m.media_url} controls className="mb-2 max-h-72 rounded-lg" />}

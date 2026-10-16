@@ -54,9 +54,11 @@
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   async function api(path = "", options = {}) { const headers = { "Content-Type": "application/json", ...(options.headers || {}) }; if (state.session?.token) headers["X-Chat-Token"] = state.session.token; const response = await fetch(`${API}${path}`, { cache: "no-store", ...options, headers }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || "Não foi possível conectar agora."); return data; }
   const money = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inputDate = (v) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(v || "")); return m ? `${m[3]}-${m[2]}-${m[1]}` : String(v || ""); };
   function renderClt() {
     const c = state.clt;
-    root.classList.toggle("is-contracting", !!state.selectedOffer);
+    root.classList.toggle("is-contracting", !!state.selectedOffer || c?.etapa === "dados_pessoais");
     if (!c) { cltEl.classList.remove("show"); cltEl.innerHTML = ""; return; }
     cltEl.classList.add("show");
     if (c === "eligibility") {
@@ -68,7 +70,52 @@
       return;
     }
     if (c === "start") {
-      cltEl.innerHTML = `<form class="fc-clt-card" data-action="start"><span class="fc-clt-step">1 de 5 · Simulação</span><h3>Agora informe seus dados</h3><p>Usaremos estas informações somente para iniciar a consulta no ambiente seguro do banco.</p><label>CPF<input name="cpf" inputmode="numeric" maxlength="14" required placeholder="000.000.000-00"></label><label>Celular com DDD<input name="phone" inputmode="tel" maxlength="16" required placeholder="(47) 99999-9999"></label><button class="fc-chat-primary">Continuar</button></form>`;
+      cltEl.innerHTML = `<form class="fc-clt-card" data-action="start"><span class="fc-clt-step">1 de 5 · Autorização</span><h3>Vamos iniciar sua simulação na Facta</h3><p>Informe CPF e celular. A Facta enviará pelo WhatsApp um link para você autorizar a consulta dos dados do seu vínculo de trabalho.</p><label>CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" required placeholder="000.000.000-00"></label><label>Celular com DDD<input name="phone" inputmode="tel" autocomplete="tel" maxlength="16" required placeholder="(47) 99999-9999"></label><label class="fc-clt-consent"><input type="checkbox" required> Autorizo o envio dos meus dados à Facta para solicitar a autorização de consulta.</label><button class="fc-chat-primary">Enviar autorização no WhatsApp</button><small class="fc-clt-safe">A autorização vale por até 30 dias e pode ser revogada conforme as regras da Facta.</small></form>`;
+      return;
+    }
+    if (c.provider === "facta" && c.etapa === "solicitando_autorizacao") {
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">1 de 5 · Autorização</span><h3>Solicitando sua autorização…</h3><p>Aguarde enquanto conectamos com a Facta.</p><span class="fc-clt-loading">Enviando para o seu WhatsApp</span></div>`;
+      return;
+    }
+    if (c.provider === "facta" && c.etapa === "autorizacao_enviada") {
+      const checked = c.checkedAt ? `<small class="fc-clt-checked">Última verificação: ${formatTime(c.checkedAt)}</small>` : "";
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">2 de 5 · Autorize no WhatsApp</span><h3>Enviamos o link da Facta</h3><p>Abra a mensagem recebida no celular informado e autorize a consulta. Depois, volte aqui para verificar suas condições.</p><div class="fc-clt-notice"><b>Você continua no controle</b><span>A autorização permite consultar vínculo, margem e dados necessários à simulação. Ainda não cria empréstimo.</span></div>${c.error ? `<p class="fc-clt-inline-error">${esc(c.error)}</p>` : ""}<button type="button" class="fc-chat-primary" data-confirm-authorization>Já autorizei, consultar agora</button><button type="button" class="fc-clt-link" data-resend-authorization>Reenviar autorização</button>${checked}</div>`;
+      return;
+    }
+    if (c.provider === "facta" && ["erro_autorizacao", "erro_integracao"].includes(c.etapa)) {
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Não foi possível enviar</span><h3>Confira o celular informado</h3><p>${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p><button type="button" class="fc-chat-primary" data-resend-authorization>Tentar enviar novamente</button><button type="button" class="fc-clt-secondary" data-talk-agent>Falar com um atendente</button></div>`;
+      return;
+    }
+    if (c.provider === "facta" && c.etapa === "ofertas_disponiveis") {
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">3 de 5 · Escolha sua condição</span><h3>Estas são as condições encontradas</h3><p>O valor mostrado é líquido estimado. Ao escolher, a Facta fará a política de crédito antes de abrir o cadastro da proposta.</p><div class="fc-clt-offers">${c.offers.map((o) => `<button type="button" data-facta-offer="${esc(o.id)}" class="fc-clt-offer"><span>${o.installments} parcelas de</span><strong>${money(o.installmentValue)}</strong><small>Valor líquido ${money(o.disbursedAmount)}${o.rate ? ` · Taxa informada ${Number(o.rate).toFixed(2)}%` : ""}${o.insuranceValue ? ` · Inclui seguro de ${money(o.insuranceValue)}` : ""}</small></button>`).join("")}</div><div class="fc-clt-notice"><b>Antes de continuar</b><span>Valores e aprovação podem mudar após as validações finais. Você verá o contrato completo antes de assinar.</span></div></div>`;
+      return;
+    }
+    if (c.provider === "facta" && c.etapa === "dados_pessoais") {
+      const d = c.customerDefaults || {}, offer = c.selectedOffer || {};
+      cltEl.innerHTML = `<form class="fc-clt-card fc-clt-formalize" data-action="facta-personal"><span class="fc-clt-step">4 de 5 · Dados da proposta</span><h3>Complete seus dados</h3><p>Condição selecionada: você recebe aproximadamente <b>${money(offer.disbursedAmount)}</b> e paga ${offer.installments || "—"} parcelas de ${money(offer.installmentValue)}.</p><div class="fc-clt-section"><b>Dados pessoais</b><div class="fc-clt-grid"><label>Nome completo<input name="nome" value="${esc(d.nome)}" required autocomplete="name"></label><label>Sexo<select name="sexo" required><option value="">Selecione</option><option value="M" ${d.sexo === "M" ? "selected" : ""}>Masculino</option><option value="F" ${d.sexo === "F" ? "selected" : ""}>Feminino</option></select></label><label>Estado civil<select name="estado_civil" required><option value="">Selecione</option><option value="4">Solteiro(a)</option><option value="3">Casado(a)</option><option value="2">Divorciado(a)</option><option value="5">Viúvo(a)</option><option value="9">União estável</option><option value="6">Outro</option></select></label><label>Data de nascimento<input name="data_nascimento" type="date" value="${esc(inputDate(d.data_nascimento))}" required></label><label>RG<input name="rg" required inputmode="numeric"></label><label>UF do RG<input name="estado_rg" maxlength="2" required placeholder="SC"></label><label>Órgão emissor<input name="orgao_emissor" required placeholder="SSP"></label><label>Data de expedição<input name="data_expedicao" type="date" required></label><label>UF de nascimento<input name="estado_natural" maxlength="2" required placeholder="SC"></label><label>Cidade de nascimento<input name="cidade_natural_nome" required></label><label>Nacionalidade<select name="nacionalidade" required><option value="1">Brasileiro(a)</option><option value="2">Estrangeiro(a)</option></select></label><label>Celular<input name="celular" required inputmode="tel"></label><label>E-mail<input name="email" type="email" autocomplete="email"></label><label>Nome da mãe<input name="nome_mae" value="${esc(d.nome_mae)}" required></label><label>Nome do pai<input name="nome_pai" required placeholder="Ou NÃO DECLARADO"></label><label>Faixa de patrimônio<select name="valor_patrimonio" required><option value="1">Até R$ 10 mil</option><option value="2">De R$ 10 mil a R$ 100 mil</option><option value="3">De R$ 100 mil a R$ 500 mil</option><option value="4">De R$ 500 mil a R$ 1 milhão</option><option value="5">Acima de R$ 1 milhão</option></select></label></div></div><div class="fc-clt-section"><b>Endereço</b><div class="fc-clt-grid"><label>CEP<input name="cep" required inputmode="numeric" maxlength="9"></label><label>Endereço<input name="endereco" required></label><label>Número<input name="numero" required inputmode="numeric"></label><label>Complemento<input name="complemento"></label><label>Bairro<input name="bairro" required></label><label>Cidade<input name="cidade_nome" required></label><label>UF<input name="estado" required maxlength="2" placeholder="SC"></label></div></div><div class="fc-clt-section"><b>Conta para recebimento</b><div class="fc-clt-grid"><label>Banco<select name="banco" required><option value="">Selecione</option><option value="001">Banco do Brasil</option><option value="033">Santander</option><option value="104">Caixa</option><option value="237">Bradesco</option><option value="341">Itaú</option><option value="260">Nubank</option><option value="077">Inter</option><option value="336">C6 Bank</option></select></label><label>Tipo de conta<select name="tipo_conta" required><option value="C">Conta corrente</option><option value="P">Conta poupança</option></select></label><label>Agência<input name="agencia" required inputmode="numeric"></label><label>Conta com dígito<input name="conta" required></label><label>Tipo de chave Pix<select name="tipo_chave_pix" required><option value="1">CPF</option><option value="2">Telefone</option><option value="3">E-mail</option><option value="4">Chave aleatória</option></select></label><label>Chave Pix<input name="chave_pix" required></label></div></div><input type="hidden" name="renda" value="${esc(d.renda)}"><input type="hidden" name="matricula" value="${esc(d.matricula)}"><input type="hidden" name="cnpj_empregador" value="${esc(d.cnpj_empregador)}"><input type="hidden" name="data_admissao" value="${esc(inputDate(d.data_admissao))}"><label>Precisa de assinatura a rogo?<select name="cliente_iletrado_impossibilitado" required><option value="N">Não</option><option value="S">Sim</option></select></label><div class="fc-clt-rogo" hidden><div class="fc-clt-grid"><label>Nome de quem assina a rogo<input name="nome_a_rogo"></label><label>CPF de quem assina<input name="cpf_a_rogo" inputmode="numeric"></label><label>Nome da testemunha<input name="nome_a_rogo_testemunha"></label><label>CPF da testemunha<input name="cpf_a_rogo_testemunha" inputmode="numeric"></label></div></div><label class="fc-clt-consent"><input type="checkbox" required> Confirmo que os dados estão corretos e autorizo a geração de uma proposta real na Facta. Poderei revisar o contrato antes de assinar.</label><button class="fc-chat-primary">Gerar proposta para revisão</button></form>`;
+      const customerPhone = cltEl.querySelector('[name="celular"]');
+      if (customerPhone) customerPhone.value = d.celular || "";
+      return;
+    }
+    if (c.provider === "facta" && ["sem_margem", "nao_elegivel", "sem_oferta", "politica_reprovada", "erro_consulta"].includes(c.etapa)) {
+      const titles = { sem_margem: "Não há margem disponível agora", nao_elegivel: "O vínculo não está elegível agora", sem_oferta: "A Facta não encontrou uma condição", politica_reprovada: "A proposta não passou pela política da Facta", erro_consulta: "A Facta não concluiu a consulta" };
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Análise concluída</span><h3>${titles[c.etapa]}</h3><p>${esc(c.error || "Neste momento não é possível continuar automaticamente com esta contratação.")}</p><button type="button" class="fc-clt-secondary" data-talk-agent>Falar com um atendente</button></div>`;
+      return;
+    }
+    if (c.provider === "facta" && c.etapa === "aguardando_assinatura_facta") {
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">5 de 5 · Revisão e assinatura</span><h3>Sua proposta foi gerada</h3><p>Revise no ambiente seguro da Facta o valor liberado, parcelas, taxa, CET e demais condições. A contratação só é concluída depois da sua assinatura.</p><a class="fc-chat-primary" href="${esc(c.contractLink)}" target="_blank" rel="noopener noreferrer">Revisar e assinar na Facta</a><button type="button" class="fc-clt-secondary" data-refresh-clt>Já assinei, verificar andamento</button><small class="fc-clt-checked">Proposta ${esc(c.proposalCode || "")} · Também solicitamos o envio do link para o seu WhatsApp.</small>${c.error ? `<p class="fc-clt-inline-error">${esc(c.error)}</p>` : ""}</div>`;
+      return;
+    }
+    if (c.provider === "facta" && c.etapa === "proposta_em_analise") {
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Proposta em acompanhamento</span><h3>A Facta está analisando sua proposta</h3><p>A assinatura foi recebida ou a proposta avançou para análise. Status atual: <strong>${esc(c.status || "Em análise")}</strong>.</p><button type="button" class="fc-chat-primary" data-refresh-clt>Atualizar andamento</button><small class="fc-clt-checked">Você não precisa preencher os dados novamente.</small></div>`;
+      return;
+    }
+    if (c.provider === "facta" && c.etapa === "proposta_concluida") {
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Contratação concluída</span><h3>Proposta concluída pela Facta</h3><p>Status atual: <strong>${esc(c.status || "Concluída")}</strong>. Guarde o número da proposta ${esc(c.proposalCode || "")} para acompanhamento.</p></div>`;
+      return;
+    }
+    if (c.provider === "facta" && c.etapa === "proposta_cancelada") {
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Proposta encerrada</span><h3>A Facta não prosseguiu com esta proposta</h3><p>${esc(c.error || c.status || "Um atendente pode conferir o motivo com você.")}</p><button type="button" class="fc-clt-secondary" data-talk-agent>Falar com um atendente</button></div>`;
       return;
     }
     if (["aguardando_autorizacao", "simulando"].includes(c.etapa)) {
@@ -109,6 +156,51 @@
   startForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && state.step < 2) { e.preventDefault(); goTo(state.step + 1); } if (state.step === 2 && ["a","b","c"].includes(e.key.toLowerCase())) startForm.elements.topic[["a","b","c"].indexOf(e.key.toLowerCase())].checked = true; });
   startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const data = await api("", { method: "POST", body: JSON.stringify({ name: form.get("name"), contact: form.get("contact"), message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
   cltEl.addEventListener("click", async (e) => {
+    const confirmAuthorization = e.target.closest("[data-confirm-authorization]");
+    if (confirmAuthorization) {
+      confirmAuthorization.disabled = true;
+      confirmAuthorization.textContent = "Confirmando…";
+      try {
+        const data = await api(`/${state.session.id}/clt/confirm-authorization`, { method: "POST", body: "{}" });
+        state.clt = data.clt;
+        renderClt();
+        await refresh();
+      } catch (error) {
+        confirmAuthorization.disabled = false;
+        confirmAuthorization.textContent = "Já fiz a autorização";
+        alert(error.message);
+      }
+      return;
+    }
+    const resendAuthorization = e.target.closest("[data-resend-authorization]");
+    if (resendAuthorization) {
+      resendAuthorization.disabled = true;
+      resendAuthorization.textContent = "Reenviando…";
+      try {
+        const data = await api(`/${state.session.id}/clt/resend-authorization`, { method: "POST", body: "{}" });
+        state.clt = data.clt;
+        renderClt();
+      } catch (error) { alert(error.message); resendAuthorization.disabled = false; }
+      return;
+    }
+    const factaOffer = e.target.closest("[data-facta-offer]");
+    if (factaOffer) {
+      factaOffer.disabled = true;
+      const original = factaOffer.innerHTML;
+      factaOffer.innerHTML = "<strong>Analisando esta condição…</strong><small>A Facta está verificando a política de crédito.</small>";
+      try {
+        const data = await api(`/${state.session.id}/clt/select-offer`, { method: "POST", body: JSON.stringify({ offerId: factaOffer.dataset.factaOffer }) });
+        state.clt = data.clt;
+        renderClt();
+        await refresh();
+      } catch (error) { factaOffer.disabled = false; factaOffer.innerHTML = original; alert(error.message); }
+      return;
+    }
+    if (e.target.closest("[data-talk-agent]")) {
+      composeText.value = "Quero falar com um atendente sobre minha consulta CLT.";
+      composeText.focus();
+      return;
+    }
     const authorizationLink = e.target.closest("[data-open-authorization]");
     if (authorizationLink) {
       const width = Math.min(720, Math.max(360, window.screen.availWidth - 32));
@@ -139,6 +231,11 @@
       if (e.target.dataset.action === "start") {
         state.cltCpf = String(form.get("cpf") || "");
         const data = await api(`/${state.session.id}/clt/start`, { method: "POST", body: JSON.stringify({ cpf: state.cltCpf, phone: form.get("phone") }) }); state.clt = data.clt;
+      } else if (e.target.dataset.action === "facta-personal") {
+        const customer = Object.fromEntries(form.entries());
+        delete customer["on"];
+        const data = await api(`/${state.session.id}/clt/personal-data`, { method: "POST", body: JSON.stringify({ customer }) });
+        state.clt = data.clt;
       } else if (e.target.classList.contains("fc-clt-resim")) {
         const rawRequested = String(form.get("installmentValue") || "");
         const matchRequested = rawRequested.match(/\d[\d.]*([,]\d{1,2})?/);
@@ -156,7 +253,24 @@
         const data = await api(`/${state.session.id}/clt/formalize`, { method: "POST", body: JSON.stringify({ simulationId: form.get("simulationId"), cpf: form.get("cpf") || state.cltCpf, customer }) }); state.selectedOffer = null; state.clt = data.clt;
       }
       renderClt(); await refresh();
-    } catch (error) { alert(error.message); } finally { if (button) button.disabled = false; }
+    } catch (error) {
+      let inline = e.target.querySelector(".fc-clt-submit-error");
+      if (!inline) {
+        inline = document.createElement("p");
+        inline.className = "fc-clt-inline-error fc-clt-submit-error";
+        e.target.insertBefore(inline, button || null);
+      }
+      inline.textContent = error.message;
+      inline.scrollIntoView({ behavior: "smooth", block: "center" });
+    } finally { if (button) button.disabled = false; }
+  });
+  cltEl.addEventListener("change", (e) => {
+    if (e.target.name !== "cliente_iletrado_impossibilitado") return;
+    const rogo = cltEl.querySelector(".fc-clt-rogo");
+    if (!rogo) return;
+    const enabled = e.target.value === "S";
+    rogo.hidden = !enabled;
+    rogo.querySelectorAll("input").forEach((input) => { input.required = enabled; });
   });
   async function sendPayload(payload) { const button = $(".fc-chat-send"); button.disabled = true; const started = Date.now(); if (payload.message) { state.messages.push({ id: `local-${started}`, direction: "visitor", body: payload.message, created_at: started }); renderMessages(); } composeText.value = ""; typingEl.classList.add("show"); messagesEl.scrollTop = messagesEl.scrollHeight; try { const result = await api(`/${state.session.id}`, { method: "POST", body: JSON.stringify(payload) }); const restante = 1500 - (Date.now() - started); if (restante > 0) await wait(restante); if (result.cltStep) { state.clt = result.cltStep; renderClt(); } else if (result.clt && !state.clt) { state.clt = "eligibility"; renderClt(); } while (state.refreshing) await wait(50); await Promise.all([refresh(true), refreshClt()]); } finally { typingEl.classList.remove("show"); button.disabled = false; } }
   compose.addEventListener("submit", async (e) => { e.preventDefault(); const message = composeText.value.trim(); if (message) await sendPayload({ message }); });

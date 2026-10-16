@@ -18,6 +18,7 @@ const backup = require("./backup");
 const r2 = require("./r2");
 const unnotech = require("./unnotech");
 const novosaque = require("./novosaque");
+const facta = require("./facta");
 const flowCrypto = require("./flow-crypto");
 const google = require("./google");
 const mcp = require("./mcp");
@@ -72,7 +73,51 @@ function siteChatCltPublico(row) {
   if (!row) return null;
   let offers = [];
   try { offers = JSON.parse(row.offers_json || "[]"); } catch {}
+  if (row.provider === "facta") {
+    let worker = {};
+    let selectedOffer = null;
+    try { worker = JSON.parse(row.facta_worker_json || "{}"); } catch {}
+    try { selectedOffer = JSON.parse(row.facta_offer_json || "null"); } catch {}
+    return {
+      provider: "facta",
+      etapa: row.etapa,
+      status: row.status_novosaque || null,
+      waitingSince: row.authorization_requested_at || row.created_at || null,
+      checkedAt: row.authorization_checked_at || null,
+      offers: offers.map((o, index) => ({
+        id: String(o.codigoTabela || index),
+        tableCode: o.codigoTabela,
+        tableName: o.tabela,
+        installments: Number(o.prazo || 0),
+        installmentValue: Number(o.parcela || 0),
+        disbursedAmount: Number(o.valor_liquido || o.contrato || 0),
+        contractValue: Number(o.contrato || 0),
+        rate: Number(o.taxa || 0),
+        insuranceValue: Number(o.valor_seguro || 0),
+      })),
+      selectedOffer: selectedOffer ? {
+        installments: Number(selectedOffer.prazo || 0),
+        installmentValue: Number(selectedOffer.parcela || 0),
+        disbursedAmount: Number(selectedOffer.valor_liquido || selectedOffer.contrato || 0),
+      } : null,
+      customerDefaults: {
+        nome: worker.nome || "",
+        sexo: worker.sexo_codigo || "",
+        data_nascimento: worker.dataNascimento || "",
+        renda: worker.valorTotalVencimentos || "",
+        nome_mae: worker.nomeMae || "",
+        matricula: worker.matricula || "",
+        cnpj_empregador: worker.numeroInscricaoEmpregador || "",
+        data_admissao: worker.dataAdmissao || "",
+        celular: row.phone || "",
+      },
+      contractLink: row.contract_link || null,
+      proposalCode: row.codigo_proposta || null,
+      error: row.error_message || null,
+    };
+  }
   return {
+    provider: row.provider || "novosaque",
     etapa: row.etapa,
     status: row.status_novosaque || null,
     termsLink: row.terms_link || null,
@@ -88,7 +133,76 @@ function siteChatCltPublico(row) {
       firstPaymentDate: o.first_payment_date,
     })),
     error: row.error_message || null,
+    preQualificado: row.provider === "facta" && Number(row.margem_disponivel || 0) > 0,
   };
+}
+
+function numeroFacta(value) {
+  const raw = String(value ?? "").trim().replace(/R\$\s*/i, "").replace(/\s/g, "");
+  if (!raw) return 0;
+  const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function simFacta(value) {
+  return /^(s|sim|true|1|elegivel|elegível)$/i.test(String(value ?? "").trim());
+}
+
+function classificarBaseOfflineFacta(response) {
+  const rows = Array.isArray(response?.dados) ? response.dados : [];
+  if (!rows.length) return { etapa: "analise_manual", status: "SEM_DADOS", margemDisponivel: 0 };
+  const elegiveis = rows.filter((row) => simFacta(row.elegivel));
+  const melhor = elegiveis.sort((a, b) => numeroFacta(b.valorMargemDisponivel) - numeroFacta(a.valorMargemDisponivel))[0];
+  if (!melhor) return { etapa: "nao_elegivel", status: "INELEGIVEL", margemDisponivel: 0 };
+  const margemDisponivel = numeroFacta(melhor.valorMargemDisponivel);
+  return {
+    etapa: margemDisponivel > 0 ? "pre_qualificado" : "sem_margem",
+    status: margemDisponivel > 0 ? "MARGEM_IDENTIFICADA" : "SEM_MARGEM",
+    margemDisponivel,
+    offlineUpdatedAt: melhor.updated_at || melhor.created_at || null,
+    possuiAlertas: melhor.possuiAlertas || null,
+    matricula: melhor.matricula || null,
+  };
+}
+
+function mensagemFacta(payload, fallback = "A Facta não conseguiu concluir esta etapa.") {
+  return String(payload?.mensagem || payload?.message || fallback).trim();
+}
+
+function respostaFactaComErro(payload) {
+  return payload?.erro === true || payload?.erro === "true" || payload?.success === false;
+}
+
+function dadosTrabalhadorFacta(payload) {
+  const rows = payload?.dados_trabalhador?.dados || payload?.dados?.dados || payload?.dados || [];
+  return Array.isArray(rows) ? rows : [];
+}
+
+function ofertasFacta(payload) {
+  const rows = payload?.tabelas || payload?.dados || [];
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter((o) => o && o.codigoTabela && Number(o.prazo) > 0 && Number(o.parcela) > 0 && Number(o.valor_liquido || o.contrato) > 0)
+    .sort((a, b) => Number(a.prazo) - Number(b.prazo) || Number(b.valor_liquido || b.contrato) - Number(a.valor_liquido || a.contrato));
+}
+
+function formatarCelularFacta(phone) {
+  const digits = String(phone || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return phone;
+}
+
+function normalizarDataFacta(value) {
+  const raw = String(value || "").trim();
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(raw)) return raw;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : raw;
+}
+
+function somenteCamposFacta(source, fields) {
+  return Object.fromEntries(fields.map((field) => [field, String(source?.[field] ?? "").trim()]));
 }
 
 async function notificarContratoCltNoWhatsApp(row) {
@@ -109,7 +223,126 @@ async function notificarContratoCltNoWhatsApp(row) {
   }
 }
 
+async function notificarEtapaFactaNoWhatsApp(row, etapa) {
+  if (!row?.phone) return;
+  const templates = {
+    proposta_em_analise: process.env.FACTA_SITE_WHATSAPP_ANALISE_TEMPLATE,
+    proposta_concluida: process.env.FACTA_SITE_WHATSAPP_CONCLUIDA_TEMPLATE,
+    proposta_cancelada: process.env.FACTA_SITE_WHATSAPP_ENCERRADA_TEMPLATE,
+  };
+  const template = String(templates[etapa] || "").trim();
+  if (!template) return;
+  const textos = {
+    proposta_em_analise: "Sua assinatura foi recebida e a proposta Facta está em análise.",
+    proposta_concluida: "Sua proposta Facta foi concluída. Confira o crédito na conta informada.",
+    proposta_cancelada: "Sua proposta Facta foi encerrada. Fale com a FelizCred para conferir o motivo.",
+  };
+  const phone = normalizarTelefoneBR(row.phone);
+  const businessId = process.env.NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID || "1335976862924566";
+  try {
+    const result = await wa.sendTemplate(businessId, phone, template, "pt_BR");
+    const now = Date.now();
+    await db.upsertConversation(phone, businessId, null, now);
+    await db.insertMessage({ phone, business_number_id: businessId, direction: "out", type: "template", body: textos[etapa], status: "sent", wa_message_id: result.messages?.[0]?.id || null, created_at: now });
+  } catch (err) {
+    console.error(`Notificação WhatsApp da etapa ${etapa} não enviada (${row.conversation_id}):`, err.message);
+  }
+}
+
+async function sincronizarSiteChatFacta(row) {
+  if (!row) return row;
+  if (["aguardando_assinatura_facta", "proposta_em_analise"].includes(row.etapa) && row.codigo_proposta) {
+    if (row.authorization_checked_at && Date.now() - Number(row.authorization_checked_at) < 30_000) return row;
+    await db.siteChatCltAtualizar(row.conversation_id, { authorization_checked_at: Date.now() });
+    const progress = await facta.consultarAndamentoProposta(row.codigo_proposta);
+    if (respostaFactaComErro(progress)) return db.siteChatCltAtualizar(row.conversation_id, { error_message: mensagemFacta(progress) });
+    const proposal = Array.isArray(progress?.propostas) ? progress.propostas[0] : null;
+    if (!proposal) return row;
+    const status = String(proposal.status_proposta || proposal.status_crivo || "PROPOSTA EM ACOMPANHAMENTO").trim();
+    const changes = { status_novosaque: status, error_message: null };
+    if (/cancelad|reprovad|recusad/i.test(status)) {
+      changes.etapa = "proposta_cancelada";
+      const occurrences = await facta.consultarOcorrenciasProposta(row.codigo_proposta).catch(() => null);
+      const lastOccurrence = Array.isArray(occurrences?.ocorrencias) ? occurrences.ocorrencias.at(-1) : null;
+      changes.error_message = lastOccurrence?.obs || "A Facta encerrou a proposta. Um atendente pode conferir o motivo com você.";
+    } else if (/\b16\b.*pag|pago|efetivad|liquidad/i.test(status) || proposal.data_pgto_cliente) {
+      changes.etapa = "proposta_concluida";
+      await db.siteChatDefinirPipeline(row.conversation_id, "aprovado");
+    } else if (!/aguardando assinatura|assinatura digital$/i.test(status)) {
+      changes.etapa = "proposta_em_analise";
+    }
+    const updated = await db.siteChatCltAtualizar(row.conversation_id, changes);
+    if (updated.etapa !== row.etapa) {
+      if (updated.etapa === "proposta_em_analise") {
+        await db.siteChatDefinirPipeline(row.conversation_id, "analise");
+        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Sua assinatura foi recebida. A proposta agora está em análise na Facta; você pode acompanhar o andamento por aqui sem preencher os dados novamente.");
+      } else if (updated.etapa === "proposta_concluida") {
+        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", `Sua proposta ${updated.codigo_proposta || ""} foi concluída pela Facta. Confira o crédito na conta informada e fale com a gente se precisar de ajuda.`);
+      } else if (updated.etapa === "proposta_cancelada") {
+        await db.siteChatDefinirPipeline(row.conversation_id, "perdido");
+        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", updated.error_message || "A Facta encerrou a proposta. Nossa equipe pode conferir o motivo com você.");
+      }
+      notificarEtapaFactaNoWhatsApp(updated, updated.etapa).catch(() => {});
+    }
+    return updated;
+  }
+  if (!["autorizacao_enviada", "aguardando_autorizacao"].includes(row.etapa)) return row;
+  if (row.authorization_checked_at && Date.now() - Number(row.authorization_checked_at) < 12_000) return row;
+  await db.siteChatCltAtualizar(row.conversation_id, { authorization_checked_at: Date.now() });
+  const response = await facta.consultarTrabalhador(row.cpf);
+  if (respostaFactaComErro(response)) {
+    const message = mensagemFacta(response);
+    if (/token expirado|necess[aá]rio.*autoriza|n[aã]o autoriz/i.test(message)) {
+      return db.siteChatCltAtualizar(row.conversation_id, { status_novosaque: "AGUARDANDO_AUTORIZACAO", error_message: null });
+    }
+    return db.siteChatCltAtualizar(row.conversation_id, { etapa: "erro_consulta", status_novosaque: "ERRO_CONSULTA", error_message: message });
+  }
+
+  const rows = dadosTrabalhadorFacta(response);
+  const elegiveis = rows.filter((item) => simFacta(item.elegivel));
+  const worker = elegiveis.sort((a, b) => numeroFacta(b.valorMargemDisponivel) - numeroFacta(a.valorMargemDisponivel))[0];
+  if (!worker) {
+    const reason = rows.map((item) => item.erro_mensagem || item.motivoInelegibilidade_descricao).find(Boolean);
+    return db.siteChatCltAtualizar(row.conversation_id, { etapa: "nao_elegivel", status_novosaque: "INELEGIVEL", error_message: reason || null });
+  }
+  const margem = numeroFacta(worker.valorMargemDisponivel);
+  if (margem <= 0) return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_margem", status_novosaque: "SEM_MARGEM", margem_disponivel: 0, facta_worker_json: JSON.stringify(worker), error_message: null });
+
+  const operations = await facta.consultarOperacoes({
+    opcao_valor: 2,
+    valor_parcela: margem.toFixed(2),
+    cpf: row.cpf,
+    data_nascimento: normalizarDataFacta(worker.dataNascimento),
+    valor_renda: numeroFacta(worker.valorTotalVencimentos).toFixed(2),
+  });
+  if (respostaFactaComErro(operations)) {
+    return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_oferta", status_novosaque: "SEM_OPERACOES", margem_disponivel: margem, facta_worker_json: JSON.stringify(worker), error_message: mensagemFacta(operations) });
+  }
+  const offers = ofertasFacta(operations);
+  if (!offers.length) return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_oferta", status_novosaque: "SEM_OPERACOES", margem_disponivel: margem, facta_worker_json: JSON.stringify(worker), error_message: null });
+  await db.siteChatDefinirPipeline(row.conversation_id, "proposta");
+  await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Autorização confirmada. Encontramos condições para você escolher. Os valores ainda passam pela política final da Facta.");
+  return db.siteChatCltAtualizar(row.conversation_id, {
+    etapa: "ofertas_disponiveis",
+    status_novosaque: "OFERTAS_DISPONIVEIS",
+    margem_disponivel: margem,
+    facta_worker_json: JSON.stringify(worker),
+    offers_json: JSON.stringify(offers),
+    error_message: null,
+  });
+}
+
 async function sincronizarSiteChatClt(row) {
+  if (row?.provider === "facta") {
+    try {
+      return await sincronizarSiteChatFacta(row);
+    } catch (err) {
+      console.error(`Erro ao sincronizar Facta no site (${row.conversation_id}):`, err.message);
+      return db.siteChatCltAtualizar(row.conversation_id, {
+        error_message: "Não conseguimos confirmar sua autorização agora. Aguarde um instante e tente novamente.",
+      }).catch(() => row);
+    }
+  }
   if (!row?.transaction_id || ["concluido", "sem_oferta", "erro"].includes(row.etapa)) return row;
   try {
     const contract = await novosaque.consultarContratoClt(row.transaction_id);
@@ -576,6 +809,57 @@ function send(res, status, body, headers = {}) {
   const payload = typeof body === "string" ? body : JSON.stringify(body);
   res.writeHead(status, { "Content-Type": "application/json", ...headers });
   res.end(payload);
+}
+
+// <audio>/<video> usam Range para descobrir duração, reproduzir e permitir seek.
+// Sem estes headers o Chrome pode reportar duration=Infinity.
+function sendMediaBuffer(req, res, buffer, contentType) {
+  const total = buffer.length;
+  const range = req.headers.range;
+  const base = {
+    "Content-Type": contentType,
+    "Accept-Ranges": "bytes",
+    "Cache-Control": "private, max-age=3600",
+  };
+
+  if (!range) {
+    res.writeHead(200, { ...base, "Content-Length": total });
+    return req.method === "HEAD" ? res.end() : res.end(buffer);
+  }
+
+  const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+  if (!match) {
+    res.writeHead(416, { ...base, "Content-Range": `bytes */${total}` });
+    return res.end();
+  }
+
+  let start;
+  let end;
+  if (match[1] === "") {
+    const suffixLength = Number(match[2]);
+    if (!Number.isFinite(suffixLength) || suffixLength <= 0) {
+      res.writeHead(416, { ...base, "Content-Range": `bytes */${total}` });
+      return res.end();
+    }
+    start = Math.max(0, total - suffixLength);
+    end = total - 1;
+  } else {
+    start = Number(match[1]);
+    end = match[2] === "" ? total - 1 : Math.min(Number(match[2]), total - 1);
+  }
+
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start >= total || end < start) {
+    res.writeHead(416, { ...base, "Content-Range": `bytes */${total}` });
+    return res.end();
+  }
+
+  const chunk = buffer.subarray(start, end + 1);
+  res.writeHead(206, {
+    ...base,
+    "Content-Length": chunk.length,
+    "Content-Range": `bytes ${start}-${end}/${total}`,
+  });
+  return req.method === "HEAD" ? res.end() : res.end(chunk);
 }
 
 // Login por pessoa (cada atendente com seu próprio usuário/senha) — PAINEL_USER/PAINEL_PASS
@@ -5194,7 +5478,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
-      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|resimulate|formalize|assistant)$/i);
+      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|personal-data|assistant)$/i);
       if (cltMatch) {
         const id = cltMatch[1];
         const action = cltMatch[2].toLowerCase();
@@ -5228,63 +5512,143 @@ const server = http.createServer(async (req, res) => {
             const phone = String(body.phone || "").replace(/\D/g, "");
             if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
-            const transactionId = await novosaque.criarSimulacaoClt(cpf);
-            let row = await db.siteChatCltCriar(id, transactionId, phone);
+            let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO" });
             await db.siteChatDefinirProduto(id, "Empréstimo CLT");
             await db.siteChatDefinirPipeline(id, "qualificacao");
-            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Simulação iniciada. Agora vamos gerar a autorização segura de consulta.");
-            row = await sincronizarSiteChatClt(row);
+            const authorization = await facta.solicitarAutorizacao({ nome: conversation.name, cpf, celular: formatarCelularFacta(phone) });
+            const authMessage = mensagemFacta(authorization);
+            if (respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage)) {
+              row = await db.siteChatCltAtualizar(id, { etapa: "erro_autorizacao", status_novosaque: "ERRO_AUTORIZACAO", error_message: authMessage });
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", `Não conseguimos enviar a autorização: ${authMessage}`);
+            } else {
+              const alreadyAuthorized = /n[aã]o necessita de autoriza/i.test(authMessage);
+              row = await db.siteChatCltAtualizar(id, {
+                etapa: "autorizacao_enviada",
+                status_novosaque: alreadyAuthorized ? "JA_AUTORIZADO" : "AUTORIZACAO_ENVIADA",
+                authorization_requested_at: Date.now(),
+                authorization_checked_at: null,
+                error_message: null,
+              });
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", alreadyAuthorized
+                ? "Sua autorização ainda está válida. Já estamos consultando suas condições."
+                : "Enviamos a autorização da Facta para seu WhatsApp. Autorize a consulta e depois volte aqui para continuar.");
+              if (alreadyAuthorized) row = await sincronizarSiteChatFacta(row);
+            }
             return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
           const atual = await db.siteChatCltObter(id);
           if (!atual) return send(res, 409, { error: "Inicie a simulação primeiro." }, corsHeaders);
-          if (action === "resimulate") {
-            const rawInstallment = String(body.installmentValue || "").trim();
-            const numericMatch = rawInstallment.match(/\d[\d.]*([,]\d{1,2})?/);
-            let installment = numericMatch ? Number(numericMatch[0].replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".")) : NaN;
-            if (!Number.isFinite(installment) || installment <= 0) installment = await gemini.interpretarValorParcela(rawInstallment);
-            if (!Number.isFinite(installment) || installment <= 0) return send(res, 400, { error: "Informe uma parcela válida." }, corsHeaders);
-            let offers = [];
-            try { offers = JSON.parse(atual.offers_json || "[]"); } catch {}
-            const maximum = Math.max(0, ...offers.map((offer) => Number(offer.installment_value || 0)));
-            if (maximum && installment > maximum) {
-              return send(res, 400, { error: `Essa parcela ultrapassa o máximo permitido de R$ ${maximum.toFixed(2).replace(".", ",")}.` }, corsHeaders);
-            }
-            await novosaque.resimularClt(atual.transaction_id, installment);
-            const row = await db.siteChatCltAtualizar(id, { etapa: "simulando", offers_json: null, error_message: null });
+          if (action === "confirm-authorization") {
+            if (atual.provider !== "facta" || atual.etapa !== "autorizacao_enviada") return send(res, 409, { error: "Esta confirmação não está disponível nesta etapa." }, corsHeaders);
+            const unlocked = await db.siteChatCltAtualizar(id, { authorization_checked_at: null, error_message: null });
+            const row = await sincronizarSiteChatFacta(unlocked);
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
-          if (action === "formalize") {
+          if (action === "resend-authorization") {
+            if (atual.provider !== "facta") return send(res, 409, { error: "Esta solicitação não pertence à Facta." }, corsHeaders);
+            const authorization = await facta.solicitarAutorizacao({ nome: conversation.name, cpf: atual.cpf, celular: formatarCelularFacta(atual.phone) });
+            const authMessage = mensagemFacta(authorization);
+            const failed = respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage);
+            const row = await db.siteChatCltAtualizar(id, {
+              etapa: failed ? "erro_autorizacao" : "autorizacao_enviada",
+              status_novosaque: failed ? "ERRO_AUTORIZACAO" : "AUTORIZACAO_REENVIADA",
+              authorization_requested_at: Date.now(), authorization_checked_at: null,
+              error_message: failed ? authMessage : null,
+            });
+            return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          if (action === "select-offer") {
             let offers = [];
             try { offers = JSON.parse(atual.offers_json || "[]"); } catch {}
-            const offer = offers.find((o) => String(o.simulation_id) === String(body.simulationId));
-            if (!offer) return send(res, 400, { error: "Escolha uma oferta válida." }, corsHeaders);
-            const cpf = String(body.cpf || "").replace(/\D/g, "");
-            const customer = body.customer || {};
-            const obrigatorios = ["nome", "data_nascimento", "genero", "profissao", "email", "celular", "cep", "rua", "numero", "bairro", "cidade", "uf", "email_rh", "forma_desembolso"];
-            if (!novosaque.cpfValido(cpf) || obrigatorios.some((campo) => !String(customer[campo] || "").trim())) {
-              return send(res, 400, { error: "Revise os dados obrigatórios antes de gerar o contrato." }, corsHeaders);
+            const offer = offers.find((o, index) => String(o.codigoTabela || index) === String(body.offerId));
+            if (!offer || atual.etapa !== "ofertas_disponiveis") return send(res, 400, { error: "Escolha uma condição disponível." }, corsHeaders);
+            let worker = {};
+            try { worker = JSON.parse(atual.facta_worker_json || "{}"); } catch {}
+            const policy = await facta.analisarPolitica({
+              cpf: atual.cpf, matricula: worker.matricula,
+              dataNascimento: normalizarDataFacta(worker.dataNascimento),
+              dataAdmissao: normalizarDataFacta(worker.dataAdmissao),
+              prazo: offer.prazo, valorEmprestimo: Number(offer.contrato || 0).toFixed(2),
+            });
+            if (String(policy?.aprovado) !== "1") {
+              const row = await db.siteChatCltAtualizar(id, { etapa: "politica_reprovada", status_novosaque: "POLITICA_REPROVADA", error_message: mensagemFacta(policy, "A condição não passou pela política de crédito da Facta.") });
+              return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
             }
-            if (customer.forma_desembolso === "CONTA" && ["banco", "tipo_conta", "agencia", "conta", "digito_conta"].some((campo) => !String(customer[campo] || "").trim())) {
-              return send(res, 400, { error: "Preencha todos os dados da conta bancária." }, corsHeaders);
-            }
-            // A API exige employer_phone, mas o cliente não precisa procurar o telefone do RH:
-            // usamos o próprio celular informado como contato de referência da proposta.
-            customer.telefone_rh = customer.telefone_rh || customer.celular;
-            const customerData = novosaque.montarCustomerData(cpf, customer);
-            await novosaque.enviarFormalizacaoClt(atual.transaction_id, offer.simulation_id, customerData);
+            const loginCertificado = String(process.env.FACTA_LOGIN_CERTIFICADO || "").trim();
+            if (!loginCertificado) throw new Error("FACTA_LOGIN_CERTIFICADO não configurado");
+            const simulation = await facta.criarSimulacao({
+              cpf: atual.cpf, data_nascimento: normalizarDataFacta(worker.dataNascimento),
+              login_certificado: loginCertificado, codigo_tabela: offer.codigoTabela,
+              prazo: offer.prazo, valor_operacao: offer.contrato, valor_parcela: offer.parcela,
+              coeficiente: offer.coeficiente,
+            });
+            if (respostaFactaComErro(simulation) || !simulation?.id_simulador) throw new Error(mensagemFacta(simulation, "A Facta não criou a simulação selecionada."));
+            const row = await db.siteChatCltAtualizar(id, { transaction_id: String(simulation.id_simulador), facta_offer_json: JSON.stringify(offer), etapa: "dados_pessoais", status_novosaque: "SIMULACAO_CRIADA", error_message: null });
+            return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          if (action === "personal-data") {
+            if (atual.provider !== "facta" || atual.etapa !== "dados_pessoais" || !atual.transaction_id) return send(res, 409, { error: "Selecione uma condição antes de enviar seus dados." }, corsHeaders);
+            if (process.env.FACTA_PROPOSAL_ENABLED !== "true") throw new Error("FACTA_PROPOSAL_ENABLED não configurado");
+            const customer = somenteCamposFacta(body.customer, ["nome", "sexo", "estado_civil", "data_nascimento", "rg", "estado_rg", "orgao_emissor", "data_expedicao", "estado_natural", "cidade_natural_nome", "nacionalidade", "celular", "renda", "cep", "endereco", "numero", "complemento", "bairro", "cidade_nome", "estado", "nome_mae", "nome_pai", "valor_patrimonio", "cliente_iletrado_impossibilitado", "tipo_conta", "banco", "agencia", "conta", "email", "matricula", "cnpj_empregador", "data_admissao", "tipo_chave_pix", "chave_pix", "nome_a_rogo", "cpf_a_rogo", "nome_a_rogo_testemunha", "cpf_a_rogo_testemunha"]);
+            let worker = {};
+            try { worker = JSON.parse(atual.facta_worker_json || "{}"); } catch {}
+            Object.assign(customer, {
+              nome: worker.nome || customer.nome,
+              sexo: worker.sexo_codigo || customer.sexo,
+              data_nascimento: worker.dataNascimento || customer.data_nascimento,
+              celular: atual.phone || customer.celular,
+              renda: worker.valorTotalVencimentos || customer.renda,
+              nome_mae: worker.nomeMae || customer.nome_mae,
+              matricula: worker.matricula || customer.matricula,
+              cnpj_empregador: worker.numeroInscricaoEmpregador || customer.cnpj_empregador,
+              data_admissao: worker.dataAdmissao || customer.data_admissao,
+            });
+            const required = ["nome", "sexo", "estado_civil", "data_nascimento", "rg", "estado_rg", "orgao_emissor", "data_expedicao", "estado_natural", "cidade_natural_nome", "nacionalidade", "celular", "renda", "cep", "endereco", "numero", "bairro", "cidade_nome", "estado", "nome_mae", "nome_pai", "valor_patrimonio", "cliente_iletrado_impossibilitado", "tipo_conta", "banco", "agencia", "conta", "matricula", "cnpj_empregador", "data_admissao", "tipo_chave_pix", "chave_pix"];
+            if (required.some((field) => !customer[field])) return send(res, 400, { error: "Preencha todos os campos obrigatórios para gerar a proposta." }, corsHeaders);
+            if (customer.cliente_iletrado_impossibilitado === "S" && ["nome_a_rogo", "cpf_a_rogo", "nome_a_rogo_testemunha", "cpf_a_rogo_testemunha"].some((field) => !customer[field])) return send(res, 400, { error: "Preencha os dados de assinatura a rogo e da testemunha." }, corsHeaders);
+            if (customer.tipo_chave_pix === "1" && customer.chave_pix.replace(/\D/g, "") !== atual.cpf) return send(res, 400, { error: "Quando a chave Pix for CPF, ela precisa ser o mesmo CPF da proposta." }, corsHeaders);
+            const cityResponse = await facta.consultarCombo("cidade", { estado: customer.estado, nome_cidade: customer.cidade_nome });
+            const naturalCityResponse = await facta.consultarCombo("cidade", { estado: customer.estado_natural, nome_cidade: customer.cidade_natural_nome });
+            const cityEntries = Object.entries(cityResponse?.cidade || {});
+            const naturalEntries = Object.entries(naturalCityResponse?.cidade || {});
+            const normalizeName = (value) => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+            const city = cityEntries.find(([, value]) => normalizeName(value?.nome) === normalizeName(customer.cidade_nome)) || cityEntries[0];
+            const naturalCity = naturalEntries.find(([, value]) => normalizeName(value?.nome) === normalizeName(customer.cidade_natural_nome)) || naturalEntries[0];
+            if (!city || !naturalCity) return send(res, 400, { error: "Não localizamos uma das cidades informadas. Confira cidade e estado." }, corsHeaders);
+            const stage2Payload = { ...customer };
+            delete stage2Payload.cidade_nome;
+            delete stage2Payload.cidade_natural_nome;
+            const stage2 = await facta.cadastrarDadosPessoais({
+              id_simulador: atual.transaction_id, cpf: atual.cpf, ...stage2Payload,
+              data_nascimento: normalizarDataFacta(customer.data_nascimento),
+              data_expedicao: normalizarDataFacta(customer.data_expedicao),
+              data_admissao: normalizarDataFacta(customer.data_admissao),
+              cidade: city[0], cidade_natural: naturalCity[0],
+              celular: formatarCelularFacta(customer.celular),
+            });
+            if (respostaFactaComErro(stage2) || !stage2?.codigo_cliente) throw new Error(mensagemFacta(stage2, "A Facta não aceitou os dados pessoais."));
+            const proposal = await facta.criarProposta({ codigo_cliente: stage2.codigo_cliente, id_simulador: atual.transaction_id, tipo_formalizacao: "DIG" });
+            if (respostaFactaComErro(proposal) || !proposal?.codigo || !proposal?.url_formalizacao) throw new Error(mensagemFacta(proposal, "A Facta não devolveu o código e o link de assinatura da proposta."));
+            const contractLink = /^https?:\/\//i.test(String(proposal.url_formalizacao)) ? proposal.url_formalizacao : `https://${proposal.url_formalizacao}`;
+            await facta.enviarLinkAssinatura(proposal.codigo, "whatsapp").catch((linkError) => console.error(`Link Facta não enviado por WhatsApp (${id}):`, linkError.message));
             await db.siteChatDefinirPipeline(id, "documentos");
-            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Dados recebidos. Estamos gerando seu contrato para assinatura.");
-            const row = await db.siteChatCltAtualizar(id, { simulation_id: offer.simulation_id, etapa: "formalizando", error_message: null });
-            return send(res, 202, { clt: siteChatCltPublico(row) }, corsHeaders);
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Proposta gerada. Revise todas as condições e assine somente se estiver de acordo.");
+            const row = await db.siteChatCltAtualizar(id, { codigo_cliente: String(stage2.codigo_cliente), codigo_proposta: String(proposal.codigo), contract_link: contractLink, etapa: "aguardando_assinatura_facta", status_novosaque: "PROPOSTA_CRIADA", authorization_checked_at: null, error_message: null });
+            notificarContratoCltNoWhatsApp(row).catch(() => {});
+            return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
         } catch (err) {
           console.error(`Erro no fluxo CLT do site (${id}/${action}):`, err.message);
-          await db.siteChatCltAtualizar(id, { error_message: "Não conseguimos avançar automaticamente. A equipe já pode continuar pelo chat." }).catch(() => {});
-          const configurationError = /NOVOSAQUE_API_KEY não configurada/i.test(err.message);
+          const existing = await db.siteChatCltObter(id).catch(() => null);
+          const failureChanges = { error_message: "Não conseguimos avançar automaticamente. A equipe já pode continuar pelo chat." };
+          if (existing?.provider === "facta" && ["solicitando_autorizacao", "erro_autorizacao", "erro_integracao"].includes(existing.etapa)) {
+            Object.assign(failureChanges, { etapa: "erro_integracao", status_novosaque: "ERRO_INTEGRACAO" });
+          }
+          await db.siteChatCltAtualizar(id, failureChanges).catch(() => {});
+          const configurationError = /FACTA_BRIDGE_URL|FACTA_BRIDGE_SECRET|FACTA_LOGIN_CERTIFICADO|FACTA_PROPOSAL_ENABLED|não configurados/i.test(err.message);
           return send(res, 502, {
-            error: configurationError ? "A integração bancária ainda não está configurada no servidor." : "Não conseguimos avançar agora. Continue pelo chat com nossa equipe.",
-            code: configurationError ? "NOVOSAQUE_CONFIG_MISSING" : "NOVOSAQUE_REQUEST_FAILED",
+            error: configurationError ? "A integração da Facta ainda precisa de uma configuração do correspondente." : "A Facta não conseguiu concluir esta etapa. Nossa equipe recebeu o atendimento para conferir.",
+            code: configurationError ? "FACTA_CONFIG_MISSING" : "FACTA_REQUEST_FAILED",
             providerStatus: Number(err.httpStatus) || null,
           }, corsHeaders);
         }
@@ -5365,15 +5729,8 @@ const server = http.createServer(async (req, res) => {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Antes da consulta, preciso confirmar: você tem mais de 3 meses de registro no trabalho atual?");
               cltStep = "eligibility";
             } else if (!row && cpfInformado) {
-              const transactionId = await novosaque.criarSimulacaoClt(cpfInformado);
-              row = await db.siteChatCltCriar(id, transactionId, null);
-              await db.siteChatDefinirProduto(id, "Empréstimo CLT");
-              await db.siteChatDefinirPipeline(id, "qualificacao");
-              row = await sincronizarSiteChatClt(row);
-              const orientacao = row?.terms_link
-                ? `CPF recebido. Para consultar suas condições, faça a autorização segura neste link:\n${row.terms_link}`
-                : "CPF recebido. Estamos preparando sua autorização segura de consulta.";
-              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", orientacao);
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "CPF recebido. Informe também seu celular com DDD no formulário abaixo para enviarmos a autorização da Facta pelo WhatsApp.");
+              cltStep = "start";
             } else if (!row && (pediuSimulacao || produtoDetectado === "Empréstimo CLT") && !jaPerguntouTempo) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
               cltStep = "eligibility";
@@ -5406,7 +5763,8 @@ const server = http.createServer(async (req, res) => {
       const conversation = await db.siteChatObter(painelSiteChatMatch[1]);
       if (!conversation) return send(res, 404, { error: "Conversa não encontrada" });
       await db.siteChatMarcarLida(conversation.id);
-      return send(res, 200, { conversation, messages: await db.siteChatMensagens(conversation.id) });
+      const clt = await db.siteChatCltObter(conversation.id);
+      return send(res, 200, { conversation, messages: await db.siteChatMensagens(conversation.id), clt: siteChatCltPublico(clt) });
     }
 
     const painelSiteChatReplyMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)\/reply$/i);
@@ -7183,12 +7541,12 @@ const server = http.createServer(async (req, res) => {
     // (Instagram/Facebook precisam buscar essa imagem publicamente pra publicar). Pasta
     // própria e separada de /media/ (essa continua exigindo login, guarda mídia de clientes).
     const matchPublicarMedia = path_.match(/^\/publicar-media\/([a-zA-Z0-9_.-]+)$/);
-    if (req.method === "GET" && matchPublicarMedia) {
+    if ((req.method === "GET" || req.method === "HEAD") && matchPublicarMedia) {
       const filePath = path.join(PUBLICAR_MEDIA_DIR, matchPublicarMedia[1]);
       if (!filePath.startsWith(PUBLICAR_MEDIA_DIR) || !fs.existsSync(filePath)) {
         return send(res, 404, "Not found");
       }
-      return send(res, 200, fs.readFileSync(filePath), { "Content-Type": mimeDoArquivo(matchPublicarMedia[1]) });
+      return sendMediaBuffer(req, res, fs.readFileSync(filePath), mimeDoArquivo(matchPublicarMedia[1]));
     }
 
     // POST /painel/api/publicar/perfil-facebook — troca capa/foto de perfil/"sobre" da
@@ -7508,12 +7866,12 @@ const server = http.createServer(async (req, res) => {
     // <img>/<audio> não conseguem mandar o header Authorization, só um fetch com header
     // customizado consegue.
     const matchMedia = path_.match(/^\/media\/([a-zA-Z0-9_.-]+)$/);
-    if (req.method === "GET" && matchMedia) {
+    if ((req.method === "GET" || req.method === "HEAD") && matchMedia) {
       const token = url.searchParams.get("token");
       if (!(token && validarTokenMedia(token)) && !requireAuth(req, res)) return;
       try {
         const { buffer } = await r2.baixarArquivo(`clientes/${matchMedia[1]}`);
-        return send(res, 200, buffer, { "Content-Type": mimeDoArquivo(matchMedia[1]) });
+        return sendMediaBuffer(req, res, buffer, mimeDoArquivo(matchMedia[1]));
       } catch {
         return send(res, 404, "Not found");
       }
@@ -7934,6 +8292,28 @@ setInterval(async () => {
 
 // Mesmo padrão dos 2 verificadores acima — tabela própria (novosaque_origination), independente
 // da Unnotech.
+// Mantém propostas iniciadas no chat do site avançando mesmo depois que o cliente fecha a aba.
+// As transições relevantes ficam registradas no histórico para cliente e atendente.
+let verificandoSiteChatFacta = false;
+setInterval(async () => {
+  if (verificandoSiteChatFacta) return;
+  verificandoSiteChatFacta = true;
+  try {
+    const propostas = await db.siteChatFactaListarEmAcompanhamento();
+    for (const proposta of propostas) {
+      try {
+        await sincronizarSiteChatFacta(proposta);
+      } catch (err) {
+        console.error(`Erro ao acompanhar proposta Facta do site ${proposta.conversation_id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error("Erro no acompanhamento das propostas Facta do site:", err.message);
+  } finally {
+    verificandoSiteChatFacta = false;
+  }
+}, 60 * 1000);
+
 let verificandoNsOrigination = false;
 setInterval(async () => {
   if (verificandoNsOrigination) return;

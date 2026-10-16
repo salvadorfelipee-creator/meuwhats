@@ -107,6 +107,20 @@ export type SiteChatMessage = {
   file_name: string | null
 }
 
+export type SiteChatClt = {
+  provider: string
+  etapa: string
+  status: string | null
+  proposalCode?: string | null
+  contractLink?: string | null
+  selectedOffer?: {
+    installments: number
+    installmentValue: number
+    disbursedAmount: number
+  } | null
+  error?: string | null
+}
+
 export type Tag = { id: number; business_number_id: string; nome: string; cor: string; created_at: number }
 
 export type CampoPersonalizado = { id: number; business_id: string; nome: string; created_at: number }
@@ -517,7 +531,7 @@ export const api = {
 
   siteChatConversas: () => request<SiteChatConversation[]>("/painel/api/site-chat/conversations"),
   siteChatConversa: (id: string) =>
-    request<{ conversation: SiteChatConversation; messages: SiteChatMessage[] }>(
+    request<{ conversation: SiteChatConversation; messages: SiteChatMessage[]; clt: SiteChatClt | null }>(
       `/painel/api/site-chat/conversations/${encodeURIComponent(id)}`,
     ),
   siteChatResponder: (id: string, payload: string | {

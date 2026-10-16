@@ -12,6 +12,8 @@ assert.equal(bridge.extractToken({ token: "a" }), "a");
 assert.equal(bridge.extractToken({ access_token: "b" }), "b");
 assert.equal(bridge.extractToken({ data: { token: "c" } }), "c");
 assert.equal(bridge.ALLOWED.online.has("/solicita-autorizacao-consulta"), true);
+assert.equal(bridge.ALLOWED.online.has("/proposta/andamento-propostas"), true);
+assert.equal(bridge.ALLOWED.online.has("/proposta/consulta-ocorrencias"), true);
 assert.equal(bridge.ALLOWED.offline.has("/clt/base-offline"), true);
 assert.equal(bridge.ALLOWED.online.has("https://site-malicioso.example"), false);
 

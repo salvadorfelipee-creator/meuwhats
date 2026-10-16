@@ -146,8 +146,23 @@ const ready = (async () => {
     FOREIGN KEY (conversation_id) REFERENCES site_chat_conversations(id) ON DELETE CASCADE
   )`);
   const infoSiteChatClt = await client.execute(`PRAGMA table_info(site_chat_clt)`);
-  for (const nome of ["whatsapp_notified_at", "whatsapp_notify_attempt_at"]) {
-    if (!infoSiteChatClt.rows.some((r) => r.name === nome)) await client.execute(`ALTER TABLE site_chat_clt ADD COLUMN ${nome} INTEGER`);
+  const colunasSiteChatClt = [
+    ["whatsapp_notified_at", "INTEGER"],
+    ["whatsapp_notify_attempt_at", "INTEGER"],
+    ["provider", "TEXT"],
+    ["cpf", "TEXT"],
+    ["margem_disponivel", "REAL"],
+    ["offline_updated_at", "TEXT"],
+    ["possui_alertas", "TEXT"],
+    ["facta_worker_json", "TEXT"],
+    ["facta_offer_json", "TEXT"],
+    ["codigo_cliente", "TEXT"],
+    ["codigo_proposta", "TEXT"],
+    ["authorization_requested_at", "INTEGER"],
+    ["authorization_checked_at", "INTEGER"],
+  ];
+  for (const [nome, tipo] of colunasSiteChatClt) {
+    if (!infoSiteChatClt.rows.some((r) => r.name === nome)) await client.execute(`ALTER TABLE site_chat_clt ADD COLUMN ${nome} ${tipo}`);
   }
   const infoSiteChat = await client.execute(`PRAGMA table_info(site_chat_conversations)`);
   if (!infoSiteChat.rows.some((r) => r.name === "pipeline_estagio")) {
@@ -3655,6 +3670,18 @@ async function siteChatCltObter(conversationId) {
   return result.rows[0] || null;
 }
 
+async function siteChatFactaListarEmAcompanhamento() {
+  await ready;
+  const result = await client.execute(`
+    SELECT * FROM site_chat_clt
+    WHERE provider = 'facta'
+      AND codigo_proposta IS NOT NULL
+      AND etapa IN ('aguardando_assinatura_facta', 'proposta_em_analise')
+    ORDER BY updated_at ASC
+  `);
+  return result.rows;
+}
+
 async function siteChatCltCriar(conversationId, transactionId, phone) {
   await ready;
   const now = Date.now();
@@ -3668,9 +3695,40 @@ async function siteChatCltCriar(conversationId, transactionId, phone) {
   return siteChatCltObter(conversationId);
 }
 
+async function siteChatFactaCriar(conversationId, dados) {
+  await ready;
+  const now = Date.now();
+  await client.execute({
+    sql: `INSERT INTO site_chat_clt
+            (conversation_id, provider, cpf, phone, margem_disponivel, offline_updated_at, possui_alertas, etapa, status_novosaque, created_at, updated_at)
+          VALUES (?, 'facta', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(conversation_id) DO UPDATE SET
+            provider = 'facta', cpf = excluded.cpf, phone = excluded.phone,
+            margem_disponivel = excluded.margem_disponivel,
+            offline_updated_at = excluded.offline_updated_at,
+            possui_alertas = excluded.possui_alertas, etapa = excluded.etapa,
+            status_novosaque = excluded.status_novosaque, transaction_id = NULL,
+            terms_link = NULL, contract_link = NULL, offers_json = NULL,
+            error_message = NULL, updated_at = excluded.updated_at`,
+    args: [
+      conversationId,
+      dados.cpf,
+      dados.phone || null,
+      dados.margemDisponivel ?? null,
+      dados.offlineUpdatedAt || null,
+      dados.possuiAlertas || null,
+      dados.etapa,
+      dados.status || null,
+      now,
+      now,
+    ],
+  });
+  return siteChatCltObter(conversationId);
+}
+
 async function siteChatCltAtualizar(conversationId, campos) {
   await ready;
-  const permitidos = ["transaction_id", "simulation_id", "etapa", "status_novosaque", "terms_link", "contract_link", "offers_json", "phone", "whatsapp_notified_at", "whatsapp_notify_attempt_at", "error_message"];
+  const permitidos = ["transaction_id", "simulation_id", "etapa", "status_novosaque", "terms_link", "contract_link", "offers_json", "phone", "whatsapp_notified_at", "whatsapp_notify_attempt_at", "error_message", "provider", "cpf", "margem_disponivel", "offline_updated_at", "possui_alertas", "facta_worker_json", "facta_offer_json", "codigo_cliente", "codigo_proposta", "authorization_requested_at", "authorization_checked_at"];
   const entradas = Object.entries(campos).filter(([k]) => permitidos.includes(k));
   if (!entradas.length) return siteChatCltObter(conversationId);
   const sets = entradas.map(([k]) => `${k} = ?`).join(", ");
@@ -3737,7 +3795,9 @@ module.exports = {
   siteChatDefinirPipeline,
   siteChatDefinirProduto,
   siteChatCltObter,
+  siteChatFactaListarEmAcompanhamento,
   siteChatCltCriar,
+  siteChatFactaCriar,
   siteChatCltAtualizar,
   fluxoDinamicoCriar,
   fluxoDinamicoAtivo,

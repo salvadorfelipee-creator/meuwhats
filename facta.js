@@ -43,4 +43,63 @@ function consultarOfertas(cpf) {
   return request("online", "GET", "/consignado-trabalhador/consulta-ofertas", { query: { cpf } });
 }
 
-module.exports = { request, solicitarAutorizacao, consultarTrabalhador, consultarBaseOffline, consultarOfertas };
+function analisarPolitica(dados) {
+  return request("online", "GET", "/consignado-trabalhador/analise-politica-credito", { query: dados });
+}
+
+function consultarOperacoes(dados) {
+  return request("online", "GET", "/proposta/operacoes-disponiveis", {
+    query: { produto: "D", tipo_operacao: 13, averbador: 10010, convenio: 3, ...dados },
+  });
+}
+
+function criarSimulacao(dados) {
+  return request("online", "POST", "/proposta/etapa1-simulador", {
+    body: { produto: "D", tipo_operacao: 13, averbador: 10010, convenio: 3, ...dados },
+  });
+}
+
+function cadastrarDadosPessoais(dados) {
+  return request("online", "POST", "/proposta/etapa2-dados-pessoais", { body: dados });
+}
+
+function criarProposta(dados) {
+  return request("online", "POST", "/proposta/etapa3-proposta-cadastro", { body: dados });
+}
+
+function enviarLinkAssinatura(codigoAf, tipoEnvio = "whatsapp") {
+  return request("online", "POST", "/proposta/envio-link", {
+    body: { codigo_af: codigoAf, tipo_envio: tipoEnvio },
+  });
+}
+
+function consultarAndamentoProposta(codigoAf) {
+  return request("online", "GET", "/proposta/andamento-propostas", {
+    query: { af: codigoAf, convenio: 3, averbador: 10010, quantidade: 1 },
+  });
+}
+
+function consultarOcorrenciasProposta(codigoAf) {
+  return request("online", "GET", "/proposta/consulta-ocorrencias", { query: { af: codigoAf } });
+}
+
+function consultarCombo(nome, query) {
+  return request("online", "GET", `/proposta-combos/${nome}`, { query });
+}
+
+module.exports = {
+  request,
+  solicitarAutorizacao,
+  consultarTrabalhador,
+  consultarBaseOffline,
+  consultarOfertas,
+  analisarPolitica,
+  consultarOperacoes,
+  criarSimulacao,
+  cadastrarDadosPessoais,
+  criarProposta,
+  enviarLinkAssinatura,
+  consultarAndamentoProposta,
+  consultarOcorrenciasProposta,
+  consultarCombo,
+};

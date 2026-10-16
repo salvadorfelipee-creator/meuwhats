@@ -180,7 +180,6 @@
 .fc-clt-link { justify-self: start; border: 0; background: transparent; color: var(--fc-green-dark); cursor: pointer; font: 650 12px "DM Sans", sans-serif; }
 .fc-clt-resim { display: grid; gap: 9px; }
 .fc-clt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-.fc-clt-grid label:nth-child(2), .fc-clt-grid label:nth-child(8), .fc-clt-grid label:nth-child(9) { grid-column: 1 / -1; }
 .fc-clt-consent { grid-template-columns: 18px 1fr !important; align-items: start; font-weight: 500 !important; line-height: 1.35; }
 .fc-clt-consent input { width: 16px; height: 16px; }
 .fc-clt-loading { color: var(--fc-muted); font-size: 12px; animation: fc-pulse 1.2s ease-in-out infinite; }
@@ -189,6 +188,25 @@
 .fc-clt-secondary { display: flex; min-height: 44px; align-items: center; justify-content: center; border: 1px solid #d8e0e7; border-radius: 12px; background: #fff; color: var(--fc-ink); cursor: pointer; font: 650 13px "Sora", sans-serif; text-decoration: none; }
 .fc-clt-checked { color: var(--fc-muted); font-size: 11px; text-align: center; }
 .fc-clt-inline-error { color: #b42318 !important; font-weight: 650; }
+.fc-clt-safe { color: var(--fc-muted); font-size: 10px; text-align: center; }
+.fc-clt-notice { display: grid; gap: 3px; padding: 11px 12px; border-radius: 12px; background: #eefaf3; color: #24523a; font-size: 11px; line-height: 1.45; }
+.fc-clt-notice b { color: var(--fc-green-dark); font: 700 11px "Sora", sans-serif; }
+.fc-clt-checklist { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: facta-step; }
+.fc-clt-checklist li { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 9px; color: #344054; font-size: 12px; }
+.fc-clt-checklist li::before { counter-increment: facta-step; content: counter(facta-step); display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: #e7f8ee; color: var(--fc-green-dark); font: 700 10px "Sora", sans-serif; }
+.fc-clt-status { display: flex; align-items: center; gap: 8px; padding-top: 2px; color: var(--fc-muted); font-size: 11px; }
+.fc-clt-status span { width: 8px; height: 8px; border-radius: 50%; background: var(--fc-green); box-shadow: 0 2px 8px rgba(0, 204, 102, .28); animation: fc-pulse 1.2s ease-in-out infinite; }
+.fc-clt-section { display: grid; gap: 9px; padding-top: 12px; border-top: 1px solid #e7ece9; }
+.fc-clt-section > b { color: var(--fc-navy); font: 700 12px "Sora", sans-serif; }
+.fc-clt-rogo { display: grid; gap: 9px; }
+.fc-clt-offer:disabled { cursor: wait; opacity: .72; transform: none; }
+.fc-clt-card input:focus-visible, .fc-clt-card select:focus-visible, .fc-clt-card button:focus-visible, .fc-clt-card a:focus-visible { outline: 3px solid rgba(0, 160, 80, .28); outline-offset: 2px; }
+
+@media (max-width: 560px) {
+  .fc-chat-root.is-contracting .fc-chat { width: 100vw; height: 100dvh; max-height: none; border-radius: 0; }
+  .fc-clt-grid { grid-template-columns: 1fr; }
+  .fc-chat-clt { max-height: 72%; }
+}
 @keyframes fc-pulse { 50% { opacity: .45; } }
 .fc-chat-compose textarea { min-height: 42px; max-height: 104px; flex: 1; padding: 10px 12px; }
 .fc-chat-tool { display: grid; width: 34px; height: 42px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 10px; background: transparent; color: #667085; cursor: pointer; font: 700 18px/1 sans-serif; }
