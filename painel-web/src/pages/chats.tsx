@@ -2,6 +2,7 @@ import * as React from "react"
 import { COMPANY_LABELS, useChannel, type Channel } from "@/lib/channel-context"
 import { SiteChatPage } from "@/pages/site-chat"
 import { useUnread } from "@/lib/unread-context"
+import { useAuth } from "@/lib/auth-context"
 import {
   api,
   type Conversation,
@@ -21,13 +22,14 @@ import {
   type SugestaoIa,
   pipelineEstagiosPara,
   mediaUrl,
+  conversaEhUrgente,
 } from "@/lib/api"
 import { GerenciarTags } from "@/pages/analytics"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CardDescription, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { SidebarTrigger } from "@/components/blocks/sidebar"
@@ -54,7 +56,6 @@ import {
   Info,
   MessagesSquare,
   Radio,
-  Smile,
   Bell,
   BellOff,
   ChevronDown,
@@ -91,6 +92,12 @@ import {
   MapPin,
   User,
   Globe2,
+  MoreHorizontal,
+  Plus,
+  UserCheck,
+  UserX,
+  Check,
+  UserRound,
 } from "lucide-react"
 
 // Emoji picker — dataset grande (emoji-picker-react), carregado só quando alguém de fato abre o
@@ -140,6 +147,46 @@ function formatVisto(ts: number | null | undefined): string | null {
 
 function vistoRecentemente(ts: number | null | undefined): boolean {
   return !!ts && Date.now() - ts < VISTO_RECENTE_MS
+}
+
+function formatarTelefone(phone: string): string {
+  const digitos = phone.replace(/\D/g, "")
+  const semDdi = digitos.startsWith("55") && digitos.length > 11 ? digitos.slice(2) : digitos
+  if (semDdi.length === 11) return `(${semDdi.slice(0, 2)}) ${semDdi.slice(2, 7)}-${semDdi.slice(7)}`
+  if (semDdi.length === 10) return `(${semDdi.slice(0, 2)}) ${semDdi.slice(2, 6)}-${semDdi.slice(6)}`
+  return phone
+}
+
+// Campos personalizados dessa conversa (Responsável/Produto/Origem/Valor solicitado etc.), já
+// vêm prontos no GET /conversations como JSON (ver listConversations em db.js) — sem isso cada
+// card pediria 1 fetch extra só pra mostrar "Responsável" na lista.
+function camposDe(c: Conversation): Record<string, string> {
+  if (!c.campos_json) return {}
+  try {
+    return JSON.parse(c.campos_json)
+  } catch {
+    return {}
+  }
+}
+
+function tagsDe(c: Conversation): Tag[] {
+  if (!c.tags_json) return []
+  try {
+    return JSON.parse(c.tags_json)
+  } catch {
+    return []
+  }
+}
+
+// "há quanto tempo o cliente está esperando" — só faz sentido quando a última mensagem foi DELE
+// (senão já tem resposta nossa, não tem espera nenhuma rolando). Cor esquenta com o tempo: verde
+// (rápido) → laranja → vermelho (demorado).
+function tempoEspera(c: Conversation): { texto: string; cor: string } | null {
+  if (c.last_direction !== "in" || !c.last_message_at) return null
+  const min = Math.floor((Date.now() - c.last_message_at) / 60000)
+  const cor = min < 5 ? "#2F7D4F" : min < 30 ? "#B8690F" : "#C03C3C"
+  const texto = min < 1 ? "agora" : min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)}h` : formatTime(c.last_message_at).split(" ")[0]
+  return { texto, cor }
 }
 
 // Divide o texto em pedaços marcando as ocorrências de `termo` (sem diferenciar
@@ -203,11 +250,13 @@ function ChannelChatsPage() {
     requestNotifPermission,
     unreadChannels,
     unreadConversations,
+    overdueConversations,
     markConversationSeen,
     setActiveConversation,
     alvoAbrir,
     limparAlvoAbrir,
   } = useUnread()
+  const { identidade } = useAuth()
   const [conversations, setConversations] = React.useState<Conversation[]>([])
   const [selected, setSelected] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<Message[]>([])
@@ -216,7 +265,7 @@ function ChannelChatsPage() {
   const [enviando, setEnviando] = React.useState(false)
   const [respostas, setRespostas] = React.useState<RespostaPronta[]>([])
   const [respostasMenuOpen, setRespostasMenuOpen] = React.useState(false)
-  const [respostaEditando, setRespostaEditando] = React.useState<RespostaPronta | null>(null)
+  const [respostaEditando, setRespostaEditando] = React.useState<RespostaPronta | "novo" | null>(null)
   // Painel de detalhes do contato fica FIXO ao lado da conversa por padrão (pedido do usuário —
   // antes era um Sheet que precisava clicar pra abrir toda vez); o ícone "i" só recolhe/expande
   // pra quem quiser mais espaço pra tela de chat.
@@ -669,6 +718,53 @@ function ChannelChatsPage() {
     carregarConversas()
   }
 
+  // Nome do contato direto no cabeçalho (prominente — achado real: contato sem nome salvo não
+  // tinha nada que sugerisse/lembrasse de preencher, ficava escondido atrás de um lápis pequeno
+  // no painel de detalhes). Estado próprio, independente do que ContactDetails usa internamente.
+  const [editandoNomeHeader, setEditandoNomeHeader] = React.useState(false)
+  const [nomeHeaderEditado, setNomeHeaderEditado] = React.useState("")
+  const [salvandoNomeHeader, setSalvandoNomeHeader] = React.useState(false)
+  async function salvarNomeHeader() {
+    if (!current || !selected || !nomeHeaderEditado.trim() || salvandoNomeHeader) return
+    setSalvandoNomeHeader(true)
+    try {
+      await api.renomearContato(current.id, selected, nomeHeaderEditado.trim())
+      setEditandoNomeHeader(false)
+      carregarConversas()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao renomear")
+    } finally {
+      setSalvandoNomeHeader(false)
+    }
+  }
+
+  // Atribui (ou remove a atribuição de) essa conversa pra quem está logado — reaproveita o
+  // mesmo campo personalizado "Responsável" que já existe no CRM (ver lista/Pipeline/Contatos),
+  // não é um mecanismo novo. Só marca visibilidade de quem está cuidando — não muda nada no
+  // comportamento automático do bot (isso exigiria uma mudança separada no fluxo em server.js).
+  const [atribuindo, setAtribuindo] = React.useState(false)
+  async function atribuirAMim() {
+    if (!current || !selected || !conversaAtual || atribuindo) return
+    const meuNome = identidade?.nome?.trim()
+    if (!meuNome) return
+    const jaAtribuido = camposDe(conversaAtual)["Responsável"]
+    setAtribuindo(true)
+    try {
+      const campos = await api.camposPersonalizados(current.id)
+      let campo = campos.find((c) => c.nome === "Responsável")
+      if (!campo) {
+        const { id } = await api.criarCampoPersonalizado(current.id, "Responsável")
+        campo = { id, business_id: current.id, nome: "Responsável", created_at: Date.now() }
+      }
+      await api.definirCampoConversa(current.id, selected, campo.id, jaAtribuido ? "" : meuNome)
+      carregarConversas()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao atribuir conversa")
+    } finally {
+      setAtribuindo(false)
+    }
+  }
+
   // Esc fecha o lightbox de mídia em tela cheia.
   React.useEffect(() => {
     if (!lightbox) return
@@ -780,6 +876,18 @@ function ChannelChatsPage() {
             <div className="flex flex-col gap-1 p-2">
             {listaFiltrada.map((c) => {
               const naoLida = current ? unreadConversations.has(`${current.id}|${c.phone}`) : false
+              // Pisca só pra quem bate a regra de urgência (ver conversaEhUrgente em api.ts) —
+              // sem isso, uma conversa não lida sempre "chama atenção" igual pra todo mundo.
+              const urgente = naoLida && conversaEhUrgente(c, identidade)
+              // Alerta universal: última mensagem foi do cliente e ninguém (bot nem humano)
+              // respondeu há mais de 30min — independente de etapa/status/quem está logado.
+              const semResposta = current ? overdueConversations.has(`${current.id}|${c.phone}`) : false
+              const espera = tempoEspera(c)
+              const campos = camposDe(c)
+              const tags = tagsDe(c)
+              const estagiosLista = pipelineEstagiosPara(current?.label)
+              const estagio = estagiosLista.find((e) => e.id === c.pipeline_estagio)
+              const ehInstagram = c.channel === "instagram" || current?.id === "instagram"
               return (
               <button
                 key={c.phone}
@@ -787,44 +895,97 @@ function ChannelChatsPage() {
                   setSelected(c.phone)
                   if (current) markConversationSeen(current.id, c.phone)
                 }}
-                className={`w-full p-3 rounded-lg cursor-pointer text-left transition-colors ${
-                  naoLida
-                    ? "animate-pulse bg-red-50 dark:bg-red-950/40"
-                    : selected === c.phone
+                className={`w-full p-2.5 rounded-lg cursor-pointer text-left transition-colors relative ${
+                  selected === c.phone
                     ? "bg-accent"
+                    : semResposta
+                    ? "bg-red-500/10 dark:bg-red-500/15 animate-pulse"
                     : "hover:bg-accent/50"
-                }`}
+                } ${naoLida ? "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary" : ""}`}
+                title={semResposta ? "Sem nenhuma resposta (bot ou humano) há mais de 30 minutos" : undefined}
               >
-                <div className="flex flex-row gap-3 items-center">
+                <div className="flex flex-row gap-2.5 items-start">
                   <div className="relative shrink-0">
-                    <Avatar className="size-12">
+                    <Avatar className="size-9">
+                      {c.foto_url && <AvatarImage src={mediaUrl(c.foto_url)} alt="" />}
                       <AvatarFallback>{initials(c.name, c.phone)}</AvatarFallback>
                     </Avatar>
-                    {vistoRecentemente(c.last_seen_at) && (
-                      <span
-                        title={formatVisto(c.last_seen_at) || undefined}
-                        className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-background"
-                      />
-                    )}
+                    <span
+                      title={ehInstagram ? "Instagram" : "WhatsApp"}
+                      className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-background flex items-center justify-center"
+                      style={{ background: ehInstagram ? "#C13584" : "#25D366" }}
+                    >
+                      {ehInstagram ? <InstagramIcon className="h-2 w-2 text-white" /> : <Phone className="h-2 w-2 text-white" />}
+                    </span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="truncate text-sm min-w-0 flex-1">{c.name || c.phone}</CardTitle>
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {formatTime(c.last_message_at)}
-                      </span>
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`truncate text-[13px] min-w-0 ${naoLida ? "font-semibold" : "font-medium"}`}>
+                          {c.name || formatarTelefone(c.phone)}
+                        </span>
+                        {campos["Responsável"] && (
+                          <span
+                            title={`Responsável: ${campos["Responsável"]}`}
+                            className="shrink-0 h-4 w-4 rounded-full bg-muted text-[8px] font-semibold flex items-center justify-center"
+                          >
+                            {campos["Responsável"].slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="shrink-0 flex flex-col items-end gap-0.5">
+                        {espera ? (
+                          <span className="text-[10px] font-bold tabular-nums" style={{ color: espera.cor }}>
+                            {espera.texto}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(c.last_message_at)}</span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-0.5">
-                      <CardDescription className="truncate min-w-0 flex-1">
-                        {c.last_direction === "out" ? "Você: " : ""}
+                      <p className={`truncate min-w-0 flex-1 text-xs ${naoLida ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+                        {c.last_direction === "out" ? (c.last_origem ? "Você: " : "Automático: ") : ""}
                         {c.last_body || "—"}
-                      </CardDescription>
-                      {c.status && c.status !== "novo" && (
-                        <Badge variant={STATUS_VARIANT[c.status]} className="shrink-0 text-[10px]">
-                          {STATUS_LABEL[c.status]}
-                        </Badge>
+                      </p>
+                      {/* Não existe contagem de mensagem não lida por conversa, só um booleano —
+                          bolinha simples em vez de número inventado. Pisca (ping) só quando é
+                          urgente pra essa pessoa; calma (sólida) quando é só "tem mensagem nova". */}
+                      {naoLida && (
+                        <span className={urgente ? "relative flex h-2 w-2 shrink-0" : "flex h-2 w-2 shrink-0"}>
+                          {urgente && (
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                          )}
+                          <span className={`relative inline-flex h-2 w-2 rounded-full ${urgente ? "bg-red-500" : "bg-primary"}`} />
+                        </span>
                       )}
                     </div>
+                    {(tags.length > 0 || estagio || (c.status && c.status !== "novo")) && (
+                      <div className="flex items-center gap-1 mt-1 flex-wrap">
+                        {tags.slice(0, 2).map((t) => (
+                          <span
+                            key={t.id}
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                            style={{ background: `${t.cor}1a`, color: t.cor }}
+                          >
+                            {t.nome}
+                          </span>
+                        ))}
+                        {estagio && (
+                          <span
+                            className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                            style={{ background: `${estagio.cor}1a`, color: estagio.cor }}
+                          >
+                            {estagio.nome}
+                          </span>
+                        )}
+                        {c.status && c.status !== "novo" && (
+                          <Badge variant={STATUS_VARIANT[c.status]} className="shrink-0 text-[10px]">
+                            {STATUS_LABEL[c.status]}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </button>
@@ -846,60 +1007,158 @@ function ChannelChatsPage() {
           <div className="flex flex-col h-screen">
             {/* Cabeçalho */}
             <div className="h-14 border-b flex items-center px-4 shrink-0 gap-3">
-              <Avatar className="size-9">
-                <AvatarFallback>{initials(conversaAtual.name, conversaAtual.phone)}</AvatarFallback>
-              </Avatar>
+              <div className="relative shrink-0">
+                <Avatar className="size-9">
+                  {conversaAtual.foto_url && <AvatarImage src={mediaUrl(conversaAtual.foto_url)} alt="" />}
+                  <AvatarFallback>{initials(conversaAtual.name, conversaAtual.phone)}</AvatarFallback>
+                </Avatar>
+                {vistoRecentemente(conversaAtual.last_seen_at) && (
+                  <span
+                    title={formatVisto(conversaAtual.last_seen_at) || undefined}
+                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background"
+                  />
+                )}
+              </div>
               <div className="min-w-0">
-                <CardTitle className="text-sm truncate">{conversaAtual.name || conversaAtual.phone}</CardTitle>
+                {conversaAtual.name ? (
+                  <CardTitle className="text-sm truncate">{conversaAtual.name}</CardTitle>
+                ) : editandoNomeHeader ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      value={nomeHeaderEditado}
+                      onChange={(e) => setNomeHeaderEditado(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") salvarNomeHeader()
+                        if (e.key === "Escape") setEditandoNomeHeader(false)
+                      }}
+                      placeholder="Nome do contato"
+                      className="h-6 w-40 rounded border border-input bg-background px-1.5 text-sm"
+                    />
+                    <button
+                      onClick={salvarNomeHeader}
+                      disabled={salvandoNomeHeader}
+                      className="text-muted-foreground hover:text-foreground shrink-0"
+                    >
+                      {salvandoNomeHeader ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                ) : (
+                  // Prominente de propósito — nenhum contato sem nome tinha jeito fácil de
+                  // perceber/preencher isso antes. Fica na frente, não escondido atrás de um
+                  // lápis pequeno no painel de detalhes.
+                  <button
+                    onClick={() => {
+                      setNomeHeaderEditado("")
+                      setEditandoNomeHeader(true)
+                    }}
+                    className="flex items-center gap-1 text-sm font-medium text-amber-700 dark:text-amber-400 hover:underline"
+                    title="Esse contato ainda não tem nome salvo — clique pra adicionar"
+                  >
+                    <UserRound className="h-3.5 w-3.5" />
+                    Adicionar nome do contato
+                  </button>
+                )}
                 <CardDescription className="truncate">
-                  {formatVisto(conversaAtual.last_seen_at) || conversaAtual.phone}
+                  {camposDe(conversaAtual)["Origem"]
+                    ? `veio de ${camposDe(conversaAtual)["Origem"]}`
+                    : formatVisto(conversaAtual.last_seen_at) || conversaAtual.phone}
                 </CardDescription>
               </div>
+
+              {/* Janela de 24h do WhatsApp — depois dela só dá pra mandar template aprovado.
+                  Instagram não tem essa janela. */}
+              {current?.id !== "instagram" &&
+                (() => {
+                  const restante = conversaAtual.last_inbound_at
+                    ? 24 * 60 - (Date.now() - conversaAtual.last_inbound_at) / 60000
+                    : -1
+                  const aberta = restante > 0
+                  return (
+                    <span
+                      className={`shrink-0 text-[11px] font-medium px-2 py-1 rounded-full ${
+                        aberta
+                          ? "bg-[#DDF1E4] text-[#2F7D4F] dark:bg-emerald-950/40 dark:text-emerald-400"
+                          : "bg-[#FBEBD3] text-[#B8690F] dark:bg-amber-950/40 dark:text-amber-400"
+                      }`}
+                    >
+                      {aberta ? `Janela aberta · ${Math.floor(restante / 60)}h restantes` : "Janela fechada · só template"}
+                    </span>
+                  )
+                })()}
+
               <div className="flex-grow flex justify-end gap-2 items-center">
+                {camposDe(conversaAtual)["Responsável"] && (
+                  <span
+                    className="shrink-0 text-[11px] font-medium px-2 py-1 rounded-full bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                    title={`${camposDe(conversaAtual)["Responsável"]} está cuidando dessa conversa`}
+                  >
+                    Com {camposDe(conversaAtual)["Responsável"]}
+                  </span>
+                )}
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  title="Buscar nesta conversa"
-                  onClick={() => setBuscaAberta((v) => !v)}
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={atribuirAMim}
+                  disabled={atribuindo || !identidade?.nome?.trim()}
+                  title={
+                    camposDe(conversaAtual)["Responsável"]
+                      ? "Remove a atribuição — só muda a visibilidade de quem está cuidando, não mexe no bot"
+                      : "Marca você como responsável por essa conversa — só visibilidade, não mexe no bot"
+                  }
                 >
-                  <Search className="h-4 w-4" />
+                  {camposDe(conversaAtual)["Responsável"] ? (
+                    <>
+                      <UserX className="h-3.5 w-3.5" />
+                      Remover atribuição
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="h-3.5 w-3.5" />
+                      Atribuir a mim
+                    </>
+                  )}
+                </Button>
+                <Button size="sm" variant="outline" disabled title="Lembrete/snooze chegando em breve">
+                  Adiar
                 </Button>
                 {conversaAtual.status !== "resolvido" && (
-                  <Button variant="outline" size="sm" onClick={() => mudarStatus("resolvido")}>
+                  <Button size="sm" onClick={() => mudarStatus("resolvido")}>
                     <CircleCheck className="h-4 w-4 mr-1" />
                     Finalizar
                   </Button>
                 )}
+                {/* Resto das ações — juntas num só menu pra não lotar o cabeçalho de botão (achado
+                    real testando com várias ações ligadas ao mesmo tempo: a barra quebrava linha
+                    e sobrepunha o texto do nome). */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      {STATUS_LABEL[conversaAtual.status || "novo"]}
+                    <Button variant="ghost" size="icon" title="Mais opções">
+                      <ChevronDown className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={() => setBuscaAberta((v) => !v)}>
+                      <Search className="h-4 w-4 mr-2" /> Buscar nesta conversa
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => current && selected && api.exportarConversa(current.id, selected).catch((err) => alert(err instanceof Error ? err.message : "Erro ao exportar"))}
+                    >
+                      <Download className="h-4 w-4 mr-2" /> Exportar conversa (.txt)
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setDetailsOpen((v) => !v)}>
+                      <Info className="h-4 w-4 mr-2" /> {detailsOpen ? "Esconder" : "Mostrar"} painel do contato
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Status</DropdownMenuLabel>
                     {(["novo", "andamento", "resolvido"] as const).map((s) => (
                       <DropdownMenuItem key={s} onClick={() => mudarStatus(s)}>
-                        {STATUS_LABEL[s]}
+                        {STATUS_LABEL[s]} {conversaAtual.status === s || (!conversaAtual.status && s === "novo") ? "✓" : ""}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  title="Exportar conversa (.txt)"
-                  onClick={() => current && selected && api.exportarConversa(current.id, selected).catch((err) => alert(err instanceof Error ? err.message : "Erro ao exportar"))}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={detailsOpen ? "secondary" : "ghost"}
-                  size="icon"
-                  title={detailsOpen ? "Esconder painel do contato" : "Mostrar painel do contato"}
-                  onClick={() => setDetailsOpen((v) => !v)}
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
               </div>
             </div>
 
@@ -1139,12 +1398,39 @@ function ChannelChatsPage() {
               </div>
             ) : (
               <div className="flex flex-col border-t shrink-0">
-                <div className="flex items-end gap-1 p-2">
+                {/* Atalhos sempre visíveis — os 3 mais usados de verdade (uso_count, já contado
+                    em registrarUsoRespostaPronta) ficam à mão sem precisar abrir menu nenhum;
+                    "..." abre a lista completa, "+" cria uma nova sem sair da conversa. Clique
+                    com o botão direito num atalho edita na hora. */}
+                <div className="px-2 pt-2 flex items-center gap-1.5 flex-wrap">
+                  {[...respostas]
+                    .sort((a, b) => (b.uso_count || 0) - (a.uso_count || 0))
+                    .slice(0, 3)
+                    .map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => {
+                          setTexto(r.texto)
+                          api.registrarUsoRespostaPronta(r.id).catch(() => {})
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault()
+                          setRespostaEditando(r)
+                        }}
+                        title="Clique com o botão direito pra editar"
+                        className="text-[11px] font-medium px-2 py-1 rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground"
+                      >
+                        {r.atalho}
+                      </button>
+                    ))}
                   <DropdownMenu open={respostasMenuOpen} onOpenChange={setRespostasMenuOpen}>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" title="Respostas prontas">
-                        <Smile className="h-4 w-4" />
-                      </Button>
+                      <button
+                        title="Ver todas as respostas prontas"
+                        className="h-[22px] w-[22px] rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
+                      >
+                        <MoreHorizontal className="h-3 w-3" />
+                      </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto w-64">
                       <DropdownMenuLabel>Respostas prontas</DropdownMenuLabel>
@@ -1183,7 +1469,16 @@ function ChannelChatsPage() {
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  <button
+                    onClick={() => setRespostaEditando("novo")}
+                    title="Nova resposta pronta"
+                    className="h-[22px] w-[22px] rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
+                  >
+                    <Plus className="h-3 w-3" />
+                  </button>
+                </div>
 
+                <div className="flex items-end gap-1 p-2">
                   <div className="relative">
                     <Button variant="ghost" size="icon" title="Emoji" onClick={() => setEmojiOpen((v) => !v)}>
                       <span className="text-base leading-none">😊</span>
@@ -1328,17 +1623,24 @@ function EditarRespostaProntaDialog({
   onOpenChange,
   onSaved,
 }: {
-  resposta: RespostaPronta | null
+  // "novo" = criar uma resposta pronta do zero (mesmo dialog, só troca a chamada de API) — ver
+  // botão "+" na barra de atalhos do composer.
+  resposta: RespostaPronta | "novo" | null
   onOpenChange: (open: boolean) => void
   onSaved: () => void
 }) {
+  const modoNovo = resposta === "novo"
   const [atalho, setAtalho] = React.useState("")
   const [texto, setTexto] = React.useState("")
   const [salvando, setSalvando] = React.useState(false)
   const [erro, setErro] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    if (resposta) {
+    if (resposta === "novo") {
+      setAtalho("")
+      setTexto("")
+      setErro(null)
+    } else if (resposta) {
       setAtalho(resposta.atalho)
       setTexto(resposta.texto)
       setErro(null)
@@ -1350,7 +1652,11 @@ function EditarRespostaProntaDialog({
     setSalvando(true)
     setErro(null)
     try {
-      await api.atualizarRespostaPronta(resposta.id, atalho.trim(), texto.trim())
+      if (modoNovo) {
+        await api.criarRespostaPronta(atalho.trim(), texto.trim())
+      } else {
+        await api.atualizarRespostaPronta((resposta as RespostaPronta).id, atalho.trim(), texto.trim())
+      }
       onSaved()
       onOpenChange(false)
     } catch (err) {
@@ -1364,7 +1670,7 @@ function EditarRespostaProntaDialog({
     <Dialog open={!!resposta} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Editar resposta pronta</DialogTitle>
+          <DialogTitle>{modoNovo ? "Nova resposta pronta" : "Editar resposta pronta"}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <div>
