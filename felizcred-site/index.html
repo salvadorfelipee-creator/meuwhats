@@ -469,6 +469,20 @@
     width: 100%; height: 680px;
     border: none; display: block;
   }
+  .sim-section.contact-only .sim-header {
+    grid-template-columns: minmax(0, 760px);
+    justify-content: center;
+  }
+  .contact-cta {
+    margin-top: 30px;
+    padding: 24px 28px;
+    border: 1px solid rgba(37,211,102,.28);
+    border-radius: 16px;
+    background: rgba(37,211,102,.08);
+  }
+  .contact-cta strong { display: block; margin-bottom: 7px; color: #fff; font-family: "Sora", sans-serif; font-size: 17px; }
+  .contact-cta p { margin-bottom: 16px; color: #b6c6d3; font-size: 14px; line-height: 1.6; }
+  .contact-cta .btn-primary { width: fit-content; }
 
   /* ─── HOW IT WORKS ─── */
   .how-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
@@ -755,8 +769,8 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   <div class="logo">Feliz<span>Cred</span></div>
   <ul class="nav-links">
     <li><a href="#produtos">Produtos</a></li>
-    <li><a href="#simular">Simular CLT</a></li>
-    <li><a href="#fgts-simular">Simular FGTS</a></li>
+    <li><a href="#simular">Crédito CLT</a></li>
+    <li><a href="#fgts-simular">Antecipar FGTS</a></li>
     <li><a href="#como-funciona">Como Funciona</a></li>
     <li><a href="#calculadoras">Calculadoras</a></li>
     <li><a href="#faq">Dúvidas</a></li>
@@ -774,7 +788,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       <h1>Seu dinheiro<br/>na conta em<br/><em>até 40 minutos</em></h1>
       <p class="hero-sub">Empréstimo CLT com desconto no salário e antecipação do FGTS. Sem consulta SPC para negativados. Atendimento humano pelo WhatsApp.</p>
       <div class="hero-btns">
-        <a href="#simular" class="btn-primary">🚀 Simular agora — grátis</a>
+        <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20uma%20op%C3%A7%C3%A3o%20de%20cr%C3%A9dito." class="btn-primary" target="_blank">💬 Consultar pelo WhatsApp</a>
         <a href="https://wa.me/554797059353" class="btn-secondary">💬 Falar com atendente</a>
       </div>
       <div class="hero-stats">
@@ -837,64 +851,42 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   </div>
 </div>
 
-<!-- SIMULATOR -->
-<div class="sim-section" id="simular" style="margin-top:40px;">
+<!-- CLT VIA WHATSAPP -->
+<div class="sim-section contact-only" id="simular" style="margin-top:40px;">
   <div class="sim-header">
     <div>
-      <div class="sim-tag">⚡ Simulador CLT</div>
-      <h2 style="margin-bottom:14px;">Simule e aprove<br/>na hora</h2>
+      <div class="sim-tag">Crédito do Trabalhador</div>
+      <h2 style="margin-bottom:14px;">Consulte seu crédito CLT<br/>com nossa equipe</h2>
       <p style="color:var(--gray); font-size:16px; line-height:1.6; margin-bottom:28px;">
-        Preencha os dados ao lado e descubra em segundos quanto você pode pegar emprestado. Aprovação automática — sem fila, sem burocracia.
+        Fale com um atendente pelo WhatsApp para verificar sua elegibilidade e receber orientação em cada etapa. A contratação está sujeita à análise e às condições disponíveis para o seu perfil.
       </p>
       <div class="sim-steps">
         <div class="sim-step">
           <div class="step-num">1</div>
           <div class="step-text">
-            <strong>Preencha seus dados para simular</strong>
-            <span>Nome, CPF e informações de trabalho</span>
+            <strong>Chame a FelizCred no WhatsApp</strong>
+            <span>A mensagem já vai pronta para iniciar seu atendimento</span>
           </div>
         </div>
         <div class="sim-step">
           <div class="step-num">2</div>
           <div class="step-text">
-            <strong>Veja a proposta na hora</strong>
-            <span>Valor, parcelas e taxa personalizada</span>
+            <strong>Envie os dados solicitados</strong>
+            <span>Nossa equipe explica quais informações são necessárias</span>
           </div>
         </div>
         <div class="sim-step">
           <div class="step-num">3</div>
           <div class="step-text">
-            <strong>Aprove e receba via PIX</strong>
-            <span>Dinheiro na conta em até 40 minutos</span>
+            <strong>Receba as condições disponíveis</strong>
+            <span>Confira valores, parcelas e CET antes de decidir</span>
           </div>
         </div>
       </div>
-      <!-- WhatsApp fallback -->
-      <div style="margin-top:32px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:24px 28px; display:flex; align-items:center; gap:20px;">
-        <div style="font-size:36px; flex-shrink:0;">💬</div>
-        <div>
-          <p style="font-family:'Sora',sans-serif; font-weight:700; font-size:16px; color:#fff; margin-bottom:6px;">
-            Prefere falar com uma pessoa?
-          </p>
-          <p style="font-size:14px; color:#8fa3b1; line-height:1.6; margin-bottom:14px;">
-            Sem problema! Chame um de nossos atendentes no WhatsApp — respondemos na hora, todos os dias.
-          </p>
-          <a href="https://wa.me/554797059353" target="_blank"
-            style="display:inline-flex; align-items:center; gap:8px; background:#25D366; color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:14px; padding:11px 22px; border-radius:50px; text-decoration:none;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-            Falar com atendente agora
-          </a>
-        </div>
-      </div>
-    </div>
-    <div>
-      <div class="iframe-wrapper">
-        <iframe
-          src="https://v8-auto-clt-front.vercel.app/d93b3e28-721d-4f7a-aba4-33af558857ff"
-          title="Simulador de Empréstimo CLT FelizCred"
-          allow="clipboard-write; payment"
-          loading="eager">
-        </iframe>
+      <div class="contact-cta">
+        <strong>Comece pelo WhatsApp</strong>
+        <p>Você conversa com a equipe da FelizCred e acompanha toda a solicitação pelo celular.</p>
+        <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20meu%20cr%C3%A9dito%20CLT." target="_blank" class="btn-primary">Falar sobre crédito CLT</a>
       </div>
     </div>
   </div>
@@ -906,7 +898,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   <h2>Escolha o crédito<br/>certo para você</h2>
   <p class="section-sub">Dois produtos, aprovação rápida, dinheiro na conta. Simples assim.</p>
   <div class="products-grid">
-    <a href="#simular" class="product-card clt highlight">
+    <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20meu%20cr%C3%A9dito%20CLT." class="product-card clt highlight" target="_blank">
       <div class="highlight-badge">⭐ MAIS PROCURADO</div>
       <div class="product-tag">Para CLT</div>
       <h3>Crédito do Trabalhador</h3>
@@ -917,7 +909,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         <li>Até 48x para pagar</li>
         <li>Aprovação em minutos</li>
       </ul>
-      <span class="product-btn">Simular agora →</span>
+      <span class="product-btn">Consultar pelo WhatsApp →</span>
     </a>
     <a href="https://wa.me/554797059353" class="product-card fgts">
       <div class="product-tag">FGTS</div>
@@ -934,15 +926,15 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   </div>
 </div>
 
-<!-- FGTS SIMULATOR -->
-<div class="sim-section" id="fgts-simular" style="margin-top:40px; border-color:rgba(255,214,0,0.2);">
+<!-- FGTS VIA WHATSAPP -->
+<div class="sim-section contact-only" id="fgts-simular" style="margin-top:40px; border-color:rgba(255,214,0,0.2);">
   <div style="position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#FFD600,#FFA000); border-radius:28px 28px 0 0;"></div>
 
   <!-- Aviso bancos -->
   <div style="background:rgba(255,214,0,0.08); border:1px solid rgba(255,214,0,0.3); border-radius:16px; padding:20px 24px; margin-bottom:32px; display:flex; align-items:flex-start; gap:16px;">
     <div style="font-size:28px; flex-shrink:0;">⚠️</div>
     <div>
-      <p style="font-family:'Sora',sans-serif; font-weight:700; font-size:15px; color:#FFD600; margin-bottom:6px;">Antes de simular — autorize os bancos no app FGTS!</p>
+      <p style="font-family:'Sora',sans-serif; font-weight:700; font-size:15px; color:#FFD600; margin-bottom:6px;">Antes do atendimento, autorize os bancos no app FGTS</p>
       <p style="font-size:14px; color:rgba(255,255,255,0.7); line-height:1.6; margin-bottom:12px;">Para liberar sua antecipação você precisa autorizar as instituições financeiras parceiras no aplicativo FGTS da Caixa.</p>
       <a href="#fgts-instrucoes" onclick="document.getElementById('fgts-instrucoes').scrollIntoView({behavior:'smooth'});return false;" style="display:inline-flex; align-items:center; gap:8px; background:#FFD600; color:#0A1628; font-family:'Sora',sans-serif; font-weight:700; font-size:13px; padding:9px 18px; border-radius:50px; text-decoration:none;">
         📱 Ver como autorizar os bancos
@@ -952,10 +944,10 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 
   <div class="sim-header">
     <div>
-      <div class="sim-tag" style="background:rgba(255,214,0,0.12); border-color:rgba(255,214,0,0.3); color:#FFD600;">🏦 Simulador FGTS</div>
-      <h2 style="margin-bottom:14px;">Antecipe seu FGTS<br/>na hora</h2>
+      <div class="sim-tag" style="background:rgba(255,214,0,0.12); border-color:rgba(255,214,0,0.3); color:#FFD600;">Antecipação FGTS</div>
+      <h2 style="margin-bottom:14px;">Consulte sua antecipação<br/>pelo WhatsApp</h2>
       <p style="color:var(--gray); font-size:16px; line-height:1.6; margin-bottom:28px;">
-        Simule quanto você pode antecipar do seu saque-aniversário. Sem consulta SPC, sem parcelas mensais — o pagamento sai direto do seu FGTS.
+        Nossa equipe verifica as condições disponíveis para antecipar o saque-aniversário. Sem parcelas mensais: o pagamento é descontado do saldo do FGTS.
       </p>
       <div class="sim-steps">
         <div class="sim-step">
@@ -968,49 +960,30 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         <div class="sim-step">
           <div class="step-num" style="background:rgba(255,214,0,0.15); border-color:rgba(255,214,0,0.3); color:#FFD600;">2</div>
           <div class="step-text">
-            <strong>Preencha seus dados para simular</strong>
-            <span>CPF e informações pessoais</span>
+            <strong>Chame a FelizCred no WhatsApp</strong>
+            <span>Informe que deseja consultar a antecipação do FGTS</span>
           </div>
         </div>
         <div class="sim-step">
           <div class="step-num" style="background:rgba(255,214,0,0.15); border-color:rgba(255,214,0,0.3); color:#FFD600;">3</div>
           <div class="step-text">
-            <strong>Veja o valor disponível na hora</strong>
-            <span>Resultado automático em segundos</span>
+            <strong>Envie os dados solicitados</strong>
+            <span>Nossa equipe acompanha a consulta com você</span>
           </div>
         </div>
         <div class="sim-step">
           <div class="step-num" style="background:rgba(255,214,0,0.15); border-color:rgba(255,214,0,0.3); color:#FFD600;">4</div>
           <div class="step-text">
-            <strong>Fale com nosso atendente</strong>
-            <span>Para acompanhar e finalizar via WhatsApp</span>
+            <strong>Confira as condições disponíveis</strong>
+            <span>Analise o valor e conclua somente se fizer sentido</span>
           </div>
         </div>
       </div>
 
-      <!-- WhatsApp após simular -->
-      <div style="margin-top:28px; background:rgba(37,211,102,0.08); border:1px solid rgba(37,211,102,0.25); border-radius:16px; padding:20px 24px; display:flex; align-items:center; gap:16px;">
-        <div style="font-size:32px; flex-shrink:0;">💬</div>
-        <div>
-          <p style="font-family:'Sora',sans-serif; font-weight:700; font-size:15px; color:#fff; margin-bottom:4px;">Após simular — chame nosso atendente!</p>
-          <p style="font-size:13px; color:#8fa3b1; line-height:1.6; margin-bottom:12px;">Nossa equipe acompanha todo o processo e garante que tudo seja liberado corretamente.</p>
-          <a href="https://wa.me/554797059353" target="_blank" style="display:inline-flex; align-items:center; gap:8px; background:#25D366; color:#fff; font-family:'Sora',sans-serif; font-weight:700; font-size:13px; padding:9px 18px; border-radius:50px; text-decoration:none;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-            Falar com atendente agora
-          </a>
-        </div>
-      </div>
-    </div>
-
-    <!-- Iframe FGTS -->
-    <div>
-      <div class="iframe-wrapper">
-        <iframe
-          src="https://auto.v8sistema.com/7ec2dd55-e570-45f4-aada-d7961f5da46f"
-          title="Simulador FGTS FelizCred"
-          allow="clipboard-write; payment"
-          loading="eager">
-        </iframe>
+      <div class="contact-cta">
+        <strong>Faça a consulta com nossa equipe</strong>
+        <p>O atendimento continua no WhatsApp, desde a verificação até a conclusão da solicitação.</p>
+        <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20a%20antecipa%C3%A7%C3%A3o%20do%20meu%20FGTS." target="_blank" class="btn-primary">Falar sobre antecipação FGTS</a>
       </div>
     </div>
   </div>
@@ -1069,10 +1042,10 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       </div>
     </div>
 
-    <!-- CTA voltar ao simulador -->
+    <!-- CTA para atendimento -->
     <div style="text-align:center; margin-top:36px;">
-      <a href="#fgts-simular" style="display:inline-flex; align-items:center; gap:10px; background:#FFD600; color:#0A1628; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; padding:14px 32px; border-radius:50px; text-decoration:none;">
-        ✅ Já autorizei — Simular agora
+      <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20j%C3%A1%20autorizei%20os%20bancos%20no%20app%20FGTS%20e%20quero%20consultar%20minha%20antecipa%C3%A7%C3%A3o." target="_blank" style="display:inline-flex; align-items:center; gap:10px; background:#FFD600; color:#0A1628; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; padding:14px 32px; border-radius:50px; text-decoration:none;">
+        ✅ Já autorizei — Falar no WhatsApp
       </a>
     </div>
   </div>
@@ -1086,8 +1059,8 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   <div class="how-grid">
     <div class="how-card">
       <div class="how-num">1</div>
-      <h4>Simule grátis</h4>
-      <p>Use o simulador acima ou chame no WhatsApp. Veja o valor e parcelas sem compromisso.</p>
+      <h4>Fale no WhatsApp</h4>
+      <p>Chame nossa equipe no WhatsApp para consultar as condições disponíveis sem compromisso.</p>
     </div>
     <div class="how-card">
       <div class="how-num">2</div>
@@ -1249,9 +1222,9 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 <!-- CTA FINAL -->
 <div class="cta-final">
   <h2>Pronto para ter o dinheiro<br/>na sua conta hoje?</h2>
-  <p>Simule agora ou fale com um atendente humano pelo WhatsApp.<br/>Sem burocracia, sem enganação.</p>
+  <p>Fale com um atendente pelo WhatsApp para consultar as condições disponíveis.<br/>Atendimento claro, do início ao fim.</p>
   <div>
-    <a href="#simular" class="btn-dark">🚀 Simular agora</a>
+    <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20uma%20op%C3%A7%C3%A3o%20de%20cr%C3%A9dito." class="btn-dark" target="_blank">Consultar pelo WhatsApp</a>
     <a href="https://wa.me/554797059353" class="btn-outline">💬 Falar no WhatsApp</a>
   </div>
 </div>
