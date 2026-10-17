@@ -195,6 +195,12 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "whatsapp_opt_out_at")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN whatsapp_opt_out_at INTEGER`);
   }
+  if (!infoSiteChat.rows.some((r) => r.name === "whatsapp_opt_in_version")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN whatsapp_opt_in_version TEXT`);
+  }
+  if (!infoSiteChat.rows.some((r) => r.name === "whatsapp_opt_in_text")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN whatsapp_opt_in_text TEXT`);
+  }
   await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_funnel_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id TEXT NOT NULL,
@@ -3589,16 +3595,17 @@ async function roteadorRevisadoDefinir(chave, revisado) {
   });
 }
 
-async function siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag, whatsappOptIn }) {
+async function siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag, whatsappOptIn, whatsappOptInVersion, whatsappOptInText }) {
   await ready;
   const now = Date.now();
   await client.batch([
     {
       sql: `INSERT INTO site_chat_conversations
             (id, visitor_token_hash, name, contact, email, page_url, status, created_at, updated_at, last_visitor_at,
-             produto_tag, pipeline_estagio, pipeline_estagio_desde, whatsapp_opt_in_at, whatsapp_opt_in_source)
-            VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, 'novo_lead', ?, ?, ?)`,
-      args: [id, tokenHash, name, contact || null, email || null, pageUrl || null, now, now, now, produtoTag || null, now, whatsappOptIn ? now : null, whatsappOptIn ? "site_chat" : null],
+             produto_tag, pipeline_estagio, pipeline_estagio_desde, whatsapp_opt_in_at, whatsapp_opt_in_source,
+             whatsapp_opt_in_version, whatsapp_opt_in_text)
+            VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, 'novo_lead', ?, ?, ?, ?, ?)`,
+      args: [id, tokenHash, name, contact || null, email || null, pageUrl || null, now, now, now, produtoTag || null, now, whatsappOptIn ? now : null, whatsappOptIn ? "site_chat" : null, whatsappOptIn ? whatsappOptInVersion : null, whatsappOptIn ? whatsappOptInText : null],
     },
     {
       sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)
@@ -3607,6 +3614,25 @@ async function siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, mes
     },
   ]);
   return { id, status: "open", created_at: now, updated_at: now };
+}
+
+// Mantém a prova do aceite original e registra separadamente quando o mesmo telefone pede
+// para não receber mais mensagens. O contato do site pode estar formatado e o webhook chega
+// com DDI; por isso a comparação usa os 10/11 dígitos nacionais.
+async function siteChatRegistrarOptOut(phone) {
+  await ready;
+  const digits = String(phone || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (digits.length < 10) return 0;
+  const now = Date.now();
+  const result = await client.execute({
+    sql: `UPDATE site_chat_conversations
+          SET whatsapp_opt_out_at = ?, updated_at = ?
+          WHERE whatsapp_opt_in_at IS NOT NULL
+            AND whatsapp_opt_out_at IS NULL
+            AND REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(contact, '(', ''), ')', ''), '-', ''), ' ', ''), '+', '') LIKE ?`,
+    args: [now, now, `%${digits}`],
+  });
+  return result.rowsAffected;
 }
 
 async function siteChatObter(id) {
@@ -3926,6 +3952,7 @@ module.exports = {
   roteadorRevisadoListar,
   roteadorRevisadoDefinir,
   siteChatCriar,
+  siteChatRegistrarOptOut,
   siteChatObter,
   siteChatRecuperarClt,
   siteChatRenovarToken,

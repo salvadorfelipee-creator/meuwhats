@@ -1117,6 +1117,8 @@ const HORAS_INATIVIDADE_MENU = 24;
 // fluxo por inatividade (ver checagem perto de TIPOS_COM_MENU); a pessoa ainda pode reabrir na
 // mão digitando "menu", porque aí a iniciativa é dela.
 const PASSO_OPTOUT_BLOQUEADO = "bloqueado_optout";
+const WHATSAPP_OPT_IN_VERSION = "site-chat-v1-2026-10-17";
+const WHATSAPP_OPT_IN_TEXT = "Aceito receber no WhatsApp mensagens da FelizCred sobre esta simulação e futuras oportunidades. Posso cancelar a qualquer momento.";
 
 // Primeiro nome do perfil do WhatsApp, só se parecer um nome de verdade (nada de emoji sozinho,
 // nome vazio ou símbolo) — usado pra personalizar a abertura da campanha fria sem alongar o
@@ -4122,6 +4124,7 @@ async function handlerIndBloquear(de, businessNumberId) {
       "me chamar. 🙏"
   );
   await db.setFluxoPasso(de, businessNumberId, PASSO_OPTOUT_BLOQUEADO);
+  await db.siteChatRegistrarOptOut(de);
 }
 
 const PERGUNTA_BATEU_PONTO = "Nesse cargo, você batia ponto?";
@@ -5588,7 +5591,19 @@ const server = http.createServer(async (req, res) => {
         let produtoTag = null;
         try { produtoTag = await gemini.classificarProdutoSite(message); }
         catch { produtoTag = /fgts/i.test(message) ? "FGTS" : /clt/i.test(message) ? "Empréstimo CLT" : /carro/i.test(message) ? "Carro em garantia" : null; }
-        const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag, whatsappOptIn });
+        const conversation = await db.siteChatCriar({
+          id,
+          tokenHash,
+          name,
+          contact,
+          email,
+          pageUrl,
+          message,
+          produtoTag,
+          whatsappOptIn,
+          whatsappOptInVersion: WHATSAPP_OPT_IN_VERSION,
+          whatsappOptInText: WHATSAPP_OPT_IN_TEXT,
+        });
         enviarInicioChatFelizcred({ nome: name, email }).catch((err) => console.error(`E-mail inicial do chat não enviado (${id}):`, err.message));
         if (produtoTag === "Empréstimo CLT") {
           await db.siteChatFunilEvento(id, "entrada", "inicio", "facta");
