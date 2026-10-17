@@ -17,10 +17,10 @@
       "environmentVariable": "FACTA_SITE_WHATSAPP_CONCLUIDA_TEMPLATE"
     },
     {
-      "name": "felizcred_clt_proposta_encerrada",
-      "body": "Olá, {{1}}. A proposta {{2}} foi encerrada pela {{3}}. Veja o status e, quando disponível, outras opções no chat da FelizCred.",
-      "examples": ["Alessandra", "123456", "Facta"],
-      "button": { "type": "URL", "text": "Ver detalhes", "url": "https://www.felizcred.com.br/?chat=abrir&utm_source=whatsapp&utm_medium=utility" },
+      "name": "felizcred_clt_contrato_nao_finalizado",
+      "body": "Olá, {{1}}. Seu contrato da proposta {{2}} não foi finalizado. Aguarde nosso atendimento para mais detalhes.",
+      "examples": ["Alessandra", "123456"],
+      "button": { "type": "URL", "text": "Abrir chat da FelizCred", "url": "https://www.felizcred.com.br/?chat=acompanhar&utm_source=whatsapp&utm_medium=utility" },
       "environmentVariable": "FACTA_SITE_WHATSAPP_ENCERRADA_TEMPLATE"
     }
   ]

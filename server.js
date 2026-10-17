@@ -260,16 +260,19 @@ async function notificarEtapaFactaNoWhatsApp(row, etapa) {
   const textos = {
     proposta_em_analise: "Sua assinatura foi recebida e a proposta Facta está em análise.",
     proposta_concluida: "A Facta confirmou o pagamento da sua proposta. Confira a conta informada na contratação.",
-    proposta_cancelada: "Sua proposta Facta foi encerrada. Fale com a FelizCred para conferir o motivo.",
+    proposta_cancelada: "Seu contrato não foi finalizado. Aguarde nosso atendimento para mais detalhes.",
   };
   const phone = normalizarTelefoneBR(row.phone);
   const businessId = process.env.NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID || "1335976862924566";
   try {
     const conversation = row.conversation_id ? await db.siteChatObter(row.conversation_id) : null;
     const firstName = String(conversation?.name || "cliente").trim().split(/\s+/)[0];
+    const bodyParameters = etapa === "proposta_cancelada"
+      ? [firstName, row.codigo_proposta || "em acompanhamento"]
+      : [firstName, row.codigo_proposta || "em acompanhamento", "Facta"];
     const components = [{
       type: "body",
-      parameters: [firstName, row.codigo_proposta || "em acompanhamento", "Facta"].map((text) => ({ type: "text", text: String(text) })),
+      parameters: bodyParameters.map((text) => ({ type: "text", text: String(text) })),
     }];
     const result = await wa.sendTemplate(businessId, phone, template, "pt_BR", components);
     const now = Date.now();
@@ -287,7 +290,7 @@ async function notificarEtapaFactaPorEmail(row, etapa) {
     aguardando_assinatura_facta: ["Sua proposta está pronta para assinatura", "Abra o chat da FelizCred para revisar as condições e acessar a assinatura segura da Facta."],
     proposta_em_analise: ["Sua proposta Facta está em análise", "A assinatura foi recebida. Você pode acompanhar cada atualização pelo chat da FelizCred."],
     proposta_concluida: ["Sua proposta Facta foi concluída", "Confira o crédito na conta informada. Se precisar, converse conosco pelo chat do site."],
-    proposta_cancelada: ["Sua proposta Facta foi encerrada", "Entre no chat da FelizCred para consultar o motivo e verificar como podemos ajudar."],
+    proposta_cancelada: ["Seu contrato não foi finalizado", "Nossa equipe recebeu a atualização e verificará os detalhes. Aguarde nosso atendimento pelo chat da FelizCred."],
   }[etapa];
   if (!conteudo) return;
   await enviarAtualizacaoChatFelizcred({ nome: conversation.name, email: conversation.email, titulo: conteudo[0], mensagem: conteudo[1] });
@@ -327,7 +330,8 @@ async function sincronizarSiteChatFacta(row) {
       } else if (updated.etapa === "proposta_cancelada") {
         await db.siteChatFunilEvento(row.conversation_id, "saida", "proposta_cancelada", "facta", "proposta_cancelada");
         await db.siteChatDefinirPipeline(row.conversation_id, "perdido");
-        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", updated.error_message || "A Facta encerrou a proposta. Nossa equipe pode conferir o motivo com você.");
+        await db.siteChatConfirmarHumano(row.conversation_id);
+        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Seu contrato não foi finalizado. Nossa equipe já recebeu a atualização; aguarde o atendimento para mais detalhes.");
       }
       notificarEtapaFactaNoWhatsApp(updated, updated.etapa).catch(() => {});
       notificarEtapaFactaPorEmail(updated, updated.etapa).catch((err) => console.error(`E-mail da etapa ${updated.etapa} não enviado (${row.conversation_id}):`, err.message));

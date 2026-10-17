@@ -31,9 +31,9 @@ O arquivo `templates/whatsapp/jornada-clt-meta.json` contém os três templates 
 
 1. `felizcred_clt_proposta_em_analise`;
 2. `felizcred_clt_proposta_concluida`;
-3. `felizcred_clt_proposta_encerrada`.
+3. `felizcred_clt_contrato_nao_finalizado`.
 
-Todos usam três parâmetros: primeiro nome, código da proposta e banco. Nenhum template contém CPF, valor, margem ou dados bancários.
+Os templates de análise e conclusão usam primeiro nome, código da proposta e banco. O template de contrato não finalizado usa primeiro nome e código da proposta. Nenhum contém CPF, valor, margem ou dados bancários.
 
 ## Templates que precisam ser cadastrados no Brevo
 

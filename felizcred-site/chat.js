@@ -159,7 +159,7 @@
       return;
     }
     if (c.provider === "facta" && c.etapa === "proposta_cancelada") {
-      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Proposta encerrada</span><h3>A Facta não prosseguiu com esta proposta</h3><p>${esc(c.error || c.status || "Um atendente pode conferir o motivo com você.")}</p><button type="button" class="fc-clt-secondary" data-talk-agent>Falar com um atendente</button></div>`;
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Atualização do contrato</span><h3>Seu contrato não foi finalizado</h3><p>Nossa equipe já recebeu a atualização. Aguarde o atendimento para mais detalhes.</p></div>`;
       return;
     }
     if (["aguardando_autorizacao", "simulando"].includes(c.etapa)) {
