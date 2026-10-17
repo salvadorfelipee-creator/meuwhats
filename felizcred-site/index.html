@@ -1313,10 +1313,15 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   });
 
   // Exit intent popup
+  const exitPopupStorage = 'felizcred_exit_popup_shown_at';
+  const exitPopupTtl = 24 * 60 * 60 * 1000;
   let popupShown = false;
   document.addEventListener('mouseleave', e => {
-    if (e.clientY < 10 && !popupShown) {
+    let lastShown = 0;
+    try { lastShown = Number(localStorage.getItem(exitPopupStorage) || 0); } catch {}
+    if (e.clientY < 10 && !popupShown && Date.now() - lastShown >= exitPopupTtl) {
       popupShown = true;
+      try { localStorage.setItem(exitPopupStorage, String(Date.now())); } catch {}
       document.getElementById('exitPopup').classList.add('show');
     }
   });
@@ -1400,14 +1405,10 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     window.clearInterval(demoTimer);
     demoTimer = window.setInterval(() => activateDemo(demoIndex + 1), 3000);
   };
-  demoPanel?.addEventListener('mouseenter', () => window.clearInterval(demoTimer));
-  demoPanel?.addEventListener('mouseleave', startDemo);
-  demoPanel?.addEventListener('focusin', () => window.clearInterval(demoTimer));
-  demoPanel?.addEventListener('focusout', startDemo);
   window.addEventListener('resize', () => activateDemo(demoIndex));
   activateDemo(0);
   startDemo();
 </script>
-<script src="/chat.js?v=20261017-6" defer></script>
+<script src="/chat.js?v=20261017-7" defer></script>
 </body>
 </html>

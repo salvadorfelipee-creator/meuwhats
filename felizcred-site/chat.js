@@ -2,6 +2,8 @@
   const API = "https://meuwhats.onrender.com/site-chat/conversations";
   const STORAGE = "felizcred_site_chat_v1";
   const SESSION_TTL = 6 * 60 * 60 * 1000;
+  const NUDGE_STORAGE = "felizcred_chat_nudge_shown_at";
+  const NUDGE_TTL = 24 * 60 * 60 * 1000;
   const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false, cltCheckedAt: null, dismissedCltStatus: null, reasoningTimer: null, retryingAuthorization: false };
   const iconChat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></svg>';
   const iconClose = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
@@ -63,7 +65,14 @@
     if (state.session) { title.textContent = "Continue aqui sua simulação e aprovação do empréstimo."; detail.textContent = "Sua conversa fica disponível por até 6 horas."; }
     else { title.textContent = "Faça aqui sua simulação e aprovação do seu empréstimo."; detail.textContent = "Eu acompanho você em cada etapa."; }
   }
-  function setOpen(open) { state.open = open; root.classList.toggle("is-open", open); nudge.classList.remove("show"); launcher.setAttribute("aria-expanded", String(open)); panel.setAttribute("aria-hidden", String(!open)); if (open) { unreadEl.classList.remove("show"); setTimeout(() => (state.session ? composeText : fieldForStep(state.step)).focus(), 180); refresh(); } else { prepareNudge(); setTimeout(() => { if (!state.open) nudge.classList.add("show"); }, 280); } }
+  function showNudgeOnce() {
+    let lastShown = 0;
+    try { lastShown = Number(localStorage.getItem(NUDGE_STORAGE) || 0); } catch {}
+    if (Date.now() - lastShown < NUDGE_TTL || state.open) return;
+    nudge.classList.add("show");
+    try { localStorage.setItem(NUDGE_STORAGE, String(Date.now())); } catch {}
+  }
+  function setOpen(open) { state.open = open; root.classList.toggle("is-open", open); nudge.classList.remove("show"); launcher.setAttribute("aria-expanded", String(open)); panel.setAttribute("aria-hidden", String(!open)); if (open) { unreadEl.classList.remove("show"); setTimeout(() => (state.session ? composeText : fieldForStep(state.step)).focus(), 180); refresh(); } else { prepareNudge(); setTimeout(showNudgeOnce, 280); } }
   function formatTime(ms) { return new Date(Number(ms)).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
   function sound(kind) { try { const Ctx = window.AudioContext || window.webkitAudioContext; state.audioCtx ||= new Ctx(); const ctx = state.audioCtx, osc = ctx.createOscillator(), gain = ctx.createGain(); osc.type = "sine"; osc.frequency.value = kind === "in" ? 660 : 440; gain.gain.setValueAtTime(.0001, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(.12, ctx.currentTime + .02); gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + .22); osc.connect(gain).connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + .24); } catch {} }
   function appendMessageText(container, body) { const parts = String(body).split(/(https?:\/\/[^\s]+)/g); parts.forEach((part) => { if (/^https?:\/\//.test(part)) { const link = document.createElement("a"); link.href = part; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Abrir autorização segura"; container.appendChild(link); } else { container.appendChild(document.createTextNode(part)); } }); }
@@ -364,6 +373,6 @@
   loadSession(); prepareNudge();
   const chatAction = new URLSearchParams(location.search).get("chat");
   if (["abrir", "acompanhar"].includes(chatAction)) setTimeout(() => { setOpen(true); if (chatAction === "acompanhar" && !state.session) $("[data-open-recovery]").click(); }, 180);
-  else setTimeout(() => { if (!state.open) nudge.classList.add("show"); }, 900);
-  goTo(0); refresh(); refreshClt(); setInterval(() => { if (state.session && !sessionIsValid(state.session)) { resetSession(); prepareNudge(); nudge.classList.add("show"); return; } if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
+  else setTimeout(showNudgeOnce, 900);
+  goTo(0); refresh(); refreshClt(); setInterval(() => { if (state.session && !sessionIsValid(state.session)) { resetSession(); prepareNudge(); showNudgeOnce(); return; } if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
 })();
