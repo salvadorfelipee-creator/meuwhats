@@ -3606,6 +3606,30 @@ async function siteChatObter(id) {
   return result.rows[0] || null;
 }
 
+async function siteChatRecuperarClt(cpf, referencia) {
+  await ready;
+  const digits = String(referencia || "").replace(/\D/g, "");
+  const phoneDigits = /^55\d{10,11}$/.test(digits) ? digits.slice(2) : digits;
+  const result = await client.execute({
+    sql: `SELECT conversation_id FROM site_chat_clt
+          WHERE cpf = ? AND (codigo_proposta = ? OR phone LIKE ?)
+          ORDER BY updated_at DESC LIMIT 1`,
+    args: [String(cpf || "").replace(/\D/g, ""), digits, `%${phoneDigits}`],
+  });
+  const id = result.rows[0]?.conversation_id;
+  if (!id) return null;
+  return { conversation: await siteChatObter(id), clt: await siteChatCltObter(id) };
+}
+
+async function siteChatRenovarToken(id, tokenHash) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE site_chat_conversations SET visitor_token_hash = ?, status = 'open', updated_at = ? WHERE id = ?`,
+    args: [tokenHash, Date.now(), id],
+  });
+  return siteChatObter(id);
+}
+
 async function siteChatMensagens(id) {
   await ready;
   const result = await client.execute({
@@ -3894,6 +3918,8 @@ module.exports = {
   roteadorRevisadoDefinir,
   siteChatCriar,
   siteChatObter,
+  siteChatRecuperarClt,
+  siteChatRenovarToken,
   siteChatMensagens,
   siteChatMensagemVisitante,
   siteChatMensagemAtendente,

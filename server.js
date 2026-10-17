@@ -39,6 +39,7 @@ const SITE_CHAT_ORIGINS = new Set([
   ...(process.env.NODE_ENV === "production" ? [] : ["http://localhost:8000", "http://127.0.0.1:8000"]),
 ]);
 const siteChatRate = new Map();
+const siteChatRecoveryRate = new Map();
 
 function siteChatCors(req) {
   const origin = req.headers.origin || "";
@@ -59,6 +60,16 @@ function siteChatRateLimit(req) {
   if (recent.length >= 12) return false;
   recent.push(now);
   siteChatRate.set(ip, recent);
+  return true;
+}
+
+function siteChatRecoveryRateLimit(req) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const now = Date.now();
+  const recent = (siteChatRecoveryRate.get(ip) || []).filter((time) => now - time < 10 * 60_000);
+  if (recent.length >= 5) return false;
+  recent.push(now);
+  siteChatRecoveryRate.set(ip, recent);
   return true;
 }
 
@@ -248,7 +259,7 @@ async function notificarEtapaFactaNoWhatsApp(row, etapa) {
   if (!template) return;
   const textos = {
     proposta_em_analise: "Sua assinatura foi recebida e a proposta Facta está em análise.",
-    proposta_concluida: "Sua proposta Facta foi concluída. Confira o crédito na conta informada.",
+    proposta_concluida: "A Facta confirmou o pagamento da sua proposta. Confira a conta informada na contratação.",
     proposta_cancelada: "Sua proposta Facta foi encerrada. Fale com a FelizCred para conferir o motivo.",
   };
   const phone = normalizarTelefoneBR(row.phone);
@@ -312,7 +323,7 @@ async function sincronizarSiteChatFacta(row) {
         await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Sua assinatura foi recebida. A proposta agora está em análise na Facta; você pode acompanhar o andamento por aqui sem preencher os dados novamente.");
       } else if (updated.etapa === "proposta_concluida") {
         await db.siteChatFunilEvento(row.conversation_id, "proposta_concluida", "proposta_concluida", "facta");
-        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", `Sua proposta ${updated.codigo_proposta || ""} foi concluída pela Facta. Confira o crédito na conta informada e fale com a gente se precisar de ajuda.`);
+        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", `A Facta confirmou o pagamento da proposta ${updated.codigo_proposta || ""}. Confira a conta informada na contratação e fale com a gente se precisar de ajuda.`);
       } else if (updated.etapa === "proposta_cancelada") {
         await db.siteChatFunilEvento(row.conversation_id, "saida", "proposta_cancelada", "facta", "proposta_cancelada");
         await db.siteChatDefinirPipeline(row.conversation_id, "perdido");
@@ -5488,6 +5499,27 @@ const server = http.createServer(async (req, res) => {
         return res.end();
       }
       if (!corsHeaders["Access-Control-Allow-Origin"]) return send(res, 403, { error: "Origem não permitida" });
+
+      if (req.method === "POST" && path_ === "/site-chat/recover") {
+        if (!siteChatRecoveryRateLimit(req)) return send(res, 429, { error: "Muitas tentativas. Aguarde dez minutos e tente novamente." }, corsHeaders);
+        const body = await parseBody(req);
+        const cpf = String(body.cpf || "").replace(/\D/g, "");
+        const referencia = String(body.reference || "").replace(/\D/g, "");
+        if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
+        if (referencia.length < 4) return send(res, 400, { error: "Informe o número da proposta ou o celular usado no atendimento." }, corsHeaders);
+        const found = await db.siteChatRecuperarClt(cpf, referencia);
+        if (!found?.conversation || !found?.clt) return send(res, 404, { error: "Não encontramos uma solicitação com esses dados. Confira e tente novamente." }, corsHeaders);
+        const token = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        const conversation = await db.siteChatRenovarToken(found.conversation.id, tokenHash);
+        const clt = await sincronizarSiteChatClt(found.clt);
+        return send(res, 200, {
+          conversation: { id: conversation.id, name: conversation.name, contact: conversation.contact, email: conversation.email, status: conversation.status },
+          token,
+          messages: await db.siteChatMensagens(conversation.id),
+          clt: siteChatCltPublico(clt),
+        }, corsHeaders);
+      }
 
       if (req.method === "POST" && path_ === "/site-chat/conversations") {
         if (!siteChatRateLimit(req)) return send(res, 429, { error: "Muitas mensagens. Aguarde um instante." }, corsHeaders);

@@ -108,6 +108,17 @@
 .fc-chat-step > input { height: 54px; padding: 0 2px; border: 0; border-bottom: 2px solid #cbd5df; border-radius: 0; background: transparent; font: 500 18px "DM Sans", sans-serif; }
 .fc-chat-step > input:focus { border-color: var(--fc-green-dark); background: transparent; }
 .fc-chat-step .fc-chat-primary { align-self: flex-start; margin-top: 20px; padding: 0 17px; }
+.fc-chat-resume-link { align-self: flex-start; margin-top: 16px; padding: 6px 0; border: 0; border-bottom: 1px solid currentColor; background: transparent; color: var(--fc-green-dark); cursor: pointer; font: 650 13px "DM Sans", sans-serif; }
+.fc-chat-resume-link:focus-visible { outline: 3px solid rgba(0,200,83,.22); outline-offset: 4px; }
+.fc-chat-recovery { display: grid; gap: 15px; padding: 28px 20px; }
+.fc-chat-recovery[hidden] { display: none; }
+.fc-chat-recovery h2 { margin: 0; color: var(--fc-navy); font: 750 23px/1.25 "Sora", sans-serif; letter-spacing: -.025em; }
+.fc-chat-recovery > p { margin: -5px 0 5px; color: var(--fc-muted); font-size: 14px; line-height: 1.55; }
+.fc-chat-recovery label { display: grid; gap: 7px; color: var(--fc-ink); font-size: 13px; font-weight: 650; }
+.fc-chat-recovery input { min-height: 50px; font-size: 16px; }
+.fc-chat-recovery small { color: var(--fc-muted); font-size: 11px; line-height: 1.5; }
+.fc-chat-recovery-error { display: none; margin: 0; color: #c82a3a; font-size: 12px; line-height: 1.45; }
+.fc-chat-recovery-error.show { display: block; }
 .fc-chat-primary kbd { margin-left: 8px; color: rgba(13,34,54,.55); font: 500 10px "DM Sans", sans-serif; }
 .fc-chat-back { align-self: flex-start; margin: 0 0 18px; padding: 0; border: 0; background: transparent; color: var(--fc-muted); cursor: pointer; font: 600 12px "DM Sans", sans-serif; }
 .fc-chat-back:hover { color: var(--fc-navy); }

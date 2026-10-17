@@ -11,9 +11,9 @@
     },
     {
       "name": "felizcred_clt_proposta_concluida",
-      "body": "Olá, {{1}}. A proposta {{2}} foi concluída pela {{3}}. Confira o crédito na conta informada e acompanhe os detalhes no chat.",
+      "body": "Olá, {{1}}. O pagamento da proposta {{2}} foi confirmado pela {{3}}. Confira a conta informada na contratação. Para consultar o status ou falar com a FelizCred, toque no botão abaixo.",
       "examples": ["Alessandra", "123456", "Facta"],
-      "button": { "type": "URL", "text": "Ver acompanhamento", "url": "https://www.felizcred.com.br/?chat=abrir&utm_source=whatsapp&utm_medium=utility" },
+      "button": { "type": "URL", "text": "Abrir chat da FelizCred", "url": "https://www.felizcred.com.br/?chat=acompanhar&utm_source=whatsapp&utm_medium=utility" },
       "environmentVariable": "FACTA_SITE_WHATSAPP_CONCLUIDA_TEMPLATE"
     },
     {

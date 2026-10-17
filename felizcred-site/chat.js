@@ -18,19 +18,20 @@
       <div class="fc-chat-assurance"><span><i></i> Conexão segura</span><span>Seus dados só são pedidos quando necessários</span></div>
       <div class="fc-chat-start"><div class="fc-chat-progress"><span></span></div>
         <form class="fc-chat-form" novalidate>
-          <section class="fc-chat-step is-active" data-step="0"><p class="fc-chat-kicker">Simulação acompanhada</p><h2>Olá, como podemos chamar você?</h2><p class="fc-chat-hint">Vamos pedir somente o necessário em cada etapa.</p><input name="name" maxlength="80" autocomplete="name" required placeholder="Digite seu nome"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
+          <section class="fc-chat-step is-active" data-step="0"><p class="fc-chat-kicker">Simulação acompanhada</p><h2>Olá, como podemos chamar você?</h2><p class="fc-chat-hint">Vamos pedir somente o necessário em cada etapa.</p><input name="name" maxlength="80" autocomplete="name" required placeholder="Digite seu nome"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button><button class="fc-chat-resume-link" type="button" data-open-recovery>Já iniciei uma proposta</button></section>
           <section class="fc-chat-step" data-step="1"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Só mais um dado</p><h2>Qual é o seu celular?</h2><p class="fc-chat-hint">Ele será reaproveitado na consulta e para você continuar pelo WhatsApp.</p><input name="contact" type="tel" inputmode="tel" maxlength="16" autocomplete="tel" required placeholder="(47) 99999-9999"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
           <section class="fc-chat-step" data-step="2"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Continue por onde preferir</p><h2>Qual é o seu melhor e-mail?</h2><p class="fc-chat-hint">Enviaremos o acompanhamento por e-mail. O chat continua sendo seu canal principal.</p><input name="email" type="email" maxlength="160" autocomplete="email" required placeholder="voce@exemplo.com"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
           <section class="fc-chat-step" data-step="3"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Escolha uma opção</p><h2>O que você quer resolver hoje?</h2><fieldset class="fc-chat-topics"><legend class="sr-only">Assunto</legend><label class="fc-chat-topic"><input type="radio" name="topic" value="FGTS" required><span><i>A</i><b>FGTS</b><small>Antecipação do saque-aniversário</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo CLT" required><span><i>B</i><b>Empréstimo CLT</b><small>Simule agora com a Facta</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo com carro em garantia" required><span><i>C</i><b>Carro em garantia</b><small>Empréstimo usando seu veículo</small></span></label></fieldset><button class="fc-chat-primary" type="submit">Começar atendimento ${iconSend}</button><p class="fc-chat-privacy">Ao continuar, você aceita nossa <a href="/privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</p></section>
           <p class="fc-chat-error" role="alert"></p>
         </form>
+        <form class="fc-chat-recovery" hidden novalidate><button class="fc-chat-back" type="button" data-close-recovery>← Voltar</button><h2>Continue de onde parou</h2><p>Informe os dados usados anteriormente. Vamos localizar sua solicitação e consultar o andamento agora.</p><label>CPF<input name="recovery_cpf" inputmode="numeric" autocomplete="off" maxlength="14" required placeholder="000.000.000-00"></label><label>Número da proposta ou celular<input name="recovery_reference" inputmode="numeric" autocomplete="tel" maxlength="20" required placeholder="Ex.: 123456 ou (47) 99999-9999"></label><p class="fc-chat-recovery-error" role="alert"></p><button class="fc-chat-primary" type="submit">Consultar meu andamento</button><small>Se ainda não recebeu o número da proposta, use o celular informado no atendimento.</small></form>
       </div>
       <div class="fc-chat-thread"><div class="fc-chat-messages" aria-live="polite"><span class="fc-chat-day">Conversa com a equipe FelizCred</span><div class="fc-chat-typing" role="status" aria-live="polite"><i aria-hidden="true"><span></span><span></span><span></span></i><small class="fc-reasoning-text">Analisando sua mensagem</small></div></div><div class="fc-chat-quick-replies" aria-label="Respostas rápidas"></div><div class="fc-chat-clt" aria-live="polite"></div><div class="fc-chat-emoji-menu"><button type="button">😊</button><button type="button">👍</button><button type="button">❤️</button><button type="button">😂</button><button type="button">🙏</button><button type="button">✅</button></div><form class="fc-chat-compose"><button class="fc-chat-more" type="button" aria-label="Mais opções" aria-expanded="false">+</button><div class="fc-chat-tools-menu" aria-label="Opções de mensagem"><button class="fc-chat-tool fc-chat-emoji" type="button" aria-label="Adicionar emoji"><span>☺</span> Emoji</button><label class="fc-chat-tool" aria-label="Anexar arquivo"><span>＋</span> Anexar<input class="fc-chat-file" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden></label><button class="fc-chat-tool fc-chat-mic" type="button" aria-label="Gravar áudio"><span>●</span> Áudio</button></div><textarea maxlength="2000" rows="1" aria-label="Mensagem" placeholder="Escreva sua mensagem..."></textarea><button class="fc-chat-send" type="submit" aria-label="Enviar mensagem">${iconSend}</button></form></div>
     </section>`;
   document.body.appendChild(root);
   const $ = (s) => root.querySelector(s);
   const launcher = $(".fc-chat-launcher"), panel = $(".fc-chat"), close = $(".fc-chat-close"), expand = $(".fc-chat-expand"), nudge = $(".fc-chat-nudge");
-  const startForm = $(".fc-chat-form"), compose = $(".fc-chat-compose"), composeText = compose.querySelector("textarea");
+  const startForm = $(".fc-chat-form"), recoveryForm = $(".fc-chat-recovery"), compose = $(".fc-chat-compose"), composeText = compose.querySelector("textarea");
   const messagesEl = $(".fc-chat-messages"), errorEl = $(".fc-chat-error"), unreadEl = $(".fc-chat-unread"), progress = $(".fc-chat-progress span");
   const fileInput = $(".fc-chat-file"), emojiButton = $(".fc-chat-emoji"), emojiMenu = $(".fc-chat-emoji-menu"), micButton = $(".fc-chat-mic"), moreButton = $(".fc-chat-more"), toolsMenu = $(".fc-chat-tools-menu");
   const cltEl = $(".fc-chat-clt"), typingEl = $(".fc-chat-typing"), quickRepliesEl = $(".fc-chat-quick-replies");
@@ -54,7 +55,7 @@
   function sessionIsValid(session) { return !!(session?.id && session?.token && session?.email && Number(session.expiresAt) > Date.now()); }
   function resetSession() {
     localStorage.removeItem(STORAGE); state.session = null; state.messages = []; state.clt = null; state.cltCpf = ""; state.selectedOffer = null;
-    root.classList.remove("has-conversation", "is-contracting", "is-expanded"); goTo(0); renderClt();
+    root.classList.remove("has-conversation", "is-contracting", "is-expanded"); recoveryForm.hidden = true; startForm.hidden = false; goTo(0); renderClt();
   }
   function loadSession() { try { const saved = JSON.parse(localStorage.getItem(STORAGE) || "null"); state.session = sessionIsValid(saved) ? saved : null; } catch { state.session = null; } if (!state.session) localStorage.removeItem(STORAGE); else root.classList.add("has-conversation"); }
   function prepareNudge() {
@@ -198,6 +199,25 @@
   root.querySelectorAll(".fc-chat-back").forEach((b) => b.addEventListener("click", () => goTo(state.step - 1)));
   startForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && state.step < 3) { e.preventDefault(); goTo(state.step + 1); } if (state.step === 3 && ["a","b","c"].includes(e.key.toLowerCase())) startForm.elements.topic[["a","b","c"].indexOf(e.key.toLowerCase())].checked = true; });
   startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const contact = String(form.get("contact") || ""), email = String(form.get("email") || ""), name = String(form.get("name") || ""); const data = await api("", { method: "POST", body: JSON.stringify({ name, contact, email, message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token, name, contact, email, expiresAt: Date.now() + SESSION_TTL }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
+  $("[data-open-recovery]").addEventListener("click", () => { startForm.hidden = true; recoveryForm.hidden = false; recoveryForm.elements.recovery_cpf.focus(); });
+  $("[data-close-recovery]").addEventListener("click", () => { recoveryForm.hidden = true; startForm.hidden = false; startForm.elements.name.focus(); });
+  recoveryForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const button = recoveryForm.querySelector('button[type="submit"]'), error = $(".fc-chat-recovery-error"), form = new FormData(recoveryForm);
+    button.disabled = true; button.textContent = "Consultando…"; error.classList.remove("show");
+    try {
+      if (String(form.get("recovery_cpf") || "").replace(/\D/g, "").length !== 11) throw new Error("Digite o CPF completo para continuar.");
+      if (String(form.get("recovery_reference") || "").replace(/\D/g, "").length < 4) throw new Error("Informe o número da proposta ou o celular usado no atendimento.");
+      const response = await fetch(`${API.replace(/\/conversations$/, "")}/recover`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cpf: form.get("recovery_cpf"), reference: form.get("recovery_reference") }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível consultar agora.");
+      state.session = { id: data.conversation.id, token: data.token, name: data.conversation.name, contact: data.conversation.contact || "", email: data.conversation.email || "", expiresAt: Date.now() + SESSION_TTL };
+      state.messages = data.messages || []; state.clt = data.clt || null;
+      localStorage.setItem(STORAGE, JSON.stringify(state.session));
+      root.classList.add("has-conversation"); renderMessages(); renderClt(); sound("in"); composeText.focus();
+    } catch (err) { error.textContent = err.message; error.classList.add("show"); }
+    finally { button.disabled = false; button.textContent = "Consultar meu andamento"; }
+  });
   cltEl.addEventListener("click", async (e) => {
     if (e.target.closest("[data-dismiss-clt-status]")) {
       const c = state.clt;
@@ -342,8 +362,8 @@
   close.addEventListener("click", () => setOpen(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.open) setOpen(false); });
   window.addEventListener("online", updateConnection); window.addEventListener("offline", updateConnection); updateConnection();
   loadSession(); prepareNudge();
-  const openFromLink = new URLSearchParams(location.search).get("chat") === "abrir";
-  if (openFromLink) setTimeout(() => setOpen(true), 180);
+  const chatAction = new URLSearchParams(location.search).get("chat");
+  if (["abrir", "acompanhar"].includes(chatAction)) setTimeout(() => { setOpen(true); if (chatAction === "acompanhar" && !state.session) $("[data-open-recovery]").click(); }, 180);
   else setTimeout(() => { if (!state.open) nudge.classList.add("show"); }, 900);
   goTo(0); refresh(); refreshClt(); setInterval(() => { if (state.session && !sessionIsValid(state.session)) { resetSession(); prepareNudge(); nudge.classList.add("show"); return; } if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
 })();
