@@ -4,18 +4,22 @@
   const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false, cltCheckedAt: null };
   const iconChat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></svg>';
   const iconClose = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
+  const iconExpand = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>';
   const iconSend = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>';
   const root = document.createElement("div");
   root.className = "fc-chat-root";
   root.innerHTML = `
-    <button class="fc-chat-launcher" type="button" aria-label="Abrir chat com a FelizCred" aria-expanded="false">${iconChat}<span>Fale com a gente</span><span class="fc-chat-unread">1</span></button>
+    <aside class="fc-chat-nudge" aria-live="polite"><button type="button" aria-label="Abrir simulação"><span>Simulação CLT</span><strong>Veja se existe uma condição para você</strong><small>Leva poucos minutos · sem compromisso</small></button></aside>
+    <button class="fc-chat-launcher" type="button" aria-label="Abrir chat com a FelizCred" aria-expanded="false">${iconChat}<span class="fc-chat-launcher-copy"><b>Simule por aqui</b><small>Atendimento seguro</small></span><span class="fc-chat-unread">1</span></button>
     <section class="fc-chat" role="dialog" aria-label="Chat com a FelizCred" aria-hidden="true">
-      <header class="fc-chat-head"><div class="fc-chat-brand">F</div><div class="fc-chat-head-copy"><p class="fc-chat-title">Atendimento FelizCred</p><p class="fc-chat-status">Respondemos por aqui</p></div><button class="fc-chat-close" type="button" aria-label="Fechar chat">${iconClose}</button></header>
+      <header class="fc-chat-head"><div class="fc-chat-brand">F</div><div class="fc-chat-head-copy"><span>Crédito com acompanhamento</span><p class="fc-chat-title">FelizCred</p><p class="fc-chat-status">Assistente online agora</p></div><button class="fc-chat-expand" type="button" aria-label="Expandir chat" aria-pressed="false">${iconExpand}</button><button class="fc-chat-close" type="button" aria-label="Minimizar chat">${iconClose}</button></header>
+      <div class="fc-chat-offline" role="status">Você está sem internet. Sua conversa continua salva neste dispositivo.</div>
+      <div class="fc-chat-assurance"><span><i></i> Conexão segura</span><span>Seus dados só são pedidos quando necessários</span></div>
       <div class="fc-chat-start"><div class="fc-chat-progress"><span></span></div>
         <form class="fc-chat-form" novalidate>
-          <section class="fc-chat-step is-active" data-step="0"><p class="fc-chat-kicker">Vamos começar</p><h2>Como podemos chamar você?</h2><p class="fc-chat-hint">Digite seu nome para deixar a conversa mais pessoal.</p><input name="name" maxlength="80" autocomplete="name" required placeholder="Seu nome"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
+          <section class="fc-chat-step is-active" data-step="0"><p class="fc-chat-kicker">Simulação acompanhada</p><h2>Olá, como podemos chamar você?</h2><p class="fc-chat-hint">Vamos pedir somente o necessário em cada etapa.</p><input name="name" maxlength="80" autocomplete="name" required placeholder="Digite seu nome"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
           <section class="fc-chat-step" data-step="1"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Só mais um dado</p><h2>Qual é o seu celular?</h2><p class="fc-chat-hint">Ele será reaproveitado na consulta e para você continuar pelo WhatsApp.</p><input name="contact" type="tel" inputmode="tel" maxlength="16" autocomplete="tel" required placeholder="(47) 99999-9999"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
-          <section class="fc-chat-step" data-step="2"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Escolha uma opção</p><h2>Sobre o que você quer falar?</h2><fieldset class="fc-chat-topics"><legend class="sr-only">Assunto</legend><label class="fc-chat-topic"><input type="radio" name="topic" value="FGTS" required><span><i>A</i><b>FGTS</b><small>Antecipação do saque-aniversário</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo CLT" required><span><i>B</i><b>Empréstimo CLT</b><small>Crédito para quem trabalha registrado</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo com carro em garantia" required><span><i>C</i><b>Carro em garantia</b><small>Empréstimo usando seu veículo</small></span></label></fieldset><button class="fc-chat-primary" type="submit">Iniciar conversa ${iconSend}</button><p class="fc-chat-privacy">Ao enviar, você concorda com o uso destes dados para responder ao seu atendimento.</p></section>
+          <section class="fc-chat-step" data-step="2"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Escolha uma opção</p><h2>O que você quer resolver hoje?</h2><fieldset class="fc-chat-topics"><legend class="sr-only">Assunto</legend><label class="fc-chat-topic"><input type="radio" name="topic" value="FGTS" required><span><i>A</i><b>FGTS</b><small>Antecipação do saque-aniversário</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo CLT" required><span><i>B</i><b>Empréstimo CLT</b><small>Simule agora com a Facta</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo com carro em garantia" required><span><i>C</i><b>Carro em garantia</b><small>Empréstimo usando seu veículo</small></span></label></fieldset><button class="fc-chat-primary" type="submit">Começar atendimento ${iconSend}</button><p class="fc-chat-privacy">Ao continuar, você aceita nossa <a href="/privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</p></section>
           <p class="fc-chat-error" role="alert"></p>
         </form>
       </div>
@@ -23,7 +27,7 @@
     </section>`;
   document.body.appendChild(root);
   const $ = (s) => root.querySelector(s);
-  const launcher = $(".fc-chat-launcher"), panel = $(".fc-chat"), close = $(".fc-chat-close");
+  const launcher = $(".fc-chat-launcher"), panel = $(".fc-chat"), close = $(".fc-chat-close"), expand = $(".fc-chat-expand"), nudge = $(".fc-chat-nudge");
   const startForm = $(".fc-chat-form"), compose = $(".fc-chat-compose"), composeText = compose.querySelector("textarea");
   const messagesEl = $(".fc-chat-messages"), errorEl = $(".fc-chat-error"), unreadEl = $(".fc-chat-unread"), progress = $(".fc-chat-progress span");
   const fileInput = $(".fc-chat-file"), emojiButton = $(".fc-chat-emoji"), emojiMenu = $(".fc-chat-emoji-menu"), micButton = $(".fc-chat-mic");
@@ -45,7 +49,7 @@
     setTimeout(() => fieldForStep(state.step)?.focus?.(), 220);
   }
   function loadSession() { try { state.session = JSON.parse(localStorage.getItem(STORAGE) || "null"); } catch { state.session = null; } if (state.session?.id && state.session?.token) root.classList.add("has-conversation"); }
-  function setOpen(open) { state.open = open; root.classList.toggle("is-open", open); launcher.setAttribute("aria-expanded", String(open)); panel.setAttribute("aria-hidden", String(!open)); if (open) { unreadEl.classList.remove("show"); setTimeout(() => (state.session ? composeText : fieldForStep(state.step)).focus(), 180); refresh(); } }
+  function setOpen(open) { state.open = open; root.classList.toggle("is-open", open); nudge.classList.remove("show"); launcher.setAttribute("aria-expanded", String(open)); panel.setAttribute("aria-hidden", String(!open)); if (open) { unreadEl.classList.remove("show"); setTimeout(() => (state.session ? composeText : fieldForStep(state.step)).focus(), 180); refresh(); } }
   function formatTime(ms) { return new Date(Number(ms)).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
   function sound(kind) { try { const Ctx = window.AudioContext || window.webkitAudioContext; state.audioCtx ||= new Ctx(); const ctx = state.audioCtx, osc = ctx.createOscillator(), gain = ctx.createGain(); osc.type = "sine"; osc.frequency.value = kind === "in" ? 660 : 440; gain.gain.setValueAtTime(.0001, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(.12, ctx.currentTime + .02); gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + .22); osc.connect(gain).connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + .24); } catch {} }
   function appendMessageText(container, body) { const parts = String(body).split(/(https?:\/\/[^\s]+)/g); parts.forEach((part) => { if (/^https?:\/\//.test(part)) { const link = document.createElement("a"); link.href = part; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Abrir autorização segura"; container.appendChild(link); } else { container.appendChild(document.createTextNode(part)); } }); }
@@ -56,9 +60,17 @@
   const money = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const inputDate = (v) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(v || "")); return m ? `${m[3]}-${m[2]}-${m[1]}` : String(v || ""); };
+  function showCltActionError(message) {
+    let error = cltEl.querySelector(".fc-clt-action-error");
+    if (!error) { error = document.createElement("p"); error.className = "fc-clt-inline-error fc-clt-action-error"; cltEl.querySelector(".fc-clt-card")?.appendChild(error); }
+    error.textContent = `${message} Tente novamente ou escreva sua dúvida abaixo.`;
+    error.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
   function renderClt() {
     const c = state.clt;
     root.classList.toggle("is-contracting", !!state.selectedOffer || c?.etapa === "dados_pessoais");
+    const status = $(".fc-chat-status");
+    if (status) status.textContent = c?.etapa === "proposta_em_analise" ? "Proposta em análise" : c?.etapa === "proposta_concluida" ? "Proposta concluída" : c ? "Simulação Facta em andamento" : "Assistente online agora";
     if (!c) { cltEl.classList.remove("show"); cltEl.innerHTML = ""; return; }
     cltEl.classList.add("show");
     if (c === "eligibility") {
@@ -170,7 +182,7 @@
       } catch (error) {
         confirmAuthorization.disabled = false;
         confirmAuthorization.textContent = "Já fiz a autorização";
-        alert(error.message);
+        showCltActionError(error.message);
       }
       return;
     }
@@ -182,7 +194,7 @@
         const data = await api(`/${state.session.id}/clt/resend-authorization`, { method: "POST", body: "{}" });
         state.clt = data.clt;
         renderClt();
-      } catch (error) { alert(error.message); resendAuthorization.disabled = false; }
+      } catch (error) { showCltActionError(error.message); resendAuthorization.disabled = false; }
       return;
     }
     const factaOffer = e.target.closest("[data-facta-offer]");
@@ -195,7 +207,7 @@
         state.clt = data.clt;
         renderClt();
         await refresh();
-      } catch (error) { factaOffer.disabled = false; factaOffer.innerHTML = original; alert(error.message); }
+      } catch (error) { factaOffer.disabled = false; factaOffer.innerHTML = original; showCltActionError(error.message); }
       return;
     }
     if (e.target.closest("[data-talk-agent]")) {
@@ -281,6 +293,12 @@
   fileInput.addEventListener("change", async () => { const file = fileInput.files?.[0]; if (!file) return; if (file.size > 15 * 1024 * 1024) return alert("O arquivo deve ter no máximo 15 MB."); const data = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(file); }); const key = file.type.startsWith("image/") ? "imagemBase64" : file.type.startsWith("video/") ? "videoBase64" : file.type.startsWith("audio/") ? "audioBase64" : "documentBase64"; await sendPayload({ message: composeText.value.trim(), [key]: data, fileName: file.name }); fileInput.value = ""; });
   micButton.addEventListener("click", async () => { if (state.recorder?.state === "recording") { state.recorder.stop(); return; } try { state.stream = await navigator.mediaDevices.getUserMedia({ audio: true }); state.recorder = new MediaRecorder(state.stream); state.chunks = []; state.recorder.ondataavailable = (e) => e.data.size && state.chunks.push(e.data); state.recorder.onstop = async () => { const blob = new Blob(state.chunks, { type: state.recorder.mimeType || "audio/webm" }); state.stream.getTracks().forEach((t) => t.stop()); micButton.classList.remove("recording"); const data = await new Promise((resolve) => { const r = new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(blob); }); await sendPayload({ audioBase64: data, fileName: "audio.webm" }); }; state.recorder.start(); micButton.classList.add("recording"); } catch { alert("Autorize o microfone para gravar áudio."); } });
   composeText.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); compose.requestSubmit(); } });
-  launcher.addEventListener("click", () => { setOpen(true); if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }); close.addEventListener("click", () => setOpen(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.open) setOpen(false); });
+  function updateConnection() { root.classList.toggle("is-offline", !navigator.onLine); }
+  launcher.addEventListener("click", () => { setOpen(true); if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); });
+  nudge.addEventListener("click", () => setOpen(true));
+  expand.addEventListener("click", () => { const expanded = root.classList.toggle("is-expanded"); expand.setAttribute("aria-pressed", String(expanded)); expand.setAttribute("aria-label", expanded ? "Reduzir chat" : "Expandir chat"); });
+  close.addEventListener("click", () => setOpen(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.open) setOpen(false); });
+  window.addEventListener("online", updateConnection); window.addEventListener("offline", updateConnection); updateConnection();
+  setTimeout(() => { if (!state.open && !state.session) nudge.classList.add("show"); }, 6500);
   loadSession(); goTo(0); refresh(); refreshClt(); setInterval(() => { if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
 })();
