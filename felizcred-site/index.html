@@ -777,6 +777,97 @@
     .hero h1 { font-size: clamp(38px,10vw,58px); }
   }
   @media (max-width:600px){nav{padding-inline:20px}.logo{font-size:24px}.hero{padding-inline:20px}.hero h1{text-align:left}.hero-sub{text-align:left;font-size:17px}.hero-btns{align-items:stretch}.hero-btns .btn-primary,.hero-btns .btn-secondary{max-width:none}.hero-stats{justify-content:flex-start}.badge{margin:0 0 20px}.hero-options{grid-template-columns:1fr 1fr}.hero-option{align-items:flex-start;padding:12px 10px}.hero-option small{display:none}}
+
+  /* Sistema de movimento e acabamento da landing page */
+  html { scroll-padding-top: 86px; }
+  [id] { scroll-margin-top: 86px; }
+  nav {
+    transition: padding .35s cubic-bezier(.22,1,.36,1), background-color .35s ease, box-shadow .35s ease;
+  }
+  nav.is-scrolled {
+    padding-block: 10px;
+    background: rgba(5,16,29,.96);
+    box-shadow: 0 16px 42px rgba(0,0,0,.22);
+  }
+  .nav-toggle {
+    display: none; width: 44px; height: 44px; padding: 10px; border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px; background: rgba(255,255,255,.04); cursor: pointer;
+  }
+  .nav-toggle span { display:block; width:20px; height:2px; margin:4px auto; border-radius:4px; background:#fff; transition:transform .25s ease,opacity .2s ease; }
+  nav.menu-open .nav-toggle span:nth-child(1) { transform:translateY(6px) rotate(45deg); }
+  nav.menu-open .nav-toggle span:nth-child(2) { opacity:0; }
+  nav.menu-open .nav-toggle span:nth-child(3) { transform:translateY(-6px) rotate(-45deg); }
+  .nav-toggle:focus-visible, a:focus-visible, button:focus-visible { outline:3px solid rgba(0,230,118,.55); outline-offset:3px; }
+
+  .hero::after {
+    content:''; position:absolute; width:38vw; height:38vw; min-width:360px; min-height:360px;
+    top:8%; right:-12%; border-radius:50%; pointer-events:none;
+    background:radial-gradient(circle,rgba(0,230,118,.12),transparent 68%); filter:blur(12px);
+  }
+  .hero-product { will-change: transform; }
+
+  .motion-enabled .motion-item {
+    opacity:0; transform:translateY(20px);
+    transition:opacity .58s cubic-bezier(.22,1,.36,1),transform .58s cubic-bezier(.22,1,.36,1);
+    transition-delay:var(--motion-delay,0ms);
+  }
+  .motion-enabled .motion-item.is-visible { opacity:1; transform:translateY(0); }
+  .motion-enabled .hero .motion-item { animation:none; }
+
+  .product-card, .how-card, .calc-card, #fgts-instrucoes .steps-grid > div {
+    transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s ease,border-color .35s ease,background-color .35s ease;
+  }
+  .product-card:hover, .product-card:focus-within { transform:translateY(-7px); box-shadow:0 34px 80px rgba(0,0,0,.22); }
+  .how-card:hover, .how-card:focus-within, .calc-card:hover, .calc-card:focus-visible { transform:translateY(-5px); border-color:rgba(0,200,83,.38); box-shadow:0 18px 50px rgba(0,0,0,.16); }
+  .product-card:active, .calc-card:active { transform:translateY(-1px); }
+  .sim-steps { position:relative; }
+  .sim-steps::before { content:''; position:absolute; left:20px; top:20px; bottom:20px; width:1px; background:linear-gradient(#ffd600,rgba(255,214,0,.06)); transform:scaleY(0); transform-origin:top; transition:transform 1.2s cubic-bezier(.22,1,.36,1); }
+  .sim-steps.is-visible::before { transform:scaleY(1); }
+  .sim-step { position:relative; z-index:1; }
+
+  .faq-question {
+    width:100%; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer;
+  }
+  .faq-answer { visibility:hidden; }
+  .faq-item.open .faq-answer { visibility:visible; }
+  .faq-item:focus-within { border-color:rgba(0,200,83,.32); }
+  .cta-final { isolation:isolate; overflow:hidden; }
+  .cta-final::after { content:''; position:absolute; z-index:-1; width:330px; height:330px; right:-90px; bottom:-210px; border-radius:50%; background:rgba(0,200,83,.22); filter:blur(38px); }
+
+  @media (min-width:901px) and (prefers-reduced-motion:no-preference) {
+    .hero-product { animation:heroFloat 7s ease-in-out infinite; }
+    .hero::after { animation:ambientGlow 9s ease-in-out infinite alternate; }
+  }
+  @keyframes heroFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+  @keyframes ambientGlow { from{opacity:.55;transform:scale(.94)} to{opacity:1;transform:scale(1.08)} }
+
+  @media (max-width:900px) {
+    nav { padding-inline:20px; }
+    .nav-toggle { display:block; order:3; }
+    #mob-cta { margin-left:auto; margin-right:10px; padding:10px 14px; font-size:12px; }
+    .nav-links {
+      display:flex; position:absolute; left:14px; right:14px; top:calc(100% + 8px); flex-direction:column; gap:4px;
+      padding:14px; border:1px solid rgba(255,255,255,.1); border-radius:18px; background:rgba(7,20,35,.985);
+      box-shadow:0 24px 60px rgba(0,0,0,.38); opacity:0; visibility:hidden; transform:translateY(-10px); pointer-events:none;
+      transition:opacity .25s ease,transform .3s cubic-bezier(.22,1,.36,1),visibility .25s;
+    }
+    nav.menu-open .nav-links { opacity:1; visibility:visible; transform:translateY(0); pointer-events:auto; }
+    .nav-links a { display:block; padding:12px 14px; border-radius:10px; }
+    .nav-links a:hover { background:rgba(255,255,255,.05); }
+    .nav-links .nav-cta { text-align:center; margin-top:4px; }
+  }
+  @media (max-width:600px) {
+    #mob-cta { display:none !important; }
+    .hero-options { grid-template-columns:1fr; }
+    .hero-option { align-items:center; padding:14px 12px; }
+    .hero-option small { display:block; }
+    .sim-steps::before { left:20px; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    html { scroll-behavior:auto; }
+    *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; }
+    .motion-enabled .motion-item { opacity:1; transform:none; }
+  }
 </style>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMXC2DFR5G"></script>
@@ -810,7 +901,10 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 <!-- NAV -->
 <nav>
   <div class="logo">Feliz<span>Cred</span></div>
-  <ul class="nav-links">
+  <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" aria-label="Abrir menu">
+    <span></span><span></span><span></span>
+  </button>
+  <ul class="nav-links" id="primary-navigation">
     <li><a href="#produtos">Produtos</a></li>
     <li><a href="#simular">Crédito CLT</a></li>
     <li><a href="#fgts-simular">Antecipar FGTS</a></li>
@@ -1162,28 +1256,28 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   <h2 style="margin-bottom:40px;">Perguntas frequentes</h2>
   <div class="faq-list">
     <div class="faq-item">
-      <div class="faq-question">Quem pode fazer o Empréstimo CLT?</div>
-      <div class="faq-answer">Qualquer trabalhador com carteira assinada (CLT) em empresa privada. Você precisa ter vínculo empregatício ativo e salário compatível com o valor do crédito solicitado.</div>
+      <button type="button" class="faq-question" id="faq-q-1" aria-expanded="false" aria-controls="faq-a-1">Quem pode fazer o Empréstimo CLT?</button>
+      <div class="faq-answer" id="faq-a-1" role="region" aria-labelledby="faq-q-1">Qualquer trabalhador com carteira assinada (CLT) em empresa privada. Você precisa ter vínculo empregatício ativo e salário compatível com o valor do crédito solicitado.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-question">Consigo fazer mesmo com nome sujo?</div>
-      <div class="faq-answer">Para o FGTS sim — não há consulta ao SPC/Serasa. Para o Empréstimo CLT depende da análise de cada banco parceiro. Nossa equipe orienta você na melhor opção para o seu perfil.</div>
+      <button type="button" class="faq-question" id="faq-q-2" aria-expanded="false" aria-controls="faq-a-2">Consigo fazer mesmo com nome sujo?</button>
+      <div class="faq-answer" id="faq-a-2" role="region" aria-labelledby="faq-q-2">Para o FGTS sim — não há consulta ao SPC/Serasa. Para o Empréstimo CLT depende da análise de cada banco parceiro. Nossa equipe orienta você na melhor opção para o seu perfil.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-question">Preciso pagar alguma taxa para simular?</div>
-      <div class="faq-answer">Não. A simulação e todo o processo de análise são 100% gratuitos. O único custo é a taxa de juros do banco, que será apresentada de forma clara antes da assinatura do contrato.</div>
+      <button type="button" class="faq-question" id="faq-q-3" aria-expanded="false" aria-controls="faq-a-3">Preciso pagar alguma taxa para simular?</button>
+      <div class="faq-answer" id="faq-a-3" role="region" aria-labelledby="faq-q-3">Não. A simulação e todo o processo de análise são 100% gratuitos. O único custo é a taxa de juros do banco, que será apresentada de forma clara antes da assinatura do contrato.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-question">Em quanto tempo recebo o dinheiro?</div>
-      <div class="faq-answer">Após a aprovação e assinatura digital do contrato, o PIX é enviado em até 40 minutos para qualquer banco.</div>
+      <button type="button" class="faq-question" id="faq-q-4" aria-expanded="false" aria-controls="faq-a-4">Em quanto tempo recebo o dinheiro?</button>
+      <div class="faq-answer" id="faq-a-4" role="region" aria-labelledby="faq-q-4">Após a aprovação e assinatura digital do contrato, o PIX é enviado em até 40 minutos para qualquer banco.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-question">Como funciona o pagamento do empréstimo CLT?</div>
-      <div class="faq-answer">As parcelas são descontadas diretamente do seu salário todo mês — você não precisa se preocupar com boleto ou data de vencimento.</div>
+      <button type="button" class="faq-question" id="faq-q-5" aria-expanded="false" aria-controls="faq-a-5">Como funciona o pagamento do empréstimo CLT?</button>
+      <div class="faq-answer" id="faq-a-5" role="region" aria-labelledby="faq-q-5">As parcelas são descontadas diretamente do seu salário todo mês — você não precisa se preocupar com boleto ou data de vencimento.</div>
     </div>
     <div class="faq-item">
-      <div class="faq-question">A FelizCred é segura? É regulamentada?</div>
-      <div class="faq-answer">Sim. A FelizCred é operada pela Handmoney Correspondente Bancário Ltda., CNPJ 27.963.662/0001-13, correspondente bancário credenciado pelos principais bancos do Brasil, seguindo todas as normas do Banco Central.</div>
+      <button type="button" class="faq-question" id="faq-q-6" aria-expanded="false" aria-controls="faq-a-6">A FelizCred é segura? É regulamentada?</button>
+      <div class="faq-answer" id="faq-a-6" role="region" aria-labelledby="faq-q-6">Sim. A FelizCred é operada pela Handmoney Correspondente Bancário Ltda., CNPJ 27.963.662/0001-13, correspondente bancário credenciado pelos principais bancos do Brasil, seguindo todas as normas do Banco Central.</div>
     </div>
   </div>
 </div>
@@ -1233,7 +1327,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 <!-- EXIT POPUP -->
 <div class="popup-overlay" id="exitPopup">
   <div class="popup-box">
-    <button class="popup-close" onclick="closePopup()">×</button>
+    <button class="popup-close" type="button" aria-label="Fechar aviso" onclick="closePopup()">×</button>
     <div class="popup-emoji">💰</div>
     <h3>Antes de sair...</h3>
     <p>Que tal simular em 30 segundos? Sem compromisso — veja quanto você pode pegar emprestado agora mesmo.</p>
@@ -1249,10 +1343,71 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     q.addEventListener('click', () => {
       const item = q.parentElement;
       const isOpen = item.classList.contains('open');
-      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
-      if (!isOpen) item.classList.add('open');
+      document.querySelectorAll('.faq-item').forEach(i => {
+        i.classList.remove('open');
+        i.querySelector('.faq-question')?.setAttribute('aria-expanded', 'false');
+      });
+      if (!isOpen) {
+        item.classList.add('open');
+        q.setAttribute('aria-expanded', 'true');
+      }
     });
   });
+
+  // Header responsivo e menu acessível
+  const siteNav = document.querySelector('nav');
+  const navToggle = document.querySelector('.nav-toggle');
+  const closeMobileNav = () => {
+    siteNav?.classList.remove('menu-open');
+    navToggle?.setAttribute('aria-expanded', 'false');
+    navToggle?.setAttribute('aria-label', 'Abrir menu');
+  };
+  navToggle?.addEventListener('click', () => {
+    const willOpen = !siteNav.classList.contains('menu-open');
+    siteNav.classList.toggle('menu-open', willOpen);
+    navToggle.setAttribute('aria-expanded', String(willOpen));
+    navToggle.setAttribute('aria-label', willOpen ? 'Fechar menu' : 'Abrir menu');
+  });
+  document.querySelectorAll('.nav-links a').forEach(link => link.addEventListener('click', closeMobileNav));
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMobileNav(); });
+  window.addEventListener('scroll', () => siteNav?.classList.toggle('is-scrolled', window.scrollY > 24), { passive:true });
+  siteNav?.classList.toggle('is-scrolled', window.scrollY > 24);
+
+  // Revelações progressivas; sem JavaScript, todo o conteúdo continua visível.
+  const motionGroups = [
+    ['.hero .badge, .hero h1, .hero-sub, .hero-btns, .hero-stats, .hero-product'],
+    ['#produtos .section-label, #produtos > h2, #produtos > .section-sub, #produtos .product-card'],
+    ['#fgts-simular > div, #fgts-simular .sim-tag, #fgts-simular h2, #fgts-simular .sim-step, #fgts-simular .contact-cta'],
+    ['#fgts-instrucoes h2, #fgts-instrucoes .banks-grid > div, #fgts-instrucoes .steps-grid > div, #fgts-instrucoes a'],
+    ['#como-funciona .section-label, #como-funciona h2, #como-funciona .section-sub, #como-funciona .how-card'],
+    ['#calculadoras .section-label, #calculadoras h2, #calculadoras .section-sub, #calculadoras .calc-card'],
+    ['#faq .section-label, #faq h2, #faq .faq-item'],
+    ['.cta-final > *, .footer-grid > *, .footer-bottom']
+  ];
+  const motionItems = [];
+  motionGroups.forEach(([selector]) => {
+    document.querySelectorAll(selector).forEach((element, index) => {
+      if (motionItems.includes(element)) return;
+      element.classList.add('motion-item');
+      element.style.setProperty('--motion-delay', `${Math.min(index, 5) * 85}ms`);
+      motionItems.push(element);
+    });
+  });
+  document.body.classList.add('motion-enabled');
+  if ('IntersectionObserver' in window) {
+    const motionObserver = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-visible');
+        motionObserver.unobserve(entry.target);
+      });
+    }, { threshold:.14, rootMargin:'0px 0px -10% 0px' });
+    motionItems.forEach(item => motionObserver.observe(item));
+    const timeline = document.querySelector('.sim-steps');
+    if (timeline) motionObserver.observe(timeline);
+  } else {
+    motionItems.forEach(item => item.classList.add('is-visible'));
+  }
 
   // Exit intent popup
   const exitPopupStorage = 'felizcred_exit_popup_shown_at';
