@@ -432,6 +432,11 @@ export type FunilResponse = {
     campanha_clique: number
     campanha_dados_completos: number
   }
+  site: {
+    etapas: Record<string, number>
+    paradas: { etapa: string; total: number; silenciosos: number }[]
+    motivos: { motivo: string; total: number }[]
+  }
 }
 
 function getCredentials(): string | null {

@@ -174,6 +174,25 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "produto_tag")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN produto_tag TEXT`);
   }
+  if (!infoSiteChat.rows.some((r) => r.name === "human_intent_count")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN human_intent_count INTEGER NOT NULL DEFAULT 0`);
+  }
+  if (!infoSiteChat.rows.some((r) => r.name === "human_handoff_requested_at")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN human_handoff_requested_at INTEGER`);
+  }
+  await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_funnel_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    event_name TEXT NOT NULL,
+    step_id TEXT NOT NULL,
+    provider_id TEXT,
+    reason_code TEXT,
+    created_at INTEGER NOT NULL,
+    UNIQUE(conversation_id, event_name, step_id, provider_id),
+    FOREIGN KEY (conversation_id) REFERENCES site_chat_conversations(id) ON DELETE CASCADE
+  )`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_site_chat_funnel_event
+    ON site_chat_funnel_events(event_name, created_at)`);
   // Mantém conversas antigas do site visíveis no mesmo funil da FelizCred. Versões anteriores
   // gravavam nomes que não existem nas colunas do painel, deixando esses cards invisíveis.
   await client.execute(`UPDATE site_chat_conversations
@@ -3664,6 +3683,62 @@ async function siteChatDefinirProduto(id, produtoTag) {
   });
 }
 
+async function siteChatFunilEvento(conversationId, eventName, stepId, providerId = null, reasonCode = null) {
+  await ready;
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO site_chat_funnel_events
+          (conversation_id, event_name, step_id, provider_id, reason_code, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [conversationId, eventName, stepId, providerId, reasonCode, Date.now()],
+  });
+}
+
+async function siteChatSolicitarHumano(id) {
+  await ready;
+  const now = Date.now();
+  await client.execute({
+    sql: `UPDATE site_chat_conversations
+          SET human_intent_count = COALESCE(human_intent_count, 0) + 1,
+              human_handoff_requested_at = CASE WHEN COALESCE(human_intent_count, 0) >= 1 THEN ? ELSE human_handoff_requested_at END,
+              updated_at = ? WHERE id = ?`,
+    args: [now, now, id],
+  });
+  return siteChatObter(id);
+}
+
+async function siteChatFunilResumo(desdeMs) {
+  await ready;
+  const [eventos, paradas, motivos] = await Promise.all([
+    client.execute({
+      sql: `SELECT event_name, COUNT(DISTINCT conversation_id) AS total
+            FROM site_chat_funnel_events WHERE created_at >= ? GROUP BY event_name`,
+      args: [desdeMs],
+    }),
+    client.execute({
+      sql: `SELECT COALESCE(clt.etapa, 'entrada') AS etapa,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN c.status = 'open' AND c.updated_at <= ? THEN 1 ELSE 0 END) AS silenciosos
+            FROM site_chat_conversations c
+            LEFT JOIN site_chat_clt clt ON clt.conversation_id = c.id
+            WHERE c.created_at >= ? AND c.produto_tag = 'Empréstimo CLT'
+            GROUP BY COALESCE(clt.etapa, 'entrada') ORDER BY total DESC`,
+      args: [Date.now() - 30 * 60 * 1000, desdeMs],
+    }),
+    client.execute({
+      sql: `SELECT reason_code AS motivo, COUNT(DISTINCT conversation_id) AS total
+            FROM site_chat_funnel_events
+            WHERE created_at >= ? AND reason_code IS NOT NULL
+            GROUP BY reason_code ORDER BY total DESC`,
+      args: [desdeMs],
+    }),
+  ]);
+  return {
+    etapas: Object.fromEntries(eventos.rows.map((r) => [r.event_name, Number(r.total || 0)])),
+    paradas: paradas.rows.map((r) => ({ etapa: r.etapa, total: Number(r.total || 0), silenciosos: Number(r.silenciosos || 0) })),
+    motivos: motivos.rows.map((r) => ({ motivo: r.motivo, total: Number(r.total || 0) })),
+  };
+}
+
 async function siteChatCltObter(conversationId) {
   await ready;
   const result = await client.execute({ sql: `SELECT * FROM site_chat_clt WHERE conversation_id = ?`, args: [conversationId] });
@@ -3794,6 +3869,9 @@ module.exports = {
   siteChatDefinirStatus,
   siteChatDefinirPipeline,
   siteChatDefinirProduto,
+  siteChatFunilEvento,
+  siteChatSolicitarHumano,
+  siteChatFunilResumo,
   siteChatCltObter,
   siteChatFactaListarEmAcompanhamento,
   siteChatCltCriar,

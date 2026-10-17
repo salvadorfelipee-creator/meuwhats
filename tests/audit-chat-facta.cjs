@@ -47,14 +47,13 @@ const json = (route, body, status = 200) => route.fulfill({ status, contentType:
     await page.locator(".fc-chat-launcher").click();
     await page.locator('[name="name"]').fill("Auditoria Facta");
     await page.locator('.fc-chat-step[data-step="0"] .fc-chat-next').click();
-    await page.locator('[name="contact"]').fill("auditoria@example.com");
+    await page.locator('[name="contact"]').fill("47999999999");
     await page.locator('.fc-chat-step[data-step="1"] .fc-chat-next').click();
     await page.locator('input[value="Empréstimo CLT"]').check({ force: true });
     await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit());
     await page.locator('[data-tenure="yes"]').click();
     await page.locator('[data-action="start"]').waitFor();
     await page.locator('[name="cpf"]').fill("08361943900");
-    await page.locator('[name="phone"]').fill("47999999999");
     await page.locator('[data-action="start"] .fc-clt-consent input').check();
     await page.locator('[data-action="start"]').evaluate((form) => form.requestSubmit());
     await page.locator("[data-confirm-authorization]").click();

@@ -48,7 +48,7 @@ function json(route, body, status = 200) {
     await page.locator(".fc-chat-launcher").click()
     await page.locator('[name="name"]').fill("Auditoria completa")
     await page.locator('.fc-chat-step[data-step="0"] .fc-chat-next').click()
-    await page.locator('[name="contact"]').fill("auditoria.completa@example.com")
+    await page.locator('[name="contact"]').fill("47999999999")
     await page.locator('.fc-chat-step[data-step="1"] .fc-chat-next').click()
     await page.locator('input[value="Empréstimo CLT"]').check({ force: true })
     await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit())
@@ -60,7 +60,6 @@ function json(route, body, status = 200) {
     await page.locator('.fc-clt-card[data-action="start"]').waitFor()
     assert.ok(Date.now() - inicioResposta >= 1400, "a resposta deve respeitar o atraso de digitação")
     await page.locator('.fc-clt-card[data-action="start"] input[name="cpf"]').fill("083.619.439-00")
-    await page.locator('.fc-clt-card[data-action="start"] input[name="phone"]').fill("(47) 99999-9999")
     await page.locator('.fc-clt-card[data-action="start"]').evaluate((form) => form.requestSubmit())
     await page.locator('a[href="https://banco.example/autorizar"]').waitFor()
 

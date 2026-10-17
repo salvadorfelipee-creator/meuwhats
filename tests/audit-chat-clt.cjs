@@ -11,7 +11,7 @@ async function abrirConversa(browser, assunto, sufixo) {
   await page.locator(".fc-chat-launcher").click()
   await page.locator('[name="name"]').fill(`Auditoria CLT ${sufixo}`)
   await page.locator('.fc-chat-step[data-step="0"] .fc-chat-next').click()
-  await page.locator('[name="contact"]').fill(`auditoria.clt.${sufixo}@example.com`)
+  await page.locator('[name="contact"]').fill("47999999999")
   await page.locator('.fc-chat-step[data-step="1"] .fc-chat-next').click()
   await page.locator(`input[name="topic"][value="${assunto}"]`).check({ force: true })
   await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit())

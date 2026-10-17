@@ -22,14 +22,13 @@ async function textOf(locator) {
     await page.locator(".fc-chat-launcher").click();
     await page.locator('[name="name"]').fill(process.env.LIVE_NAME);
     await page.locator('.fc-chat-step[data-step="0"] .fc-chat-next').click();
-    await page.locator('[name="contact"]').fill(process.env.LIVE_EMAIL);
+    await page.locator('[name="contact"]').fill(process.env.LIVE_PHONE);
     await page.locator('.fc-chat-step[data-step="1"] .fc-chat-next').click();
     await page.locator('input[value="Empréstimo CLT"]').check({ force: true });
     await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit());
     await page.locator('[data-tenure="yes"]').click();
     await page.locator('[data-action="start"]').waitFor({ timeout: 30_000 });
     await page.locator('[name="cpf"]').fill(process.env.LIVE_CPF);
-    await page.locator('[name="phone"]').fill(process.env.LIVE_PHONE);
     const consent = page.locator('[data-action="start"] .fc-clt-consent input');
     console.log("FORMULARIO_PUBLICADO:", await textOf(page.locator('[data-action="start"]')));
     await page.locator(".fc-chat").screenshot({ path: "test-results/live-facta-form-published.png" });
