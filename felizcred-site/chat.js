@@ -2,7 +2,7 @@
   const API = "https://meuwhats.onrender.com/site-chat/conversations";
   const STORAGE = "felizcred_site_chat_v1";
   const SESSION_TTL = 6 * 60 * 60 * 1000;
-  const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false, cltCheckedAt: null };
+  const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false, cltCheckedAt: null, dismissedCltStatus: null, reasoningTimer: null };
   const iconChat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></svg>';
   const iconClose = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
   const iconExpand = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>';
@@ -25,14 +25,14 @@
           <p class="fc-chat-error" role="alert"></p>
         </form>
       </div>
-      <div class="fc-chat-thread"><div class="fc-chat-messages" aria-live="polite"><span class="fc-chat-day">Conversa com a equipe FelizCred</span><div class="fc-chat-typing" role="status"><span></span><span></span><span></span><small>digitando…</small></div></div><div class="fc-chat-quick-replies" aria-label="Respostas rápidas"></div><div class="fc-chat-clt" aria-live="polite"></div><div class="fc-chat-emoji-menu"><button type="button">😊</button><button type="button">👍</button><button type="button">❤️</button><button type="button">😂</button><button type="button">🙏</button><button type="button">✅</button></div><form class="fc-chat-compose"><button class="fc-chat-tool fc-chat-emoji" type="button" aria-label="Emoji">☺</button><label class="fc-chat-tool" aria-label="Anexar arquivo">⌕<input class="fc-chat-file" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden></label><button class="fc-chat-tool fc-chat-mic" type="button" aria-label="Gravar áudio">●</button><textarea maxlength="2000" rows="1" aria-label="Mensagem" placeholder="Escreva sua mensagem..."></textarea><button class="fc-chat-send" type="submit" aria-label="Enviar mensagem">${iconSend}</button></form></div>
+      <div class="fc-chat-thread"><div class="fc-chat-messages" aria-live="polite"><span class="fc-chat-day">Conversa com a equipe FelizCred</span><div class="fc-chat-typing" role="status" aria-live="polite"><i aria-hidden="true"><span></span><span></span><span></span></i><small class="fc-reasoning-text">Analisando sua mensagem</small></div></div><div class="fc-chat-quick-replies" aria-label="Respostas rápidas"></div><div class="fc-chat-clt" aria-live="polite"></div><div class="fc-chat-emoji-menu"><button type="button">😊</button><button type="button">👍</button><button type="button">❤️</button><button type="button">😂</button><button type="button">🙏</button><button type="button">✅</button></div><form class="fc-chat-compose"><button class="fc-chat-more" type="button" aria-label="Mais opções" aria-expanded="false">+</button><div class="fc-chat-tools-menu" aria-label="Opções de mensagem"><button class="fc-chat-tool fc-chat-emoji" type="button" aria-label="Adicionar emoji"><span>☺</span> Emoji</button><label class="fc-chat-tool" aria-label="Anexar arquivo"><span>＋</span> Anexar<input class="fc-chat-file" type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" hidden></label><button class="fc-chat-tool fc-chat-mic" type="button" aria-label="Gravar áudio"><span>●</span> Áudio</button></div><textarea maxlength="2000" rows="1" aria-label="Mensagem" placeholder="Escreva sua mensagem..."></textarea><button class="fc-chat-send" type="submit" aria-label="Enviar mensagem">${iconSend}</button></form></div>
     </section>`;
   document.body.appendChild(root);
   const $ = (s) => root.querySelector(s);
   const launcher = $(".fc-chat-launcher"), panel = $(".fc-chat"), close = $(".fc-chat-close"), expand = $(".fc-chat-expand"), nudge = $(".fc-chat-nudge");
   const startForm = $(".fc-chat-form"), compose = $(".fc-chat-compose"), composeText = compose.querySelector("textarea");
   const messagesEl = $(".fc-chat-messages"), errorEl = $(".fc-chat-error"), unreadEl = $(".fc-chat-unread"), progress = $(".fc-chat-progress span");
-  const fileInput = $(".fc-chat-file"), emojiButton = $(".fc-chat-emoji"), emojiMenu = $(".fc-chat-emoji-menu"), micButton = $(".fc-chat-mic");
+  const fileInput = $(".fc-chat-file"), emojiButton = $(".fc-chat-emoji"), emojiMenu = $(".fc-chat-emoji-menu"), micButton = $(".fc-chat-mic"), moreButton = $(".fc-chat-more"), toolsMenu = $(".fc-chat-tools-menu");
   const cltEl = $(".fc-chat-clt"), typingEl = $(".fc-chat-typing"), quickRepliesEl = $(".fc-chat-quick-replies");
   const steps = [...root.querySelectorAll(".fc-chat-step")];
   function fieldForStep(step) { return step === 0 ? startForm.elements.name : step === 1 ? startForm.elements.contact : step === 2 ? startForm.elements.email : startForm.elements.topic; }
@@ -69,6 +69,19 @@
   function renderMessages() { messagesEl.querySelectorAll(".fc-chat-bubble").forEach((n) => n.remove()); state.messages.forEach((m) => { const bubble = document.createElement("div"); bubble.className = `fc-chat-bubble ${m.direction}`; if (m.media_url) { let media; if (m.type === "image") { media = document.createElement("img"); media.alt = m.file_name || "Imagem"; } else if (m.type === "video") { media = document.createElement("video"); media.controls = true; } else if (m.type === "audio") { media = document.createElement("audio"); media.controls = true; } else { media = document.createElement("a"); media.target = "_blank"; media.textContent = m.file_name || "Abrir arquivo"; } media.src = m.media_url; if (media.tagName === "A") media.href = m.media_url; media.className = "fc-chat-media"; bubble.appendChild(media); } if (m.body) { const text = document.createElement("p"); appendMessageText(text, m.body); bubble.appendChild(text); } const meta = document.createElement("small"); meta.textContent = `${m.direction === "agent" && m.sender_name ? `${m.sender_name} · ` : ""}${formatTime(m.created_at)}`; bubble.appendChild(meta); messagesEl.insertBefore(bubble, typingEl); }); messagesEl.scrollTop = messagesEl.scrollHeight; renderQuickReplies(); }
   function renderQuickReplies() { quickRepliesEl.innerHTML = ""; const ultima = [...state.messages].reverse().find((m) => m.direction === "agent")?.body || ""; let items = []; if (/ainda deseja falar com o atendimento humano|responda sim ou não/i.test(ultima)) items = [{ label: "Sim, falar com Felipe", message: "Sim" }, { label: "Continuar com o assistente", message: "Não" }]; else if (!state.clt && /mais de 3 meses|completou esse período/i.test(ultima)) items = [{ label: "Sim", message: "Sim, tenho mais de 3 meses" }, { label: "Não", message: "Ainda não tenho 3 meses" }]; items.forEach((item) => { const button = document.createElement("button"); button.type = "button"; button.textContent = item.label; button.addEventListener("click", () => sendPayload({ message: item.message })); quickRepliesEl.appendChild(button); }); }
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  function startReasoning(phrases = ["Analisando sua mensagem", "Consultando seu contexto", "Preparando a resposta"]) {
+    window.clearInterval(state.reasoningTimer);
+    const text = typingEl.querySelector(".fc-reasoning-text");
+    let index = 0;
+    text.textContent = phrases[index];
+    typingEl.classList.add("show");
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) state.reasoningTimer = window.setInterval(() => {
+      text.classList.add("is-changing");
+      window.setTimeout(() => { index = (index + 1) % phrases.length; text.textContent = phrases[index]; text.classList.remove("is-changing"); }, 180);
+    }, 1500);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  function stopReasoning() { window.clearInterval(state.reasoningTimer); state.reasoningTimer = null; typingEl.classList.remove("show"); }
   async function api(path = "", options = {}) { const headers = { "Content-Type": "application/json", ...(options.headers || {}) }; if (state.session?.token) headers["X-Chat-Token"] = state.session.token; const response = await fetch(`${API}${path}`, { cache: "no-store", ...options, headers }); const data = await response.json().catch(() => ({})); if (!response.ok) throw new Error(data.error || "Não foi possível conectar agora."); return data; }
   const money = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -111,7 +124,9 @@
     }
     if (c.provider === "facta" && ["erro_autorizacao", "erro_integracao"].includes(c.etapa)) {
       const integrationError = c.etapa === "erro_integracao";
-      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">${integrationError ? "Instabilidade temporária" : "Não foi possível enviar"}</span><h3>${integrationError ? "A Facta não respondeu agora" : "Confira o celular informado"}</h3><p>${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p><button type="button" class="fc-chat-primary" data-resend-authorization>Tentar novamente</button><button type="button" class="fc-clt-secondary" data-talk-agent>Continuar pelo chat</button></div>`;
+      const statusKey = `${c.etapa}:${c.status || ""}:${c.error || ""}`;
+      if (state.dismissedCltStatus === statusKey) { cltEl.classList.remove("show"); cltEl.innerHTML = ""; return; }
+      cltEl.innerHTML = `<div class="fc-clt-card fc-clt-status-card"><button type="button" class="fc-clt-dismiss" data-dismiss-clt-status aria-label="Fechar aviso">×</button><span class="fc-clt-step">${integrationError ? "Instabilidade temporária" : "Não foi possível enviar"}</span><h3>${integrationError ? "A consulta não avançou agora" : "Confira o celular informado"}</h3><p><strong>Motivo:</strong> ${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p><p class="fc-clt-reassurance">Seus dados ficaram salvos e nenhum contrato foi criado.</p><div class="fc-clt-actions"><button type="button" class="fc-chat-primary" data-resend-authorization>Tentar novamente</button><button type="button" class="fc-clt-secondary" data-dismiss-clt-status>Voltar à conversa</button></div></div>`;
       return;
     }
     if (c.provider === "facta" && c.etapa === "ofertas_disponiveis") {
@@ -178,12 +193,20 @@
     }
   }
   async function refreshClt() { if (!state.session) return; try { const data = await api(`/${state.session.id}/clt/status`); if (data.clt) { state.clt = data.clt; renderClt(); } } catch {} }
-  async function refresh(semAtraso = false) { if (!state.session || state.refreshing) return; state.refreshing = true; try { const data = await api(`/${state.session.id}`); const count = data.messages.filter((m) => m.direction === "agent").length; const novaResposta = state.lastAgentCount !== null && count > state.lastAgentCount; if (novaResposta && !semAtraso) { typingEl.classList.add("show"); messagesEl.scrollTop = messagesEl.scrollHeight; await wait(1500); } if (novaResposta) { sound("in"); if (!state.open) unreadEl.classList.add("show"); if (document.hidden && "Notification" in window && Notification.permission === "granted") new Notification("FelizCred respondeu", { body: data.messages.at(-1)?.body || "Você recebeu uma nova mensagem." }); } state.lastAgentCount = count; state.messages = data.messages; renderMessages(); } catch (error) { if (/não encontrada/i.test(error.message)) { localStorage.removeItem(STORAGE); state.session = null; root.classList.remove("has-conversation"); } } finally { typingEl.classList.remove("show"); state.refreshing = false; } }
+  async function refresh(semAtraso = false) { if (!state.session || state.refreshing) return; state.refreshing = true; try { const data = await api(`/${state.session.id}`); const count = data.messages.filter((m) => m.direction === "agent").length; const novaResposta = state.lastAgentCount !== null && count > state.lastAgentCount; if (novaResposta && !semAtraso) { startReasoning(["Nova resposta recebida", "Organizando a conversa"]); await wait(900); } if (novaResposta) { sound("in"); if (!state.open) unreadEl.classList.add("show"); if (document.hidden && "Notification" in window && Notification.permission === "granted") new Notification("FelizCred respondeu", { body: data.messages.at(-1)?.body || "Você recebeu uma nova mensagem." }); } state.lastAgentCount = count; state.messages = data.messages; renderMessages(); } catch (error) { if (/não encontrada/i.test(error.message)) { localStorage.removeItem(STORAGE); state.session = null; root.classList.remove("has-conversation"); } } finally { stopReasoning(); state.refreshing = false; } }
   root.querySelectorAll(".fc-chat-next").forEach((b) => b.addEventListener("click", () => goTo(state.step + 1)));
   root.querySelectorAll(".fc-chat-back").forEach((b) => b.addEventListener("click", () => goTo(state.step - 1)));
   startForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && state.step < 3) { e.preventDefault(); goTo(state.step + 1); } if (state.step === 3 && ["a","b","c"].includes(e.key.toLowerCase())) startForm.elements.topic[["a","b","c"].indexOf(e.key.toLowerCase())].checked = true; });
   startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const contact = String(form.get("contact") || ""), email = String(form.get("email") || ""); const data = await api("", { method: "POST", body: JSON.stringify({ name: form.get("name"), contact, email, message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token, contact, email, expiresAt: Date.now() + SESSION_TTL }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
   cltEl.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-dismiss-clt-status]")) {
+      const c = state.clt;
+      state.dismissedCltStatus = `${c?.etapa || ""}:${c?.status || ""}:${c?.error || ""}`;
+      cltEl.classList.remove("show");
+      cltEl.innerHTML = "";
+      composeText.focus();
+      return;
+    }
     const confirmAuthorization = e.target.closest("[data-confirm-authorization]");
     if (confirmAuthorization) {
       confirmAuthorization.disabled = true;
@@ -255,6 +278,7 @@
   });
   cltEl.addEventListener("submit", async (e) => {
     e.preventDefault(); const form = new FormData(e.target), button = e.target.querySelector('button[type="submit"],button:not([type])'); if (button) button.disabled = true;
+    startReasoning(e.target.dataset.action === "start" ? ["Conectando com a Facta", "Verificando a autorização", "Preparando o próximo passo"] : ["Validando seus dados", "Consultando a Facta", "Preparando o próximo passo"]);
     try {
       if (e.target.dataset.action === "start") {
         state.cltCpf = String(form.get("cpf") || "");
@@ -290,7 +314,7 @@
       }
       inline.textContent = error.message;
       inline.scrollIntoView({ behavior: "smooth", block: "center" });
-    } finally { if (button) button.disabled = false; }
+    } finally { stopReasoning(); if (button) button.disabled = false; }
   });
   cltEl.addEventListener("change", (e) => {
     if (e.target.name !== "cliente_iletrado_impossibilitado") return;
@@ -300,10 +324,12 @@
     rogo.hidden = !enabled;
     rogo.querySelectorAll("input").forEach((input) => { input.required = enabled; });
   });
-  async function sendPayload(payload) { const button = $(".fc-chat-send"); button.disabled = true; const started = Date.now(); if (payload.message) { state.messages.push({ id: `local-${started}`, direction: "visitor", body: payload.message, created_at: started }); renderMessages(); } composeText.value = ""; typingEl.classList.add("show"); messagesEl.scrollTop = messagesEl.scrollHeight; try { const result = await api(`/${state.session.id}`, { method: "POST", body: JSON.stringify(payload) }); const restante = 1500 - (Date.now() - started); if (restante > 0) await wait(restante); if (result.cltStep) { state.clt = result.cltStep; renderClt(); } else if (result.clt && !state.clt) { state.clt = "eligibility"; renderClt(); } while (state.refreshing) await wait(50); await Promise.all([refresh(true), refreshClt()]); } finally { typingEl.classList.remove("show"); button.disabled = false; } }
+  async function sendPayload(payload) { const button = $(".fc-chat-send"); button.disabled = true; const started = Date.now(); if (payload.message) { state.messages.push({ id: `local-${started}`, direction: "visitor", body: payload.message, created_at: started }); renderMessages(); } composeText.value = ""; startReasoning(); try { const result = await api(`/${state.session.id}`, { method: "POST", body: JSON.stringify(payload) }); const restante = 1500 - (Date.now() - started); if (restante > 0) await wait(restante); if (result.cltStep) { state.clt = result.cltStep; renderClt(); } else if (result.clt && !state.clt) { state.clt = "eligibility"; renderClt(); } while (state.refreshing) await wait(50); await Promise.all([refresh(true), refreshClt()]); } finally { stopReasoning(); button.disabled = false; } }
   compose.addEventListener("submit", async (e) => { e.preventDefault(); const message = composeText.value.trim(); if (message) await sendPayload({ message }); });
-  emojiButton.addEventListener("click", () => emojiMenu.classList.toggle("show"));
+  moreButton.addEventListener("click", () => { const open = toolsMenu.classList.toggle("show"); moreButton.classList.toggle("is-open", open); moreButton.setAttribute("aria-expanded", String(open)); emojiMenu.classList.remove("show"); });
+  emojiButton.addEventListener("click", () => { toolsMenu.classList.remove("show"); moreButton.classList.remove("is-open"); moreButton.setAttribute("aria-expanded", "false"); emojiMenu.classList.toggle("show"); });
   emojiMenu.addEventListener("click", (e) => { if (e.target === emojiMenu) return; const emoji = e.target.textContent; composeText.value += emoji; emojiMenu.classList.remove("show"); composeText.focus(); });
+  document.addEventListener("click", (e) => { if (!compose.contains(e.target) && !emojiMenu.contains(e.target)) { toolsMenu.classList.remove("show"); emojiMenu.classList.remove("show"); moreButton.classList.remove("is-open"); moreButton.setAttribute("aria-expanded", "false"); } });
   fileInput.addEventListener("change", async () => { const file = fileInput.files?.[0]; if (!file) return; if (file.size > 15 * 1024 * 1024) return alert("O arquivo deve ter no máximo 15 MB."); const data = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(file); }); const key = file.type.startsWith("image/") ? "imagemBase64" : file.type.startsWith("video/") ? "videoBase64" : file.type.startsWith("audio/") ? "audioBase64" : "documentBase64"; await sendPayload({ message: composeText.value.trim(), [key]: data, fileName: file.name }); fileInput.value = ""; });
   micButton.addEventListener("click", async () => { if (state.recorder?.state === "recording") { state.recorder.stop(); return; } try { state.stream = await navigator.mediaDevices.getUserMedia({ audio: true }); state.recorder = new MediaRecorder(state.stream); state.chunks = []; state.recorder.ondataavailable = (e) => e.data.size && state.chunks.push(e.data); state.recorder.onstop = async () => { const blob = new Blob(state.chunks, { type: state.recorder.mimeType || "audio/webm" }); state.stream.getTracks().forEach((t) => t.stop()); micButton.classList.remove("recording"); const data = await new Promise((resolve) => { const r = new FileReader(); r.onload=()=>resolve(r.result); r.readAsDataURL(blob); }); await sendPayload({ audioBase64: data, fileName: "audio.webm" }); }; state.recorder.start(); micButton.classList.add("recording"); } catch { alert("Autorize o microfone para gravar áudio."); } });
   composeText.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); compose.requestSubmit(); } });

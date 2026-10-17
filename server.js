@@ -170,6 +170,18 @@ function mensagemFacta(payload, fallback = "A Facta não conseguiu concluir esta
   return String(payload?.mensagem || payload?.message || fallback).trim();
 }
 
+function motivoPublicoErroFacta(err) {
+  const status = Number(err?.httpStatus) || 0;
+  const message = String(err?.message || "");
+  if (/FACTA_BRIDGE_URL|FACTA_BRIDGE_SECRET|FACTA_LOGIN_CERTIFICADO|FACTA_PROPOSAL_ENABLED|não configurados/i.test(message)) return "A integração do correspondente está em configuração. Nossa equipe já pode conferir pelo chat.";
+  if (/timeout|timed out|aborted|tempo limite/i.test(message) || [408, 504].includes(status)) return "A Facta demorou mais que o esperado para responder. Tente novamente em alguns instantes.";
+  if (status === 429) return "A Facta limitou temporariamente novas consultas por excesso de solicitações. Aguarde um instante e tente novamente.";
+  if (status >= 500) return `A Facta informou indisponibilidade temporária${status ? ` (código ${status})` : ""}. Tente novamente em alguns instantes.`;
+  if ([401, 403].includes(status)) return "A Facta não autorizou a conexão neste momento. Nossa equipe já pode conferir pelo chat.";
+  if (status >= 400) return `A Facta não aceitou esta etapa da consulta (código ${status}). Confira os dados ou tente novamente.`;
+  return "A Facta não concluiu esta etapa da consulta. Tente novamente; se persistir, continue falando conosco aqui.";
+}
+
 function respostaFactaComErro(payload) {
   return payload?.erro === true || payload?.erro === "true" || payload?.success === false;
 }
@@ -5676,14 +5688,15 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
           console.error(`Erro no fluxo CLT do site (${id}/${action}):`, err.message);
           const existing = await db.siteChatCltObter(id).catch(() => null);
-          const failureChanges = { error_message: "Não conseguimos avançar automaticamente. A equipe já pode continuar pelo chat." };
+          const publicReason = motivoPublicoErroFacta(err);
+          const failureChanges = { error_message: publicReason };
           if (existing?.provider === "facta" && ["solicitando_autorizacao", "erro_autorizacao", "erro_integracao"].includes(existing.etapa)) {
             Object.assign(failureChanges, { etapa: "erro_integracao", status_novosaque: "ERRO_INTEGRACAO" });
           }
           await db.siteChatCltAtualizar(id, failureChanges).catch(() => {});
           const configurationError = /FACTA_BRIDGE_URL|FACTA_BRIDGE_SECRET|FACTA_LOGIN_CERTIFICADO|FACTA_PROPOSAL_ENABLED|não configurados/i.test(err.message);
           return send(res, 502, {
-            error: configurationError ? "A integração da Facta ainda precisa de uma configuração do correspondente." : "A Facta não conseguiu concluir esta etapa. Nossa equipe recebeu o atendimento para conferir.",
+            error: publicReason,
             code: configurationError ? "FACTA_CONFIG_MISSING" : "FACTA_REQUEST_FAILED",
             providerStatus: Number(err.httpStatus) || null,
           }, corsHeaders);
