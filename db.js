@@ -186,6 +186,15 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "human_intent_stage")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN human_intent_stage TEXT`);
   }
+  if (!infoSiteChat.rows.some((r) => r.name === "whatsapp_opt_in_at")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN whatsapp_opt_in_at INTEGER`);
+  }
+  if (!infoSiteChat.rows.some((r) => r.name === "whatsapp_opt_in_source")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN whatsapp_opt_in_source TEXT`);
+  }
+  if (!infoSiteChat.rows.some((r) => r.name === "whatsapp_opt_out_at")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN whatsapp_opt_out_at INTEGER`);
+  }
   await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_funnel_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id TEXT NOT NULL,
@@ -3580,16 +3589,16 @@ async function roteadorRevisadoDefinir(chave, revisado) {
   });
 }
 
-async function siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag }) {
+async function siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag, whatsappOptIn }) {
   await ready;
   const now = Date.now();
   await client.batch([
     {
       sql: `INSERT INTO site_chat_conversations
             (id, visitor_token_hash, name, contact, email, page_url, status, created_at, updated_at, last_visitor_at,
-             produto_tag, pipeline_estagio, pipeline_estagio_desde)
-            VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, 'novo_lead', ?)`,
-      args: [id, tokenHash, name, contact || null, email || null, pageUrl || null, now, now, now, produtoTag || null, now],
+             produto_tag, pipeline_estagio, pipeline_estagio_desde, whatsapp_opt_in_at, whatsapp_opt_in_source)
+            VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, 'novo_lead', ?, ?, ?)`,
+      args: [id, tokenHash, name, contact || null, email || null, pageUrl || null, now, now, now, produtoTag || null, now, whatsappOptIn ? now : null, whatsappOptIn ? "site_chat" : null],
     },
     {
       sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)

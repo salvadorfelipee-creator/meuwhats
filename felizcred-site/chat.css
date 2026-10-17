@@ -145,6 +145,8 @@
 .fc-chat-primary svg { width: 18px; height: 18px; }
 .fc-chat-primary:hover { background: #2cdd78; }
 .fc-chat-primary:disabled { cursor: wait; opacity: .62; }
+.fc-chat-optin { display: grid; grid-template-columns: 18px 1fr; gap: 9px; align-items: start; margin-top: 12px; color: var(--fc-muted); cursor: pointer; font-size: 11px; line-height: 1.45; }
+.fc-chat-optin input { width: 18px; height: 18px; margin: 0; accent-color: var(--fc-green-dark); }
 .fc-chat-privacy { margin: auto 0 0; color: #98a2b3; font-size: 11px; line-height: 1.45; text-align: center; }
 .fc-chat-error { display: none; margin: 0; color: #c82a3a; font-size: 12px; }
 .fc-chat-error.show { display: block; }

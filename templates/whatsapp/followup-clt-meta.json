@@ -1,0 +1,35 @@
+{
+  "language": "pt_BR",
+  "templates": [
+    {
+      "name": "felizcred_clt_simulacao_incompleta",
+      "category": "MARKETING",
+      "body": "Olá, {{1}}. Sua simulação de consignado CLT ficou incompleta. Se quiser continuar, seus dados já estão salvos. Toque abaixo para voltar ao ponto em que parou.",
+      "examples": ["Alessandra"],
+      "buttons": [
+        { "type": "URL", "text": "Continuar simulação", "url": "https://www.felizcred.com.br/?chat=acompanhar&utm_source=whatsapp&utm_medium=followup" },
+        { "type": "QUICK_REPLY", "text": "Parar mensagens" }
+      ]
+    },
+    {
+      "name": "felizcred_clt_assinatura_pendente",
+      "category": "UTILITY",
+      "body": "Olá, {{1}}. A proposta {{2}} está aguardando sua revisão e assinatura. Consulte as condições antes de decidir e continue pelo botão abaixo.",
+      "examples": ["Alessandra", "123456"],
+      "buttons": [
+        { "type": "URL", "text": "Revisar proposta", "url": "https://www.felizcred.com.br/?chat=acompanhar&utm_source=whatsapp&utm_medium=followup" }
+      ]
+    },
+    {
+      "name": "felizcred_reapresentacao_novo_numero",
+      "category": "MARKETING",
+      "body": "Olá, {{1}}. Aqui é a FelizCred em nosso novo número de atendimento. Você já foi nosso cliente e pode consultar novamente as opções disponíveis. Quer iniciar um novo atendimento?",
+      "examples": ["Alessandra"],
+      "buttons": [
+        { "type": "URL", "text": "Consultar opções", "url": "https://www.felizcred.com.br/?chat=abrir&utm_source=whatsapp&utm_medium=reativacao" },
+        { "type": "QUICK_REPLY", "text": "Parar mensagens" }
+      ],
+      "requiresDocumentedOptIn": true
+    }
+  ]
+}

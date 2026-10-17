@@ -1171,20 +1171,36 @@ const TEXTO_MENU_PRINCIPAL =
   "✅ (47) 3514-3392\n" +
   "🌐 http://www.felizcred.com.br";
 
-// Entrada enxuta da FelizCred: o WhatsApp recebe uma única resposta e leva o cliente ao
-// chat do site, que funciona a qualquer hora e concentra a coleta de dados e a contratação.
-// O passo fica nulo para não iniciar lembretes do menu legado nem consumir mensagens extras.
+// Entrada híbrida usada nos dois números da FelizCred: CLT segue para o chat seguro do site;
+// os demais produtos continuam no WhatsApp. Uma mensagem genérica recebe uma única lista.
 function menuInicial() {
   return {
     texto:
-      "Olá! Aqui é o Felipe, da FelizCred. Você quer simular ou acompanhar um empréstimo? " +
-      "Para manter tudo organizado e pedir somente os dados necessários, continue pelo nosso chat seguro.",
-    cta: {
-      buttonText: "Abrir chat seguro",
-      url: "https://www.felizcred.com.br/?chat=abrir&utm_source=whatsapp&utm_medium=atendimento",
+      "Olá! Aqui é o Felipe, da FelizCred. Qual produto você procura? O consignado CLT continua no chat seguro do site; os demais atendimentos seguem por aqui.",
+    lista: {
+      botao: "Escolher produto",
+      opcoes: [
+        { id: "prod_clt", title: "Empréstimo CLT", description: "Simulação pelo chat seguro" },
+        { id: "prod_fgts", title: "Antecipação FGTS", description: "Continue pelo WhatsApp" },
+        { id: "prod_seguro", title: "Seguro de veículo", description: "Continue pelo WhatsApp" },
+        { id: "prod_carro", title: "Carro em garantia", description: "Continue pelo WhatsApp" },
+        { id: "prod_financiamento", title: "Financiar veículo", description: "Continue pelo WhatsApp" },
+      ],
     },
-    encaminhaSite: true,
   };
+}
+
+async function encaminharCltParaSite(de, businessNumberId) {
+  logFunil(businessNumberId, de, "clt_direcionado_site");
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Perfeito. A simulação do consignado CLT é feita no chat seguro da FelizCred, onde você consulta as condições e acompanha cada etapa.",
+    null,
+    null,
+    { buttonText: "Simular CLT no site", url: "https://www.felizcred.com.br/?chat=abrir&utm_source=whatsapp&utm_medium=clt" }
+  );
+  await db.setFluxoPasso(de, businessNumberId, null);
 }
 
 // Reconhece a opção do menu principal em texto livre — número (1-4) ou palavra-chave.
@@ -1214,6 +1230,16 @@ function detectarOpcaoMenuPrincipal(texto) {
   return null;
 }
 
+function pediuConsignadoClt(texto) {
+  const t = normalizarTexto(texto);
+  if (/\binss\b/.test(t)) return false;
+  return /\b(clt|consignado|credito do trabalhador|emprestimo do trabalhador|carteira assinada)\b/.test(t);
+}
+
+function pediuPararMensagens(texto) {
+  return /^(parar mensagens|nao quero receber mais|sair|cancelar mensagens|pare)$/i.test(normalizarTexto(texto));
+}
+
 // Documentos pedidos em garantia/financiamento — mesma lista pros dois (só muda a frase de
 // requisito antes). "Foto do documento" fica sem automação de verdade: capturaTexto só roda
 // pra mensagens de texto, então uma foto sozinha não confirma nada — fica visível no
@@ -1231,17 +1257,7 @@ const DOCUMENTOS_VEICULO =
 async function handlerMenuPrincipal(de, businessNumberId, corpo) {
   const escolha = detectarOpcaoMenuPrincipal(corpo);
   if (escolha === "1") {
-    logFunil(businessNumberId, de, "clt_menu_escolhido");
-    await enviarRespostaAutomatica(
-      businessNumberId,
-      de,
-      "Para simular o consignado CLT, precisa ter no mínimo 3 meses de carteira assinada no seu trabalho atual.",
-      [
-        { id: "clt_3mais", title: "3 MESES OU MAIS" },
-        { id: "clt_menos3", title: "MENOS DE 3 MESES" },
-      ]
-    );
-    await db.setFluxoPasso(de, businessNumberId, "clt_pergunta_tempo");
+    await encaminharCltParaSite(de, businessNumberId);
   } else if (escolha === "2") {
     await enviarRespostaAutomatica(businessNumberId, de, PRODUTO_CONFIRMACAO("o SEGURO DE CARRO/MOTO") + avisoForaHorarioCotaCerta());
     await db.setFluxoPasso(de, businessNumberId, null);
@@ -1445,11 +1461,12 @@ const FLUXO_BOTOES = {
     lista: LISTA_PRODUTOS,
   },
   // Escolhas da lista de produtos → confirma e passa pro atendimento humano
-  prod_clt: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO CLT") },
+  prod_clt: encaminharCltParaSite,
   prod_inss: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO INSS") },
   prod_fgts: { texto: PRODUTO_CONFIRMACAO("o SAQUE-ANIVERSÁRIO FGTS") },
   prod_carro: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO COM CARRO EM GARANTIA") },
   prod_seguro: { texto: PRODUTO_CONFIRMACAO("o SEGURO VEICULAR") },
+  prod_financiamento: { texto: PRODUTO_CONFIRMACAO("o FINANCIAMENTO DE VEÍCULO") },
   // Resposta provisória — o fluxo completo do consignado CLT ainda vai ser definido
   fluxo_clt: {
     texto:
@@ -4502,8 +4519,8 @@ const FLUXO_FGTS_ANUNCIO = {
   semAvisoJanela: true,
 };
 
-// CAMPANHA_CLT_NUMBER_ID não entra aqui de propósito — é resolvido à parte em getFluxo
-// (escolherVarianteCampanhaCLT), que decide entre as variantes 1 e 2 por telefone.
+// CAMPANHA_CLT_NUMBER_ID é resolvido à parte em getFluxo para preservar originações CLT
+// já abertas e usar a entrada híbrida da FelizCred para as novas conversas.
 const FLUXOS_POR_NUMERO = {
   [COTACERTA_NUMBER_ID]: FLUXO_COTACERTA,
   [CIAHOT_NUMBER_ID]: FLUXO_CIAHOT,
@@ -4547,7 +4564,7 @@ async function getFluxo(businessNumberId, phone, fluxoPassoAtual) {
     // novosaque_origination identifica que a pessoa está nesse sub-fluxo.
     if (String(fluxoPassoAtual || "").startsWith("nsorig_")) return FLUXO_CAMPANHA_CLT;
     if (await db.novosaqueOriginationBuscarAberta(phone, businessNumberId)) return FLUXO_CAMPANHA_CLT;
-    return escolherVarianteCampanhaCLT(phone);
+    return FLUXO_FELIZCRED;
   }
   if (businessNumberId === FELIZCRED_PRINCIPAL_NUMBER_ID) {
     if (String(fluxoPassoAtual || "").startsWith("fgtsad_")) return FLUXO_FGTS_ANUNCIO;
@@ -4795,12 +4812,30 @@ async function processarEntry(entry) {
           if (msg.referral) console.log(`📣 Referral recebido de ${de} (${businessNumberId}):`, JSON.stringify(msg.referral));
           // Palavra-chave "menu" reabre o menu inicial do fluxo a qualquer momento,
           // não importa em que passo a conversa está.
-          if (normalizarTexto(corpo) === "menu") {
+          if (pediuPararMensagens(corpo)) {
+            try {
+              await handlerIndBloquear(de, businessNumberId);
+              mensagemJaTratada = true;
+            } catch (err) {
+              console.error("Erro ao registrar saída de mensagens:", err.message);
+            }
+          } else if (normalizarTexto(corpo) === "menu") {
             try {
               await dispararInicioFluxo(fluxo, de, businessNumberId);
               mensagemJaTratada = true;
             } catch (err) {
               console.error("Erro ao reabrir menu inicial:", err.message);
+            }
+          } else if (
+            [CAMPANHA_CLT_NUMBER_ID, FELIZCRED_PRINCIPAL_NUMBER_ID].includes(businessNumberId) &&
+            pediuConsignadoClt(corpo) &&
+            (!conversaAnterior?.fluxo_passo || conversaAnterior.fluxo_passo === "menu_inicial" || conversaInativa)
+          ) {
+            try {
+              await encaminharCltParaSite(de, businessNumberId);
+              mensagemJaTratada = true;
+            } catch (err) {
+              console.error("Erro ao encaminhar CLT para o site:", err.message);
             }
           } else if (businessNumberId === CAMPANHA_CLT_NUMBER_ID && normalizarTexto(corpo) === "clt1") {
             // Gatilho dedicado pra entrar na originação automática (Novo Saque) sem mexer no
@@ -4876,6 +4911,10 @@ async function processarEntry(entry) {
         } else if (tipo === "button") {
           const textoBotao = msg.button?.text || msg.button?.payload || "";
           await db.insertMessage({ ...base, type: "button", body: textoBotao });
+          if (pediuPararMensagens(textoBotao)) {
+            await handlerIndBloquear(de, businessNumberId);
+            continue;
+          }
           const resposta = RESPOSTAS_BOTAO[normalizar(textoBotao)];
           if (resposta) {
             try {
@@ -4954,6 +4993,10 @@ async function processarEntry(entry) {
           // Clique em um botão do fluxo automático (mensagens interativas)
           const reply = msg.interactive?.button_reply || msg.interactive?.list_reply || {};
           await db.insertMessage({ ...base, type: "button", body: reply.title || "[botão]" });
+          if (pediuPararMensagens(reply.title || reply.id)) {
+            await handlerIndBloquear(de, businessNumberId);
+            continue;
+          }
           const passo = fluxo.fluxoBotoes[reply.id];
           if (passo) {
             try {
@@ -5533,6 +5576,7 @@ const server = http.createServer(async (req, res) => {
         const email = String(body.email || "").trim().toLowerCase().slice(0, 160);
         const message = String(body.message || "").trim().slice(0, 2000);
         const pageUrl = String(body.pageUrl || "").trim().slice(0, 500);
+        const whatsappOptIn = body.whatsappOptIn === true;
         const celularValido = /^\d{10,11}$/.test(contact.replace(/\D/g, ""));
         const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
         if (name.length < 2 || !celularValido || !emailValido || !message) {
@@ -5544,7 +5588,7 @@ const server = http.createServer(async (req, res) => {
         let produtoTag = null;
         try { produtoTag = await gemini.classificarProdutoSite(message); }
         catch { produtoTag = /fgts/i.test(message) ? "FGTS" : /clt/i.test(message) ? "Empréstimo CLT" : /carro/i.test(message) ? "Carro em garantia" : null; }
-        const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag });
+        const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag, whatsappOptIn });
         enviarInicioChatFelizcred({ nome: name, email }).catch((err) => console.error(`E-mail inicial do chat não enviado (${id}):`, err.message));
         if (produtoTag === "Empréstimo CLT") {
           await db.siteChatFunilEvento(id, "entrada", "inicio", "facta");
