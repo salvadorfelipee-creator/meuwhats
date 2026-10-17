@@ -9,10 +9,10 @@
   const root = document.createElement("div");
   root.className = "fc-chat-root";
   root.innerHTML = `
-    <aside class="fc-chat-nudge" aria-live="polite"><button type="button" aria-label="Abrir simulação"><span>Simulação CLT</span><strong>Veja se existe uma condição para você</strong><small>Leva poucos minutos · sem compromisso</small></button></aside>
-    <button class="fc-chat-launcher" type="button" aria-label="Abrir chat com a FelizCred" aria-expanded="false">${iconChat}<span class="fc-chat-launcher-copy"><b>Simule por aqui</b><small>Atendimento seguro</small></span><span class="fc-chat-unread">1</span></button>
+    <aside class="fc-chat-nudge" aria-live="polite"><button type="button" aria-label="Fazer simulação de empréstimo"><span>Felipe, da FelizCred</span><strong>Faça aqui sua simulação e aprovação do seu empréstimo.</strong><small>Eu acompanho você em cada etapa.</small></button></aside>
+    <button class="fc-chat-launcher" type="button" aria-label="Abrir atendimento com Felipe, da FelizCred" aria-expanded="false"><img src="/assets/img/chat/felipe-atendimento-profissional-512.png" alt="Felipe, atendimento FelizCred"><span class="fc-chat-online" aria-hidden="true"></span><span class="fc-chat-launcher-copy"><b>Fale com Felipe</b><small>Simule agora</small></span><span class="fc-chat-unread">1</span></button>
     <section class="fc-chat" role="dialog" aria-label="Chat com a FelizCred" aria-hidden="true">
-      <header class="fc-chat-head"><div class="fc-chat-brand">F</div><div class="fc-chat-head-copy"><span>Crédito com acompanhamento</span><p class="fc-chat-title">FelizCred</p><p class="fc-chat-status">Assistente online agora</p></div><button class="fc-chat-expand" type="button" aria-label="Expandir chat" aria-pressed="false">${iconExpand}</button><button class="fc-chat-close" type="button" aria-label="Minimizar chat">${iconClose}</button></header>
+      <header class="fc-chat-head"><div class="fc-chat-brand"><img src="/assets/img/chat/felipe-atendimento-profissional-512.png" alt="Felipe, atendimento FelizCred"><i aria-hidden="true"></i></div><div class="fc-chat-head-copy"><span>Atendimento FelizCred</span><p class="fc-chat-title">Felipe</p><p class="fc-chat-status">Assistente online agora</p></div><button class="fc-chat-expand" type="button" aria-label="Expandir chat" aria-pressed="false">${iconExpand}</button><button class="fc-chat-close" type="button" aria-label="Minimizar chat">${iconClose}</button></header>
       <div class="fc-chat-offline" role="status">Você está sem internet. Sua conversa continua salva neste dispositivo.</div>
       <div class="fc-chat-assurance"><span><i></i> Conexão segura</span><span>Seus dados só são pedidos quando necessários</span></div>
       <div class="fc-chat-start"><div class="fc-chat-progress"><span></span></div>
@@ -299,6 +299,6 @@
   expand.addEventListener("click", () => { const expanded = root.classList.toggle("is-expanded"); expand.setAttribute("aria-pressed", String(expanded)); expand.setAttribute("aria-label", expanded ? "Reduzir chat" : "Expandir chat"); });
   close.addEventListener("click", () => setOpen(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.open) setOpen(false); });
   window.addEventListener("online", updateConnection); window.addEventListener("offline", updateConnection); updateConnection();
-  setTimeout(() => { if (!state.open && !state.session) nudge.classList.add("show"); }, 6500);
+  setTimeout(() => { if (!state.open && !state.session) nudge.classList.add("show"); }, 900);
   loadSession(); goTo(0); refresh(); refreshClt(); setInterval(() => { if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
 })();
