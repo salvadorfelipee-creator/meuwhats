@@ -23,7 +23,7 @@ const flowCrypto = require("./flow-crypto");
 const google = require("./google");
 const mcp = require("./mcp");
 const gemini = require("./gemini");
-const { notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarEmail } = require("./email");
+const { notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarEmail } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -249,6 +249,19 @@ async function notificarEtapaFactaNoWhatsApp(row, etapa) {
   }
 }
 
+async function notificarEtapaFactaPorEmail(row, etapa) {
+  const conversation = row?.conversation_id ? await db.siteChatObter(row.conversation_id) : null;
+  if (!conversation?.email) return;
+  const conteudo = {
+    aguardando_assinatura_facta: ["Sua proposta está pronta para assinatura", "Abra o chat da FelizCred para revisar as condições e acessar a assinatura segura da Facta."],
+    proposta_em_analise: ["Sua proposta Facta está em análise", "A assinatura foi recebida. Você pode acompanhar cada atualização pelo chat da FelizCred."],
+    proposta_concluida: ["Sua proposta Facta foi concluída", "Confira o crédito na conta informada. Se precisar, converse conosco pelo chat do site."],
+    proposta_cancelada: ["Sua proposta Facta foi encerrada", "Entre no chat da FelizCred para consultar o motivo e verificar como podemos ajudar."],
+  }[etapa];
+  if (!conteudo) return;
+  await enviarAtualizacaoChatFelizcred({ nome: conversation.name, email: conversation.email, titulo: conteudo[0], mensagem: conteudo[1] });
+}
+
 async function sincronizarSiteChatFacta(row) {
   if (!row) return row;
   if (["aguardando_assinatura_facta", "proposta_em_analise"].includes(row.etapa) && row.codigo_proposta) {
@@ -286,6 +299,7 @@ async function sincronizarSiteChatFacta(row) {
         await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", updated.error_message || "A Facta encerrou a proposta. Nossa equipe pode conferir o motivo com você.");
       }
       notificarEtapaFactaNoWhatsApp(updated, updated.etapa).catch(() => {});
+      notificarEtapaFactaPorEmail(updated, updated.etapa).catch((err) => console.error(`E-mail da etapa ${updated.etapa} não enviado (${row.conversation_id}):`, err.message));
     }
     return updated;
   }
@@ -375,7 +389,9 @@ async function sincronizarSiteChatClt(row) {
   } catch (err) {
     console.error(`Erro ao sincronizar CLT do site (${row.conversation_id}):`, err.message);
     return db.siteChatCltAtualizar(row.conversation_id, {
-      error_message: "O ambiente do banco ainda não liberou a autorização. Tente novamente em alguns instantes.",
+      etapa: "erro_integracao",
+      status_novosaque: "ERRO_INTEGRACAO",
+      error_message: "A conexão com a Facta está indisponível agora. Seus dados ficaram salvos; tente novamente em alguns instantes ou continue falando conosco pelo chat.",
     }).catch(() => row);
   }
 }
@@ -5467,11 +5483,13 @@ const server = http.createServer(async (req, res) => {
         const body = await parseBody(req);
         const name = String(body.name || "").trim().slice(0, 80);
         const contact = String(body.contact || "").trim().slice(0, 160);
+        const email = String(body.email || "").trim().toLowerCase().slice(0, 160);
         const message = String(body.message || "").trim().slice(0, 2000);
         const pageUrl = String(body.pageUrl || "").trim().slice(0, 500);
         const celularValido = /^\d{10,11}$/.test(contact.replace(/\D/g, ""));
-        if (name.length < 2 || !celularValido || !message) {
-          return send(res, 400, { error: "Informe seu nome, um celular com DDD e escolha um assunto." }, corsHeaders);
+        const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        if (name.length < 2 || !celularValido || !emailValido || !message) {
+          return send(res, 400, { error: "Informe seu nome, celular com DDD, e-mail válido e escolha um assunto." }, corsHeaders);
         }
         const id = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
@@ -5479,7 +5497,8 @@ const server = http.createServer(async (req, res) => {
         let produtoTag = null;
         try { produtoTag = await gemini.classificarProdutoSite(message); }
         catch { produtoTag = /fgts/i.test(message) ? "FGTS" : /clt/i.test(message) ? "Empréstimo CLT" : /carro/i.test(message) ? "Carro em garantia" : null; }
-        const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, pageUrl, message, produtoTag });
+        const conversation = await db.siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag });
+        enviarInicioChatFelizcred({ nome: name, email }).catch((err) => console.error(`E-mail inicial do chat não enviado (${id}):`, err.message));
         if (produtoTag === "Empréstimo CLT") {
           await db.siteChatFunilEvento(id, "entrada", "inicio", "facta");
           await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
@@ -5651,6 +5670,7 @@ const server = http.createServer(async (req, res) => {
             const row = await db.siteChatCltAtualizar(id, { codigo_cliente: String(stage2.codigo_cliente), codigo_proposta: String(proposal.codigo), contract_link: contractLink, etapa: "aguardando_assinatura_facta", status_novosaque: "PROPOSTA_CRIADA", authorization_checked_at: null, error_message: null });
             await db.siteChatFunilEvento(id, "proposta_criada", "aguardando_assinatura_facta", "facta");
             notificarContratoCltNoWhatsApp(row).catch(() => {});
+            notificarEtapaFactaPorEmail(row, "aguardando_assinatura_facta").catch((err) => console.error(`E-mail de assinatura não enviado (${id}):`, err.message));
             return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
         } catch (err) {

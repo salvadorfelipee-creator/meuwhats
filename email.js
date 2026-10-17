@@ -116,4 +116,34 @@ async function enviarBoasVindasFelizcred({ nome, email }) {
   });
 }
 
-module.exports = { enviarEmail, notificarLeadCotaCerta, enviarBoasVindasFelizcred };
+async function enviarInicioChatFelizcred({ nome, email }) {
+  const primeiroNome = (nome || "").trim().split(/\s+/)[0] || "";
+  const saudacao = primeiroNome ? `Olá, ${escapeHtml(primeiroNome)}.` : "Olá.";
+  const html = `
+    <div style="background:#f2f7f4;padding:32px 16px;font-family:Arial,sans-serif;color:#10243b">
+      <div style="max-width:560px;margin:auto;background:#fff;border-radius:16px;padding:28px">
+        <p style="margin:0 0 8px;color:#087a47;font-size:12px;font-weight:700">FELIZCRED</p>
+        <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25">Seu atendimento começou pelo chat</h1>
+        <p style="margin:0 0 12px;line-height:1.6">${saudacao} Recebemos seu contato e sua conversa já está disponível no site.</p>
+        <p style="margin:0 0 20px;line-height:1.6">O chat é o canal principal para acompanhar a simulação. Volte pelo mesmo navegador nas próximas 6 horas para continuar de onde parou. Usaremos o WhatsApp somente quando a etapa bancária precisar de autorização ou aviso importante.</p>
+        <a href="https://www.felizcred.com.br/" style="display:inline-block;background:#071a2f;color:#fff;text-decoration:none;padding:13px 18px;border-radius:10px;font-weight:700">Voltar ao chat da FelizCred</a>
+        <p style="margin:22px 0 0;color:#647386;font-size:12px;line-height:1.5">Se você não iniciou este atendimento, ignore esta mensagem.</p>
+      </div>
+    </div>`;
+  await enviarEmail({ to: email, toNome: nome || email, from: FELIZCRED_EMAIL_FROM, fromNome: FELIZCRED_EMAIL_FROM_NOME, subject: "Seu atendimento no chat da FelizCred começou", html });
+}
+
+async function enviarAtualizacaoChatFelizcred({ nome, email, titulo, mensagem }) {
+  const html = `
+    <div style="background:#f2f7f4;padding:32px 16px;font-family:Arial,sans-serif;color:#10243b">
+      <div style="max-width:560px;margin:auto;background:#fff;border-radius:16px;padding:28px">
+        <p style="margin:0 0 8px;color:#087a47;font-size:12px;font-weight:700">ATUALIZAÇÃO DO SEU ATENDIMENTO</p>
+        <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25">${escapeHtml(titulo)}</h1>
+        <p style="margin:0 0 20px;line-height:1.6">${escapeHtml(mensagem)}</p>
+        <a href="https://www.felizcred.com.br/" style="display:inline-block;background:#071a2f;color:#fff;text-decoration:none;padding:13px 18px;border-radius:10px;font-weight:700">Conversar pelo chat</a>
+      </div>
+    </div>`;
+  await enviarEmail({ to: email, toNome: nome || email, from: FELIZCRED_EMAIL_FROM, fromNome: FELIZCRED_EMAIL_FROM_NOME, subject: titulo, html });
+}
+
+module.exports = { enviarEmail, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred };

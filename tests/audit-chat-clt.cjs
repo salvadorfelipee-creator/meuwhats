@@ -13,6 +13,8 @@ async function abrirConversa(browser, assunto, sufixo) {
   await page.locator('.fc-chat-step[data-step="0"] .fc-chat-next').click()
   await page.locator('[name="contact"]').fill("47999999999")
   await page.locator('.fc-chat-step[data-step="1"] .fc-chat-next').click()
+  await page.locator('[name="email"]').fill(`auditoria.clt.${sufixo}@example.com`)
+  await page.locator('.fc-chat-step[data-step="2"] .fc-chat-next').click()
   await page.locator(`input[name="topic"][value="${assunto}"]`).check({ force: true })
   await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit())
   await page.locator(".fc-chat-root.has-conversation").waitFor({ timeout: 30000 })

@@ -174,6 +174,9 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "produto_tag")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN produto_tag TEXT`);
   }
+  if (!infoSiteChat.rows.some((r) => r.name === "email")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN email TEXT`);
+  }
   if (!infoSiteChat.rows.some((r) => r.name === "human_intent_count")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN human_intent_count INTEGER NOT NULL DEFAULT 0`);
   }
@@ -3574,16 +3577,16 @@ async function roteadorRevisadoDefinir(chave, revisado) {
   });
 }
 
-async function siteChatCriar({ id, tokenHash, name, contact, pageUrl, message, produtoTag }) {
+async function siteChatCriar({ id, tokenHash, name, contact, email, pageUrl, message, produtoTag }) {
   await ready;
   const now = Date.now();
   await client.batch([
     {
       sql: `INSERT INTO site_chat_conversations
-            (id, visitor_token_hash, name, contact, page_url, status, created_at, updated_at, last_visitor_at,
+            (id, visitor_token_hash, name, contact, email, page_url, status, created_at, updated_at, last_visitor_at,
              produto_tag, pipeline_estagio, pipeline_estagio_desde)
-            VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, 'novo_lead', ?)`,
-      args: [id, tokenHash, name, contact || null, pageUrl || null, now, now, now, produtoTag || null, now],
+            VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, 'novo_lead', ?)`,
+      args: [id, tokenHash, name, contact || null, email || null, pageUrl || null, now, now, now, produtoTag || null, now],
     },
     {
       sql: `INSERT INTO site_chat_messages (conversation_id, direction, body, sender_name, created_at)

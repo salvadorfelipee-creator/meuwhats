@@ -20,7 +20,8 @@
         <form class="fc-chat-form" novalidate>
           <section class="fc-chat-step is-active" data-step="0"><p class="fc-chat-kicker">Simulação acompanhada</p><h2>Olá, como podemos chamar você?</h2><p class="fc-chat-hint">Vamos pedir somente o necessário em cada etapa.</p><input name="name" maxlength="80" autocomplete="name" required placeholder="Digite seu nome"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
           <section class="fc-chat-step" data-step="1"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Só mais um dado</p><h2>Qual é o seu celular?</h2><p class="fc-chat-hint">Ele será reaproveitado na consulta e para você continuar pelo WhatsApp.</p><input name="contact" type="tel" inputmode="tel" maxlength="16" autocomplete="tel" required placeholder="(47) 99999-9999"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
-          <section class="fc-chat-step" data-step="2"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Escolha uma opção</p><h2>O que você quer resolver hoje?</h2><fieldset class="fc-chat-topics"><legend class="sr-only">Assunto</legend><label class="fc-chat-topic"><input type="radio" name="topic" value="FGTS" required><span><i>A</i><b>FGTS</b><small>Antecipação do saque-aniversário</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo CLT" required><span><i>B</i><b>Empréstimo CLT</b><small>Simule agora com a Facta</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo com carro em garantia" required><span><i>C</i><b>Carro em garantia</b><small>Empréstimo usando seu veículo</small></span></label></fieldset><button class="fc-chat-primary" type="submit">Começar atendimento ${iconSend}</button><p class="fc-chat-privacy">Ao continuar, você aceita nossa <a href="/privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</p></section>
+          <section class="fc-chat-step" data-step="2"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Continue por onde preferir</p><h2>Qual é o seu melhor e-mail?</h2><p class="fc-chat-hint">Enviaremos o acompanhamento por e-mail. O chat continua sendo seu canal principal.</p><input name="email" type="email" maxlength="160" autocomplete="email" required placeholder="voce@exemplo.com"><button class="fc-chat-primary fc-chat-next" type="button">Continuar <kbd>Enter ↵</kbd></button></section>
+          <section class="fc-chat-step" data-step="3"><button class="fc-chat-back" type="button">← Voltar</button><p class="fc-chat-kicker">Escolha uma opção</p><h2>O que você quer resolver hoje?</h2><fieldset class="fc-chat-topics"><legend class="sr-only">Assunto</legend><label class="fc-chat-topic"><input type="radio" name="topic" value="FGTS" required><span><i>A</i><b>FGTS</b><small>Antecipação do saque-aniversário</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo CLT" required><span><i>B</i><b>Empréstimo CLT</b><small>Simule agora com a Facta</small></span></label><label class="fc-chat-topic"><input type="radio" name="topic" value="Empréstimo com carro em garantia" required><span><i>C</i><b>Carro em garantia</b><small>Empréstimo usando seu veículo</small></span></label></fieldset><button class="fc-chat-primary" type="submit">Começar atendimento ${iconSend}</button><p class="fc-chat-privacy">Ao continuar, você aceita nossa <a href="/privacidade.html" target="_blank" rel="noopener">Política de Privacidade</a>.</p></section>
           <p class="fc-chat-error" role="alert"></p>
         </form>
       </div>
@@ -34,22 +35,23 @@
   const fileInput = $(".fc-chat-file"), emojiButton = $(".fc-chat-emoji"), emojiMenu = $(".fc-chat-emoji-menu"), micButton = $(".fc-chat-mic");
   const cltEl = $(".fc-chat-clt"), typingEl = $(".fc-chat-typing"), quickRepliesEl = $(".fc-chat-quick-replies");
   const steps = [...root.querySelectorAll(".fc-chat-step")];
-  function fieldForStep(step) { return step === 0 ? startForm.elements.name : step === 1 ? startForm.elements.contact : startForm.elements.topic; }
+  function fieldForStep(step) { return step === 0 ? startForm.elements.name : step === 1 ? startForm.elements.contact : step === 2 ? startForm.elements.email : startForm.elements.topic; }
   function showError(message) { errorEl.textContent = message; errorEl.classList.add("show"); }
   function validStep(step) {
     const field = fieldForStep(step);
     if (step === 0 && field.value.trim().length < 2) { showError("Digite seu nome para continuar."); return false; }
     if (step === 1 && !/^\d{10,11}$/.test(field.value.replace(/\D/g, ""))) { showError("Digite um celular com DDD para continuar."); return false; }
+    if (step === 2 && !field.checkValidity()) { showError("Digite um e-mail válido para continuar."); return false; }
     return true;
   }
   function goTo(step) {
     if (step > state.step && !validStep(state.step)) return;
-    state.step = Math.max(0, Math.min(2, step)); errorEl.classList.remove("show");
+    state.step = Math.max(0, Math.min(3, step)); errorEl.classList.remove("show");
     steps.forEach((node, index) => node.classList.toggle("is-active", index === state.step));
-    progress.style.width = `${((state.step + 1) / 3) * 100}%`;
+    progress.style.width = `${((state.step + 1) / 4) * 100}%`;
     setTimeout(() => fieldForStep(state.step)?.focus?.(), 220);
   }
-  function sessionIsValid(session) { return !!(session?.id && session?.token && Number(session.expiresAt) > Date.now()); }
+  function sessionIsValid(session) { return !!(session?.id && session?.token && session?.email && Number(session.expiresAt) > Date.now()); }
   function resetSession() {
     localStorage.removeItem(STORAGE); state.session = null; state.messages = []; state.clt = null; state.cltCpf = ""; state.selectedOffer = null;
     root.classList.remove("has-conversation", "is-contracting", "is-expanded"); goTo(0); renderClt();
@@ -108,7 +110,8 @@
       return;
     }
     if (c.provider === "facta" && ["erro_autorizacao", "erro_integracao"].includes(c.etapa)) {
-      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Não foi possível enviar</span><h3>Confira o celular informado</h3><p>${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p><button type="button" class="fc-chat-primary" data-resend-authorization>Tentar enviar novamente</button><button type="button" class="fc-clt-secondary" data-talk-agent>Falar com um atendente</button></div>`;
+      const integrationError = c.etapa === "erro_integracao";
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">${integrationError ? "Instabilidade temporária" : "Não foi possível enviar"}</span><h3>${integrationError ? "A Facta não respondeu agora" : "Confira o celular informado"}</h3><p>${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p><button type="button" class="fc-chat-primary" data-resend-authorization>Tentar novamente</button><button type="button" class="fc-clt-secondary" data-talk-agent>Continuar pelo chat</button></div>`;
       return;
     }
     if (c.provider === "facta" && c.etapa === "ofertas_disponiveis") {
@@ -178,8 +181,8 @@
   async function refresh(semAtraso = false) { if (!state.session || state.refreshing) return; state.refreshing = true; try { const data = await api(`/${state.session.id}`); const count = data.messages.filter((m) => m.direction === "agent").length; const novaResposta = state.lastAgentCount !== null && count > state.lastAgentCount; if (novaResposta && !semAtraso) { typingEl.classList.add("show"); messagesEl.scrollTop = messagesEl.scrollHeight; await wait(1500); } if (novaResposta) { sound("in"); if (!state.open) unreadEl.classList.add("show"); if (document.hidden && "Notification" in window && Notification.permission === "granted") new Notification("FelizCred respondeu", { body: data.messages.at(-1)?.body || "Você recebeu uma nova mensagem." }); } state.lastAgentCount = count; state.messages = data.messages; renderMessages(); } catch (error) { if (/não encontrada/i.test(error.message)) { localStorage.removeItem(STORAGE); state.session = null; root.classList.remove("has-conversation"); } } finally { typingEl.classList.remove("show"); state.refreshing = false; } }
   root.querySelectorAll(".fc-chat-next").forEach((b) => b.addEventListener("click", () => goTo(state.step + 1)));
   root.querySelectorAll(".fc-chat-back").forEach((b) => b.addEventListener("click", () => goTo(state.step - 1)));
-  startForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && state.step < 2) { e.preventDefault(); goTo(state.step + 1); } if (state.step === 2 && ["a","b","c"].includes(e.key.toLowerCase())) startForm.elements.topic[["a","b","c"].indexOf(e.key.toLowerCase())].checked = true; });
-  startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const contact = String(form.get("contact") || ""); const data = await api("", { method: "POST", body: JSON.stringify({ name: form.get("name"), contact, message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token, contact, expiresAt: Date.now() + SESSION_TTL }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
+  startForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && state.step < 3) { e.preventDefault(); goTo(state.step + 1); } if (state.step === 3 && ["a","b","c"].includes(e.key.toLowerCase())) startForm.elements.topic[["a","b","c"].indexOf(e.key.toLowerCase())].checked = true; });
+  startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const contact = String(form.get("contact") || ""), email = String(form.get("email") || ""); const data = await api("", { method: "POST", body: JSON.stringify({ name: form.get("name"), contact, email, message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token, contact, email, expiresAt: Date.now() + SESSION_TTL }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
   cltEl.addEventListener("click", async (e) => {
     const confirmAuthorization = e.target.closest("[data-confirm-authorization]");
     if (confirmAuthorization) {

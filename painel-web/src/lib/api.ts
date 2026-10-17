@@ -80,6 +80,7 @@ export type SiteChatConversation = {
   id: string
   name: string
   contact: string | null
+  email: string | null
   page_url: string | null
   status: "open" | "closed"
   created_at: number

@@ -50,6 +50,8 @@ function json(route, body, status = 200) {
     await page.locator('.fc-chat-step[data-step="0"] .fc-chat-next').click()
     await page.locator('[name="contact"]').fill("47999999999")
     await page.locator('.fc-chat-step[data-step="1"] .fc-chat-next').click()
+    await page.locator('[name="email"]').fill("auditoria.completa@example.com")
+    await page.locator('.fc-chat-step[data-step="2"] .fc-chat-next').click()
     await page.locator('input[value="Empréstimo CLT"]').check({ force: true })
     await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit())
 
