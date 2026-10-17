@@ -183,6 +183,9 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "human_handoff_requested_at")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN human_handoff_requested_at INTEGER`);
   }
+  if (!infoSiteChat.rows.some((r) => r.name === "human_intent_stage")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN human_intent_stage TEXT`);
+  }
   await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_funnel_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id TEXT NOT NULL,
@@ -3709,6 +3712,33 @@ async function siteChatSolicitarHumano(id) {
   return siteChatObter(id);
 }
 
+async function siteChatDefinirIntencaoHumano(id, stage) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE site_chat_conversations SET human_intent_stage = ?, updated_at = ? WHERE id = ?`,
+    args: [stage || null, Date.now(), id],
+  });
+  return siteChatObter(id);
+}
+
+async function siteChatConfirmarHumano(id) {
+  await ready;
+  const now = Date.now();
+  await client.execute({
+    sql: `UPDATE site_chat_conversations
+          SET human_intent_count = COALESCE(human_intent_count, 0) + 1,
+              human_intent_stage = 'requested', human_handoff_requested_at = ?,
+              status = 'open', updated_at = ? WHERE id = ?`,
+    args: [now, now, id],
+  });
+  return siteChatObter(id);
+}
+
+async function siteChatLimparHumano(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE site_chat_conversations SET human_intent_stage = NULL WHERE id = ?`, args: [id] });
+}
+
 async function siteChatFunilResumo(desdeMs) {
   await ready;
   const [eventos, paradas, motivos] = await Promise.all([
@@ -3874,6 +3904,9 @@ module.exports = {
   siteChatDefinirProduto,
   siteChatFunilEvento,
   siteChatSolicitarHumano,
+  siteChatDefinirIntencaoHumano,
+  siteChatConfirmarHumano,
+  siteChatLimparHumano,
   siteChatFunilResumo,
   siteChatCltObter,
   siteChatFactaListarEmAcompanhamento,

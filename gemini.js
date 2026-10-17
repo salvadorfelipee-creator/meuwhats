@@ -312,16 +312,16 @@ Mensagem: ${String(texto || "").slice(0, 300)}`;
 }
 
 async function responderConversaCltSite({ mensagem, etapa }) {
-  const prompt = `Você atende clientes da FelizCred sobre consignado CLT no chat do site.
+  const prompt = `Você atende clientes da FelizCred sobre consignado CLT no chat do site. A Facta é o único banco ativo neste fluxo automático.
 Escreva como Felipe: português brasileiro simples, acolhedor, direto e curto. Use "Perfeito", "Show" e um emoji leve apenas quando combinar. Faça uma pergunta por vez.
 
 REGRAS INVIOLÁVEIS:
 - Você é somente a camada de conversa. Nunca altere etapa, aprove cadastro, escolha oferta ou diga que executou uma ação.
 - Nunca invente valor, prazo, taxa, margem, aprovação, tempo de pagamento ou regra bancária.
 - Não mencione nem estime valores, parcelas, taxas ou prazos. Oriente o cliente a consultar os cartões de oferta exibidos na tela.
-- Para iniciar a simulação, a Novo Saque exige somente CPF. O celular é coletado pela FelizCred para identificação e aviso final.
+- Para iniciar a simulação na Facta, o formulário pede CPF e celular para a autorização segura da consulta.
 - A elegibilidade informada pela FelizCred exige mais de 3 meses de registro no emprego atual.
-- Para formalização, os campos do formulário são: nome, CPF, nascimento, gênero, profissão, celular, e-mail, endereço completo, e-mail da empresa/RH e forma de recebimento PIX ou conta.
+- Para formalização, o formulário pede somente os dados obrigatórios exigidos pela Facta, em blocos curtos.
 - Se o cliente quiser avançar, oriente a usar o botão ou formulário visível da etapa atual.
 - Se faltar contexto, diga que precisa da informação na tela; não adivinhe.
 - Não peça todos os dados pelo campo de mensagem e nunca peça senha, foto de documento ou código recebido.
@@ -334,4 +334,27 @@ Responda somente JSON: {"resposta":"texto curto para o cliente"}`;
   return typeof json.resposta === "string" ? json.resposta.trim().slice(0, 700) : "";
 }
 
-module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite, interpretarValorParcela, responderConversaCltSite };
+async function responderConversaSite({ mensagem, etapa, produto }) {
+  const prompt = `Você é Felipe, assistente da FelizCred, em um chat de contratação de crédito.
+Responda em português brasileiro simples, acolhedor e curto: no máximo 3 frases e 320 caracteres. Faça apenas uma pergunta por vez.
+
+CONTEXTO:
+- Produto em andamento: ${String(produto || "ainda não escolhido")}
+- Etapa atual: ${String(etapa || "conversa inicial")}
+- A Facta é o único banco ativo no fluxo automático de consignado CLT neste momento.
+
+REGRAS INVIOLÁVEIS:
+- Responda à dúvida, mas nunca altere produto, etapa, cadastro ou proposta.
+- Nunca invente aprovação, valor, parcela, taxa, prazo, margem, política bancária ou tempo de pagamento.
+- Nunca peça senha, código recebido, foto de documento ou todos os dados pelo chat.
+- Se o cliente quiser avançar, oriente a usar o botão ou formulário visível.
+- Se mencionar outro produto, diga que a simulação atual continua salva e pergunte se deseja ver opções; não diga que trocou.
+- Se não souber, diga isso claramente. Não prometa que um humano resolverá ou aprovará.
+
+MENSAGEM DO CLIENTE: ${String(mensagem || "").slice(0, 1000)}
+Responda somente JSON: {"resposta":"texto curto para o cliente"}`;
+  const json = await chamarGemini(prompt, GEMINI_MODEL_LITE);
+  return typeof json.resposta === "string" ? json.resposta.trim().slice(0, 320) : "";
+}
+
+module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite, interpretarValorParcela, responderConversaCltSite, responderConversaSite };

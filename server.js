@@ -5709,15 +5709,44 @@ const server = http.createServer(async (req, res) => {
         try { media = salvarMidiaSite(req, body); } catch (err) { return send(res, 400, { error: err.message }, corsHeaders); }
         if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." }, corsHeaders);
         await db.siteChatMensagemVisitante(id, conversation.name, message, media);
+        const normalizadaHumano = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
         const pediuHumano = /\b(falar|conversar|chamar).{0,18}\b(humano|pessoa|atendente|atendimento)\b|\bquero (?:um |uma )?(?:humano|atendente)\b/i.test(message);
+        const confirmouHumano = /^(sim|s|quero|pode|confirmo|sim por favor|quero sim)[!. ]*$/.test(normalizadaHumano);
+        const recusouHumano = /^(nao|n|agora nao|continuar|quero continuar|nao preciso)[!. ]*$/.test(normalizadaHumano);
+        const etapaHumano = String(conversation.human_intent_stage || "");
+        if (etapaHumano === "requested" || etapaHumano === "human_active") {
+          return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: true }, corsHeaders);
+        }
+        if (etapaHumano === "awaiting_confirmation") {
+          if (confirmouHumano) {
+            await db.siteChatConfirmarHumano(id);
+            await db.siteChatFunilEvento(id, "handoff_humano", "atendimento", conversation.produto_tag || null, "confirmado");
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Certo. Seu pedido foi enviado ao Felipe, junto com esta conversa. Você pode continuar por aqui e verá a resposta neste chat.");
+            return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: true }, corsHeaders);
+          }
+          if (recusouHumano) {
+            await db.siteChatLimparHumano(id);
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Tudo bem. Continuo com você por aqui. Use a opção da etapa atual ou escreva sua próxima dúvida.");
+            return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: false }, corsHeaders);
+          }
+          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Você ainda deseja falar com o atendimento humano? Responda sim ou não.");
+          return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: false }, corsHeaders);
+        }
+        if (etapaHumano === "awaiting_question") {
+          const row = await db.siteChatCltObter(id).catch(() => null);
+          let resposta = "Entendi. Posso orientar você por aqui e acompanhar sua contratação nesta mesma conversa.";
+          try {
+            resposta = await gemini.responderConversaSite({ mensagem: message, etapa: row?.etapa || "conversa inicial", produto: conversation.produto_tag }) || resposta;
+          } catch (err) { console.error(`Gemini não respondeu à dúvida pré-handoff ${id}:`, err.message); }
+          await db.siteChatDefinirIntencaoHumano(id, "awaiting_confirmation");
+          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", `${resposta}\n\nO atendimento humano fará esse mesmo acompanhamento: vai guiar a contratação e explicar qualquer retorno do banco. Você ainda deseja falar com o atendimento humano?`);
+          return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: false, awaitingHumanConfirmation: true }, corsHeaders);
+        }
         if (pediuHumano) {
-          const atualizada = await db.siteChatSolicitarHumano(id);
-          const insistiu = Number(atualizada.human_intent_count || 0) >= 2;
-          await db.siteChatFunilEvento(id, insistiu ? "handoff_humano" : "intencao_humano", insistiu ? "atendimento" : "duvida", "facta", insistiu ? "pedido_repetido" : null);
-          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", insistiu
-            ? "Entendi. Vou deixar seu histórico organizado para um atendente continuar por aqui."
-            : "Claro. Em poucas palavras, qual é a sua dúvida? Se for para consultar o CLT, consigo fazer agora por aqui — o atendente faria essa mesma consulta.");
-          return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: insistiu }, corsHeaders);
+          await db.siteChatDefinirIntencaoHumano(id, "awaiting_question");
+          await db.siteChatFunilEvento(id, "intencao_humano", "duvida", conversation.produto_tag || null);
+          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Claro. Para eu ajudar primeiro, diga em poucas palavras qual é a sua dúvida.");
+          return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: false }, corsHeaders);
         }
         const pediuClt = /\b(clt|consignado(?:\s+(?:clt|privado))?|carteira assinada|cr[eé]dito (?:do |para o )?trabalhador)\b/i.test(message);
         let conversaClt = pediuClt || conversation.produto_tag === "Empréstimo CLT";
@@ -5796,6 +5825,15 @@ const server = http.createServer(async (req, res) => {
             await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Recebi seus dados. Não consegui concluir a consulta automática agora, mas nossa equipe continuará o atendimento por aqui.").catch(() => {});
           }
         }
+        if (message && !conversaClt) {
+          try {
+            const resposta = await gemini.responderConversaSite({ mensagem: message, etapa: "conversa sobre produto", produto: produtoDetectado || conversation.produto_tag });
+            if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
+          } catch (err) {
+            console.error(`Gemini não respondeu no chat do site ${id}:`, err.message);
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Posso ajudar com sua dúvida ou orientar você a iniciar uma simulação pelo chat.").catch(() => {});
+          }
+        }
         return send(res, 201, { ok: true, clt: conversaClt, cltStep }, corsHeaders);
       }
     }
@@ -5827,6 +5865,7 @@ const server = http.createServer(async (req, res) => {
       try { media = salvarMidiaSite(req, body); } catch (err) { return send(res, 400, { error: err.message }); }
       if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." });
       await db.siteChatMensagemAtendente(conversation.id, usuario.nome || "Atendimento FelizCred", message, media);
+      if (conversation.human_intent_stage === "requested") await db.siteChatDefinirIntencaoHumano(conversation.id, "human_active");
       return send(res, 201, { ok: true });
     }
 

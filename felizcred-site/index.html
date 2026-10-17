@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 
 <!-- ═══ SEO PRIMÁRIO ═══ -->
-<title>FelizCred | Empréstimo CLT e FGTS em Balneário Camboriú – Aprovação na Hora</title>
-<meta name="description" content="FelizCred – Empréstimo Consignado CLT e Antecipação FGTS em Balneário Camboriú. Taxa 4,99% ao mês, até 48x, PIX em 40 minutos. Sem consulta SPC para negativados. Simule grátis agora!"/>
+<title>FelizCred | Simule empréstimo CLT pelo chat</title>
+<meta name="description" content="Simule seu empréstimo CLT com a FelizCred pelo chat do site. Consulta gratuita, contratação digital e acompanhamento em cada etapa."/>
 <meta name="keywords" content="empréstimo CLT Balneário Camboriú, consignado CLT Santa Catarina, antecipação FGTS Balneário Camboriú, empréstimo para negativado SC, crédito consignado CLT, saque aniversário FGTS, empréstimo com desconto em folha, correspondente bancário Balneário Camboriú, empréstimo rápido PIX, FelizCred"/>
 <meta name="author" content="FelizCred – Handmoney Correspondente Bancário Ltda."/>
 <meta name="robots" content="index, follow"/>
@@ -15,8 +15,8 @@
 <!-- ═══ OPEN GRAPH (Facebook/Instagram/WhatsApp) ═══ -->
 <meta property="og:type" content="website"/>
 <meta property="og:url" content="https://www.felizcred.com.br/"/>
-<meta property="og:title" content="FelizCred | Empréstimo CLT e FGTS – PIX em 40 Minutos"/>
-<meta property="og:description" content="Empréstimo Consignado CLT com taxa 4,99% ao mês e Antecipação FGTS sem consulta SPC. Aprovação na hora, PIX em 40 minutos. Atendimento em Balneário Camboriú e todo o Brasil!"/>
+<meta property="og:title" content="FelizCred | Simule seu empréstimo pelo chat"/>
+<meta property="og:description" content="Consulta gratuita, contratação digital e acompanhamento em cada etapa pelo chat da FelizCred."/>
 <meta property="og:image" content="https://www.felizcred.com.br/og-image.jpg"/>
 <meta property="og:locale" content="pt_BR"/>
 <meta property="og:site_name" content="FelizCred"/>
@@ -32,7 +32,7 @@
   "@context": "https://schema.org",
   "@type": "FinancialService",
   "name": "FelizCred",
-  "description": "Correspondente bancário especializado em Empréstimo Consignado CLT e Antecipação FGTS. Taxa 4,99% ao mês, aprovação na hora, PIX em 40 minutos.",
+  "description": "Correspondente bancário com simulação de Empréstimo Consignado CLT e atendimento digital acompanhado.",
   "url": "https://www.felizcred.com.br",
   "logo": "https://www.felizcred.com.br/logo.png",
   "telephone": "+554797059353",
@@ -81,11 +81,6 @@
         "url": "https://www.felizcred.com.br/#fgts-simular"
       }
     ]
-  },
-  "aggregateRating": {
-    "@type": "AggregateRating",
-    "ratingValue": "5",
-    "reviewCount": "3200"
   }
 }
 </script>
@@ -528,7 +523,7 @@
   @media (max-width: 560px) { .calc-grid { grid-template-columns: 1fr; } }
 
   /* ─── TESTIMONIALS ─── */
-  .testimonials-section { background: rgba(255,255,255,0.02); padding: 90px 5%; }
+  .testimonials-section { display: none; background: rgba(255,255,255,0.02); padding: 90px 5%; }
   .testi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 1200px; margin: 0 auto; }
   .testi-card {
     background: var(--navy-mid);
@@ -734,6 +729,41 @@
     .product-card { padding: 28px 20px; }
     .product-card h3 { font-size: 22px; }
   }
+
+  /* Conversão centrada no chat */
+  ::selection { background: rgba(0,200,83,.28); color: #fff; }
+  :root { --gray: #b8c7d2; }
+  body { background: #071423; }
+  nav { padding-block: 14px; background: rgba(7,20,35,.94); }
+  .nav-cta, .btn-primary { border-radius: 12px; box-shadow: 0 12px 28px rgba(0,0,0,.24); }
+  .hero { min-height: 92vh; padding-top: 132px; background: radial-gradient(circle at 78% 32%, rgba(0,200,83,.14), transparent 34%); }
+  .hero-grid { grid-template-columns: minmax(0,1.08fr) minmax(320px,.92fr); gap: clamp(42px,7vw,92px); }
+  .hero h1 { max-width: 760px; font-size: clamp(42px,5.5vw,74px); line-height: 1.02; letter-spacing: -.035em; text-wrap: balance; }
+  .hero h1 em { display: inline; }
+  .hero h1 em::after { display: none; }
+  .hero-sub { max-width: 610px; color: rgba(255,255,255,.72); font-size: clamp(17px,1.5vw,20px); text-wrap: pretty; }
+  .hero-stats { padding-top: 28px; border-top: 1px solid rgba(255,255,255,.1); }
+  .stat-num { font-size: 17px; color: #fff; }
+  .stat-label { max-width: 120px; line-height: 1.35; }
+  .hero-visual { display: grid; gap: 10px; padding: 18px; border-radius: 28px; background: rgba(255,255,255,.045); box-shadow: 0 30px 80px rgba(0,0,0,.28); }
+  .trust-card { margin: 0 !important; border: 0; border-radius: 15px; background: rgba(255,255,255,.075); box-shadow: none; transform: none !important; }
+  .trust-card:first-child { background: #fff; color: var(--navy); }
+  .trust-card:first-child .tc-sub { color: #5f6f7e; }
+  .banks-bar { border-block: 1px solid rgba(255,255,255,.08); background: #091a2c; }
+  .bank-pill { border-radius: 10px; }
+  .product-card.clt { color: #061a12; }
+  .product-card.clt p { opacity: .78; }
+  .product-card.clt .product-features li { border-color: rgba(6,26,18,.16); }
+  .product-card.clt .product-btn { border-color: rgba(6,26,18,.28); background: rgba(6,26,18,.12); color: #061a12; }
+  .footer-legal { color: rgba(255,255,255,.58); }
+  .whatsapp-float { display: none; }
+  .cta-final { border-radius: 28px; background: #eafcf1; box-shadow: 0 26px 70px rgba(0,0,0,.22); }
+  @media (max-width: 900px) {
+    .hero { min-height: auto; padding-top: 118px; }
+    .hero-grid { gap: 38px; }
+    .hero-visual { display: grid; max-width: 520px; margin: 0 auto; text-align: left; }
+    .hero h1 { font-size: clamp(38px,10vw,58px); }
+  }
 </style>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMXC2DFR5G"></script>
@@ -775,34 +805,34 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     <li><a href="#calculadoras">Calculadoras</a></li>
     <li><a href="#faq">Dúvidas</a></li>
     <li><a href="/blog/">Blog</a></li>
-    <li><a href="https://wa.me/554797059353" class="nav-cta">💬 WhatsApp</a></li>
+    <li><a href="#simular" class="nav-cta" data-open-chat>Simular no chat</a></li>
   </ul>
-  <a href="https://wa.me/554797059353" class="btn-primary" style="display:none" id="mob-cta">💬 WhatsApp</a>
+  <a href="#simular" class="btn-primary" style="display:none" id="mob-cta" data-open-chat>Simular no chat</a>
 </nav>
 
 <!-- HERO -->
 <section class="hero">
   <div class="hero-grid">
     <div>
-      <div class="badge">✦ Aprovação na hora — sem burocracia</div>
-      <h1>Seu dinheiro<br/>na conta em<br/><em>até 40 minutos</em></h1>
-      <p class="hero-sub">Empréstimo CLT com desconto no salário e antecipação do FGTS. Sem consulta SPC para negativados. Atendimento humano pelo WhatsApp.</p>
+      <div class="badge">Atendimento online e contratação acompanhada</div>
+      <h1>Simule seu empréstimo <em>sem sair do chat</em></h1>
+      <p class="hero-sub">Você responde o mínimo necessário, consulta as condições disponíveis e recebe orientação em cada etapa. Se algo não der certo, explicamos o retorno e mostramos o próximo caminho.</p>
       <div class="hero-btns">
-        <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20uma%20op%C3%A7%C3%A3o%20de%20cr%C3%A9dito." class="btn-primary" target="_blank">💬 Consultar pelo WhatsApp</a>
-        <a href="https://wa.me/554797059353" class="btn-secondary">💬 Falar com atendente</a>
+        <a href="#simular" class="btn-primary" data-open-chat>Fazer minha simulação</a>
+        <a href="#como-funciona" class="btn-secondary">Ver como funciona</a>
       </div>
       <div class="hero-stats">
         <div class="stat">
-          <div class="stat-num">R$12M+</div>
-          <div class="stat-label">em crédito liberado</div>
+          <div class="stat-num">Grátis</div>
+          <div class="stat-label">para consultar</div>
         </div>
         <div class="stat">
-          <div class="stat-num">3.200+</div>
-          <div class="stat-label">clientes aprovados</div>
+          <div class="stat-num">Digital</div>
+          <div class="stat-label">do início à assinatura</div>
         </div>
         <div class="stat">
-          <div class="stat-num">40min</div>
-          <div class="stat-label">para receber via PIX</div>
+          <div class="stat-num">Seguro</div>
+          <div class="stat-label">dados pedidos por etapa</div>
         </div>
       </div>
     </div>
@@ -824,8 +854,8 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       <div class="trust-card">
         <div class="tc-icon gold">⚡</div>
         <div>
-          <div class="tc-title">PIX em 40 minutos</div>
-          <div class="tc-sub">Aprovação digital • Sem sair de casa</div>
+          <div class="tc-title">Acompanhamento no chat</div>
+          <div class="tc-sub">Tire dúvidas sem abandonar sua simulação</div>
         </div>
       </div>
       <div class="trust-card" style="margin-top:14px; background:rgba(0,200,83,0.06); border-color:rgba(0,200,83,0.2);">
@@ -841,13 +871,10 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 
 <!-- BANKS BAR -->
 <div class="banks-bar">
-  <p>Credenciados pelos principais bancos do Brasil</p>
+  <p>Fluxo automático disponível agora</p>
   <div class="banks-logos">
-    <div class="bank-pill">🏦 Banco Pan</div>
     <div class="bank-pill">🏦 Facta</div>
-    <div class="bank-pill">🏦 BMG</div>
-    <div class="bank-pill">🏦 Itaú Consignado</div>
-    <div class="bank-pill">🏦 Caixa Econômica</div>
+    <div class="bank-pill">Atendimento FelizCred dentro do site</div>
   </div>
 </div>
 
@@ -886,7 +913,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       <div class="contact-cta">
         <strong>Comece pelo WhatsApp</strong>
         <p>Você conversa com a equipe da FelizCred e acompanha toda a solicitação pelo celular.</p>
-        <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20meu%20cr%C3%A9dito%20CLT." target="_blank" class="btn-primary">Falar sobre crédito CLT</a>
+        <a href="#simular" class="btn-primary" data-open-chat>Simular crédito CLT no chat</a>
       </div>
     </div>
   </div>
@@ -898,7 +925,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   <h2>Escolha o crédito<br/>certo para você</h2>
   <p class="section-sub">Dois produtos, aprovação rápida, dinheiro na conta. Simples assim.</p>
   <div class="products-grid">
-    <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20meu%20cr%C3%A9dito%20CLT." class="product-card clt highlight" target="_blank">
+    <a href="#simular" class="product-card clt highlight" data-open-chat>
       <div class="highlight-badge">⭐ MAIS PROCURADO</div>
       <div class="product-tag">Para CLT</div>
       <h3>Crédito do Trabalhador</h3>
@@ -909,9 +936,9 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         <li>Até 48x para pagar</li>
         <li>Aprovação em minutos</li>
       </ul>
-      <span class="product-btn">Consultar pelo WhatsApp →</span>
+      <span class="product-btn">Simular no chat →</span>
     </a>
-    <a href="https://wa.me/554797059353" class="product-card fgts">
+    <a href="#simular" class="product-card fgts" data-open-chat>
       <div class="product-tag">FGTS</div>
       <h3>Antecipação Saque-Aniversário</h3>
       <p>Antecipe até 5 anos do saque-aniversário do seu FGTS. Sem parcelas mensais — o pagamento sai direto do seu FGTS no aniversário.</p>
@@ -921,7 +948,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         <li>PIX em até 40 minutos</li>
         <li>Mesmo com restrições no nome</li>
       </ul>
-      <span class="product-btn">Falar no WhatsApp →</span>
+      <span class="product-btn">Conversar pelo chat →</span>
     </a>
   </div>
 </div>
@@ -983,7 +1010,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       <div class="contact-cta">
         <strong>Faça a consulta com nossa equipe</strong>
         <p>O atendimento continua no WhatsApp, desde a verificação até a conclusão da solicitação.</p>
-        <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20a%20antecipa%C3%A7%C3%A3o%20do%20meu%20FGTS." target="_blank" class="btn-primary">Falar sobre antecipação FGTS</a>
+        <a href="#simular" class="btn-primary" data-open-chat>Conversar sobre FGTS no chat</a>
       </div>
     </div>
   </div>
@@ -1044,8 +1071,8 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 
     <!-- CTA para atendimento -->
     <div style="text-align:center; margin-top:36px;">
-      <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20j%C3%A1%20autorizei%20os%20bancos%20no%20app%20FGTS%20e%20quero%20consultar%20minha%20antecipa%C3%A7%C3%A3o." target="_blank" style="display:inline-flex; align-items:center; gap:10px; background:#FFD600; color:#0A1628; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; padding:14px 32px; border-radius:50px; text-decoration:none;">
-        ✅ Já autorizei — Falar no WhatsApp
+      <a href="#simular" data-open-chat style="display:inline-flex; align-items:center; gap:10px; background:#FFD600; color:#0A1628; font-family:'Sora',sans-serif; font-weight:700; font-size:15px; padding:14px 32px; border-radius:12px; text-decoration:none;">
+        Já autorizei — continuar no chat
       </a>
     </div>
   </div>
@@ -1059,23 +1086,23 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   <div class="how-grid">
     <div class="how-card">
       <div class="how-num">1</div>
-      <h4>Fale no WhatsApp</h4>
-      <p>Chame nossa equipe no WhatsApp para consultar as condições disponíveis sem compromisso.</p>
+      <h4>Abra o chat</h4>
+      <p>Escolha o produto e informe apenas nome, celular e e-mail para iniciar.</p>
     </div>
     <div class="how-card">
       <div class="how-num">2</div>
-      <h4>Envie os documentos</h4>
-      <p>Tudo pelo celular. RG, CPF e contracheque. Nosso time te orienta em cada etapa.</p>
+      <h4>Faça a consulta</h4>
+      <p>O chat pede cada informação no momento certo e mostra o retorno da análise.</p>
     </div>
     <div class="how-card">
       <div class="how-num">3</div>
-      <h4>Assine digital</h4>
-      <p>Contrato 100% digital. Assine pelo celular — sem precisar ir a nenhuma agência.</p>
+      <h4>Escolha com calma</h4>
+      <p>Compare as condições disponíveis e confira os dados antes de avançar.</p>
     </div>
     <div class="how-card">
       <div class="how-num">4</div>
-      <h4>Receba via PIX</h4>
-      <p>Aprovado! O dinheiro cai na sua conta em até 40 minutos via PIX.</p>
+      <h4>Acompanhe por aqui</h4>
+      <p>Depois da assinatura, volte ao mesmo chat para consultar o andamento.</p>
     </div>
   </div>
 </div>
@@ -1221,11 +1248,11 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 
 <!-- CTA FINAL -->
 <div class="cta-final">
-  <h2>Pronto para ter o dinheiro<br/>na sua conta hoje?</h2>
-  <p>Fale com um atendente pelo WhatsApp para consultar as condições disponíveis.<br/>Atendimento claro, do início ao fim.</p>
+  <h2>Pronto para descobrir suas condições?</h2>
+  <p>Comece pelo chat e avance no seu ritmo. Seus dados ficam salvos por até 6 horas neste dispositivo.</p>
   <div>
-    <a href="https://wa.me/554797059353?text=Ol%C3%A1%2C%20quero%20consultar%20uma%20op%C3%A7%C3%A3o%20de%20cr%C3%A9dito." class="btn-dark" target="_blank">Consultar pelo WhatsApp</a>
-    <a href="https://wa.me/554797059353" class="btn-outline">💬 Falar no WhatsApp</a>
+    <a href="#simular" class="btn-dark" data-open-chat>Fazer minha simulação</a>
+    <a href="#faq" class="btn-outline">Tirar dúvidas primeiro</a>
   </div>
 </div>
 
@@ -1336,8 +1363,18 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       }
     });
   }, { threshold: 0.5 });
-  if (statNums.length) observer.observe(statNums[0]);
+  // Os destaques agora são benefícios textuais verificáveis, não contadores promocionais.
+
+  document.addEventListener('click', event => {
+    const trigger = event.target.closest('[data-open-chat]');
+    if (!trigger) return;
+    event.preventDefault();
+    const launcher = document.querySelector('.fc-chat-launcher');
+    if (launcher) launcher.click();
+    else window.setTimeout(() => document.querySelector('.fc-chat-launcher')?.click(), 250);
+    window.dataLayer?.push({ event: 'site_chat_cta_click', cta_text: trigger.textContent.trim() });
+  });
 </script>
-<script src="/chat.js?v=20261015-5" defer></script>
+<script src="/chat.js?v=20261017-1" defer></script>
 </body>
 </html>

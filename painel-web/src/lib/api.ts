@@ -93,6 +93,8 @@ export type SiteChatConversation = {
   pipeline_estagio?: string | null
   pipeline_estagio_desde?: number | null
   produto_tag?: string | null
+  human_intent_stage?: "awaiting_question" | "awaiting_confirmation" | "requested" | "human_active" | null
+  human_handoff_requested_at?: number | null
 }
 
 export type SiteChatMessage = {
