@@ -341,6 +341,9 @@
   expand.addEventListener("click", () => { const expanded = root.classList.toggle("is-expanded"); expand.setAttribute("aria-pressed", String(expanded)); expand.setAttribute("aria-label", expanded ? "Reduzir chat" : "Expandir chat"); });
   close.addEventListener("click", () => setOpen(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.open) setOpen(false); });
   window.addEventListener("online", updateConnection); window.addEventListener("offline", updateConnection); updateConnection();
-  loadSession(); prepareNudge(); setTimeout(() => { if (!state.open) nudge.classList.add("show"); }, 900);
+  loadSession(); prepareNudge();
+  const openFromLink = new URLSearchParams(location.search).get("chat") === "abrir";
+  if (openFromLink) setTimeout(() => setOpen(true), 180);
+  else setTimeout(() => { if (!state.open) nudge.classList.add("show"); }, 900);
   goTo(0); refresh(); refreshClt(); setInterval(() => { if (state.session && !sessionIsValid(state.session)) { resetSession(); prepareNudge(); nudge.classList.add("show"); return; } if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
 })();

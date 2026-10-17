@@ -254,7 +254,13 @@ async function notificarEtapaFactaNoWhatsApp(row, etapa) {
   const phone = normalizarTelefoneBR(row.phone);
   const businessId = process.env.NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID || "1335976862924566";
   try {
-    const result = await wa.sendTemplate(businessId, phone, template, "pt_BR");
+    const conversation = row.conversation_id ? await db.siteChatObter(row.conversation_id) : null;
+    const firstName = String(conversation?.name || "cliente").trim().split(/\s+/)[0];
+    const components = [{
+      type: "body",
+      parameters: [firstName, row.codigo_proposta || "em acompanhamento", "Facta"].map((text) => ({ type: "text", text: String(text) })),
+    }];
+    const result = await wa.sendTemplate(businessId, phone, template, "pt_BR", components);
     const now = Date.now();
     await db.upsertConversation(phone, businessId, null, now);
     await db.insertMessage({ phone, business_number_id: businessId, direction: "out", type: "template", body: textos[etapa], status: "sent", wa_message_id: result.messages?.[0]?.id || null, created_at: now });
@@ -1150,29 +1156,20 @@ const TEXTO_MENU_PRINCIPAL =
   "✅ (47) 3514-3392\n" +
   "🌐 http://www.felizcred.com.br";
 
-// Entrada padrão desde 12/08/2026 — foco do dia é Consignado CLT. Fora do horário
-// comercial manda um aviso pra reativar depois, em vez do menu (ninguém aqui pra rodar a
-// simulação de crédito de verdade fora desse horário — ver horarioComercialCotaCerta mais
-// abaixo, mesma janela usada pela Cota Certa, mesma equipe). Pra reativar a triagem de
-// gerente, troca essa função pelo conteúdo de menuInicialGerenteArquivado() (logo acima).
-// `foraDeHorario: true` avisa quem chama que essa NÃO foi a mensagem real do menu — é só o
-// aviso de horário. Sem essa distinção, quem manda mensagem fora do expediente era marcado no
-// passo "menu_inicial" do mesmo jeito de quem recebeu o menu de verdade, e uns minutos depois
-// levava um lembrete dizendo "responda com o número da opção que te mandei ali em cima" — só
-// que a opção nunca foi mandada, só o aviso de horário. Bug real, reportado pelo usuário
-// (13/08/2026): cliente mandou mensagem fora do horário, recebeu só o aviso, e mesmo assim
-// levou a cobrança "parou no meio do atendimento" mais tarde.
+// Entrada enxuta da FelizCred: o WhatsApp recebe uma única resposta e leva o cliente ao
+// chat do site, que funciona a qualquer hora e concentra a coleta de dados e a contratação.
+// O passo fica nulo para não iniciar lembretes do menu legado nem consumir mensagens extras.
 function menuInicial() {
-  if (!horarioComercialCotaCerta()) {
-    return {
-      texto:
-        "Olá! 😊 Aqui é o Felipe, da Felizcred. No momento estamos fora do horário comercial " +
-        "(atendemos de segunda a sexta das 9h às 18h, e aos sábados até o meio-dia).\n\n" +
-        "Por favor, envie sua mensagem dentro do horário comercial pra reativar a conversa que a gente já te atende! 😊",
-      foraDeHorario: true,
-    };
-  }
-  return { texto: TEXTO_MENU_PRINCIPAL };
+  return {
+    texto:
+      "Olá! Aqui é o Felipe, da FelizCred. Você quer simular ou acompanhar um empréstimo? " +
+      "Para manter tudo organizado e pedir somente os dados necessários, continue pelo nosso chat seguro.",
+    cta: {
+      buttonText: "Abrir chat seguro",
+      url: "https://www.felizcred.com.br/?chat=abrir&utm_source=whatsapp&utm_medium=atendimento",
+    },
+    encaminhaSite: true,
+  };
 }
 
 // Reconhece a opção do menu principal em texto livre — número (1-4) ou palavra-chave.
@@ -4723,8 +4720,8 @@ async function dispararInicioFluxo(fluxo, de, businessNumberId) {
     return;
   }
   const menu = fluxo.menuInicial();
-  await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista);
-  await db.setFluxoPasso(de, businessNumberId, menu.foraDeHorario ? null : "menu_inicial");
+  await enviarRespostaAutomatica(businessNumberId, de, menu.texto, menu.botoes, menu.lista, menu.cta);
+  await db.setFluxoPasso(de, businessNumberId, menu.foraDeHorario || menu.encaminhaSite ? null : "menu_inicial");
 }
 
 // ─── PROCESSAR MENSAGENS RECEBIDAS ───────────────────────────────────────────
@@ -5694,7 +5691,6 @@ const server = http.createServer(async (req, res) => {
             await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Proposta gerada. Revise todas as condições e assine somente se estiver de acordo.");
             const row = await db.siteChatCltAtualizar(id, { codigo_cliente: String(stage2.codigo_cliente), codigo_proposta: String(proposal.codigo), contract_link: contractLink, etapa: "aguardando_assinatura_facta", status_novosaque: "PROPOSTA_CRIADA", authorization_checked_at: null, error_message: null });
             await db.siteChatFunilEvento(id, "proposta_criada", "aguardando_assinatura_facta", "facta");
-            notificarContratoCltNoWhatsApp(row).catch(() => {});
             notificarEtapaFactaPorEmail(row, "aguardando_assinatura_facta").catch((err) => console.error(`E-mail de assinatura não enviado (${id}):`, err.message));
             return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
