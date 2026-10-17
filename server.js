@@ -125,6 +125,7 @@ function siteChatCltPublico(row) {
       contractLink: row.contract_link || null,
       proposalCode: row.codigo_proposta || null,
       error: row.error_message || null,
+      trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/proposta/?token=${encodeURIComponent(row.tracking_token)}` : null,
     };
   }
   return {
@@ -146,6 +147,26 @@ function siteChatCltPublico(row) {
     error: row.error_message || null,
     preQualificado: row.provider === "facta" && Number(row.margem_disponivel || 0) > 0,
   };
+}
+
+function acompanhamentoCltPublico(row, conversation) {
+  const finais = ["proposta_concluida", "proposta_cancelada", "nao_elegivel", "sem_margem", "sem_oferta", "politica_reprovada"];
+  return {
+    customerName: String(conversation?.name || "Cliente").trim().split(/\s+/)[0],
+    proposalCode: row.codigo_proposta || null,
+    stage: row.etapa || "inicio",
+    provider: row.provider === "facta" ? "Facta" : "Instituição financeira",
+    status: row.status_novosaque || null,
+    updatedAt: row.updated_at || null,
+    isFinal: finais.includes(row.etapa),
+    contractLink: row.etapa === "aguardando_assinatura_facta" ? row.contract_link || null : null,
+    supportUrl: "https://www.felizcred.com.br/?chat=abrir&utm_source=acompanhamento&utm_medium=portal",
+  };
+}
+
+async function garantirTrackingToken(row) {
+  if (!row || row.tracking_token) return row;
+  return db.siteChatCltAtualizar(row.conversation_id, { tracking_token: crypto.randomBytes(32).toString("base64url") });
 }
 
 function numeroFacta(value) {
@@ -5550,6 +5571,16 @@ const server = http.createServer(async (req, res) => {
       }
       if (!corsHeaders["Access-Control-Allow-Origin"]) return send(res, 403, { error: "Origem não permitida" });
 
+      const trackingMatch = path_.match(/^\/site-chat\/proposal\/([A-Za-z0-9_-]{40,})$/);
+      if (req.method === "GET" && trackingMatch) {
+        if (!siteChatRateLimit(req)) return send(res, 429, { error: "Muitas consultas. Aguarde um instante." }, corsHeaders);
+        let row = await db.siteChatCltObterPorTrackingToken(trackingMatch[1]);
+        if (!row) return send(res, 404, { error: "Link de acompanhamento inválido." }, corsHeaders);
+        row = await sincronizarSiteChatClt(row);
+        const conversation = await db.siteChatObter(row.conversation_id);
+        return send(res, 200, { proposal: acompanhamentoCltPublico(row, conversation) }, corsHeaders);
+      }
+
       if (req.method === "POST" && path_ === "/site-chat/recover") {
         if (!siteChatRecoveryRateLimit(req)) return send(res, 429, { error: "Muitas tentativas. Aguarde dez minutos e tente novamente." }, corsHeaders);
         const body = await parseBody(req);
@@ -5562,7 +5593,7 @@ const server = http.createServer(async (req, res) => {
         const token = crypto.randomBytes(32).toString("hex");
         const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
         const conversation = await db.siteChatRenovarToken(found.conversation.id, tokenHash);
-        const clt = await sincronizarSiteChatClt(found.clt);
+        const clt = await garantirTrackingToken(await sincronizarSiteChatClt(found.clt));
         return send(res, 200, {
           conversation: { id: conversation.id, name: conversation.name, contact: conversation.contact, email: conversation.email, status: conversation.status },
           token,
@@ -5620,7 +5651,7 @@ const server = http.createServer(async (req, res) => {
         const token = String(req.headers["x-chat-token"] || "");
         if (!siteChatTokenValido(conversation, token)) return send(res, 404, { error: "Conversa não encontrada" }, corsHeaders);
         if (action === "status" && req.method === "GET") {
-          const row = await sincronizarSiteChatClt(await db.siteChatCltObter(id));
+          const row = await garantirTrackingToken(await sincronizarSiteChatClt(await db.siteChatCltObter(id)));
           return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
         }
         if (req.method !== "POST") return send(res, 405, { error: "Método não permitido" }, corsHeaders);
@@ -5648,7 +5679,7 @@ const server = http.createServer(async (req, res) => {
             if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
             if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
-            let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO" });
+            let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO", trackingToken: crypto.randomBytes(32).toString("base64url") });
             row = await db.siteChatCltAtualizar(id, { facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }) });
             await db.siteChatFunilEvento(id, "dados_minimos_enviados", "cpf_consentimento", "facta");
             await db.siteChatFunilEvento(id, "provedor_tentado", "solicitando_autorizacao", "facta");

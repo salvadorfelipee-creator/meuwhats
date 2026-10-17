@@ -160,6 +160,7 @@ const ready = (async () => {
     ["codigo_proposta", "TEXT"],
     ["authorization_requested_at", "INTEGER"],
     ["authorization_checked_at", "INTEGER"],
+    ["tracking_token", "TEXT"],
   ];
   for (const [nome, tipo] of colunasSiteChatClt) {
     if (!infoSiteChatClt.rows.some((r) => r.name === nome)) await client.execute(`ALTER TABLE site_chat_clt ADD COLUMN ${nome} ${tipo}`);
@@ -3837,6 +3838,15 @@ async function siteChatCltObter(conversationId) {
   return result.rows[0] || null;
 }
 
+async function siteChatCltObterPorTrackingToken(token) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT * FROM site_chat_clt WHERE tracking_token = ? LIMIT 1`,
+    args: [String(token || "")],
+  });
+  return result.rows[0] || null;
+}
+
 async function siteChatFactaListarEmAcompanhamento() {
   await ready;
   const result = await client.execute(`
@@ -3867,14 +3877,15 @@ async function siteChatFactaCriar(conversationId, dados) {
   const now = Date.now();
   await client.execute({
     sql: `INSERT INTO site_chat_clt
-            (conversation_id, provider, cpf, phone, margem_disponivel, offline_updated_at, possui_alertas, etapa, status_novosaque, created_at, updated_at)
-          VALUES (?, 'facta', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (conversation_id, provider, cpf, phone, margem_disponivel, offline_updated_at, possui_alertas, etapa, status_novosaque, tracking_token, created_at, updated_at)
+          VALUES (?, 'facta', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(conversation_id) DO UPDATE SET
             provider = 'facta', cpf = excluded.cpf, phone = excluded.phone,
             margem_disponivel = excluded.margem_disponivel,
             offline_updated_at = excluded.offline_updated_at,
             possui_alertas = excluded.possui_alertas, etapa = excluded.etapa,
             status_novosaque = excluded.status_novosaque, transaction_id = NULL,
+            tracking_token = COALESCE(site_chat_clt.tracking_token, excluded.tracking_token),
             terms_link = NULL, contract_link = NULL, offers_json = NULL,
             error_message = NULL, updated_at = excluded.updated_at`,
     args: [
@@ -3886,6 +3897,7 @@ async function siteChatFactaCriar(conversationId, dados) {
       dados.possuiAlertas || null,
       dados.etapa,
       dados.status || null,
+      dados.trackingToken || null,
       now,
       now,
     ],
@@ -3895,7 +3907,7 @@ async function siteChatFactaCriar(conversationId, dados) {
 
 async function siteChatCltAtualizar(conversationId, campos) {
   await ready;
-  const permitidos = ["transaction_id", "simulation_id", "etapa", "status_novosaque", "terms_link", "contract_link", "offers_json", "phone", "whatsapp_notified_at", "whatsapp_notify_attempt_at", "error_message", "provider", "cpf", "margem_disponivel", "offline_updated_at", "possui_alertas", "facta_worker_json", "facta_offer_json", "codigo_cliente", "codigo_proposta", "authorization_requested_at", "authorization_checked_at"];
+  const permitidos = ["transaction_id", "simulation_id", "etapa", "status_novosaque", "terms_link", "contract_link", "offers_json", "phone", "whatsapp_notified_at", "whatsapp_notify_attempt_at", "error_message", "provider", "cpf", "margem_disponivel", "offline_updated_at", "possui_alertas", "facta_worker_json", "facta_offer_json", "codigo_cliente", "codigo_proposta", "authorization_requested_at", "authorization_checked_at", "tracking_token"];
   const entradas = Object.entries(campos).filter(([k]) => permitidos.includes(k));
   if (!entradas.length) return siteChatCltObter(conversationId);
   const sets = entradas.map(([k]) => `${k} = ?`).join(", ");
@@ -3971,6 +3983,7 @@ module.exports = {
   siteChatLimparHumano,
   siteChatFunilResumo,
   siteChatCltObter,
+  siteChatCltObterPorTrackingToken,
   siteChatFactaListarEmAcompanhamento,
   siteChatCltCriar,
   siteChatFactaCriar,
