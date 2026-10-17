@@ -1,6 +1,7 @@
 (() => {
   const API = "https://meuwhats.onrender.com/site-chat/conversations";
   const STORAGE = "felizcred_site_chat_v1";
+  const SESSION_TTL = 6 * 60 * 60 * 1000;
   const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false, cltCheckedAt: null };
   const iconChat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></svg>';
   const iconClose = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
@@ -48,8 +49,18 @@
     progress.style.width = `${((state.step + 1) / 3) * 100}%`;
     setTimeout(() => fieldForStep(state.step)?.focus?.(), 220);
   }
-  function loadSession() { try { state.session = JSON.parse(localStorage.getItem(STORAGE) || "null"); } catch { state.session = null; } if (state.session?.id && state.session?.token) root.classList.add("has-conversation"); }
-  function setOpen(open) { state.open = open; root.classList.toggle("is-open", open); nudge.classList.remove("show"); launcher.setAttribute("aria-expanded", String(open)); panel.setAttribute("aria-hidden", String(!open)); if (open) { unreadEl.classList.remove("show"); setTimeout(() => (state.session ? composeText : fieldForStep(state.step)).focus(), 180); refresh(); } }
+  function sessionIsValid(session) { return !!(session?.id && session?.token && Number(session.expiresAt) > Date.now()); }
+  function resetSession() {
+    localStorage.removeItem(STORAGE); state.session = null; state.messages = []; state.clt = null; state.cltCpf = ""; state.selectedOffer = null;
+    root.classList.remove("has-conversation", "is-contracting", "is-expanded"); goTo(0); renderClt();
+  }
+  function loadSession() { try { const saved = JSON.parse(localStorage.getItem(STORAGE) || "null"); state.session = sessionIsValid(saved) ? saved : null; } catch { state.session = null; } if (!state.session) localStorage.removeItem(STORAGE); else root.classList.add("has-conversation"); }
+  function prepareNudge() {
+    const title = nudge.querySelector("strong"), detail = nudge.querySelector("small");
+    if (state.session) { title.textContent = "Continue aqui sua simulação e aprovação do empréstimo."; detail.textContent = "Sua conversa fica disponível por até 6 horas."; }
+    else { title.textContent = "Faça aqui sua simulação e aprovação do seu empréstimo."; detail.textContent = "Eu acompanho você em cada etapa."; }
+  }
+  function setOpen(open) { state.open = open; root.classList.toggle("is-open", open); nudge.classList.remove("show"); launcher.setAttribute("aria-expanded", String(open)); panel.setAttribute("aria-hidden", String(!open)); if (open) { unreadEl.classList.remove("show"); setTimeout(() => (state.session ? composeText : fieldForStep(state.step)).focus(), 180); refresh(); } else { prepareNudge(); setTimeout(() => { if (!state.open) nudge.classList.add("show"); }, 280); } }
   function formatTime(ms) { return new Date(Number(ms)).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); }
   function sound(kind) { try { const Ctx = window.AudioContext || window.webkitAudioContext; state.audioCtx ||= new Ctx(); const ctx = state.audioCtx, osc = ctx.createOscillator(), gain = ctx.createGain(); osc.type = "sine"; osc.frequency.value = kind === "in" ? 660 : 440; gain.gain.setValueAtTime(.0001, ctx.currentTime); gain.gain.exponentialRampToValueAtTime(.12, ctx.currentTime + .02); gain.gain.exponentialRampToValueAtTime(.0001, ctx.currentTime + .22); osc.connect(gain).connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + .24); } catch {} }
   function appendMessageText(container, body) { const parts = String(body).split(/(https?:\/\/[^\s]+)/g); parts.forEach((part) => { if (/^https?:\/\//.test(part)) { const link = document.createElement("a"); link.href = part; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Abrir autorização segura"; container.appendChild(link); } else { container.appendChild(document.createTextNode(part)); } }); }
@@ -168,7 +179,7 @@
   root.querySelectorAll(".fc-chat-next").forEach((b) => b.addEventListener("click", () => goTo(state.step + 1)));
   root.querySelectorAll(".fc-chat-back").forEach((b) => b.addEventListener("click", () => goTo(state.step - 1)));
   startForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && state.step < 2) { e.preventDefault(); goTo(state.step + 1); } if (state.step === 2 && ["a","b","c"].includes(e.key.toLowerCase())) startForm.elements.topic[["a","b","c"].indexOf(e.key.toLowerCase())].checked = true; });
-  startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const contact = String(form.get("contact") || ""); const data = await api("", { method: "POST", body: JSON.stringify({ name: form.get("name"), contact, message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token, contact }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
+  startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const contact = String(form.get("contact") || ""); const data = await api("", { method: "POST", body: JSON.stringify({ name: form.get("name"), contact, message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token, contact, expiresAt: Date.now() + SESSION_TTL }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
   cltEl.addEventListener("click", async (e) => {
     const confirmAuthorization = e.target.closest("[data-confirm-authorization]");
     if (confirmAuthorization) {
@@ -299,6 +310,6 @@
   expand.addEventListener("click", () => { const expanded = root.classList.toggle("is-expanded"); expand.setAttribute("aria-pressed", String(expanded)); expand.setAttribute("aria-label", expanded ? "Reduzir chat" : "Expandir chat"); });
   close.addEventListener("click", () => setOpen(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape" && state.open) setOpen(false); });
   window.addEventListener("online", updateConnection); window.addEventListener("offline", updateConnection); updateConnection();
-  setTimeout(() => { if (!state.open && !state.session) nudge.classList.add("show"); }, 900);
-  loadSession(); goTo(0); refresh(); refreshClt(); setInterval(() => { if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
+  loadSession(); prepareNudge(); setTimeout(() => { if (!state.open) nudge.classList.add("show"); }, 900);
+  goTo(0); refresh(); refreshClt(); setInterval(() => { if (state.session && !sessionIsValid(state.session)) { resetSession(); prepareNudge(); nudge.classList.add("show"); return; } if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
 })();
