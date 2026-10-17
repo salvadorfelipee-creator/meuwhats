@@ -745,25 +745,75 @@
   .hero-stats { padding-top: 28px; border-top: 1px solid rgba(255,255,255,.1); }
   .stat-num { font-size: 17px; color: #fff; }
   .stat-label { max-width: 120px; line-height: 1.35; }
-  .hero-visual { display: grid; gap: 10px; padding: 18px; border-radius: 28px; background: rgba(255,255,255,.045); box-shadow: 0 30px 80px rgba(0,0,0,.28); }
-  .trust-card { margin: 0 !important; border: 0; border-radius: 15px; background: rgba(255,255,255,.075); box-shadow: none; transform: none !important; }
-  .trust-card:first-child { background: #fff; color: var(--navy); }
-  .trust-card:first-child .tc-sub { color: #5f6f7e; }
+  .hero-product { position: relative; overflow: hidden; padding: 18px; border-radius: 28px; background: #eef8f2; color: #10251c; box-shadow: 0 34px 90px rgba(0,0,0,.3); }
+  .hero-product-head { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 16px; font: 700 12px 'Sora',sans-serif; }
+  .hero-product-head i { padding: 6px 9px; border-radius: 7px; background: #d8f5e3; color: #08783b; font: 600 10px 'DM Sans',sans-serif; }
+  .hero-product-stage { position: relative; min-height: 310px; overflow: hidden; border-radius: 18px; background: radial-gradient(circle at 72% 28%,#49dd91 0,#0f7a51 36%,#092d2a 78%); }
+  .hero-phone { position: absolute; z-index: 2; top: 28px; left: 50%; width: 238px; overflow: hidden; border: 6px solid rgba(255,255,255,.75); border-radius: 20px; background: #f7faf8; box-shadow: 0 24px 45px rgba(4,33,23,.35); transform: translateX(-50%) rotate(-1.5deg); }
+  .hero-phone-bar { display: flex; align-items: center; gap: 9px; padding: 11px 12px; background: #09233c; color: #fff; }
+  .hero-phone-bar img { width: 32px; height: 32px; border-radius: 9px; object-fit: cover; }
+  .hero-phone-bar span { display: grid; }
+  .hero-phone-bar b { font: 700 11px 'Sora',sans-serif; }
+  .hero-phone-bar small { color: #9cdcb9; font-size: 9px; }
+  .hero-phone-thread { display: grid; gap: 8px; min-height: 188px; padding: 14px 11px; }
+  .hero-phone-thread p { width: 84%; margin: 0; padding: 8px 10px; border-radius: 9px 9px 9px 3px; background: #fff; color: #31413a; font-size: 9px; line-height: 1.4; box-shadow: 0 5px 14px rgba(4,33,23,.08); }
+  .hero-phone-thread .from-user { justify-self: end; border-radius: 9px 9px 3px 9px; background: #08223b; color: #fff; }
+  .typing-demo { display: flex; width: max-content; gap: 3px; padding: 8px 10px; border-radius: 9px; background: #fff; }
+  .typing-demo i { width: 4px; height: 4px; border-radius: 50%; background: #6b7b73; animation: demoTyping 1.2s infinite ease-in-out; }
+  .typing-demo i:nth-child(2){animation-delay:.14s}.typing-demo i:nth-child(3){animation-delay:.28s}
+  @keyframes demoTyping { 0%,60%,100%{opacity:.25;transform:translateY(0)} 30%{opacity:1;transform:translateY(-2px)} }
+  .hero-phone-compose { margin: 0 9px 9px; padding: 9px 10px; border: 1px solid #d7e3dc; border-radius: 9px; color: #52635a; font-size: 11px; }
+  .hero-phone-compose b { float: right; display:grid; width:18px; height:18px; place-items:center; border-radius:6px; background:#00c853; color:#052617; }
+  .hero-orbit span { position:absolute; z-index:1; padding:7px 9px; border-radius:8px; background:rgba(3,35,27,.68); color:#fff; font-size:11px; backdrop-filter:blur(8px); }
+  .hero-orbit span:nth-child(1){top:45px;left:18px}.hero-orbit span:nth-child(2){right:16px;top:118px}.hero-orbit span:nth-child(3){left:22px;bottom:30px}
+  .hero-options { display: grid; gap: 7px; margin-top: 10px; }
+  .hero-option { display:flex; align-items:center; gap:11px; width:100%; padding:11px 12px; border:0; border-radius:11px; background:transparent; color:#30443a; text-align:left; cursor:pointer; transition:background .35s,opacity .35s,transform .35s; }
+  .hero-option:not(.is-active){color:#4c6156}.hero-option.is-active{background:#fff; box-shadow:0 10px 28px rgba(16,52,35,.11); transform:translateX(3px)}
+  .hero-option .option-mark { display:grid; width:34px; height:34px; flex:0 0 auto; place-items:center; border-radius:9px; background:#dff8e9; color:#076b36; font:700 11px 'Sora',sans-serif; }
+  .hero-option > span:last-child { display:grid; gap:2px}.hero-option b{font:700 12px 'Sora',sans-serif}.hero-option small{font-size:11px;color:#465b50}
   .banks-bar { border-block: 1px solid rgba(255,255,255,.08); background: #091a2c; }
   .bank-pill { border-radius: 10px; }
-  .product-card.clt { color: #061a12; }
+  .product-card.clt { background:#e4f8eb; color: #061a12; }
   .product-card.clt p { opacity: .78; }
   .product-card.clt .product-features li { border-color: rgba(6,26,18,.16); }
   .product-card.clt .product-btn { border-color: rgba(6,26,18,.28); background: rgba(6,26,18,.12); color: #061a12; }
+  .product-card.fgts { background:#e8f1fb; color:#0a2848; }
+  .product-card.fgts .product-features li { border-color:rgba(10,40,72,.13); }
+  .product-card.fgts .product-btn { border-color:rgba(10,40,72,.22); background:rgba(10,40,72,.08); color:#0a2848; }
   .footer-legal { color: rgba(255,255,255,.58); }
   .whatsapp-float { display: none; }
   .cta-final { border-radius: 28px; background: #eafcf1; box-shadow: 0 26px 70px rgba(0,0,0,.22); }
+  .chat-experience { display:grid; grid-template-columns:minmax(0,.82fr) minmax(480px,1.18fr); gap:clamp(48px,7vw,100px); align-items:center; max-width:1380px; margin:86px auto 110px; padding:0 5%; }
+  .experience-copy h2 { max-width:620px; margin:0 0 22px; font:800 clamp(34px,4vw,58px)/1.05 'Sora',sans-serif; letter-spacing:-.035em; text-wrap:balance; }
+  .experience-copy > p { max-width:590px; color:#b8c7d2; font-size:17px; line-height:1.7; }
+  .experience-benefits { display:grid; gap:7px; margin:30px 0 32px; list-style:none; }
+  .experience-benefits li { display:flex; gap:14px; align-items:flex-start; padding:13px 0; border-bottom:1px solid rgba(255,255,255,.09); }
+  .experience-benefits li > span { display:grid; width:30px; height:30px; flex:0 0 auto; place-items:center; border-radius:8px; background:#0b3b2c; color:#55e89b; font:700 11px 'Sora',sans-serif; }
+  .experience-benefits div { display:grid; gap:3px; }.experience-benefits b{font:700 14px 'Sora',sans-serif}.experience-benefits small{color:#9fb1bc;font-size:13px;line-height:1.45}
+  .experience-note { margin-top:15px!important; color:#8298a5!important; font-size:11px!important; line-height:1.5!important; }
+  .experience-demo { position:relative; padding:20px 14px 34px; }
+  .demo-window { overflow:hidden; border:1px solid rgba(255,255,255,.12); border-radius:22px; background:#eef4f0; box-shadow:0 38px 90px rgba(0,0,0,.32); }
+  .demo-top { display:flex; align-items:center; gap:14px; padding:13px 17px; border-bottom:1px solid #dbe5df; background:#fff; color:#53645a; font-size:11px; }
+  .demo-top > span{display:flex;gap:5px}.demo-top i{width:7px;height:7px;border-radius:50%;background:#ccd8d1}.demo-top b{flex:1;text-align:center;font-weight:600}.demo-top em{color:#08783b;font-style:normal}
+  .demo-body { display:grid; grid-template-columns:145px 1fr; min-height:490px; }
+  .demo-progress { display:flex; flex-direction:column; gap:9px; padding:25px 17px; background:#0a2138; color:#fff; }
+  .demo-progress b { margin-bottom:13px; font:700 12px 'Sora',sans-serif; }
+  .demo-progress span { position:relative; padding:9px 8px 9px 24px; color:#91a6b6; font-size:11px; }
+  .demo-progress span::before{position:absolute;left:5px;top:11px;width:7px;height:7px;border:1px solid #5b7285;border-radius:50%;content:''}.demo-progress .done,.demo-progress .active{color:#fff}.demo-progress .done::before{border-color:#00c853;background:#00c853}.demo-progress .active{border-radius:7px;background:rgba(0,200,83,.12)}.demo-progress .active::before{border-color:#62e89b}
+  .demo-chat { display:flex; min-width:0; flex-direction:column; padding:19px; color:#162a20; }
+  .demo-agent{display:flex;align-items:center;gap:10px;padding-bottom:13px;border-bottom:1px solid #d5e1da}.demo-agent img{width:36px;height:36px;border-radius:10px;object-fit:cover}.demo-agent span{display:grid}.demo-agent b{font:700 12px 'Sora',sans-serif}.demo-agent small{color:#0d713e;font-size:11px}
+  .demo-messages{display:grid;gap:9px;flex:1;padding:22px 0}.demo-messages p{max-width:80%;margin:0;padding:10px 12px;border-radius:11px 11px 11px 3px;background:#fff;font-size:12px;line-height:1.45;box-shadow:0 6px 18px rgba(16,52,35,.07)}.demo-messages .visitor{justify-self:end;border-radius:11px 11px 3px 11px;background:#09243c;color:#fff}
+  .demo-action{display:grid;gap:5px;padding:14px;border-radius:12px;background:#dff6e8}.demo-action span{color:#0c713e;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}.demo-action b{font:700 12px 'Sora',sans-serif}.demo-action button{margin-top:7px;padding:10px;border:0;border-radius:8px;background:#00c853;color:#062117;font:700 11px 'Sora',sans-serif;cursor:pointer}
+  .demo-float{position:absolute;display:grid;gap:3px;padding:12px 14px;border-radius:12px;background:#fff;color:#17271f;box-shadow:0 18px 40px rgba(0,0,0,.22)}.demo-float b{font:700 11px 'Sora',sans-serif}.demo-float span{color:#66776d;font-size:9px}.demo-float-one{top:70px;right:-10px}.demo-float-two{bottom:0;left:-8px}
   @media (max-width: 900px) {
     .hero { min-height: auto; padding-top: 118px; }
-    .hero-grid { gap: 38px; }
-    .hero-visual { display: grid; max-width: 520px; margin: 0 auto; text-align: left; }
+    .hero-grid { grid-template-columns: 1fr; gap: 38px; }
+    .hero-product { max-width: 520px; margin: 0 auto; text-align: left; }
     .hero h1 { font-size: clamp(38px,10vw,58px); }
+    .chat-experience { grid-template-columns:1fr; margin-block:64px 82px; }
+    .experience-copy { text-align:left; }
   }
+  @media (max-width:600px){nav{padding-inline:20px}.logo{font-size:24px}.hero{padding-inline:20px}.hero h1{text-align:left}.hero-sub{text-align:left;font-size:17px}.hero-btns{align-items:stretch}.hero-btns .btn-primary,.hero-btns .btn-secondary{max-width:none}.hero-stats{justify-content:flex-start}.badge{margin:0 0 20px}.hero-product-stage{min-height:270px}.hero-phone{top:22px;width:220px}.hero-options{grid-template-columns:1fr 1fr}.hero-option{align-items:flex-start;padding:10px}.hero-option small{display:none}.demo-body{grid-template-columns:1fr}.demo-progress{display:none}.experience-demo{padding-inline:0}.demo-float{display:none}.demo-chat{padding:15px}.chat-experience{padding-inline:18px}.experience-copy h2{font-size:34px}}
 </style>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMXC2DFR5G"></script>
@@ -836,34 +886,21 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         </div>
       </div>
     </div>
-    <div class="hero-visual">
-      <div class="trust-card">
-        <div class="tc-icon green">💳</div>
-        <div>
-          <div class="tc-title">Empréstimo CLT</div>
-          <div class="tc-sub">Desconto direto em folha — sem preocupação</div>
+    <div class="hero-product" aria-label="Formas de atendimento FelizCred">
+      <div class="hero-product-head"><span>FelizCred no seu celular</span><i>online</i></div>
+      <div class="hero-product-stage">
+        <div class="hero-phone" aria-hidden="true">
+          <div class="hero-phone-bar"><img src="/assets/img/chat/felipe-atendimento-profissional-512.png" alt=""><span><b>Felipe</b><small>Assistente FelizCred</small></span></div>
+          <div class="hero-phone-thread"><p>Olá! O que você quer resolver hoje?</p><p class="from-user">Quero simular meu empréstimo CLT</p><p>Perfeito. Primeiro, preciso confirmar uma informação.</p><span class="typing-demo"><i></i><i></i><i></i></span></div>
+          <div class="hero-phone-compose">Escreva sua mensagem <b>↑</b></div>
         </div>
+        <div class="hero-orbit" aria-hidden="true"><span>consulta</span><span>ofertas</span><span>assinatura</span></div>
       </div>
-      <div class="trust-card">
-        <div class="tc-icon blue">🏦</div>
-        <div>
-          <div class="tc-title">Antecipação FGTS</div>
-          <div class="tc-sub">Até 5 parcelas antecipadas • Sem consulta SPC</div>
-        </div>
-      </div>
-      <div class="trust-card">
-        <div class="tc-icon gold">⚡</div>
-        <div>
-          <div class="tc-title">Acompanhamento no chat</div>
-          <div class="tc-sub">Tire dúvidas sem abandonar sua simulação</div>
-        </div>
-      </div>
-      <div class="trust-card" style="margin-top:14px; background:rgba(0,200,83,0.06); border-color:rgba(0,200,83,0.2);">
-        <div class="tc-icon green">🔒</div>
-        <div>
-          <div class="tc-title">100% Seguro</div>
-          <div class="tc-sub">Correspondente bancário credenciado • CNPJ ativo</div>
-        </div>
+      <div class="hero-options" role="tablist" aria-label="Etapas disponíveis">
+        <button class="hero-option is-active" type="button" role="tab" aria-selected="true" data-demo="clt"><span class="option-mark">CLT</span><span><b>Empréstimo CLT</b><small>Simulação guiada pela Facta</small></span></button>
+        <button class="hero-option" type="button" role="tab" aria-selected="false" data-demo="fgts"><span class="option-mark">FG</span><span><b>Antecipação FGTS</b><small>Orientação sem perder o contexto</small></span></button>
+        <button class="hero-option" type="button" role="tab" aria-selected="false" data-demo="track"><span class="option-mark">24</span><span><b>Acompanhe pelo chat</b><small>Volte e consulte o andamento</small></span></button>
+        <button class="hero-option" type="button" role="tab" aria-selected="false" data-demo="safe"><span class="option-mark">✓</span><span><b>Dados protegidos</b><small>Só pedimos o necessário</small></span></button>
       </div>
     </div>
   </div>
@@ -878,46 +915,35 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   </div>
 </div>
 
-<!-- CLT VIA WHATSAPP -->
-<div class="sim-section contact-only" id="simular" style="margin-top:40px;">
-  <div class="sim-header">
-    <div>
-      <div class="sim-tag">Crédito do Trabalhador</div>
-      <h2 style="margin-bottom:14px;">Consulte seu crédito CLT<br/>com nossa equipe</h2>
-      <p style="color:var(--gray); font-size:16px; line-height:1.6; margin-bottom:28px;">
-        Fale com um atendente pelo WhatsApp para verificar sua elegibilidade e receber orientação em cada etapa. A contratação está sujeita à análise e às condições disponíveis para o seu perfil.
-      </p>
-      <div class="sim-steps">
-        <div class="sim-step">
-          <div class="step-num">1</div>
-          <div class="step-text">
-            <strong>Chame a FelizCred no WhatsApp</strong>
-            <span>A mensagem já vai pronta para iniciar seu atendimento</span>
-          </div>
+<!-- EXPERIÊNCIA CLT NO CHAT -->
+<section class="chat-experience" id="simular">
+  <div class="experience-copy">
+    <h2>Do primeiro “olá” até a proposta, tudo no mesmo lugar.</h2>
+    <p>O chat entende sua dúvida, pede cada dado no momento certo e mantém a contratação visível. Você não precisa repetir informações nem trocar de aplicativo.</p>
+    <ul class="experience-benefits">
+      <li><span>1</span><div><b>Comece com pouco</b><small>Nome, celular e e-mail abrem seu atendimento.</small></div></li>
+      <li><span>2</span><div><b>Consulte quando estiver pronto</b><small>CPF e autorização aparecem somente na etapa da simulação.</small></div></li>
+      <li><span>3</span><div><b>Entenda cada retorno</b><small>Se o banco não avançar, o chat explica o motivo e orienta o próximo passo.</small></div></li>
+    </ul>
+    <a href="#simular" class="btn-primary" data-open-chat>Simular meu crédito CLT</a>
+    <p class="experience-note">Simulação gratuita. Contratação sujeita à análise e às condições da instituição financeira.</p>
+  </div>
+  <div class="experience-demo" aria-label="Exemplo da experiência no chat">
+    <div class="demo-window">
+      <div class="demo-top"><span><i></i><i></i><i></i></span><b>felizcred.com.br</b><em>Conexão segura</em></div>
+      <div class="demo-body">
+        <aside class="demo-progress"><b>Sua simulação</b><span class="done">Início</span><span class="active">Consulta</span><span>Condições</span><span>Proposta</span></aside>
+        <div class="demo-chat">
+          <div class="demo-agent"><img src="/assets/img/chat/felipe-atendimento-profissional-512.png" alt="Felipe, atendimento FelizCred"><span><b>Felipe</b><small>online agora</small></span></div>
+          <div class="demo-messages"><p>Você tem mais de 3 meses no trabalho atual?</p><p class="visitor">Sim, tenho</p><p>Ótimo. Agora podemos consultar suas condições na Facta.</p></div>
+          <div class="demo-action"><span>Próxima etapa</span><b>Autorizar consulta com segurança</b><button type="button" data-open-chat>Continuar no meu chat</button></div>
         </div>
-        <div class="sim-step">
-          <div class="step-num">2</div>
-          <div class="step-text">
-            <strong>Envie os dados solicitados</strong>
-            <span>Nossa equipe explica quais informações são necessárias</span>
-          </div>
-        </div>
-        <div class="sim-step">
-          <div class="step-num">3</div>
-          <div class="step-text">
-            <strong>Receba as condições disponíveis</strong>
-            <span>Confira valores, parcelas e CET antes de decidir</span>
-          </div>
-        </div>
-      </div>
-      <div class="contact-cta">
-        <strong>Comece pelo WhatsApp</strong>
-        <p>Você conversa com a equipe da FelizCred e acompanha toda a solicitação pelo celular.</p>
-        <a href="#simular" class="btn-primary" data-open-chat>Simular crédito CLT no chat</a>
       </div>
     </div>
+    <div class="demo-float demo-float-one"><b>Dados reaproveitados</b><span>Sem preencher tudo de novo</span></div>
+    <div class="demo-float demo-float-two"><b>Ajuda sem sair do fluxo</b><span>Gemini responde dúvidas curtas</span></div>
   </div>
-</div>
+</section>
 
 <!-- PRODUTOS -->
 <div class="section" id="produtos">
@@ -972,7 +998,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   <div class="sim-header">
     <div>
       <div class="sim-tag" style="background:rgba(255,214,0,0.12); border-color:rgba(255,214,0,0.3); color:#FFD600;">Antecipação FGTS</div>
-      <h2 style="margin-bottom:14px;">Consulte sua antecipação<br/>pelo WhatsApp</h2>
+      <h2 style="margin-bottom:14px;">Entenda sua antecipação<br/>pelo chat</h2>
       <p style="color:var(--gray); font-size:16px; line-height:1.6; margin-bottom:28px;">
         Nossa equipe verifica as condições disponíveis para antecipar o saque-aniversário. Sem parcelas mensais: o pagamento é descontado do saldo do FGTS.
       </p>
@@ -987,8 +1013,8 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         <div class="sim-step">
           <div class="step-num" style="background:rgba(255,214,0,0.15); border-color:rgba(255,214,0,0.3); color:#FFD600;">2</div>
           <div class="step-text">
-            <strong>Chame a FelizCred no WhatsApp</strong>
-            <span>Informe que deseja consultar a antecipação do FGTS</span>
+            <strong>Abra o chat da FelizCred</strong>
+            <span>Informe que deseja entender a antecipação do FGTS</span>
           </div>
         </div>
         <div class="sim-step">
@@ -1009,7 +1035,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 
       <div class="contact-cta">
         <strong>Faça a consulta com nossa equipe</strong>
-        <p>O atendimento continua no WhatsApp, desde a verificação até a conclusão da solicitação.</p>
+        <p>Você começa pelo chat do site e recebe orientação sem abandonar a página.</p>
         <a href="#simular" class="btn-primary" data-open-chat>Conversar sobre FGTS no chat</a>
       </div>
     </div>
@@ -1374,6 +1400,30 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     else window.setTimeout(() => document.querySelector('.fc-chat-launcher')?.click(), 250);
     window.dataLayer?.push({ event: 'site_chat_cta_click', cta_text: trigger.textContent.trim() });
   });
+
+  const demoButtons = [...document.querySelectorAll('.hero-option')];
+  const demoPanel = document.querySelector('.hero-product');
+  let demoIndex = 0;
+  let demoTimer;
+  const activateDemo = index => {
+    demoIndex = (index + demoButtons.length) % demoButtons.length;
+    demoButtons.forEach((button, position) => {
+      const active = position === demoIndex;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+  };
+  const startDemo = () => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || demoButtons.length < 2) return;
+    window.clearInterval(demoTimer);
+    demoTimer = window.setInterval(() => activateDemo(demoIndex + 1), 2600);
+  };
+  demoButtons.forEach((button, index) => button.addEventListener('click', () => { activateDemo(index); startDemo(); }));
+  demoPanel?.addEventListener('mouseenter', () => window.clearInterval(demoTimer));
+  demoPanel?.addEventListener('mouseleave', startDemo);
+  demoPanel?.addEventListener('focusin', () => window.clearInterval(demoTimer));
+  demoPanel?.addEventListener('focusout', startDemo);
+  startDemo();
 </script>
 <script src="/chat.js?v=20261017-1" defer></script>
 </body>

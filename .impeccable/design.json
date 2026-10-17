@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-17T00:00:00-03:00",
+  "title": "Design System: FelizCred",
+  "extensions": {
+    "colorMeta": {
+      "primary": { "role": "primary", "displayName": "Verde de ação", "canonical": "#00c853", "tonalRamp": ["#062117", "#08783b", "#00a947", "#00c853", "#55e89b", "#9bf2bf", "#dff8e9", "#f2fcf6"] },
+      "navy": { "role": "neutral", "displayName": "Azul-marinho institucional", "canonical": "#071423", "tonalRamp": ["#071423", "#0a2138", "#16324d", "#39546b", "#718697", "#a9b7c2", "#dce3e8", "#f5f8fa"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Promessas principais e títulos de seção." },
+      "body": { "displayName": "Texto", "purpose": "Explicações, formulários e mensagens." }
+    },
+    "shadows": [
+      { "name": "showcase", "value": "0 34px 90px rgba(0,0,0,.30)", "purpose": "Elevar demonstrações principais sobre o fundo navy." }
+    ],
+    "motion": [
+      { "name": "option-cycle", "value": "350ms ease", "purpose": "Alternância de opção selecionada no showcase." }
+    ],
+    "breakpoints": [
+      { "name": "stack", "value": "900px" },
+      { "name": "mobile", "value": "600px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação principal para iniciar ou continuar a simulação.",
+      "html": "<button class=\"ds-btn-primary\">Fazer minha simulação</button>",
+      "css": ".ds-btn-primary{border:0;border-radius:12px;background:#00c853;color:#071423;padding:16px 32px;font:700 14px Sora,sans-serif;transition:transform .2s,background .2s}.ds-btn-primary:hover{background:#2cdd78;transform:translateY(-2px)}.ds-btn-primary:active{transform:translateY(1px)}.ds-btn-primary:focus-visible{outline:3px solid rgba(0,200,83,.35);outline-offset:3px}"
+    },
+    {
+      "name": "Selected Product Option",
+      "kind": "custom",
+      "description": "Opção ativa do showcase rotativo.",
+      "html": "<button class=\"ds-option\"><b>Empréstimo CLT</b><span>Simulação guiada pela Facta</span></button>",
+      "css": ".ds-option{display:grid;gap:3px;width:100%;border:0;border-radius:11px;background:#fff;color:#10251c;padding:12px 14px;text-align:left;box-shadow:0 10px 28px rgba(16,52,35,.11)}.ds-option b{font:700 13px Sora,sans-serif}.ds-option span{font:400 12px 'DM Sans',sans-serif;color:#465b50}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A conversa em movimento",
+    "overview": "A interface mostra a contratação acontecendo, em vez de apenas descrevê-la.",
+    "keyCharacteristics": ["Demonstrações reais do chat", "Uma ação principal por seção", "Movimento calmo e acessível"],
+    "rules": [{ "name": "Action Green", "body": "Verde vivo indica ação, seleção ou progresso.", "section": "colors" }],
+    "dos": ["Mostrar o chat executando uma etapa real.", "Usar provas sociais reais e autorizadas."],
+    "donts": ["Não usar blocos vazios.", "Não inventar números, prazos ou depoimentos."]
+  }
+}
