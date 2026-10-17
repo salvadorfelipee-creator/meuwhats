@@ -746,12 +746,13 @@
   .stat-num { font-size: 17px; color: #fff; }
   .stat-label { max-width: 120px; line-height: 1.35; }
   .hero-product { position: relative; overflow: hidden; padding: 12px; border-radius: 22px; background: #eef8f2; color: #10251c; box-shadow: 0 34px 90px rgba(0,0,0,.3); }
-  .hero-options { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
-  .hero-option { display:flex; align-items:center; gap:14px; width:100%; padding:18px 16px; border-radius:12px; background:transparent; color:#30443a; text-align:left; transition:background .45s cubic-bezier(.16,1,.3,1),color .45s cubic-bezier(.16,1,.3,1),box-shadow .45s cubic-bezier(.16,1,.3,1),transform .45s cubic-bezier(.16,1,.3,1); }
-  .hero-option:not(.is-active){color:#4c6156}.hero-option.is-active{background:#fff; color:#10251c; box-shadow:0 12px 32px rgba(16,52,35,.14); transform:translateX(4px)}
+  .hero-options { position:relative; display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+  .hero-option-highlight { position:absolute; z-index:0; top:0; left:0; border-radius:12px; background:#fff; box-shadow:0 12px 32px rgba(16,52,35,.14); pointer-events:none; transition:transform .62s cubic-bezier(.16,1,.3,1),width .62s cubic-bezier(.16,1,.3,1),height .62s cubic-bezier(.16,1,.3,1); }
+  .hero-option { position:relative; z-index:1; display:flex; align-items:center; gap:14px; width:100%; padding:18px 16px; border-radius:12px; color:#4c6156; text-align:left; transition:color .32s ease,transform .62s cubic-bezier(.16,1,.3,1); }
+  .hero-option.is-active{color:#10251c; transform:translateX(4px)}
   .hero-option .option-mark { display:grid; width:34px; height:34px; flex:0 0 auto; place-items:center; border-radius:9px; background:#dff8e9; color:#076b36; font:700 11px 'Sora',sans-serif; }
   .hero-option > span:last-child { display:grid; gap:3px}.hero-option b{font:700 14px 'Sora',sans-serif}.hero-option small{font-size:12px;color:#465b50}
-  @media (prefers-reduced-motion: reduce) { .hero-option { transition: background .15s,color .15s,box-shadow .15s; } .hero-option.is-active { transform:none; } }
+  @media (prefers-reduced-motion: reduce) { .hero-option-highlight { transition:none; } .hero-option { transition:color .15s; } .hero-option.is-active { transform:none; } }
   .banks-bar { border-block: 1px solid rgba(255,255,255,.08); background: #091a2c; }
   .bank-pill { border-radius: 10px; }
   .product-card.clt { background:#e4f8eb; color: #061a12; }
@@ -869,6 +870,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     </div>
     <div class="hero-product" aria-label="Formas de atendimento FelizCred">
       <ul class="hero-options" aria-label="Etapas disponíveis">
+        <li class="hero-option-highlight" aria-hidden="true"></li>
         <li class="hero-option is-active" aria-current="true" data-demo="clt"><span class="option-mark">CLT</span><span><b>Empréstimo CLT</b><small>Simulação guiada pela Facta</small></span></li>
         <li class="hero-option" data-demo="fgts"><span class="option-mark">FG</span><span><b>Antecipação FGTS</b><small>Orientação sem perder o contexto</small></span></li>
         <li class="hero-option" data-demo="track"><span class="option-mark">24</span><span><b>Acompanhe pelo chat</b><small>Volte e consulte o andamento</small></span></li>
@@ -1375,6 +1377,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
 
   const demoButtons = [...document.querySelectorAll('.hero-option')];
   const demoPanel = document.querySelector('.hero-product');
+  const demoHighlight = document.querySelector('.hero-option-highlight');
   let demoIndex = 0;
   let demoTimer;
   const activateDemo = index => {
@@ -1385,6 +1388,12 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       if (active) button.setAttribute('aria-current', 'true');
       else button.removeAttribute('aria-current');
     });
+    const activeButton = demoButtons[demoIndex];
+    if (activeButton && demoHighlight) {
+      demoHighlight.style.width = `${activeButton.offsetWidth}px`;
+      demoHighlight.style.height = `${activeButton.offsetHeight}px`;
+      demoHighlight.style.transform = `translate3d(${activeButton.offsetLeft}px,${activeButton.offsetTop}px,0)`;
+    }
   };
   const startDemo = () => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || demoButtons.length < 2) return;
@@ -1395,6 +1404,8 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   demoPanel?.addEventListener('mouseleave', startDemo);
   demoPanel?.addEventListener('focusin', () => window.clearInterval(demoTimer));
   demoPanel?.addEventListener('focusout', startDemo);
+  window.addEventListener('resize', () => activateDemo(demoIndex));
+  activateDemo(0);
   startDemo();
 </script>
 <script src="/chat.js?v=20261017-6" defer></script>
