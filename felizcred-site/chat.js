@@ -2,7 +2,7 @@
   const API = "https://meuwhats.onrender.com/site-chat/conversations";
   const STORAGE = "felizcred_site_chat_v1";
   const SESSION_TTL = 6 * 60 * 60 * 1000;
-  const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false, cltCheckedAt: null, dismissedCltStatus: null, reasoningTimer: null };
+  const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false, cltCheckedAt: null, dismissedCltStatus: null, reasoningTimer: null, retryingAuthorization: false };
   const iconChat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></svg>';
   const iconClose = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
   const iconExpand = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg>';
@@ -110,7 +110,7 @@
     if (c === "start") {
       const phone = String(state.session?.contact || "").replace(/\D/g, "");
       const phoneField = /^\d{10,11}$/.test(phone) ? `<input type="hidden" name="phone" value="${esc(phone)}">` : `<label>Celular com DDD<input name="phone" inputmode="tel" autocomplete="tel" maxlength="16" required placeholder="(47) 99999-9999"></label>`;
-      cltEl.innerHTML = `<form class="fc-clt-card" data-action="start"><span class="fc-clt-step">1 de 5 · Autorização</span><h3>Vamos iniciar sua simulação na Facta</h3><p>Agora precisamos apenas do seu CPF. Enviaremos no celular informado um link para autorizar a consulta do vínculo.</p><label>CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" required placeholder="000.000.000-00"></label>${phoneField}<label class="fc-clt-consent"><input type="checkbox" required> Autorizo o envio dos meus dados à Facta para solicitar a autorização de consulta.</label><button class="fc-chat-primary">Enviar autorização no WhatsApp</button><small class="fc-clt-safe">A autorização vale por até 30 dias e pode ser revogada conforme as regras da Facta.</small></form>`;
+      cltEl.innerHTML = `<form class="fc-clt-card" data-action="start"><span class="fc-clt-step">1 de 5 · Autorização</span><h3>Vamos enviar sua autorização pela Facta</h3><p>Confirme seu nome completo e CPF. O telefone informado no início será usado pela Facta para enviar o link no WhatsApp.</p><label>Nome completo<input name="name" autocomplete="name" required placeholder="Como aparece no documento" value="${esc(state.session?.name || "")}"></label><label>CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" required placeholder="000.000.000-00"></label>${phoneField}<label class="fc-clt-consent"><input type="checkbox" required> Autorizo o envio destes dados à Facta para solicitar a consulta.</label><button class="fc-chat-primary">Enviar autorização no WhatsApp</button><small class="fc-clt-safe">A autorização permite consultar vínculo e margem. Ela não cria empréstimo.</small></form>`;
       return;
     }
     if (c.provider === "facta" && c.etapa === "solicitando_autorizacao") {
@@ -126,7 +126,7 @@
       const integrationError = c.etapa === "erro_integracao";
       const statusKey = `${c.etapa}:${c.status || ""}:${c.error || ""}`;
       if (state.dismissedCltStatus === statusKey) { cltEl.classList.remove("show"); cltEl.innerHTML = ""; return; }
-      cltEl.innerHTML = `<div class="fc-clt-card fc-clt-status-card"><button type="button" class="fc-clt-dismiss" data-dismiss-clt-status aria-label="Fechar aviso">×</button><span class="fc-clt-step">${integrationError ? "Instabilidade temporária" : "Não foi possível enviar"}</span><h3>${integrationError ? "A consulta não avançou agora" : "Confira o celular informado"}</h3><p><strong>Motivo:</strong> ${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p><p class="fc-clt-reassurance">Seus dados ficaram salvos e nenhum contrato foi criado.</p><div class="fc-clt-actions"><button type="button" class="fc-chat-primary" data-resend-authorization>Tentar novamente</button><button type="button" class="fc-clt-secondary" data-dismiss-clt-status>Voltar à conversa</button></div></div>`;
+      cltEl.innerHTML = `<div class="fc-clt-card fc-clt-status-card"><button type="button" class="fc-clt-dismiss" data-dismiss-clt-status aria-label="Fechar aviso">×</button><span class="fc-clt-step">${integrationError ? "Falha de conexão" : "Dados não aceitos"}</span><h3>${integrationError ? "A Facta não recebeu a solicitação" : "A autorização não foi enviada"}</h3><p><strong>Retorno:</strong> ${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p><p class="fc-clt-reassurance">Seus dados ficaram salvos e nenhum contrato foi criado.</p><div class="fc-clt-actions"><button type="button" class="fc-chat-primary" data-resend-authorization>${integrationError ? "Tentar novamente" : "Corrigir dados"}</button><button type="button" class="fc-clt-secondary" data-dismiss-clt-status>Voltar à conversa</button></div></div>`;
       return;
     }
     if (c.provider === "facta" && c.etapa === "ofertas_disponiveis") {
@@ -197,7 +197,7 @@
   root.querySelectorAll(".fc-chat-next").forEach((b) => b.addEventListener("click", () => goTo(state.step + 1)));
   root.querySelectorAll(".fc-chat-back").forEach((b) => b.addEventListener("click", () => goTo(state.step - 1)));
   startForm.addEventListener("keydown", (e) => { if (e.key === "Enter" && state.step < 3) { e.preventDefault(); goTo(state.step + 1); } if (state.step === 3 && ["a","b","c"].includes(e.key.toLowerCase())) startForm.elements.topic[["a","b","c"].indexOf(e.key.toLowerCase())].checked = true; });
-  startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const contact = String(form.get("contact") || ""), email = String(form.get("email") || ""); const data = await api("", { method: "POST", body: JSON.stringify({ name: form.get("name"), contact, email, message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token, contact, email, expiresAt: Date.now() + SESSION_TTL }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
+  startForm.addEventListener("submit", async (e) => { e.preventDefault(); const form = new FormData(startForm), topic = form.get("topic"); if (!topic) return showError("Escolha uma opção para iniciar a conversa."); const button = startForm.querySelector('button[type="submit"]'); button.disabled = true; errorEl.classList.remove("show"); try { const contact = String(form.get("contact") || ""), email = String(form.get("email") || ""), name = String(form.get("name") || ""); const data = await api("", { method: "POST", body: JSON.stringify({ name, contact, email, message: `Tenho interesse em: ${topic}`, pageUrl: location.href }) }); state.session = { id: data.conversation.id, token: data.token, name, contact, email, expiresAt: Date.now() + SESSION_TTL }; state.messages = data.messages; localStorage.setItem(STORAGE, JSON.stringify(state.session)); root.classList.add("has-conversation"); renderMessages(); if (/CLT/i.test(topic)) { state.clt = "eligibility"; renderClt(); } sound("out"); composeText.focus(); } catch (error) { showError(error.message); } finally { button.disabled = false; } });
   cltEl.addEventListener("click", async (e) => {
     if (e.target.closest("[data-dismiss-clt-status]")) {
       const c = state.clt;
@@ -225,6 +225,7 @@
     }
     const resendAuthorization = e.target.closest("[data-resend-authorization]");
     if (resendAuthorization) {
+      if (["erro_autorizacao", "erro_integracao"].includes(state.clt?.etapa)) { state.retryingAuthorization = true; state.clt = "start"; renderClt(); return; }
       resendAuthorization.disabled = true;
       resendAuthorization.textContent = "Reenviando…";
       try {
@@ -282,7 +283,8 @@
     try {
       if (e.target.dataset.action === "start") {
         state.cltCpf = String(form.get("cpf") || "");
-        const data = await api(`/${state.session.id}/clt/start`, { method: "POST", body: JSON.stringify({ cpf: state.cltCpf, phone: form.get("phone") }) }); state.clt = data.clt;
+        const path = state.retryingAuthorization ? "resend-authorization" : "start";
+        const data = await api(`/${state.session.id}/clt/${path}`, { method: "POST", body: JSON.stringify({ name: form.get("name"), cpf: state.cltCpf, phone: form.get("phone") }) }); state.clt = data.clt; state.retryingAuthorization = false;
       } else if (e.target.dataset.action === "facta-personal") {
         const customer = Object.fromEntries(form.entries());
         delete customer["on"];

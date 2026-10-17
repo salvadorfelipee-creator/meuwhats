@@ -17,7 +17,8 @@ async function request(target, method, path, { query, body } = {}) {
   });
   const payload = await response.json().catch(() => null);
   if (!response.ok || !payload?.ok) {
-    const error = new Error(payload?.message || `Falha na ponte Facta (${response.status})`);
+    const upstreamMessage = payload?.body?.mensagem || payload?.body?.message || payload?.upstream?.mensagem || payload?.upstream?.message;
+    const error = new Error(payload?.message || upstreamMessage || `Falha na ponte Facta (${response.status})`);
     error.httpStatus = payload?.upstreamStatus || payload?.status || response.status;
     error.factaResponse = payload?.upstream || payload?.body || payload;
     throw error;

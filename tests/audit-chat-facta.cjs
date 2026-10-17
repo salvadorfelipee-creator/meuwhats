@@ -20,6 +20,10 @@ const json = (route, body, status = 200) => route.fulfill({ status, contentType:
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (request.method() === "POST" && /\/clt\/start$/.test(path)) {
+      const payload = request.postDataJSON();
+      assert.equal(payload.name, "Cliente Auditoria");
+      assert.equal(payload.phone, "47999999999");
+      assert.equal(payload.cpf, "08361943900");
       clt = { provider: "facta", etapa: "autorizacao_enviada", checkedAt: now, offers: [] };
       return json(route, { clt }, 201);
     }
@@ -55,6 +59,7 @@ const json = (route, body, status = 200) => route.fulfill({ status, contentType:
     await page.locator(".fc-chat-form").evaluate((form) => form.requestSubmit());
     await page.locator('[data-tenure="yes"]').click();
     await page.locator('[data-action="start"]').waitFor();
+    await page.locator('[name="name"]').last().fill("Cliente Auditoria");
     await page.locator('[name="cpf"]').fill("08361943900");
     await page.locator('[data-action="start"] .fc-clt-consent input').check();
     await page.locator('[data-action="start"]').evaluate((form) => form.requestSubmit());

@@ -173,11 +173,13 @@ function mensagemFacta(payload, fallback = "A Facta não conseguiu concluir esta
 function motivoPublicoErroFacta(err) {
   const status = Number(err?.httpStatus) || 0;
   const message = String(err?.message || "");
+  const upstreamMessage = String(err?.factaResponse?.mensagem || err?.factaResponse?.message || "").trim().slice(0, 280);
   if (/FACTA_BRIDGE_URL|FACTA_BRIDGE_SECRET|FACTA_LOGIN_CERTIFICADO|FACTA_PROPOSAL_ENABLED|não configurados/i.test(message)) return "A integração do correspondente está em configuração. Nossa equipe já pode conferir pelo chat.";
   if (/timeout|timed out|aborted|tempo limite/i.test(message) || [408, 504].includes(status)) return "A Facta demorou mais que o esperado para responder. Tente novamente em alguns instantes.";
   if (status === 429) return "A Facta limitou temporariamente novas consultas por excesso de solicitações. Aguarde um instante e tente novamente.";
   if (status >= 500) return `A Facta informou indisponibilidade temporária${status ? ` (código ${status})` : ""}. Tente novamente em alguns instantes.`;
   if ([401, 403].includes(status)) return "A Facta não autorizou a conexão neste momento. Nossa equipe já pode conferir pelo chat.";
+  if (status >= 400 && upstreamMessage) return `A Facta respondeu: ${upstreamMessage}`;
   if (status >= 400) return `A Facta não aceitou esta etapa da consulta (código ${status}). Confira os dados ou tente novamente.`;
   return "A Facta não concluiu esta etapa da consulta. Tente novamente; se persistir, continue falando conosco aqui.";
 }
@@ -5550,14 +5552,17 @@ const server = http.createServer(async (req, res) => {
             if (await db.siteChatCltObter(id)) return send(res, 409, { error: "A simulação já foi iniciada." }, corsHeaders);
             const cpf = String(body.cpf || "").replace(/\D/g, "");
             const phone = String(body.phone || "").replace(/\D/g, "");
+            const fullName = String(body.name || conversation.name || "").trim().replace(/\s+/g, " ").slice(0, 120);
             if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
+            if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
             let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO" });
+            row = await db.siteChatCltAtualizar(id, { facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }) });
             await db.siteChatFunilEvento(id, "dados_minimos_enviados", "cpf_consentimento", "facta");
             await db.siteChatFunilEvento(id, "provedor_tentado", "solicitando_autorizacao", "facta");
             await db.siteChatDefinirProduto(id, "Empréstimo CLT");
             await db.siteChatDefinirPipeline(id, "qualificacao");
-            const authorization = await facta.solicitarAutorizacao({ nome: conversation.name, cpf, celular: formatarCelularFacta(phone) });
+            const authorization = await facta.solicitarAutorizacao({ nome: fullName, cpf, celular: formatarCelularFacta(phone) });
             const authMessage = mensagemFacta(authorization);
             if (respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage)) {
               await db.siteChatFunilEvento(id, "saida", "erro_autorizacao", "facta", "erro_autorizacao");
@@ -5590,10 +5595,18 @@ const server = http.createServer(async (req, res) => {
           }
           if (action === "resend-authorization") {
             if (atual.provider !== "facta") return send(res, 409, { error: "Esta solicitação não pertence à Facta." }, corsHeaders);
-            const authorization = await facta.solicitarAutorizacao({ nome: conversation.name, cpf: atual.cpf, celular: formatarCelularFacta(atual.phone) });
+            let saved = {};
+            try { saved = JSON.parse(atual.facta_worker_json || "{}").preAuthorization || {}; } catch {}
+            const fullName = String(body.name || saved.nome || conversation.name || "").trim().replace(/\s+/g, " ").slice(0, 120);
+            const phone = String(body.phone || atual.phone || "").replace(/\D/g, "");
+            if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
+            if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
+            const authorization = await facta.solicitarAutorizacao({ nome: fullName, cpf: atual.cpf, celular: formatarCelularFacta(phone) });
             const authMessage = mensagemFacta(authorization);
             const failed = respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage);
             const row = await db.siteChatCltAtualizar(id, {
+              phone,
+              facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }),
               etapa: failed ? "erro_autorizacao" : "autorizacao_enviada",
               status_novosaque: failed ? "ERRO_AUTORIZACAO" : "AUTORIZACAO_REENVIADA",
               authorization_requested_at: Date.now(), authorization_checked_at: null,
