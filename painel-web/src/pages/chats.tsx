@@ -1,4 +1,5 @@
 import * as React from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import { COMPANY_LABELS, useChannel, type Channel } from "@/lib/channel-context"
 import { SiteChatPage } from "@/pages/site-chat"
 import { useUnread } from "@/lib/unread-context"
@@ -1332,7 +1333,7 @@ function ChannelChatsPage() {
                           </button>
                         </div>
                       )}
-                      {m.type === "audio" && m.media_path && <AudioPlayerMensagem src={mediaUrl(m.media_path)} />}
+                      {m.type === "audio" && m.media_path && <AudioPlayerMensagem src={mediaUrl(m.media_path)} abrirPorPadrao={m.direction === "out"} />}
                       {m.type === "document" && m.media_path && (
                         <a
                           href={mediaUrl(m.media_path)}
@@ -1382,22 +1383,20 @@ function ChannelChatsPage() {
             )}
 
             {/* Composer */}
+            <AnimatePresence mode="wait" initial={false}>
             {gravando ? (
-              <div className="flex items-center gap-3 p-2 border-t shrink-0">
-                <Button variant="ghost" size="icon" onClick={cancelarGravacao} title="Cancelar gravação">
-                  <X className="h-4 w-4" />
-                </Button>
-                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
-                </span>
-                <span className="text-sm tabular-nums flex-1">{formatGravacao(gravacaoSegundos)}</span>
-                <Button size="icon" onClick={pararGravacaoEEnviar} title="Enviar áudio">
-                  <Send className="h-4 w-4" />
-                </Button>
+              <div key="gravando" className="px-2 pb-3 pt-1.5 flex justify-center border-t shrink-0">
+                <GravadorBar segundos={gravacaoSegundos} onCancelar={cancelarGravacao} onEnviar={pararGravacaoEEnviar} />
               </div>
             ) : (
-              <div className="flex flex-col border-t shrink-0">
+              <motion.div
+                key="composer"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.18 }}
+                className="flex flex-col border-t shrink-0"
+              >
                 {/* Atalhos sempre visíveis — os 3 mais usados de verdade (uso_count, já contado
                     em registrarUsoRespostaPronta) ficam à mão sem precisar abrir menu nenhum;
                     "..." abre a lista completa, "+" cria uma nova sem sair da conversa. Clique
@@ -1478,9 +1477,10 @@ function ChannelChatsPage() {
                   </button>
                 </div>
 
-                <div className="flex items-end gap-1 p-2">
+                <div className="px-2 pb-3 pt-1.5 flex justify-center">
+                <div className="w-full max-w-[640px] flex items-end gap-1 rounded-[20px] border border-indigo-100 dark:border-indigo-900/40 bg-white/85 dark:bg-zinc-900/70 backdrop-blur-md px-2 py-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.10),0_2px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 focus-within:border-indigo-300 dark:focus-within:border-indigo-700 focus-within:shadow-[0_0_0_3px_rgba(99,102,241,0.22),0_0_26px_rgba(139,92,246,0.22),0_10px_32px_rgba(0,0,0,0.08)]">
                   <div className="relative">
-                    <Button variant="ghost" size="icon" title="Emoji" onClick={() => setEmojiOpen((v) => !v)}>
+                    <Button variant="ghost" size="icon" title="Emoji" className="h-9 w-9 rounded-xl shrink-0" onClick={() => setEmojiOpen((v) => !v)}>
                       <span className="text-base leading-none">😊</span>
                     </Button>
                     {emojiOpen && (
@@ -1513,7 +1513,7 @@ function ChannelChatsPage() {
                         e.target.value = ""
                       }}
                     />
-                    <Button variant="ghost" size="icon" asChild>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl shrink-0" asChild>
                       <span>
                         <Paperclip className="h-4 w-4" />
                       </span>
@@ -1526,7 +1526,7 @@ function ChannelChatsPage() {
                       value={texto}
                       onChange={(e) => setTexto(e.target.value)}
                       placeholder="Digite uma mensagem"
-                      className="min-h-9 w-full resize-none"
+                      className="min-h-9 max-h-40 w-full resize-none overflow-y-auto border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       rows={1}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
@@ -1538,18 +1538,20 @@ function ChannelChatsPage() {
                     <CorretorBaloes textareaRef={textareaRef} texto={texto} correcoes={correcoes} onAplicar={aplicarCorrecao} />
                   </div>
                   {texto.trim() ? (
-                    <Button size="icon" onClick={enviar} disabled={enviando}>
+                    <Button size="icon" onClick={enviar} disabled={enviando} className="h-9 w-9 rounded-xl shrink-0 bg-gradient-to-br from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white shadow-[0_2px_8px_rgba(14,165,233,0.35)]">
                       <Send className="h-4 w-4" />
                     </Button>
                   ) : (
-                    <Button size="icon" variant="ghost" onClick={iniciarGravacao} disabled={enviando} title="Gravar áudio">
+                    <Button size="icon" variant="ghost" onClick={iniciarGravacao} disabled={enviando} title="Gravar áudio" className="h-9 w-9 rounded-xl shrink-0">
                       <Mic className="h-4 w-4" />
                     </Button>
                   )}
                 </div>
+                </div>
                 {corretorErro && <p className="text-[10px] text-muted-foreground px-3 pb-1.5">{corretorErro}</p>}
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
         )}
       </div>
@@ -1693,68 +1695,142 @@ function EditarRespostaProntaDialog({
   )
 }
 
-// Player de áudio simples (play/pause + barra de progresso) no lugar do <audio controls> nativo
-// do navegador — só estética, o <audio> real por baixo continua sendo o mesmo elemento que já
-// funciona com mediaUrl() (Basic Auth via token).
-function AudioPlayerMensagem({ src }: { src: string }) {
+// Alturas de barra "tipo waveform" determinísticas a partir da URL — decorativas, mas cada áudio
+// sempre mostra o mesmo desenho (não re-sorteia a cada render).
+function barrasDe(seed: string, n: number): number[] {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
+  const out: number[] = []
+  for (let i = 0; i < n; i++) {
+    h = (h * 1103515245 + 12345) >>> 0
+    out.push(4 + (h % 15))
+  }
+  return out
+}
+
+// Player de áudio no formato do painel da Especitá: começa compacto (só o botão de play) e
+// EXPANDE ao tocar, mostrando onda + tempo. O que a equipe envia (`abrirPorPadrao`) já nasce
+// aberto, como no WhatsApp. O <audio> real por baixo continua usando mediaUrl() (token).
+function AudioPlayerMensagem({ src, abrirPorPadrao = false }: { src: string; abrirPorPadrao?: boolean }) {
   const audioRef = React.useRef<HTMLAudioElement>(null)
+  const [aberto, setAberto] = React.useState(abrirPorPadrao)
   const [tocando, setTocando] = React.useState(false)
   const [duracao, setDuracao] = React.useState(0)
   const [atual, setAtual] = React.useState(0)
   const [erro, setErro] = React.useState(false)
-
-  function atualizarDuracao(audio: HTMLAudioElement) {
-    setDuracao(Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0)
-  }
+  const barras = React.useMemo(() => barrasDe(src, 22), [src])
 
   function alternar() {
-    const a = audioRef.current
-    if (!a) return
+    const el = audioRef.current
+    if (!el) return
+    setAberto(true)
     setErro(false)
-    if (a.paused) a.play().catch(() => setErro(true))
-    else a.pause()
+    if (el.paused) el.play().catch(() => setErro(true))
+    else el.pause()
   }
 
-  const restante = Number.isFinite(duracao) && Number.isFinite(atual)
-    ? Math.max(0, Math.round(duracao - atual))
-    : 0
+  // Ogg/WebM sem duração no cabeçalho dá Infinity/NaN até o navegador descobrir o fim.
+  const duracaoValida = Number.isFinite(duracao) && duracao > 0
+  const pct = duracaoValida ? atual / duracao : 0
 
   return (
-    <div className="flex items-center gap-2 mb-1 w-full max-w-[260px]">
+    <motion.div layout transition={{ duration: 0.25, ease: "easeOut" }} className="flex items-center gap-2.5 py-0.5 mb-1">
       <audio
         ref={audioRef}
         src={src}
         preload="metadata"
+        onLoadedMetadata={(e) => setDuracao(e.currentTarget.duration || 0)}
+        onDurationChange={(e) => setDuracao(e.currentTarget.duration || 0)}
+        onTimeUpdate={(e) => setAtual(e.currentTarget.currentTime || 0)}
         onPlay={() => setTocando(true)}
         onPause={() => setTocando(false)}
         onEnded={() => setTocando(false)}
-        onLoadedMetadata={(e) => atualizarDuracao(e.currentTarget)}
-        onDurationChange={(e) => atualizarDuracao(e.currentTarget)}
-        onTimeUpdate={(e) => {
-          const tempo = e.currentTarget.currentTime
-          setAtual(Number.isFinite(tempo) ? tempo : 0)
-          atualizarDuracao(e.currentTarget)
+        onError={() => {
+          setErro(true)
+          setTocando(false)
         }}
-        onError={() => { setErro(true); setTocando(false) }}
         className="hidden"
       />
       <button
         type="button"
         onClick={alternar}
-        className="h-7 w-7 shrink-0 rounded-full bg-black/10 hover:bg-black/20 flex items-center justify-center"
+        className="h-8 w-8 rounded-full bg-[#0E7C6B] text-white flex items-center justify-center shrink-0 active:scale-95 transition-transform"
+        aria-label={tocando ? "Pausar áudio" : "Tocar áudio"}
       >
-        {tocando ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+        {tocando ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
       </button>
-      <div className="flex-1 h-1 rounded-full bg-black/15 overflow-hidden">
-        <div
-          className="h-full bg-current opacity-70"
-          style={{ width: duracao ? `${Math.min(100, (atual / duracao) * 100)}%` : "0%" }}
-        />
-      </div>
-      <span className={`text-[10px] tabular-nums shrink-0 ${erro ? "text-red-600" : "opacity-70"}`}>
-        {erro ? "Erro" : duracao > 0 ? formatGravacao(restante) : "0:00"}
+      <AnimatePresence initial={false}>
+        {aberto && (
+          <motion.div
+            layout
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="flex flex-col gap-1 min-w-[150px]"
+          >
+            <div className="flex items-center gap-[2.5px] h-6">
+              {barras.map((h, i) => (
+                <span
+                  key={i}
+                  className={`w-[2.5px] rounded-full shrink-0 bg-current transition-opacity duration-150 ${
+                    i / barras.length <= pct ? "opacity-90" : "opacity-30"
+                  }`}
+                  style={{ height: h }}
+                />
+              ))}
+            </div>
+            <span className={`text-[10px] tabular-nums ${erro ? "text-red-500" : "opacity-70"}`}>
+              {erro
+                ? "Erro ao tocar"
+                : `${formatGravacao(Math.round(atual))} / ${duracaoValida ? formatGravacao(Math.round(duracao)) : "--:--"}`}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+// Barra de gravação no formato da Especitá: cápsula compacta com ponto vermelho pulsando, barras
+// "dançando" (feedback visual, não é o volume real) e cronômetro.
+function GravadorBar({ segundos, onCancelar, onEnviar }: { segundos: number; onCancelar: () => void; onEnviar: () => void }) {
+  const [tick, setTick] = React.useState(0)
+  React.useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 180)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ type: "spring", damping: 26, stiffness: 320 }}
+      className="w-fit max-w-[640px] flex items-center gap-3 px-3 py-2 rounded-full border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/20 shadow-sm"
+    >
+      <Button variant="ghost" size="icon" onClick={onCancelar} title="Cancelar gravação" className="shrink-0 h-8 w-8">
+        <X className="h-4 w-4" />
+      </Button>
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
       </span>
-    </div>
+      <div className="flex gap-0.5 items-center shrink-0">
+        {[...Array(24)].map((_, i) => (
+          <span
+            key={i}
+            className="w-[2.5px] bg-red-500/70 rounded-full transition-all duration-150"
+            style={{ height: 3 + ((Math.sin((tick + i) * 0.7) + 1) / 2) * 14 }}
+          />
+        ))}
+      </div>
+      <span className="text-sm tabular-nums text-muted-foreground shrink-0">{formatGravacao(segundos)}</span>
+      <Button size="icon" onClick={onEnviar} title="Enviar áudio" className="shrink-0 h-8 w-8 rounded-full bg-[#0E7C6B] hover:bg-[#0c6a5b]">
+        <Send className="h-4 w-4" />
+      </Button>
+    </motion.div>
   )
 }
 

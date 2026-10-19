@@ -5,6 +5,8 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const busboy = require("busboy");
+const { spawn } = require("child_process");
+const ffmpegPath = require("ffmpeg-static");
 
 const db = require("./db");
 const wa = require("./whatsapp");
@@ -828,12 +830,56 @@ function salvarVideoPublicar(dataUrl) {
 }
 
 // Igual a salvarVideoPublicar, mas áudio — usado pelo anexo de áudio no reply do painel.
-function salvarAudioPublicar(dataUrl) {
-  const match = /^data:(audio\/[a-zA-Z0-9.+-]+);base64,(.+)$/.exec(dataUrl || "");
+// (?:;[^,]*)? absorve parâmetro extra antes do ";base64," (ex: "audio/ogg;codecs=opus" — o
+// MediaRecorder do navegador manda o mimeType completo assim). Sem isso todo áudio GRAVADO no
+// painel falhava com "Formato de áudio inválido" (só anexo por arquivo passava).
+function decodificarAudioBase64(dataUrl) {
+  const match = /^data:(audio\/[a-zA-Z0-9.+-]+)(?:;[^,]*)?;base64,(.+)$/.exec(dataUrl || "");
   if (!match) throw new Error("Formato de áudio inválido");
-  const ext = EXT_BY_MIME[match[1]] || "ogg";
+  return { buffer: Buffer.from(match[2], "base64"), contentType: match[1], ext: EXT_BY_MIME[match[1]] || "ogg" };
+}
+
+// A Cloud API só aceita estes por link; o Chrome grava em WebM (mesmo Opus por dentro) e a Meta
+// recusa com "Unsupported Audio mime type".
+const AUDIO_MIME_ACEITOS_WHATSAPP = new Set(["audio/aac", "audio/mp4", "audio/amr", "audio/mpeg", "audio/ogg"]);
+
+// Reempacota WebM/Opus -> Ogg/Opus em memória (pipe do ffmpeg), sem tocar o disco.
+function transcodarParaOggOpus(buffer) {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn(ffmpegPath, ["-i", "pipe:0", "-c:a", "libopus", "-f", "ogg", "pipe:1"]);
+    const chunks = [];
+    let stderr = "";
+    ffmpeg.stdout.on("data", (chunk) => chunks.push(chunk));
+    ffmpeg.stderr.on("data", (chunk) => (stderr += chunk.toString()));
+    ffmpeg.on("error", reject);
+    ffmpeg.on("close", (code) => {
+      if (code === 0 && chunks.length) resolve(Buffer.concat(chunks));
+      else reject(new Error(`Não deu pra converter o áudio pro formato do WhatsApp (ffmpeg ${code}): ${stderr.slice(-400)}`));
+    });
+    ffmpeg.stdin.on("error", () => {});
+    ffmpeg.stdin.end(buffer);
+  });
+}
+
+// Converte se preciso e grava no R2 (clientes/) — persiste a deploy, o painel toca via /media/.
+// Devolve { url (assinada, pro WhatsApp buscar), mediaPath (persistente, pro painel) }.
+async function salvarAudioR2(dataUrl) {
+  let { buffer, contentType, ext } = decodificarAudioBase64(dataUrl);
+  if (!AUDIO_MIME_ACEITOS_WHATSAPP.has(contentType)) {
+    buffer = await transcodarParaOggOpus(buffer);
+    contentType = "audio/ogg";
+    ext = "ogg";
+  }
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  fs.writeFileSync(path.join(PUBLICAR_MEDIA_DIR, filename), Buffer.from(match[2], "base64"));
+  await r2.enviarVideo(`clientes/${filename}`, buffer, contentType);
+  return { url: await r2.urlAssinada(`clientes/${filename}`, 900), mediaPath: `/media/${filename}` };
+}
+
+// Versão em disco, só pro chat do site (salvarMidiaSite) — não passa pelo WhatsApp.
+function salvarAudioPublicar(dataUrl) {
+  const { buffer, ext } = decodificarAudioBase64(dataUrl);
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  fs.writeFileSync(path.join(PUBLICAR_MEDIA_DIR, filename), buffer);
   return filename;
 }
 
@@ -6541,6 +6587,7 @@ const server = http.createServer(async (req, res) => {
       let imagemUrl = null;
       let videoUrl = null;
       let audioUrl = null;
+      let audioMediaPath = null;
       let documentUrl = null;
       if (body.imagemBase64) {
         try {
@@ -6558,8 +6605,9 @@ const server = http.createServer(async (req, res) => {
         }
       } else if (body.audioBase64) {
         try {
-          const filename = salvarAudioPublicar(body.audioBase64);
-          audioUrl = `https://${req.headers.host}/publicar-media/${filename}`;
+          const salvo = await salvarAudioR2(body.audioBase64);
+          audioUrl = salvo.url;
+          audioMediaPath = salvo.mediaPath;
         } catch (err) {
           return send(res, 400, { error: err.message });
         }
@@ -6597,7 +6645,7 @@ const server = http.createServer(async (req, res) => {
         direction: "out",
         type: imagemUrl ? "image" : videoUrl ? "video" : audioUrl ? "audio" : documentUrl ? "document" : "text",
         body: texto || (documentUrl ? body.documentNome : null) || null,
-        media_path: imagemUrl || videoUrl || audioUrl || documentUrl,
+        media_path: imagemUrl || videoUrl || audioMediaPath || documentUrl,
         wa_message_id: waId,
         status: "sent",
         // origem = nome de quem está logado (veio do reply do painel, uma pessoa digitou) —
