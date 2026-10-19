@@ -1708,33 +1708,48 @@ function barrasDe(seed: string, n: number): number[] {
   return out
 }
 
-// Player de áudio no formato do painel da Especitá: começa compacto (só o botão de play) e
-// EXPANDE ao tocar, mostrando onda + tempo. O que a equipe envia (`abrirPorPadrao`) já nasce
-// aberto, como no WhatsApp. O <audio> real por baixo continua usando mediaUrl() (token).
-function AudioPlayerMensagem({ src, abrirPorPadrao = false }: { src: string; abrirPorPadrao?: boolean }) {
+// Player de áudio — sempre aberto (enviado e recebido): botão de play, onda clicável pra pular
+// pro ponto desejado, tempo e velocidade (1x/1.5x/2x). `abrirPorPadrao` ficou só por
+// compatibilidade com quem chama; o visual agora é o mesmo nos dois lados. O <audio> real por
+// baixo continua usando mediaUrl() (token).
+function AudioPlayerMensagem({ src }: { src: string; abrirPorPadrao?: boolean }) {
   const audioRef = React.useRef<HTMLAudioElement>(null)
-  const [aberto, setAberto] = React.useState(abrirPorPadrao)
   const [tocando, setTocando] = React.useState(false)
   const [duracao, setDuracao] = React.useState(0)
   const [atual, setAtual] = React.useState(0)
   const [erro, setErro] = React.useState(false)
-  const barras = React.useMemo(() => barrasDe(src, 22), [src])
+  const [velocidade, setVelocidade] = React.useState(1)
+  const barras = React.useMemo(() => barrasDe(src, 36), [src])
 
   function alternar() {
     const el = audioRef.current
     if (!el) return
-    setAberto(true)
     setErro(false)
     if (el.paused) el.play().catch(() => setErro(true))
     else el.pause()
   }
 
+  function pular(e: React.MouseEvent<HTMLDivElement>) {
+    const el = audioRef.current
+    if (!el || !(Number.isFinite(el.duration) && el.duration > 0)) return
+    const r = e.currentTarget.getBoundingClientRect()
+    el.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * el.duration
+    setAtual(el.currentTime)
+  }
+
+  function trocarVelocidade() {
+    const prox = velocidade === 1 ? 1.5 : velocidade === 1.5 ? 2 : 1
+    setVelocidade(prox)
+    if (audioRef.current) audioRef.current.playbackRate = prox
+  }
+
   // Ogg/WebM sem duração no cabeçalho dá Infinity/NaN até o navegador descobrir o fim.
   const duracaoValida = Number.isFinite(duracao) && duracao > 0
-  const pct = duracaoValida ? atual / duracao : 0
+  const pct = duracaoValida ? Math.min(1, atual / duracao) : 0
+  const tempo = duracaoValida ? (tocando || atual > 0 ? atual : duracao) : atual
 
   return (
-    <motion.div layout transition={{ duration: 0.25, ease: "easeOut" }} className="flex items-center gap-2.5 py-0.5 mb-1">
+    <div className="flex items-center gap-3 mb-1 w-[270px] max-w-full">
       <audio
         ref={audioRef}
         src={src}
@@ -1744,7 +1759,10 @@ function AudioPlayerMensagem({ src, abrirPorPadrao = false }: { src: string; abr
         onTimeUpdate={(e) => setAtual(e.currentTarget.currentTime || 0)}
         onPlay={() => setTocando(true)}
         onPause={() => setTocando(false)}
-        onEnded={() => setTocando(false)}
+        onEnded={() => {
+          setTocando(false)
+          setAtual(0)
+        }}
         onError={() => {
           setErro(true)
           setTocando(false)
@@ -1754,41 +1772,38 @@ function AudioPlayerMensagem({ src, abrirPorPadrao = false }: { src: string; abr
       <button
         type="button"
         onClick={alternar}
-        className="h-8 w-8 rounded-full bg-[#0E7C6B] text-white flex items-center justify-center shrink-0 active:scale-95 transition-transform"
+        className="h-10 w-10 rounded-full bg-[#0E7C6B] hover:bg-[#0c6a5b] text-white flex items-center justify-center shrink-0 shadow-sm active:scale-95 transition-all"
         aria-label={tocando ? "Pausar áudio" : "Tocar áudio"}
       >
-        {tocando ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 ml-0.5" />}
+        {tocando ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 ml-0.5 fill-current" />}
       </button>
-      <AnimatePresence initial={false}>
-        {aberto && (
-          <motion.div
-            layout
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="flex flex-col gap-1 min-w-[150px]"
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-[2px] h-7 cursor-pointer" onClick={pular}>
+          {barras.map((h, i) => (
+            <span
+              key={i}
+              className={`flex-1 max-w-[4px] rounded-full bg-current transition-opacity duration-150 ${
+                i / barras.length < pct ? "opacity-95" : "opacity-30"
+              }`}
+              style={{ height: h + 4 }}
+            />
+          ))}
+        </div>
+        <div className="flex items-center justify-between text-[10px] tabular-nums">
+          <span className={erro ? "text-red-500" : "opacity-70"}>
+            {erro ? "Erro ao tocar" : formatGravacao(Math.round(tempo))}
+          </span>
+          <button
+            type="button"
+            onClick={trocarVelocidade}
+            title="Velocidade"
+            className="rounded-full border border-current px-1.5 py-px font-medium opacity-60 hover:opacity-100"
           >
-            <div className="flex items-center gap-[2.5px] h-6">
-              {barras.map((h, i) => (
-                <span
-                  key={i}
-                  className={`w-[2.5px] rounded-full shrink-0 bg-current transition-opacity duration-150 ${
-                    i / barras.length <= pct ? "opacity-90" : "opacity-30"
-                  }`}
-                  style={{ height: h }}
-                />
-              ))}
-            </div>
-            <span className={`text-[10px] tabular-nums ${erro ? "text-red-500" : "opacity-70"}`}>
-              {erro
-                ? "Erro ao tocar"
-                : `${formatGravacao(Math.round(atual))} / ${duracaoValida ? formatGravacao(Math.round(duracao)) : "--:--"}`}
-            </span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+            {velocidade}x
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
