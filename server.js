@@ -1598,6 +1598,27 @@ async function capturarContatoEBoasVindas(de, businessNumberId, nome, email, pre
   }
 }
 
+// Sincronização com o Google Contatos a cada mensagem recebida (fire-and-forget, nunca lança):
+// se o telefone JÁ está salvo no Google, o nome do Google passa a ser o nome da conversa no
+// painel (em todos os canais do mesmo telefone); se NÃO está, salva lá (nome do perfil do
+// WhatsApp, ou só o telefone). Ciahot fica de fora — é outro negócio, não mistura com os
+// contatos da Felizcred/Cota Certa. Sem Google configurado/autorizado, não faz nada.
+const googleSyncIgnora = (businessNumberId) => businessNumberId === CIAHOT_NUMBER_ID;
+async function sincronizarContatoGoogle(telefone, businessNumberId, nomePerfil) {
+  if (!google.configurado() || googleSyncIgnora(businessNumberId)) return;
+  try {
+    const r = await google.garantirContato({ telefone, nomePerfil });
+    if (!r) return;
+    if (r.resourceName) db.salvarGoogleContactResourceName(telefone, businessNumberId, r.resourceName).catch(() => {});
+    if (r.existente && r.nome) {
+      await db.renomearConversa(telefone, businessNumberId, r.nome);
+      await db.propagarIdentidadeContato(telefone, businessNumberId, { nome: r.nome });
+    }
+  } catch (err) {
+    console.error("Erro ao sincronizar contato com o Google:", err.message);
+  }
+}
+
 // Confirmação de dados recebidos + aviso de horário — reaproveitada pelos funis que pedem
 // dados e entregam pro atendimento humano (CLT, carro em garantia, financiamento, FGTS).
 // `corpo` é a mensagem que completou os dados — se tiver e-mail nela e ainda não tivermos
@@ -4861,6 +4882,7 @@ async function processarEntry(entry) {
         const conversaInativa = !ultimaRecebida || quando - Number(ultimaRecebida) > HORAS_INATIVIDADE_MENU * 60 * 60 * 1000;
 
         await db.upsertConversation(de, businessNumberId, nome, quando);
+        sincronizarContatoGoogle(de, businessNumberId, nome);
 
         const base = {
           phone: de,
@@ -6000,7 +6022,7 @@ const server = http.createServer(async (req, res) => {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Antes da consulta, preciso confirmar: você tem mais de 3 meses de registro no trabalho atual?");
               cltStep = "eligibility";
             } else if (!row && cpfInformado) {
-              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "CPF recebido. Informe também seu celular com DDD no formulário abaixo para enviarmos a autorização da Facta pelo WhatsApp.");
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "CPF recebido. Vou usar o celular informado no início do atendimento para enviar a autorização da Facta pelo WhatsApp.");
               cltStep = "start";
             } else if (!row && (pediuSimulacao || produtoDetectado === "Empréstimo CLT") && !jaPerguntouTempo) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
@@ -7289,6 +7311,48 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       try {
         return send(res, 200, await google.listarContatosGoogle());
+      } catch (err) {
+        return send(res, 502, { error: err.message });
+      }
+    }
+
+    // POST /painel/api/google/sincronizar — passa por TODAS as conversas de WhatsApp: as que já
+    // estão no Google Contatos ganham o nome de lá; com { criarFaltantes: true }, as que já
+    // escreveram mas não estão no Google são salvas lá (até 300 por vez, nome do perfil do
+    // WhatsApp). Ciahot fica de fora. Devolve contagens pra mostrar no painel.
+    if (req.method === "POST" && path_ === "/painel/api/google/sincronizar") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        const mapa = await google.mapaContatos(true);
+        const conversas = (await db.conversasParaSincronizarGoogle()).filter((c) => !googleSyncIgnora(c.businessNumberId));
+        let renomeadas = 0;
+        let criados = 0;
+        let faltantes = 0;
+        const jaTratados = new Set();
+        for (const c of conversas) {
+          const chave = google.chaveTelefone(c.phone);
+          const achado = mapa.get(chave);
+          if (achado?.nome) {
+            if (c.name !== achado.nome) {
+              await db.renomearConversa(c.phone, c.businessNumberId, achado.nome);
+              renomeadas++;
+            }
+          } else if (!achado && c.jaEscreveu && !jaTratados.has(chave)) {
+            jaTratados.add(chave);
+            if (body.criarFaltantes && criados < 300) {
+              try {
+                await google.garantirContato({ telefone: c.phone, nomePerfil: c.name });
+                criados++;
+              } catch (err) {
+                console.error("Erro ao criar contato no Google (sincronização):", err.message);
+              }
+            } else {
+              faltantes++;
+            }
+          }
+        }
+        return send(res, 200, { totalNoGoogle: mapa.size, renomeadas, criados, faltantes });
       } catch (err) {
         return send(res, 502, { error: err.message });
       }

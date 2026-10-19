@@ -285,7 +285,87 @@ async function criarEvento({ calendarioId = "primary", titulo, descricao, inicio
   });
 }
 
+// ─── Sincronização automática (nome do Google no painel + salvar quem ainda não existe) ──────
+// Chave de comparação de telefone tolerante a DDI (55) e ao 9º dígito dos celulares BR:
+// DDD + últimos 8 dígitos. Sem DDD (menos de 10 dígitos) usa só os últimos 8.
+function chaveTelefone(tel) {
+  let d = String(tel || "").replace(/\D/g, "");
+  if (d.startsWith("55") && d.length >= 12) d = d.slice(2);
+  if (d.length >= 10) return d.slice(0, 2) + d.slice(-8);
+  return d.length >= 8 ? d.slice(-8) : "";
+}
+
+// Todos os contatos (paginado, sem o teto de 1000 do listarContatosGoogle), indexados por chave
+// de telefone. Cache em memória de 10 min — o webhook consulta a cada mensagem recebida.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+let cacheContatos = null; // { em, porChave: Map<chave, { nome, resourceName }> }
+let cacheCarregando = null;
+
+async function carregarTodosContatos() {
+  const accessToken = await obterAccessToken();
+  const porChave = new Map();
+  let pageToken = "";
+  do {
+    const params = new URLSearchParams({ personFields: "names,phoneNumbers", pageSize: "1000" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const json = await requestJson("GET", "people.googleapis.com", `/v1/people/me/connections?${params}`, { accessToken });
+    for (const p of json.connections || []) {
+      const nome = p.names?.[0]?.displayName || null;
+      for (const t of p.phoneNumbers || []) {
+        const chave = chaveTelefone(t.canonicalForm || t.value);
+        if (chave && !porChave.has(chave)) porChave.set(chave, { nome, resourceName: p.resourceName });
+      }
+    }
+    pageToken = json.nextPageToken || "";
+  } while (pageToken);
+  return porChave;
+}
+
+async function mapaContatos(forcar = false) {
+  if (!forcar && cacheContatos && Date.now() - cacheContatos.em < CACHE_TTL_MS) return cacheContatos.porChave;
+  if (!cacheCarregando) {
+    cacheCarregando = carregarTodosContatos()
+      .then((porChave) => {
+        cacheContatos = { em: Date.now(), porChave };
+        return porChave;
+      })
+      .finally(() => {
+        cacheCarregando = null;
+      });
+  }
+  return cacheCarregando;
+}
+
+function configurado() {
+  return Boolean(CLIENT_ID && CLIENT_SECRET);
+}
+
+// Garante o contato no Google: devolve { existente: true, nome, resourceName } se já havia, ou
+// cria (nome do perfil do WhatsApp, ou só o telefone) e devolve { existente: false, ... }.
+// Registra no cache ANTES da chamada de criação pra duas mensagens em rajada não criarem duas vezes.
+async function garantirContato({ telefone, nomePerfil }) {
+  const mapa = await mapaContatos();
+  const chave = chaveTelefone(telefone);
+  if (!chave) return null;
+  const achado = mapa.get(chave);
+  if (achado) return { existente: true, ...achado };
+  const novo = { nome: nomePerfil || null, resourceName: null };
+  mapa.set(chave, novo);
+  try {
+    const criado = await criarContato({ nome: nomePerfil || null, telefone });
+    novo.resourceName = criado.resourceName || null;
+    return { existente: false, ...novo };
+  } catch (err) {
+    mapa.delete(chave);
+    throw err;
+  }
+}
+
 module.exports = {
+  configurado,
+  chaveTelefone,
+  mapaContatos,
+  garantirContato,
   urlAutorizacao,
   trocarCodigoPorToken,
   criarContato,

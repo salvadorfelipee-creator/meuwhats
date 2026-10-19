@@ -613,6 +613,14 @@ export const api = {
       { method: "POST", body: JSON.stringify({ contatos }) },
     ),
 
+  // Sincroniza TODAS as conversas com o Google Contatos: nome do Google nas que já estão salvas;
+  // com criarFaltantes, salva no Google quem já escreveu e ainda não está lá.
+  googleSincronizar: (criarFaltantes = false) =>
+    request<{ totalNoGoogle: number; renomeadas: number; criados: number; faltantes: number }>(
+      "/painel/api/google/sincronizar",
+      { method: "POST", body: JSON.stringify({ criarFaltantes }) },
+    ),
+
   googleContatos: () => request<GoogleContato[]>("/painel/api/google/contatos"),
 
   // ── Roteador em código (fluxos hardcoded de cada número, tela Fluxos) ───────────────────

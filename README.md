@@ -812,6 +812,18 @@ o formulário também dispara (fire-and-forget, não bloqueia o fluxo) um `POST`
   envio de e-mail falha silenciosamente (só loga erro) mas o lead **continua sendo salvo** no
   banco — o `try/catch` em volta do e-mail não bloqueia o `try/catch` em volta do save.
 
+### Sincronização automática com o Google Contatos (19/10/2026)
+
+A cada mensagem recebida no WhatsApp (`sincronizarContatoGoogle` em `server.js`, fire-and-forget):
+telefone **já salvo** no Google → o nome do Google vira o nome da conversa no painel (todos os
+canais do mesmo telefone); telefone **não salvo** → é criado no Google (nome do perfil do
+WhatsApp, ou só o número). Comparação por DDD + últimos 8 dígitos (`chaveTelefone` em `google.js`,
+tolera DDI 55 e o 9º dígito). Lista completa paginada, em cache de memória por 10 min. **Ciahot
+fica de fora** (outro negócio). Sem `GOOGLE_CLIENT_ID/SECRET` + autorização feita, não faz nada.
+Botão **Sincronizar Google** na tela Contatos (`POST /painel/api/google/sincronizar`): aplica o
+nome do Google nas conversas antigas e, se confirmado, salva no Google (até 300 por vez) quem já
+escreveu e não está lá. O nome do Google sobrescreve o do perfil do WhatsApp a cada mensagem.
+
 ### Captura de contato do WhatsApp → Google Contacts + boas-vindas (24/08/2026)
 
 Os funis automáticos do WhatsApp que pedem "nome, CPF, telefone, e-mail" numa mensagem só (CLT,

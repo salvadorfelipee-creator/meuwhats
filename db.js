@@ -3171,6 +3171,22 @@ async function whatsappFalhasRecentes(businessNumberId, desdeMs) {
 
 // ─── CRM/IA/Retornos (portado do painel da Especitá, partes gerais — ver README) ────────────
 
+// Conversas de WhatsApp (exclui Instagram/e-mail) pra sincronização em massa com o Google
+// Contatos — só as que o cliente já escreveu alguma vez (campanha sem resposta não vira contato).
+async function conversasParaSincronizarGoogle() {
+  await ready;
+  const result = await client.execute(
+    `SELECT phone, business_number_id, name, last_inbound_at FROM conversations
+     WHERE business_number_id GLOB '[0-9]*' AND phone GLOB '[0-9]*'`
+  );
+  return result.rows.map((r) => ({
+    phone: String(r.phone),
+    businessNumberId: String(r.business_number_id),
+    name: r.name ? String(r.name) : null,
+    jaEscreveu: r.last_inbound_at != null,
+  }));
+}
+
 async function renomearConversa(phone, businessNumberId, nome) {
   await ready;
   await client.execute({
@@ -3933,6 +3949,7 @@ module.exports = {
   tagEncontrarOuCriar,
   campoPersonalizadoEncontrarOuCriar,
   renomearConversa,
+  conversasParaSincronizarGoogle,
   definirFotoContato,
   propagarIdentidadeContato,
   salvarGoogleContactResourceName,

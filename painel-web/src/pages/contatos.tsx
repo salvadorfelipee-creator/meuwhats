@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SidebarTrigger } from "@/components/blocks/sidebar"
-import { Users, Phone, AtSign as InstagramIcon, Search, Megaphone, Download, Mail, Contact, X, Upload, FileSpreadsheet } from "lucide-react"
+import { Users, Phone, AtSign as InstagramIcon, Search, Megaphone, Download, Mail, Contact, X, Upload, FileSpreadsheet, RefreshCw } from "lucide-react"
 import { CampanhaWhatsAppWizard } from "@/pages/campanha-whatsapp-wizard"
 
 // Diretório de contatos cross-canal (15/10/2026) — porte da tela equivalente construída pra
@@ -863,6 +863,30 @@ export function ContatosPage({
 
   const chaveDe = (c: Contato) => `${c.business_number_id}-${c.phone}`
 
+  const [sincronizando, setSincronizando] = React.useState(false)
+  async function sincronizarGoogle() {
+    setSincronizando(true)
+    try {
+      const r = await api.googleSincronizar(false)
+      let msg = `${r.totalNoGoogle} contatos no Google. ${r.renomeadas} conversas receberam o nome do Google.`
+      if (r.faltantes > 0 && window.confirm(`${msg}
+
+${r.faltantes} clientes que já escreveram ainda não estão no Google. Salvar agora (até 300 por vez)?`)) {
+        const r2 = await api.googleSincronizar(true)
+        msg = `${r2.criados} contatos salvos no Google.`
+      } else if (r.faltantes === 0) {
+        alert(msg)
+      }
+      if (r.faltantes > 0 && !msg.includes("salvos")) alert(msg)
+      else if (msg.includes("salvos")) alert(msg)
+      carregar()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erro ao sincronizar com o Google")
+    } finally {
+      setSincronizando(false)
+    }
+  }
+
   const carregar = React.useCallback(() => {
     setCarregando(true)
     api
@@ -960,6 +984,9 @@ export function ContatosPage({
           <div className="flex items-center gap-2 shrink-0">
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => exportarCsv(contatos, channels)} disabled={!contatos.length}>
               <Download className="h-3.5 w-3.5" /> Exportar CSV
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={sincronizarGoogle} disabled={sincronizando}>
+              <RefreshCw className={`h-3.5 w-3.5 ${sincronizando ? "animate-spin" : ""}`} /> {sincronizando ? "Sincronizando..." : "Sincronizar Google"}
             </Button>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setImportarAberto(true)} disabled={!canaisWhatsapp.length}>
               <Upload className="h-3.5 w-3.5" /> Importar contatos
