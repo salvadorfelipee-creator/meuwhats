@@ -25,6 +25,7 @@ const flowCrypto = require("./flow-crypto");
 const google = require("./google");
 const mcp = require("./mcp");
 const gemini = require("./gemini");
+const siteChatRules = require("./site-chat-rules");
 const { notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarEmail } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
@@ -1604,10 +1605,22 @@ async function capturarContatoEBoasVindas(de, businessNumberId, nome, email, pre
 // WhatsApp, ou só o telefone). Ciahot fica de fora — é outro negócio, não mistura com os
 // contatos da Felizcred/Cota Certa. Sem Google configurado/autorizado, não faz nada.
 const googleSyncIgnora = (businessNumberId) => businessNumberId === CIAHOT_NUMBER_ID;
-async function sincronizarContatoGoogle(telefone, businessNumberId, nomePerfil) {
+// Regra do CPF: quem digita o CPF e ainda não está no Google Contatos é salvo como
+// "FGTS <nome> <CPF>" (ou "FGTS <CPF>" quando não há nome). Vale pra campanha, site e qualquer entrada.
+function extrairCpfDaMensagem(texto) {
+  const candidatos = String(texto || "").match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{11}/g) || [];
+  return candidatos.map((c) => c.replace(/\D/g, "")).find((c) => novosaque.cpfValido(c)) || null;
+}
+function nomeContatoComCpf(cpf, nome) {
+  const nomeLimpo = String(nome || "").trim();
+  const nomeReal = nomeLimpo && !/^\+?[\d\s()-]+$/.test(nomeLimpo) ? nomeLimpo : "";
+  return ["FGTS", nomeReal, cpf].filter(Boolean).join(" ");
+}
+
+async function sincronizarContatoGoogle(telefone, businessNumberId, nomePerfil, nomeNovo) {
   if (!google.configurado() || googleSyncIgnora(businessNumberId)) return;
   try {
-    const r = await google.garantirContato({ telefone, nomePerfil });
+    const r = await google.garantirContato({ telefone, nomePerfil: nomeNovo || nomePerfil });
     if (!r) return;
     if (r.resourceName) db.salvarGoogleContactResourceName(telefone, businessNumberId, r.resourceName).catch(() => {});
     if (r.existente && r.nome) {
@@ -4882,7 +4895,8 @@ async function processarEntry(entry) {
         const conversaInativa = !ultimaRecebida || quando - Number(ultimaRecebida) > HORAS_INATIVIDADE_MENU * 60 * 60 * 1000;
 
         await db.upsertConversation(de, businessNumberId, nome, quando);
-        sincronizarContatoGoogle(de, businessNumberId, nome);
+        const cpfNaMensagem = tipo === "text" ? extrairCpfDaMensagem(msg.text?.body) : null;
+        sincronizarContatoGoogle(de, businessNumberId, nome, cpfNaMensagem ? nomeContatoComCpf(cpfNaMensagem, nome) : null);
 
         const base = {
           phone: de,
@@ -5747,6 +5761,13 @@ const server = http.createServer(async (req, res) => {
             if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
             if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
+            // Regra do CPF: o cliente que digitou o CPF e ainda não está no Google Contatos é salvo
+            // como "FGTS <nome> <CPF>". Não bloqueia o atendimento se o Google falhar.
+            if (google.configurado()) {
+              const telefoneGoogle = phone.startsWith("55") && phone.length >= 12 ? phone : `55${phone}`;
+              google.garantirContato({ telefone: telefoneGoogle, nomePerfil: nomeContatoComCpf(cpf, fullName) })
+                .catch((err) => console.error("Erro ao salvar contato do site com CPF no Google:", err.message));
+            }
             let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO", trackingToken: crypto.randomBytes(32).toString("base64url") });
             row = await db.siteChatCltAtualizar(id, { facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }) });
             await db.siteChatFunilEvento(id, "dados_minimos_enviados", "cpf_consentimento", "facta");
@@ -5963,6 +5984,15 @@ const server = http.createServer(async (req, res) => {
           await db.siteChatFunilEvento(id, "intencao_humano", "duvida", conversation.produto_tag || null);
           await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Claro. Para eu ajudar primeiro, diga em poucas palavras qual é a sua dúvida.");
           return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: false }, corsHeaders);
+        }
+        // Escalonamento determinístico: se o visitante precisou repetir a mesma solicitação,
+        // não deixamos o Gemini insistir na mesma resposta. A mensagem atual já foi salva acima,
+        // portanto duas ocorrências semelhantes nas mensagens recentes significam repetição real.
+        const mensagensRecentes = (await db.siteChatMensagens(id)).slice(-12);
+        if (message && siteChatRules.solicitacaoRepetida(message, mensagensRecentes)) {
+          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.encaminhamentoWhatsAppPorRepeticao());
+          await db.siteChatFunilEvento(id, "handoff_whatsapp_repeticao", "atendimento", conversation.produto_tag || null);
+          return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoffWhatsapp: true }, corsHeaders);
         }
         const pediuClt = /\b(clt|consignado(?:\s+(?:clt|privado))?|carteira assinada|cr[eé]dito (?:do |para o )?trabalhador)\b/i.test(message);
         let conversaClt = pediuClt || conversation.produto_tag === "Empréstimo CLT";
