@@ -361,7 +361,31 @@ async function garantirContato({ telefone, nomePerfil }) {
   }
 }
 
+// Exportação completa (19k+ contatos): todas as páginas, com nome, telefones e e-mails. Usada pela
+// rota GET /painel/api/google/exportar-csv pra gerar o arquivo de backup/limpeza.
+async function listarTodosContatosCompletos() {
+  const accessToken = await obterAccessToken();
+  const contatos = [];
+  let pageToken = "";
+  do {
+    const params = new URLSearchParams({ personFields: "names,phoneNumbers,emailAddresses", pageSize: "1000" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const json = await requestJson("GET", "people.googleapis.com", `/v1/people/me/connections?${params}`, { accessToken });
+    for (const p of json.connections || []) {
+      contatos.push({
+        resourceName: p.resourceName,
+        nome: p.names?.[0]?.displayName || "",
+        telefones: (p.phoneNumbers || []).map((t) => t.value).filter(Boolean),
+        emails: (p.emailAddresses || []).map((e) => e.value).filter(Boolean),
+      });
+    }
+    pageToken = json.nextPageToken || "";
+  } while (pageToken);
+  return contatos;
+}
+
 module.exports = {
+  listarTodosContatosCompletos,
   configurado,
   chaveTelefone,
   mapaContatos,

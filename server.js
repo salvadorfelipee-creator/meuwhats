@@ -7358,6 +7358,27 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    // GET /painel/api/google/exportar-csv — baixa TODOS os contatos da conta Google autorizada em
+    // CSV (nome, telefones, e-mails), pra limpeza/organização fora do Google. Só leitura.
+    if (req.method === "GET" && path_ === "/painel/api/google/exportar-csv") {
+      if (!requireAuth(req, res)) return;
+      try {
+        const contatos = await google.listarTodosContatosCompletos();
+        const escapar = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+        const linhas = [["nome", "telefones", "emails"].map(escapar).join(",")];
+        for (const c of contatos) {
+          linhas.push([c.nome, c.telefones.join(" ; "), c.emails.join(" ; ")].map(escapar).join(","));
+        }
+        const data = new Date().toISOString().slice(0, 10);
+        return send(res, 200, Buffer.from("﻿" + linhas.join("\r\n"), "utf8"), {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="contatos-google-${data}.csv"`,
+        });
+      } catch (err) {
+        return send(res, 502, { error: err.message });
+      }
+    }
+
     // GET /painel/api/google/conta — qual conta Google está autorizada agora (e-mail), pra
     // mostrar na tela de importar contatos.
     if (req.method === "GET" && path_ === "/painel/api/google/conta") {
