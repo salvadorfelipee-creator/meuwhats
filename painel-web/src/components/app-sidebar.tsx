@@ -106,11 +106,12 @@ export function AppSidebar({
   onAbrirConversa: (channelId: string, phone: string) => void
 }) {
   const { toggleSidebar } = useSidebar()
-  const { channels, current, setCurrent } = useChannel()
+  const { channels, current, setCurrent, todos, setTodos } = useChannel()
   const { unreadChannels, hasAnyUnread } = useUnread()
   const { logout } = useAuth()
 
   function selecionarCanal(c: Channel) {
+    setTodos(false)
     setCurrent(c)
   }
 
@@ -176,7 +177,7 @@ export function AppSidebar({
                       </span>
                     )}
                   </span>
-                  <span className="truncate">{current?.label ?? "Canal"}</span>
+                  <span className="truncate">{todos ? "FelizCred (todos)" : current?.label ?? "Canal"}</span>
                   <ChevronUp className="ml-auto" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -187,6 +188,12 @@ export function AppSidebar({
                   return <React.Fragment key={company}>
                     {index > 0 && <DropdownMenuSeparator />}
                     <DropdownMenuLabel>{COMPANY_LABELS[company]}</DropdownMenuLabel>
+                    {company === "felizcred" && (
+                      <DropdownMenuItem onClick={() => setTodos(true)} className="gap-2 font-medium">
+                        <MessageCircle />
+                        <span className="flex-1">Todos os canais</span>
+                      </DropdownMenuItem>
+                    )}
                     {items.map((c) => (
                       <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
                         {c.kind === "instagram" ? <InstagramIcon /> : c.kind === "site" ? <Globe2 /> : <Phone />}

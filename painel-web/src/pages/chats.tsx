@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context"
 import {
   api,
   type Conversation,
+  type SiteChatConversation,
   type Message,
   type RespostaPronta,
   type TemplateInfo,
@@ -56,6 +57,7 @@ import {
   Paperclip,
   Info,
   MessagesSquare,
+  MessageCircle,
   Radio,
   Bell,
   BellOff,
@@ -239,13 +241,25 @@ const TIPO_SEM_DADOS_LABEL: Record<string, string> = {
 }
 
 export function ChatsPage() {
-  const { current } = useChannel()
-  if (current?.kind === "site") return <SiteChatPage embedded />
+  const { current, todos } = useChannel()
+  if (current?.kind === "site" && !todos) return <SiteChatPage embedded />
   return <ChannelChatsPage />
 }
 
 function ChannelChatsPage() {
-  const { channels, current, setCurrent } = useChannel()
+  const { channels, current: canalDoMenu, setCurrent, todos, setTodos } = useChannel()
+  // Visão "todas da FelizCred": a lista junta WhatsApp principal, Campanha CLT e Instagram; cada
+  // conversa guarda de qual canal é (selectedBiz) e `current` passa a ser o canal DA CONVERSA
+  // aberta — assim enviar, renomear, finalizar etc. continuam indo pro canal certo.
+  const canaisTodos = React.useMemo(
+    () => channels.filter((c) => c.company === "felizcred" && c.kind !== "site"),
+    [channels],
+  )
+  const canaisTodosKey = canaisTodos.map((c) => c.id).join(",")
+  const [selectedBiz, setSelectedBiz] = React.useState<string | null>(null)
+  const current = todos
+    ? channels.find((c) => c.id === selectedBiz) ?? canaisTodos[0] ?? canalDoMenu
+    : canalDoMenu
   const {
     notifPermission,
     requestNotifPermission,
@@ -255,6 +269,7 @@ function ChannelChatsPage() {
     markConversationSeen,
     setActiveConversation,
     alvoAbrir,
+    abrirConversa,
     limparAlvoAbrir,
   } = useUnread()
   const { identidade } = useAuth()
@@ -322,11 +337,29 @@ function ChannelChatsPage() {
   }, [carregarRespostas])
 
   const carregarConversas = React.useCallback(() => {
-    if (!current) return
-    api.conversations(current.id, { finalizadas: mostrarFinalizadas }).then(setConversations).catch(() => {})
-  }, [current, mostrarFinalizadas])
+    if (todos) {
+      if (!canaisTodos.length) return
+      Promise.all(
+        canaisTodos.map((c) =>
+          api
+            .conversations(c.id, { finalizadas: mostrarFinalizadas })
+            .then((lista) => lista.map((conv) => ({ ...conv, business_number_id: c.id })))
+            .catch(() => [] as Conversation[]),
+        ),
+      )
+        .then((listas) =>
+          setConversations(listas.flat().sort((a, b) => (b.last_message_at || 0) - (a.last_message_at || 0))),
+        )
+        .catch(() => {})
+      return
+    }
+    if (!canalDoMenu) return
+    api.conversations(canalDoMenu.id, { finalizadas: mostrarFinalizadas }).then(setConversations).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todos, canaisTodosKey, canalDoMenu, mostrarFinalizadas])
 
   function selecionarCanal(c: Channel) {
+    setTodos(false)
     setCurrent(c)
   }
 
@@ -392,21 +425,54 @@ function ChannelChatsPage() {
     return () => window.removeEventListener("focus", marcarLidaSeEmFoco)
   }, [marcarLidaSeEmFoco])
 
+  // Chat seguro do site (outro modelo de dados — abre na tela própria dele): aparece na visão
+  // "todos" só como atalhos das conversas abertas, no topo da lista.
+  const [siteAbertas, setSiteAbertas] = React.useState<SiteChatConversation[]>([])
+  const canalSite = channels.find((c) => c.kind === "site")
+  React.useEffect(() => {
+    if (!todos) return
+    const buscar = () => {
+      if (document.hidden) return
+      api
+        .siteChatConversas()
+        .then((l) => setSiteAbertas(l.filter((c) => c.status === "open").sort((x, y) => y.updated_at - x.updated_at).slice(0, 15)))
+        .catch(() => {})
+    }
+    buscar()
+    const id = setInterval(buscar, 10000)
+    return () => clearInterval(id)
+  }, [todos])
+
+  const listaKey = todos ? "todos" : canalDoMenu?.id
   React.useEffect(() => {
     setSelected(null)
+    setSelectedBiz(null)
     setMessages([])
+    setConversations([])
     carregarConversas()
-  }, [current, carregarConversas])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listaKey, mostrarFinalizadas])
+
+  React.useEffect(() => {
+    carregarConversas()
+  }, [carregarConversas])
 
   // Clique numa notificação do navegador (ver unread-context.tsx) pede pra abrir uma conversa
   // específica — só aplica quando o canal já trocou pro certo (senão abriria o contato errado
   // num canal errado por uma fração de segundo). Roda DEPOIS do efeito acima de propósito
   // (mesma troca de canal zera `selected` pra null primeiro).
   React.useEffect(() => {
-    if (!alvoAbrir || !current || alvoAbrir.channelId !== current.id) return
+    if (!alvoAbrir || !current) return
+    if (todos && canaisTodos.some((c) => c.id === alvoAbrir.channelId)) {
+      setSelectedBiz(alvoAbrir.channelId)
+      setSelected(alvoAbrir.phone)
+      limparAlvoAbrir()
+      return
+    }
+    if (alvoAbrir.channelId !== current.id) return
     setSelected(alvoAbrir.phone)
     limparAlvoAbrir()
-  }, [alvoAbrir, current, limparAlvoAbrir])
+  }, [alvoAbrir, current, todos, canaisTodos, limparAlvoAbrir])
 
   // Troca de conversa reseta a janela de histórico, a trava de "sem mais antigas" e qualquer
   // reply pendente — nenhum desses estados deve sobreviver pra conversa seguinte.
@@ -479,7 +545,8 @@ function ChannelChatsPage() {
     }
   }, [messages])
 
-  const conversaAtual = conversations.find((c) => c.phone === selected) || null
+  const conversaAtual =
+    conversations.find((c) => c.phone === selected && (!todos || c.business_number_id === current?.id)) || null
 
   const listaFiltrada = conversations.filter((c) => {
     const alvo = `${c.name || ""} ${c.phone}`.toLowerCase()
@@ -797,7 +864,7 @@ function ChannelChatsPage() {
                 <button className="text-left rounded-md px-1 -mx-1 py-0.5 hover:bg-accent flex items-center gap-1">
                   <div>
                     <p className="font-semibold text-sm">Conversas</p>
-                    <p className="text-xs text-muted-foreground">{current.label}</p>
+                    <p className="text-xs text-muted-foreground">{todos ? "FelizCred (todos os canais)" : current.label}</p>
                   </div>
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 </button>
@@ -809,6 +876,13 @@ function ChannelChatsPage() {
                   return <React.Fragment key={company}>
                     {index > 0 && <DropdownMenuSeparator />}
                     <DropdownMenuLabel>{COMPANY_LABELS[company]}</DropdownMenuLabel>
+                    {company === "felizcred" && (
+                      <DropdownMenuItem onClick={() => setTodos(true)} className="gap-2 font-medium">
+                        <MessageCircle className="h-4 w-4" />
+                        <span className="flex-1">Todos os canais</span>
+                        {todos && <Check className="h-3.5 w-3.5" />}
+                      </DropdownMenuItem>
+                    )}
                     {items.map((c) => (
                       <DropdownMenuItem key={c.id} onClick={() => selecionarCanal(c)} className="gap-2">
                         {c.kind === "instagram" ? <InstagramIcon className="h-4 w-4" /> : c.kind === "site" ? <Globe2 className="h-4 w-4" /> : <Phone className="h-4 w-4" />}
@@ -875,29 +949,50 @@ function ChannelChatsPage() {
               </p>
             )}
             <div className="flex flex-col gap-1 p-2">
+            {todos && canalSite && siteAbertas.filter((c) => `${c.name} ${c.contact || ""}`.toLowerCase().includes(search.toLowerCase())).map((c) => (
+              <button
+                key={`site|${c.id}`}
+                onClick={() => {
+                  setCurrent(canalSite)
+                  abrirConversa("site", c.id)
+                }}
+                className="w-full p-2.5 rounded-lg text-left hover:bg-accent/50 flex items-center gap-2.5"
+              >
+                <span className="h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
+                  <Globe2 className="h-4 w-4" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-medium">{c.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">Site · {c.last_message || "Conversa iniciada"}</span>
+                </span>
+                <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(c.updated_at)}</span>
+              </button>
+            ))}
             {listaFiltrada.map((c) => {
-              const naoLida = current ? unreadConversations.has(`${current.id}|${c.phone}`) : false
+              const canalId = todos ? c.business_number_id : current?.id
+              const naoLida = canalId ? unreadConversations.has(`${canalId}|${c.phone}`) : false
               // Pisca só pra quem bate a regra de urgência (ver conversaEhUrgente em api.ts) —
               // sem isso, uma conversa não lida sempre "chama atenção" igual pra todo mundo.
               const urgente = naoLida && conversaEhUrgente(c, identidade)
               // Alerta universal: última mensagem foi do cliente e ninguém (bot nem humano)
               // respondeu há mais de 30min — independente de etapa/status/quem está logado.
-              const semResposta = current ? overdueConversations.has(`${current.id}|${c.phone}`) : false
+              const semResposta = canalId ? overdueConversations.has(`${canalId}|${c.phone}`) : false
               const espera = tempoEspera(c)
               const campos = camposDe(c)
               const tags = tagsDe(c)
               const estagiosLista = pipelineEstagiosPara(current?.label)
               const estagio = estagiosLista.find((e) => e.id === c.pipeline_estagio)
-              const ehInstagram = c.channel === "instagram" || current?.id === "instagram"
+              const ehInstagram = c.channel === "instagram" || c.business_number_id === "instagram" || (!todos && current?.id === "instagram")
               return (
               <button
-                key={c.phone}
+                key={`${c.business_number_id}|${c.phone}`}
                 onClick={() => {
                   setSelected(c.phone)
-                  if (current) markConversationSeen(current.id, c.phone)
+                  if (todos) setSelectedBiz(c.business_number_id)
+                  if (canalId) markConversationSeen(canalId, c.phone)
                 }}
                 className={`w-full p-2.5 rounded-lg cursor-pointer text-left transition-colors relative ${
-                  selected === c.phone
+                  selected === c.phone && (!todos || current?.id === c.business_number_id)
                     ? "bg-accent"
                     : semResposta
                     ? "bg-red-500/10 dark:bg-red-500/15 animate-pulse"
@@ -1404,7 +1499,7 @@ function ChannelChatsPage() {
                 <div className="px-2 pt-2 flex items-center gap-1.5 flex-wrap">
                   {[...respostas]
                     .sort((a, b) => (b.uso_count || 0) - (a.uso_count || 0))
-                    .slice(0, 3)
+                    .slice(0, 8)
                     .map((r) => (
                       <button
                         key={r.id}

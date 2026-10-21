@@ -20,7 +20,13 @@ export const COMPANY_LABELS: Record<CompanyId, string> = {
 type ChannelContextValue = {
   channels: Channel[]
   current: Channel | null
+  // Troca de canal por código (abrir conversa vinda de notificação, Hoje, Pipeline...): se a visão
+  // "todas da FelizCred" está ligada e o destino é WhatsApp/Instagram da FelizCred, ela continua.
   setCurrent: (channel: Channel) => void
+  // Visão "todas da FelizCred": WhatsApp principal + Campanha CLT + Instagram (e o Site, que abre
+  // em tela própria) numa lista só. Escolher um canal específico no menu desliga.
+  todos: boolean
+  setTodos: (v: boolean) => void
   loading: boolean
 }
 
@@ -28,15 +34,21 @@ const ChannelContext = React.createContext<ChannelContextValue | null>(null)
 
 export function ChannelProvider({ children }: { children: React.ReactNode }) {
   const [numbers, setNumbers] = React.useState<PhoneNumber[]>([])
-  const [current, setCurrent] = React.useState<Channel | null>(null)
+  const [current, setCurrentRaw] = React.useState<Channel | null>(null)
   const [loading, setLoading] = React.useState(true)
+  const [todos, setTodos] = React.useState(true)
+
+  const setCurrent = React.useCallback((channel: Channel) => {
+    setCurrentRaw(channel)
+    if (!(channel.company === "felizcred" && channel.kind !== "site")) setTodos(false)
+  }, [])
 
   React.useEffect(() => {
     api
       .numbers()
       .then((list) => {
         setNumbers(list)
-        if (list.length) setCurrent({ id: list[0].id, label: list[0].label, kind: "whatsapp", company: companyForLabel(list[0].label) })
+        if (list.length) setCurrentRaw({ id: list[0].id, label: list[0].label, kind: "whatsapp", company: companyForLabel(list[0].label) })
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -52,8 +64,8 @@ export function ChannelProvider({ children }: { children: React.ReactNode }) {
   )
 
   const value = React.useMemo(
-    () => ({ channels, current, setCurrent, loading }),
-    [channels, current, loading],
+    () => ({ channels, current, setCurrent, todos, setTodos, loading }),
+    [channels, current, setCurrent, todos, loading],
   )
 
   return <ChannelContext.Provider value={value}>{children}</ChannelContext.Provider>

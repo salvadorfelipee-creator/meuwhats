@@ -1595,7 +1595,7 @@ async function respostaProntaCriar(atalho, texto) {
     sql: `INSERT INTO respostas_prontas (atalho, texto, created_at) VALUES (?, ?, ?)`,
     args: [atalho, texto, Date.now()],
   });
-  return result.lastInsertRowid;
+  return Number(result.lastInsertRowid);
 }
 
 async function respostaProntaExcluir(id) {
@@ -1773,7 +1773,7 @@ async function insertMessage(msg) {
       args: [phone, business_number_id],
     });
   }
-  return result.lastInsertRowid;
+  return Number(result.lastInsertRowid);
 }
 
 // Chamado quando um humano abre a conversa no painel (GET .../messages) — é a ÚNICA coisa
