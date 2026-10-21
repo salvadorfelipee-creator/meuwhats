@@ -1125,6 +1125,8 @@ const RESPOSTAS_BOTAO = {
 };
 
 async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes, lista, cta) {
+  // Atendente humano respondeu pelo painel: bot pausado nessa conversa até religar ou vencer a janela.
+  if (await db.botEstaPausado(phone, businessNumberId)) return;
   const result = cta
     ? await wa.sendCtaUrl(businessNumberId, phone, texto, cta.buttonText, cta.url)
     : lista
@@ -4892,6 +4894,7 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
     tipo === "button" ? msg.button?.text || "" :
     tipo === "interactive" ? msg.interactive?.button_reply?.title || "" : "";
   if (!texto || pediuPararMensagens(texto)) return false;
+  if (await db.botEstaPausado(de, businessNumberId)) return false; // atendente humano em atendimento
 
   const passoCompleto = String(conversaAnterior?.fluxo_passo || "");
   const ehConsignado = passoCompleto.startsWith("consignado_");
@@ -5104,6 +5107,7 @@ async function processarEntry(entry) {
             }
           } else if (normalizarTexto(corpo) === "menu") {
             try {
+              await db.pausarBot(de, businessNumberId, null);
               await dispararInicioFluxo(fluxo, de, businessNumberId);
               mensagemJaTratada = true;
             } catch (err) {
@@ -6868,6 +6872,8 @@ const server = http.createServer(async (req, res) => {
       await db.upsertConversation(phone, businessId, null, now);
       // Atendente humano assumiu — cancela lembrete automático pendente
       await db.setFluxoPasso(phone, businessId, null);
+      // Pausa o bot por 24h (a janela de atendimento); cada nova resposta do atendente renova.
+      await db.pausarBot(phone, businessId, now + 24 * 60 * 60 * 1000);
       await db.insertMessage({
         phone,
         business_number_id: businessId,
@@ -6901,6 +6907,7 @@ const server = http.createServer(async (req, res) => {
       const phone = decodeURIComponent(matchReabrirFluxo[2]);
       if (businessId === "instagram") return send(res, 400, { error: "Instagram não tem fluxo automático pra reabrir" });
       try {
+        await db.pausarBot(phone, businessId, null);
         await dispararInicioFluxo(await getFluxo(businessId, phone), phone, businessId);
         return send(res, 200, { ok: true });
       } catch (err) {
