@@ -2,6 +2,12 @@
 
 const http = require("http");
 const crypto = require("crypto");
+const dns = require("dns");
+const net = require("net");
+
+// A Facta libera só o IPv4 de saída (179.221.201.100). Sem isso, o Node usa o IPv6 da máquina e recebe 403 do Cloudflare.
+dns.setDefaultResultOrder("ipv4first");
+net.setDefaultAutoSelectFamily(false);
 
 const PORT = Number(process.env.FACTA_BRIDGE_PORT || 8787);
 const HOST = process.env.FACTA_BRIDGE_HOST || "127.0.0.1";
