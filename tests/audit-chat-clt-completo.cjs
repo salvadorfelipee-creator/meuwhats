@@ -37,7 +37,12 @@ function json(route, body, status = 200) {
     }
     if (req.method() === "POST") {
       const body = req.postDataJSON()
-      if (/sim, tenho/i.test(body.message || "")) return json(route, { ok: true, clt: true, cltStep: "start" }, 201)
+      if (/sim, tenho/i.test(body.message || "")) {
+        messages.push({ id: messages.length + 1, direction: "visitor", body: body.message, created_at: Date.now() })
+        messages.push({ id: messages.length + 1, direction: "agent", body: "Perfeito! Agora digite seu CPF para iniciarmos a simulação.", sender_name: "Assistente FelizCred", created_at: Date.now() })
+        return json(route, { ok: true, clt: true, cltStep: "start" }, 201)
+      }
+      if (/^\d{11}$/.test(String(body.message || "").replace(/\D/g, ""))) return json(route, { ok: true, clt: true, cltStep: "start" }, 201)
       if (/ainda não/i.test(body.message || "")) return json(route, { ok: true, clt: true, cltStep: "ineligible" }, 201)
     }
     return json(route, { ok: true, clt: true })
@@ -59,10 +64,10 @@ function json(route, body, status = 200) {
     const inicioResposta = Date.now()
     await page.locator('[data-tenure="yes"]').click()
     await page.locator(".fc-chat-typing.show").waitFor()
-    await page.locator('.fc-clt-card[data-action="start"]').waitFor()
+    await page.locator('.fc-chat-compose textarea[placeholder*="CPF"]').waitFor()
     assert.ok(Date.now() - inicioResposta >= 1400, "a resposta deve respeitar o atraso de digitação")
-    await page.locator('.fc-clt-card[data-action="start"] input[name="cpf"]').fill("083.619.439-00")
-    await page.locator('.fc-clt-card[data-action="start"]').evaluate((form) => form.requestSubmit())
+    await page.locator('.fc-chat-compose textarea').fill("08361943900")
+    await page.locator('.fc-chat-compose').evaluate((form) => form.requestSubmit())
     await page.locator('a[href="https://banco.example/autorizar"]').waitFor()
 
     clt = {
