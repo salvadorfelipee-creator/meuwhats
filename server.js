@@ -320,6 +320,17 @@ async function notificarEtapaFactaPorEmail(row, etapa) {
   await enviarAtualizacaoChatFelizcred({ nome: conversation.name, email: conversation.email, titulo: conteudo[0], mensagem: conteudo[1] });
 }
 
+// A autorização do cliente na Facta vale por um tempo. Antes de pedir uma nova, confere se a consulta já
+// responde com dados do trabalhador: se sim, o cliente pula a etapa de autorizar de novo.
+async function autorizacaoFactaVigente(cpf) {
+  try {
+    const resposta = await facta.consultarTrabalhador(cpf);
+    return !respostaFactaComErro(resposta) && dadosTrabalhadorFacta(resposta).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function sincronizarSiteChatFacta(row) {
   if (!row) return row;
   if (["aguardando_assinatura_facta", "proposta_em_analise"].includes(row.etapa) && row.codigo_proposta) {
@@ -418,6 +429,13 @@ async function sincronizarSiteChatClt(row) {
       return await sincronizarSiteChatFacta(row);
     } catch (err) {
       console.error(`Erro ao sincronizar Facta no site (${row.conversation_id}):`, err.message);
+      const retornoFacta = `${err.message} ${JSON.stringify(err.factaResponse || "")}`;
+      if (/token expirado|necess[aá]rio.*autoriza|n[aã]o autoriz|sem autoriza/i.test(retornoFacta)) {
+        return db.siteChatCltAtualizar(row.conversation_id, {
+          status_novosaque: "AGUARDANDO_AUTORIZACAO",
+          error_message: "Ainda não vimos sua autorização. Abra a mensagem da Facta no WhatsApp, toque no link para autorizar e depois toque aqui de novo.",
+        }).catch(() => row);
+      }
       return db.siteChatCltAtualizar(row.conversation_id, {
         error_message: "Não conseguimos confirmar sua autorização agora. Aguarde um instante e tente novamente.",
       }).catch(() => row);
@@ -5991,7 +6009,9 @@ const server = http.createServer(async (req, res) => {
             await db.siteChatFunilEvento(id, "provedor_tentado", "solicitando_autorizacao", "facta");
             await db.siteChatDefinirProduto(id, "Empréstimo CLT");
             await db.siteChatDefinirPipeline(id, "qualificacao");
-            const authorization = await facta.solicitarAutorizacao({ nome: fullName, cpf, celular: formatarCelularFacta(phone) });
+            const authorization = (await autorizacaoFactaVigente(cpf))
+              ? { mensagem: "Cliente não necessita de autorização" }
+              : await facta.solicitarAutorizacao({ nome: fullName, cpf, celular: formatarCelularFacta(phone) });
             const authMessage = mensagemFacta(authorization);
             if (respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage)) {
               await db.siteChatFunilEvento(id, "saida", "erro_autorizacao", "facta", "erro_autorizacao");
@@ -6009,7 +6029,7 @@ const server = http.createServer(async (req, res) => {
               });
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", alreadyAuthorized
                 ? "Sua autorização ainda está válida. Já estamos consultando suas condições."
-                : "Enviamos a autorização da Facta para seu WhatsApp. Autorize a consulta e depois volte aqui para continuar.");
+                : "Enviamos a autorização da Facta para seu WhatsApp. Abra o WhatsApp, toque no link da mensagem e autorize a consulta. Depois volte aqui: sua simulação fica salva nesta mesma tela, é só tocar em Já autorizei.");
               if (alreadyAuthorized) row = await sincronizarSiteChatFacta(row);
             }
             return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
@@ -6033,7 +6053,10 @@ const server = http.createServer(async (req, res) => {
             const cpf = novosaque.cpfValido(cpfNovo) ? cpfNovo : atual.cpf;
             if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
-            const authorization = await facta.solicitarAutorizacao({ nome: fullName, cpf: cpf, celular: formatarCelularFacta(phone) });
+            const vigente = await autorizacaoFactaVigente(cpf);
+            const authorization = vigente
+              ? { mensagem: "Cliente não necessita de autorização" }
+              : await facta.solicitarAutorizacao({ nome: fullName, cpf: cpf, celular: formatarCelularFacta(phone) });
             const authMessage = mensagemFacta(authorization);
             const failed = respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage);
             const row = await db.siteChatCltAtualizar(id, {
@@ -6041,10 +6064,14 @@ const server = http.createServer(async (req, res) => {
               cpf,
               facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }),
               etapa: failed ? "erro_autorizacao" : "autorizacao_enviada",
-              status_novosaque: failed ? "ERRO_AUTORIZACAO" : "AUTORIZACAO_REENVIADA",
+              status_novosaque: failed ? "ERRO_AUTORIZACAO" : vigente ? "JA_AUTORIZADO" : "AUTORIZACAO_REENVIADA",
               authorization_requested_at: Date.now(), authorization_checked_at: null,
               error_message: failed ? authMessage : null,
             });
+            if (vigente && !failed) {
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Sua autorização ainda está válida. Já estamos consultando suas condições.");
+              return send(res, 200, { clt: siteChatCltPublico(await sincronizarSiteChatFacta(row)) }, corsHeaders);
+            }
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
           if (action === "select-offer") {
