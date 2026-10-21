@@ -324,7 +324,7 @@ async function notificarEtapaFactaPorEmail(row, etapa) {
 function emailDeClienteReal(email) {
   const e = String(email || "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return false;
-  return !/@example\.|@felizcred\.com\.br$|^teste|auditoria/.test(e);
+  return !/@example\.|@felizcred\.com\.br$|^teste|auditoria|^salvador\.felipe/.test(e); // inclui os e-mails do próprio dono
 }
 
 // Varredura: cliente do chat do site que parou no meio (2h a 48h sem escrever) recebe UM e-mail de retomada, conforme
