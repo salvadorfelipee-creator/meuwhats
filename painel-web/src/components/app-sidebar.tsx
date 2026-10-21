@@ -24,6 +24,7 @@ import { useAuth } from "@/lib/auth-context"
 import { RetornosNavItem } from "@/components/retornos-nav-item"
 import { MinhasConversasMenuItem } from "@/components/minhas-conversas-menu"
 import { NotificationCenter } from "@/components/notification-center"
+import { FactaStatusLed } from "@/components/facta-status-led"
 import {
   MessageCircle,
   CalendarDays,
@@ -165,6 +166,7 @@ export function AppSidebar({
 
       <SidebarFooter>
         <SidebarMenu>
+          <FactaStatusLed />
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

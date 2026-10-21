@@ -537,6 +537,7 @@ export const api = {
   // ── Identidade e usuários (login por pessoa) ─────────────────────────────────────────────
   me: () => request<Identidade>("/painel/api/me"),
 
+  factaStatus: () => request<{ ok: boolean; checadoEm: number; erro?: string }>("/painel/api/facta/status"),
   siteChatConversas: () => request<SiteChatConversation[]>("/painel/api/site-chat/conversations"),
   siteChatConversa: (id: string) =>
     request<{ conversation: SiteChatConversation; messages: SiteChatMessage[]; clt: SiteChatClt | null }>(

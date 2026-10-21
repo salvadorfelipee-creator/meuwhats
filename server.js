@@ -7865,6 +7865,23 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ips: [...ips], modoDireto: process.env.FACTA_DIRECT === "true", tamanhos: { usuario: tam("FACTA_USERNAME"), senha: tam("FACTA_PASSWORD"), ambiente: String(process.env.FACTA_ENV || "") } });
     }
 
+    // GET /painel/api/facta/status — luz do painel: a ligação com a Facta (IP liberado, credenciais e serviço no ar)
+    // está funcionando? Faz uma consulta leve só de leitura e guarda o resultado por 45s.
+    if (req.method === "GET" && path_ === "/painel/api/facta/status") {
+      if (!requireAuth(req, res)) return;
+      if (!global.__factaStatus || Date.now() - global.__factaStatus.checadoEm > 45_000) {
+        let status;
+        try {
+          await facta.consultarCombo("estado-civil");
+          status = { ok: true, checadoEm: Date.now() };
+        } catch (err) {
+          status = { ok: false, checadoEm: Date.now(), erro: String(err.message || "falha").slice(0, 120), httpStatus: err.httpStatus || null };
+        }
+        global.__factaStatus = status;
+      }
+      return send(res, 200, { ...global.__factaStatus, modoDireto: process.env.FACTA_DIRECT === "true" });
+    }
+
     // GET /painel/api/facta/teste — só leitura: gera o token e consulta o status de autorização de um CPF
     // (?cpf=...) pelo caminho em uso (ponte ou direto). Devolve só o resumo, sem dados do trabalhador.
     if (req.method === "GET" && path_ === "/painel/api/facta/teste") {
