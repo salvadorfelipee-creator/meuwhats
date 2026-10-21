@@ -40,7 +40,7 @@ fiel ao site no ar.
   veio no export — decidido deixar sem, por enquanto.
 - **Números de WhatsApp inconsistentes** no site original — preservados como
   estão, não eram problema desta migração:
-  - Home: `wa.me/554797059353`
+  - Home: `wa.me/554792747368`
   - Blog: `wa.me/554796864687`
   - Guia/Seguro: `(47) 3514-3392` (`554735143392`)
 - **Formulário do `/seguro`**: usa EmailJS, mas as credenciais ainda são

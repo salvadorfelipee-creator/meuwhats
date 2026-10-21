@@ -3771,6 +3771,11 @@ async function siteChatFinalizarAntigas(desde) {
   return Number(r.rowsAffected || 0);
 }
 
+async function siteChatDefinirNome(id, name) {
+  await ready;
+  await client.execute({ sql: `UPDATE site_chat_conversations SET name = ? WHERE id = ?`, args: [name, id] });
+}
+
 async function siteChatMarcarLida(id) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET last_read_at = ? WHERE id = ?`, args: [Date.now(), id] });
@@ -4159,6 +4164,7 @@ module.exports = {
   apagarConversa,
   planoLimpezaConversas,
   broadcastDiagnostico,
+  siteChatDefinirNome,
   pausarBot,
   botEstaPausado,
   siteChatFinalizarAntigas,

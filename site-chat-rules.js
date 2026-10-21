@@ -1,4 +1,4 @@
-const WHATSAPP_FELIZCRED = "https://wa.me/554797059353?text=Ol%C3%A1%2C%20vim%20pelo%20chat%20do%20site%20e%20preciso%20continuar%20meu%20atendimento";
+const WHATSAPP_FELIZCRED = "https://wa.me/554792747368?text=Ol%C3%A1%2C%20vim%20pelo%20chat%20do%20site%20e%20preciso%20continuar%20meu%20atendimento";
 
 function normalizar(texto) {
   return String(texto || "")

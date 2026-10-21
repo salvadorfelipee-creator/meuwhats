@@ -6217,7 +6217,8 @@ const server = http.createServer(async (req, res) => {
         // não deixamos o Gemini insistir na mesma resposta. A mensagem atual já foi salva acima,
         // portanto duas ocorrências semelhantes nas mensagens recentes significam repetição real.
         const mensagensRecentes = (await db.siteChatMensagens(id)).slice(-12);
-        if (message && siteChatRules.solicitacaoRepetida(message, mensagensRecentes)) {
+        const mensagemEhCpf = message.replace(/\D/g, "").length === 11; // reenviar o CPF é tentar de novo, não repetição
+        if (message && !mensagemEhCpf && siteChatRules.solicitacaoRepetida(message, mensagensRecentes)) {
           await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.encaminhamentoWhatsAppPorRepeticao());
           await db.siteChatFunilEvento(id, "handoff_whatsapp_repeticao", "atendimento", conversation.produto_tag || null);
           return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoffWhatsapp: true }, corsHeaders);
@@ -6240,6 +6241,8 @@ const server = http.createServer(async (req, res) => {
           await db.siteChatDefinirProduto(id, produtoDetectado);
         }
         let cltStep = null;
+        let cltCpf = null;
+        let cltNome = null;
         if (message && conversaClt) {
           try {
             let row = await db.siteChatCltObter(id);
@@ -6263,6 +6266,15 @@ const server = http.createServer(async (req, res) => {
             const pediuSimulacao = /\b(clt|consignado|simula(?:r|ção)|empr[eé]stimo)\b/i.test(message);
             const jaPerguntouTempo = recentes.some((m) => m.direction === "agent" && /mais de 3 meses/i.test(m.body || ""));
             const atalhoSaida = siteChatRules.atalhoCltSemSaida(message, row);
+            const nomeCompletoValido = (n) => {
+              const nome = String(n || "").trim().replace(/\s+/g, " ");
+              return nome.split(" ").filter(Boolean).length >= 2 && nome.length <= 120 && /^[\p{L} .'-]+$/u.test(nome);
+            };
+            const perguntouNomeCompleto = recentes.slice(-3).some((m) => m.direction === "agent" && /nome completo, como est/i.test(m.body || ""));
+            const cpfAnterior = [...recentes].reverse()
+              .filter((m) => m.direction === "visitor")
+              .map((m) => String(m.body || "").replace(/\D/g, ""))
+              .find((dig) => dig.length === 11 && novosaque.cpfValido(dig)) || null;
 
             // As etapas obrigatórias são determinísticas. O Gemini cuida apenas da linguagem
             // livre e não pode voltar a qualificação depois da confirmação nem confundir CPF.
@@ -6283,9 +6295,20 @@ const server = http.createServer(async (req, res) => {
             } else if (!row && cpfInformado && !confirmouTempoAntes) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Antes da consulta, preciso confirmar: você tem mais de 3 meses de registro no trabalho atual?");
               cltStep = "eligibility";
+            } else if (!row && cpfInformado && !nomeCompletoValido(conversation.name)) {
+              // A Facta exige nome completo: sem ele a simulação nem começava e o chat ficava em silêncio.
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "CPF recebido. Para enviar a autorização da Facta, preciso do seu nome completo, como está no documento. Pode digitar aqui?");
+              cltStep = "need_name";
             } else if (!row && cpfInformado) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "CPF recebido. Vou usar o celular informado no início do atendimento para enviar a autorização da Facta pelo WhatsApp.");
               cltStep = "start";
+            } else if (!row && nomeCompletoValido(message) && perguntouNomeCompleto && cpfAnterior) {
+              const nomeLimpo = message.trim().replace(/\s+/g, " ").slice(0, 120);
+              await db.siteChatDefinirNome(id, nomeLimpo);
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Obrigado! Vou usar o celular informado no início do atendimento para enviar a autorização da Facta pelo WhatsApp.");
+              cltStep = "start_cpf";
+              cltCpf = cpfAnterior;
+              cltNome = nomeLimpo;
             } else if (!row && (pediuSimulacao || produtoDetectado === "Empréstimo CLT") && !jaPerguntouTempo) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
               cltStep = "eligibility";
@@ -6312,7 +6335,7 @@ const server = http.createServer(async (req, res) => {
             await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Posso ajudar com sua dúvida ou orientar você a iniciar uma simulação pelo chat.").catch(() => {});
           }
         }
-        return send(res, 201, { ok: true, clt: conversaClt, cltStep }, corsHeaders);
+        return send(res, 201, { ok: true, clt: conversaClt, cltStep, cltCpf, cltNome }, corsHeaders);
       }
     }
 
