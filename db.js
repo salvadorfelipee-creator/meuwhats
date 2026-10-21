@@ -1373,6 +1373,17 @@ async function tagEncontrarOuCriar(businessNumberId, nome, cor) {
   return criarTag(businessNumberId, nome, cor);
 }
 
+// Quando (ms) a conversa recebeu a tag de nome `nome`, ou null se não tem.
+async function tagDaConversaDesde(businessNumberId, phone, nome) {
+  await ready;
+  const r = await client.execute({
+    sql: `SELECT ct.created_at FROM conversation_tags ct JOIN tags t ON t.id = ct.tag_id
+          WHERE ct.business_number_id = ? AND ct.phone = ? AND t.nome = ? COLLATE NOCASE ORDER BY ct.created_at DESC LIMIT 1`,
+    args: [businessNumberId, phone, nome],
+  });
+  return r.rows[0] ? Number(r.rows[0].created_at) : null;
+}
+
 async function adicionarTagConversa(businessNumberId, phone, tagId, origem) {
   await ready;
   await client.execute({
@@ -4105,6 +4116,7 @@ module.exports = {
   respostaProntaAtualizar,
   respostaProntaRegistrarUso,
   tagEncontrarOuCriar,
+  tagDaConversaDesde,
   campoPersonalizadoEncontrarOuCriar,
   renomearConversa,
   conversasParaSincronizarGoogle,

@@ -1403,12 +1403,61 @@ async function handlerMenuPrincipal(de, businessNumberId, corpo) {
   // Não reconheceu a opção → fica no passo menu_inicial (mantém o lembrete sutil ativo)
 }
 
+// ─── REGRA: FGTS JÁ CONSULTADO ───────────────────────────────────────────────
+// A Caixa só permite o saque-aniversário uma vez a cada 12 meses. Quem já foi atendido sobre FGTS (CPF consultado
+// ou resposta de "já sacou" do atendente) ganha a tag abaixo; se voltar a escolher FGTS dentro de 12 meses, recebe a
+// explicação automática e a oferta do consignado CLT, em vez de repetir o fluxo.
+const TAG_FGTS_CONSULTADO = "FGTS já consultado";
+const DOZE_MESES_MS = 365 * 24 * 3600 * 1000;
+
+async function marcarFgtsConsultado(de, businessNumberId) {
+  try {
+    const tagId = await db.tagEncontrarOuCriar(businessNumberId, TAG_FGTS_CONSULTADO, "#b45309");
+    await db.adicionarTagConversa(businessNumberId, de, tagId, "automatico");
+  } catch (err) {
+    console.error("Erro ao marcar FGTS já consultado:", err.message);
+  }
+}
+
+async function fgtsJaConsultado(de, businessNumberId) {
+  try {
+    const desde = await db.tagDaConversaDesde(businessNumberId, de, TAG_FGTS_CONSULTADO);
+    return desde != null && Date.now() - desde < DOZE_MESES_MS;
+  } catch {
+    return false;
+  }
+}
+
+// Explica a regra e oferece o consignado CLT (mesmos botões e continuação do fluxo do consignado).
+async function responderFgtsJaConsultado(de, businessNumberId) {
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Oi! Como você já fez a consulta do FGTS esse ano, não será possível fazer novamente agora. " +
+      "A Caixa só permite o saque uma vez a cada 12 meses, contando da data do último saque."
+  );
+  await enviarRespostaAutomatica(
+    businessNumberId,
+    de,
+    "Mas posso simular o *consignado CLT* para você, com o primeiro desconto apenas para *60 dias*. Quer simular?",
+    BOTOES_OFERTA_CONSIGNADO
+  );
+  await db.setFluxoPasso(de, businessNumberId, "consignado_oferta");
+  try {
+    const tagId = await db.tagEncontrarOuCriar(businessNumberId, "Consignado CLT", "#15803D");
+    await db.adicionarTagConversa(businessNumberId, de, tagId, "automatico");
+  } catch (err) {
+    console.error("Erro ao adicionar tag do consignado:", err.message);
+  }
+}
+
 // Extraído da opção "5" do menu principal pra poder ser chamado direto — sem passar pelo menu
 // inteiro primeiro — quando a pessoa já escreve "fgts"/"saque" na primeira mensagem (ver
 // checagem em processarEntry, mesmo espírito da palavra-chave "menu"). Mesmo texto/fluxo já
 // usado no Instagram (autorizar a J17, depois mandar o CPF) — consistência entre os dois canais,
 // ver INSTAGRAM_OPCOES_MENU.
 async function iniciarFluxoFgtsMenu(de, businessNumberId) {
+  if (await fgtsJaConsultado(de, businessNumberId)) return responderFgtsJaConsultado(de, businessNumberId);
   await enviarRespostaAutomatica(
     businessNumberId,
     de,
@@ -1581,7 +1630,11 @@ const FLUXO_BOTOES = {
   // Escolhas da lista de produtos → confirma e passa pro atendimento humano
   prod_clt: encaminharCltParaSite,
   prod_inss: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO CONSIGNADO INSS") },
-  prod_fgts: { texto: PRODUTO_CONFIRMACAO("o SAQUE-ANIVERSÁRIO FGTS") },
+  prod_fgts: async (de, businessNumberId) => {
+    if (await fgtsJaConsultado(de, businessNumberId)) return responderFgtsJaConsultado(de, businessNumberId);
+    await enviarRespostaAutomatica(businessNumberId, de, PRODUTO_CONFIRMACAO("o SAQUE-ANIVERSÁRIO FGTS"));
+    await db.setFluxoPasso(de, businessNumberId, null);
+  },
   prod_carro: { texto: PRODUTO_CONFIRMACAO("o EMPRÉSTIMO COM CARRO EM GARANTIA") },
   prod_seguro: { texto: PRODUTO_CONFIRMACAO("o SEGURO VEICULAR") },
   prod_financiamento: { texto: PRODUTO_CONFIRMACAO("o FINANCIAMENTO DE VEÍCULO") },
@@ -1883,6 +1936,7 @@ const FGTSORIG_PRAZO_OFERTA_MS = 90 * 60 * 1000;
 const FGTSORIG_ETAPAS_COM_PRAZO = ["oferta_apresentada", "formulario", "enviando_kyc"];
 
 async function iniciarOriginacaoFgts(de, businessNumberId, cpf) {
+  if (unnotech.cpfValido(cpf)) await marcarFgtsConsultado(de, businessNumberId);
   if (!unnotech.cpfValido(cpf)) {
     // Achado na revisão final: REGEX_CPF só confere formato (11 dígitos), não dígito
     // verificador — sem essa checagem, um número de celular de 11 dígitos digitado por engano
@@ -4633,6 +4687,7 @@ const FGTSAD_TEXTO_PEDIR_CPF = "Certo! Agora me informa o CPF pra eu poder simul
 
 async function iniciarFluxoFgtsAnuncio(de, businessNumberId) {
   try {
+    if (await fgtsJaConsultado(de, businessNumberId)) return await responderFgtsJaConsultado(de, businessNumberId);
     await enviarRespostaAutomatica(businessNumberId, de, FGTSAD_TEXTO_APRESENTACAO, [
       { id: "fgtsad_autorizei", title: "JÁ AUTORIZEI" },
     ]);
@@ -7028,6 +7083,10 @@ const server = http.createServer(async (req, res) => {
       await db.upsertConversation(phone, businessId, null, now);
       // Atendente humano assumiu — cancela lembrete automático pendente
       await db.setFluxoPasso(phone, businessId, null);
+      // Atendente explicou que o FGTS já foi sacado/consultado (uma vez a cada 12 meses): marca a conversa.
+      if (businessId !== "instagram" && /j[aá] sacou|n[aã]o pode mais (fazer|sacar)|uma vez a cada 12 meses|1 vez a cada 12 meses/i.test(texto)) {
+        marcarFgtsConsultado(phone, businessId);
+      }
       // Pausa o bot por 24h (a janela de atendimento); cada nova resposta do atendente renova.
       await db.pausarBot(phone, businessId, now + 24 * 60 * 60 * 1000);
       await db.insertMessage({
