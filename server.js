@@ -7852,7 +7852,8 @@ const server = http.createServer(async (req, res) => {
           if (j?.ip) ips.add(j.ip);
         } catch {}
       }
-      return send(res, 200, { ips: [...ips], modoDireto: process.env.FACTA_DIRECT === "true" });
+      const tam = (nome) => String(process.env[nome] || "").length;
+      return send(res, 200, { ips: [...ips], modoDireto: process.env.FACTA_DIRECT === "true", tamanhos: { usuario: tam("FACTA_USERNAME"), senha: tam("FACTA_PASSWORD"), ambiente: String(process.env.FACTA_ENV || "") } });
     }
 
     // GET /painel/api/facta/teste — só leitura: gera o token e consulta o status de autorização de um CPF
