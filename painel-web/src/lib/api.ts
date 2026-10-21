@@ -537,6 +537,8 @@ export const api = {
   // ── Identidade e usuários (login por pessoa) ─────────────────────────────────────────────
   me: () => request<Identidade>("/painel/api/me"),
 
+  tursoUso: () =>
+    request<{ configurado: boolean; ok?: boolean; pct?: number; pctLeituras?: number; leituras?: number; limiteLeituras?: number; pctEscritas?: number; erro?: string }>("/painel/api/turso/uso"),
   factaStatus: () => request<{ ok: boolean; checadoEm: number; erro?: string }>("/painel/api/facta/status"),
   siteChatConversas: () => request<SiteChatConversation[]>("/painel/api/site-chat/conversations"),
   siteChatConversa: (id: string) =>

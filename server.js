@@ -7871,6 +7871,37 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ips: [...ips], modoDireto: process.env.FACTA_DIRECT === "true", tamanhos: { usuario: tam("FACTA_USERNAME"), senha: tam("FACTA_PASSWORD"), ambiente: String(process.env.FACTA_ENV || "") } });
     }
 
+    // GET /painel/api/turso/uso — consumo do mês do banco (Turso) contra os limites do plano grátis, para o aviso do
+    // painel. Precisa de TURSO_PLATFORM_TOKEN (token de API da conta Turso, diferente do token do banco).
+    // TURSO_ORG (padrão: salvadorfelipee-creator) é o nome da organização. Resultado guardado por 10 min.
+    if (req.method === "GET" && path_ === "/painel/api/turso/uso") {
+      if (!requireAuth(req, res)) return;
+      const tokenPlataforma = String(process.env.TURSO_PLATFORM_TOKEN || "").trim();
+      if (!tokenPlataforma) return send(res, 200, { configurado: false });
+      if (!global.__tursoUso || Date.now() - global.__tursoUso.checadoEm > 10 * 60_000) {
+        try {
+          const org = String(process.env.TURSO_ORG || "salvadorfelipee-creator").trim();
+          const r = await fetch(`https://api.turso.tech/v1/organizations/${encodeURIComponent(org)}/usage`, {
+            headers: { Authorization: `Bearer ${tokenPlataforma}` },
+            signal: AbortSignal.timeout(15_000),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+          const uso = j?.organization?.usage || {};
+          const limiteLeituras = Number(process.env.TURSO_LIMITE_LEITURAS || 500_000_000);
+          const limiteEscritas = Number(process.env.TURSO_LIMITE_ESCRITAS || 10_000_000);
+          const leituras = Number(uso.rows_read || 0);
+          const escritas = Number(uso.rows_written || 0);
+          const pctLeituras = Math.round((leituras / limiteLeituras) * 1000) / 10;
+          const pctEscritas = Math.round((escritas / limiteEscritas) * 1000) / 10;
+          global.__tursoUso = { checadoEm: Date.now(), ok: true, leituras, limiteLeituras, pctLeituras, escritas, limiteEscritas, pctEscritas, pct: Math.max(pctLeituras, pctEscritas) };
+        } catch (err) {
+          global.__tursoUso = { checadoEm: Date.now(), ok: false, erro: String(err.message || "falha").slice(0, 120) };
+        }
+      }
+      return send(res, 200, { configurado: true, ...global.__tursoUso });
+    }
+
     // GET /painel/api/facta/status — luz do painel: a ligação com a Facta (IP liberado, credenciais e serviço no ar)
     // está funcionando? Faz uma consulta leve só de leitura e guarda o resultado por 45s.
     if (req.method === "GET" && path_ === "/painel/api/facta/status") {
