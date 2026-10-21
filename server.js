@@ -1268,16 +1268,9 @@ function menuInicial() {
 }
 
 async function encaminharCltParaSite(de, businessNumberId) {
+  // O chat do site ainda não está pronto: o CLT segue pela mesma oferta/simulação no WhatsApp da Campanha CLT.
   logFunil(businessNumberId, de, "clt_direcionado_site");
-  await enviarRespostaAutomatica(
-    businessNumberId,
-    de,
-    "Perfeito. A simulação do consignado CLT é feita no chat seguro da FelizCred, onde você consulta as condições e acompanha cada etapa.",
-    null,
-    null,
-    { buttonText: "Simular CLT no site", url: "https://www.felizcred.com.br/?chat=abrir&utm_source=whatsapp&utm_medium=clt" }
-  );
-  await db.setFluxoPasso(de, businessNumberId, null);
+  await iniciarOfertaConsignado(de, businessNumberId);
 }
 
 // Reconhece a opção do menu principal em texto livre — número (1-4) ou palavra-chave.
@@ -4858,6 +4851,19 @@ const BOTOES_CONFIRMA_CONSIGNADO = [
   { id: "consig_corrigir", title: "Corrigir" },
 ];
 
+// Apresentação + oferta do consignado CLT (2 mensagens), marca o passo e põe a tag do produto na conversa.
+async function iniciarOfertaConsignado(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, TEXTO_APRESENTACAO_CONSIGNADO);
+  await enviarRespostaAutomatica(businessNumberId, de, TEXTO_OFERTA_CONSIGNADO, BOTOES_OFERTA_CONSIGNADO);
+  await db.setFluxoPasso(de, businessNumberId, "consignado_oferta");
+  try {
+    const tagId = await db.tagEncontrarOuCriar(businessNumberId, "Consignado CLT", "#15803D");
+    await db.adicionarTagConversa(businessNumberId, de, tagId, "automatico");
+  } catch (err) {
+    console.error("Erro ao adicionar tag do consignado:", err.message);
+  }
+}
+
 function cpfDeTexto(texto) {
   const digitos = String(texto || "").replace(/\D/g, "");
   return novosaque.cpfValido(digitos) ? digitos : null;
@@ -4900,8 +4906,11 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
   const ehConsignado = passoCompleto.startsWith("consignado_");
   if (!ehConsignado && passoCompleto && passoCompleto !== "menu_inicial") return false;
   if (!ehConsignado) {
-    const recebeu = await Promise.all(TEMPLATES_CONSIGNADO.map((t) => db.recebeuTemplate(de, businessNumberId, t)));
-    if (!recebeu.some(Boolean)) return false;
+    // Os dois números usam a mesma oferta: quem recebeu o template (ou escreve texto livre, sem
+    // anúncio/palavra-chave de outro fluxo) entra nela. Histórico de template pode ter sido limpo.
+    const textoLivre = tipo === "text" && !msg.referral && !["menu", "fgts", "saque", "clt1"].includes(normalizarTexto(texto));
+    const recebeu = textoLivre || (await Promise.all(TEMPLATES_CONSIGNADO.map((t) => db.recebeuTemplate(de, businessNumberId, t)))).some(Boolean);
+    if (!recebeu) return false;
   }
 
   const [estado, ...dados] = passoCompleto.split("|");
@@ -4912,16 +4921,7 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
   try {
     await db.insertMessage({ ...base, type: tipo === "text" ? "text" : "button", body: texto });
     if (!ehConsignado) {
-      await responder(TEXTO_APRESENTACAO_CONSIGNADO);
-      await responder(TEXTO_OFERTA_CONSIGNADO, BOTOES_OFERTA_CONSIGNADO);
-      await irPara("consignado_oferta");
-      // Produto oferecido vira tag da conversa já na oferta.
-      try {
-        const tagId = await db.tagEncontrarOuCriar(businessNumberId, "Consignado CLT", "#15803D");
-        await db.adicionarTagConversa(businessNumberId, de, tagId, "automatico");
-      } catch (err) {
-        console.error("Erro ao adicionar tag do consignado:", err.message);
-      }
+      await iniciarOfertaConsignado(de, businessNumberId);
       return true;
     }
     switch (estado) {
@@ -4988,6 +4988,8 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
           const linha = `Consignado CLT (WhatsApp): ${nome} | CPF ${cpf} | nasc. ${nasc} | consulta autorizada pelo cliente em ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
           await db.atualizarNotaConversa(de, businessNumberId, [conversaAnterior?.nota, linha].filter(Boolean).join("\n"));
           await db.atualizarStatusConversa(de, businessNumberId, "andamento");
+          // Cliente confirmou os dados: entra em qualificação, para aparecer na etapa certa do pipeline.
+          await db.atualizarPipelineConversa(de, businessNumberId, "qualificacao", "fluxo_consignado");
           if (google.configurado()) {
             google.garantirContato({ telefone: de, nomePerfil: nomeContatoComCpf(cpf, nome) })
               .catch((err) => console.error("Erro ao salvar contato do consignado no Google:", err.message));
