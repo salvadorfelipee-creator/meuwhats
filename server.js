@@ -7865,7 +7865,7 @@ const server = http.createServer(async (req, res) => {
         const resposta = await facta.consultarTrabalhador(cpf);
         return send(res, 200, { ok: true, modoDireto: process.env.FACTA_DIRECT === "true", erro: respostaFactaComErro(resposta), mensagem: mensagemFacta(resposta, ""), linhas: dadosTrabalhadorFacta(resposta).length });
       } catch (err) {
-        return send(res, 200, { ok: false, modoDireto: process.env.FACTA_DIRECT === "true", status: err.httpStatus || null, erro: String(err.message || "").slice(0, 200) });
+        return send(res, 200, { ok: false, modoDireto: process.env.FACTA_DIRECT === "true", status: err.httpStatus || null, erro: String(err.message || "").slice(0, 200), detalhe: JSON.stringify(err.factaResponse || "").replace(/\s+/g, " ").slice(0, 300) });
       }
     }
 
