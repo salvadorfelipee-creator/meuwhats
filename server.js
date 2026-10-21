@@ -7584,6 +7584,40 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { resultados, agendados, intervalSeconds: intervalo });
     }
 
+    // POST /painel/api/limpeza-conversas — limpa a lista de conversas do WhatsApp, exceto CiaHot e as
+    // conversas com atividade de hoje (horário de Brasília). Sem { confirmar: true } só mostra o plano.
+    // Com confirmar, salva no Google Contatos quem tem CPF válido nas mensagens ("FGTS <nome> <CPF>") e
+    // apaga até `limite` conversas por chamada (repita até `restantes` = 0).
+    if (req.method === "POST" && path_ === "/painel/api/limpeza-conversas") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const agoraBrasilia = new Date(Date.now() - 3 * 3600 * 1000);
+      const desde = Date.UTC(agoraBrasilia.getUTCFullYear(), agoraBrasilia.getUTCMonth(), agoraBrasilia.getUTCDate(), 3);
+      const plano = await db.planoLimpezaConversas({ excetoBusinessNumberId: CIAHOT_NUMBER_ID, desde });
+      const resumo = {
+        paraApagar: plano.apagar.length,
+        comCpf: plano.comCpf.length,
+        semCpf: plano.apagar.length - plano.comCpf.length,
+        preservadasDeHoje: plano.preservadas,
+      };
+      if (!body.confirmar) return send(res, 200, { simulacao: true, ...resumo, listaComCpf: plano.comCpf });
+      let salvosNoGoogle = 0;
+      if (google.configurado()) {
+        for (const c of plano.comCpf) {
+          try {
+            await google.garantirContato({ telefone: c.phone, nomePerfil: nomeContatoComCpf(c.cpf, c.name) });
+            salvosNoGoogle++;
+          } catch (err) {
+            console.error("Limpeza: falha ao salvar contato no Google:", err.message);
+          }
+        }
+      }
+      const limite = Math.min(Math.max(Number(body.limite) || 300, 1), 500);
+      const lote = plano.apagar.slice(0, limite);
+      const apagadas = await db.apagarConversasLimpeza(lote);
+      return send(res, 200, { confirmado: true, ...resumo, salvosNoGoogle, apagadasNestaChamada: apagadas, restantes: plano.apagar.length - apagadas });
+    }
+
     // POST /painel/api/broadcast-agendar/:businessId — enfileira envios de template cada um
     // com SEU horário exato (`agendadoPara`, ms epoch), em vez de intervalo fixo — pra
     // campanhas com janela diária (ex.: 5 por dia, seg-sex, 9h-17h). Mesma fila e mesmo

@@ -1,5 +1,6 @@
 const { createClient } = require("@libsql/client");
 const crypto = require("crypto");
+const { cpfValido } = require("./cpf");
 
 const client = createClient({
   url: process.env.TURSO_DATABASE_URL,
@@ -3934,6 +3935,46 @@ async function siteChatCltAtualizar(conversationId, campos) {
   return siteChatCltObter(conversationId);
 }
 
+// Limpeza das conversas do WhatsApp (painel). Só lê no plano: quem tem CPF válido em alguma mensagem
+// recebida vira "comCpf" (para salvar no Google Contatos antes de apagar). Não apaga nada aqui.
+// Mantém fora da limpeza: o número excluído (CiaHot) e as conversas com atividade desde `desde` (ms).
+async function planoLimpezaConversas({ excetoBusinessNumberId, desde }) {
+  await ready;
+  const convs = (await client.execute({
+    sql: `SELECT phone, business_number_id, name, last_message_at FROM conversations WHERE business_number_id != ?`,
+    args: [excetoBusinessNumberId],
+  })).rows;
+  const msgs = (await client.execute(
+    `SELECT phone, business_number_id, body FROM messages WHERE direction = 'in' AND body IS NOT NULL`
+  )).rows;
+  const cpfPorConversa = new Map();
+  for (const m of msgs) {
+    const chave = `${m.business_number_id}|${m.phone}`;
+    if (cpfPorConversa.has(chave)) continue;
+    const candidatos = String(m.body).match(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}|\d{11}/g) || [];
+    const cpf = candidatos.map((c) => c.replace(/\D/g, "")).find((c) => cpfValido(c));
+    if (cpf) cpfPorConversa.set(chave, cpf);
+  }
+  const plano = { apagar: [], comCpf: [], preservadas: 0 };
+  for (const c of convs) {
+    const chave = `${c.business_number_id}|${c.phone}`;
+    if (Number(c.last_message_at || 0) >= desde) { plano.preservadas++; continue; }
+    const item = { phone: String(c.phone), businessNumberId: String(c.business_number_id), name: c.name ? String(c.name) : null };
+    plano.apagar.push(item);
+    if (cpfPorConversa.has(chave)) plano.comCpf.push({ ...item, cpf: cpfPorConversa.get(chave) });
+  }
+  return plano;
+}
+
+async function apagarConversasLimpeza(itens) {
+  await ready;
+  for (const it of itens) {
+    await client.execute({ sql: `DELETE FROM messages WHERE phone = ? AND business_number_id = ?`, args: [it.phone, it.businessNumberId] });
+    await client.execute({ sql: `DELETE FROM conversations WHERE phone = ? AND business_number_id = ?`, args: [it.phone, it.businessNumberId] });
+  }
+  return itens.length;
+}
+
 module.exports = {
   hashSenha,
   verificarSenha,
@@ -4049,6 +4090,8 @@ module.exports = {
   recebeuTemplate,
   getMensagemPorWaId,
   apagarConversa,
+  planoLimpezaConversas,
+  apagarConversasLimpeza,
   listarParaLembreteInstagram,
   tentarMarcarInstagramLembreteEnviado,
   fgtsOriginationCriar,
