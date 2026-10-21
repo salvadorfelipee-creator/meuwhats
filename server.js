@@ -6249,10 +6249,14 @@ const server = http.createServer(async (req, res) => {
             const confirmouTempoAntes = recentes.slice(0, -1).some((m) => m.direction === "visitor" && respostaEhPositiva(normalizarResposta(m.body)));
             const pediuSimulacao = /\b(clt|consignado|simula(?:r|ção)|empr[eé]stimo)\b/i.test(message);
             const jaPerguntouTempo = recentes.some((m) => m.direction === "agent" && /mais de 3 meses/i.test(m.body || ""));
+            const atalhoSaida = siteChatRules.atalhoCltSemSaida(message, row);
 
             // As etapas obrigatórias são determinísticas. O Gemini cuida apenas da linguagem
             // livre e não pode voltar a qualificação depois da confirmação nem confundir CPF.
-            if (!row && confirmouTempo) {
+            if (atalhoSaida) {
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", atalhoSaida);
+              cltStep = "atalho";
+            } else if (!row && confirmouTempo) {
               await db.siteChatFunilEvento(id, "qualificado", "mais_de_3_meses", "facta");
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Perfeito! Agora digite seu CPF para iniciarmos a simulação.");
               cltStep = "start";

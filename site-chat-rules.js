@@ -62,7 +62,21 @@ function encaminhamentoWhatsAppPorRepeticao(data = new Date()) {
   return `Percebi que você já pediu isso novamente. Nosso atendimento continua pelo WhatsApp no próximo dia útil. Você pode deixar sua mensagem agora por este link: ${WHATSAPP_FELIZCRED}`;
 }
 
+// Atalhos de saída: quando o cliente manda "Início", "menu", "Nada" etc. no meio do fluxo CLT,
+// respondemos de forma fixa em vez de deixar o Gemini improvisar (ele inventou "atualize a página").
+const ATALHO_SAIDA = /^(inicio|menu|nada|voltar|recomecar|oi|ola|tentar de novo|tentar novamente|de novo|outra vez|continuar)$/;
+
+function atalhoCltSemSaida(texto, row) {
+  if (!ATALHO_SAIDA.test(normalizar(texto))) return null;
+  if (!row) return "Tudo bem. Para começar a simulação, você já completou 3 meses de registro no trabalho atual?";
+  if (row.etapa === "erro_autorizacao") {
+    return "Sua autorização ainda não foi enviada à Facta e nenhum contrato foi criado. Toque em Tentar novamente na mensagem acima para reenviar pelo WhatsApp. Se o botão não aparecer, escreva: quero falar com atendente.";
+  }
+  return "Sua simulação continua salva aqui. Escreva sua dúvida ou use o botão ou formulário da etapa atual.";
+}
+
 module.exports = {
+  atalhoCltSemSaida,
   WHATSAPP_FELIZCRED,
   encaminhamentoWhatsAppPorRepeticao,
   horarioComercial,
