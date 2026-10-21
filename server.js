@@ -4828,6 +4828,68 @@ async function montarFluxoDinamico(fluxoRow) {
 // a pessoa manda o texto exato do gatilho, em vez de só um único fluxo "ativo" por número.
 // 100% opt-in: só age quando existe alguma linha em fluxo_gatilhos pra esse negócio (criada via
 // ferramenta MCP fluxo_gatilho_criar) — sem isso, não muda nada pra nenhum número existente.
+// Oferta do consignado CLT para quem responde aos templates bomdia/boatarde. Estados guardados em
+// conversations.fluxo_passo: consignado_oferta (aguardando o botão) → consignado_chat (link do chat
+// enviado) ou consignado_encerrado (disse "no momento não"). Quem já está em outro funil não entra aqui.
+const TEMPLATES_CONSIGNADO = ["bomdia", "boatarde"];
+const NUMEROS_CONSIGNADO = [CAMPANHA_CLT_NUMBER_ID, FELIZCRED_PRINCIPAL_NUMBER_ID];
+const TEXTO_OFERTA_CONSIGNADO =
+  "Oi, tudo bem? Quem fala é o Felipe, consultor da FelizCred, parceira de bancos como Pan, C6, BMG e Facta.\n\n" +
+  "Você pode ter margem disponível para o consignado CLT, com desconto direto na folha. Quer saber as condições?";
+const BOTOES_OFERTA_CONSIGNADO = [
+  { id: "consig_saber", title: "Desejo saber mais" },
+  { id: "consig_nao", title: "No momento não" },
+];
+const CTA_CHAT_CONSIGNADO = { buttonText: "Chat ao vivo" };
+
+function linkChatConsignado(phone) {
+  const digitos = String(phone || "").replace(/\D/g, "").replace(/^55/, "");
+  return `https://www.felizcred.com.br/?chat=abrir&wa=${digitos}`;
+}
+
+async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conversaAnterior, base }) {
+  if (!NUMEROS_CONSIGNADO.includes(businessNumberId)) return false;
+  const texto =
+    tipo === "text" ? msg.text?.body || "" :
+    tipo === "button" ? msg.button?.text || "" :
+    tipo === "interactive" ? msg.interactive?.button_reply?.title || "" : "";
+  if (!texto || pediuPararMensagens(texto)) return false;
+
+  const passo = String(conversaAnterior?.fluxo_passo || "");
+  const ehEstadoConsignado = passo.startsWith("consignado_");
+  if (!ehEstadoConsignado && passo && passo !== "menu_inicial") return false; // já está em outro funil
+  if (!ehEstadoConsignado) {
+    const recebeu = await Promise.all(TEMPLATES_CONSIGNADO.map((t) => db.recebeuTemplate(de, businessNumberId, t)));
+    if (!recebeu.some(Boolean)) return false;
+  }
+
+  try {
+    await db.insertMessage({ ...base, type: tipo === "text" ? "text" : "button", body: texto });
+    const t = normalizar(texto);
+    if (!ehEstadoConsignado || passo === "consignado_oferta") {
+      if (ehEstadoConsignado && t.includes("desejo")) {
+        await enviarRespostaAutomatica(businessNumberId, de, "Para simular e ver as condições, toque no botão abaixo e fale com a gente pelo chat do site.", null, null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
+        await db.setFluxoPasso(de, businessNumberId, "consignado_chat");
+      } else if (ehEstadoConsignado && t.includes("no momento")) {
+        await enviarRespostaAutomatica(businessNumberId, de, "Sem problemas! Fique à vontade para nos chamar quando precisar 😊");
+        await db.setFluxoPasso(de, businessNumberId, "consignado_encerrado");
+      } else if (ehEstadoConsignado) {
+        await enviarRespostaAutomatica(businessNumberId, de, "Quer saber as condições? Toque em uma das opções abaixo.", BOTOES_OFERTA_CONSIGNADO);
+      } else {
+        await enviarRespostaAutomatica(businessNumberId, de, TEXTO_OFERTA_CONSIGNADO, BOTOES_OFERTA_CONSIGNADO);
+        await db.setFluxoPasso(de, businessNumberId, "consignado_oferta");
+      }
+    } else if (passo === "consignado_chat") {
+      await enviarRespostaAutomatica(businessNumberId, de, "Para continuar, toque no botão abaixo e fale com a gente pelo chat do site.", null, null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
+    }
+    // consignado_encerrado: a pessoa já disse que não quer; não respondemos mais.
+    return true;
+  } catch (err) {
+    console.error("Erro ao tratar resposta do consignado:", err.message);
+    return true;
+  }
+}
+
 async function bateuGatilhoDeFluxoDinamico(businessNumberId, corpo, de) {
   try {
     const gatilhos = await db.fluxoGatilhosDoNegocio(businessNumberId);
@@ -4909,7 +4971,12 @@ async function processarEntry(entry) {
 
         let mensagemJaTratada = false;
 
-        if (tipo === "text") {
+        // Quem responde aos templates bomdia/boatarde (Campanha CLT e Felizcred principal) recebe a
+        // oferta do consignado CLT. Vem antes dos fluxos antigos; quem já está no meio de outro funil
+        // continua nele (ver tratarRespostaConsignado).
+        if (await tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conversaAnterior, base })) {
+          mensagemJaTratada = true;
+        } else if (tipo === "text") {
           await db.insertMessage({ ...base, type: "text", body: msg.text?.body });
           const corpo = msg.text?.body || "";
           // Diagnóstico: loga QUALQUER referral de anúncio que chegar (mesmo sem bater "fgts"),
