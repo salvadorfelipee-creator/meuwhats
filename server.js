@@ -4915,6 +4915,13 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
       await responder(TEXTO_APRESENTACAO_CONSIGNADO);
       await responder(TEXTO_OFERTA_CONSIGNADO, BOTOES_OFERTA_CONSIGNADO);
       await irPara("consignado_oferta");
+      // Produto oferecido vira tag da conversa já na oferta.
+      try {
+        const tagId = await db.tagEncontrarOuCriar(businessNumberId, "Consignado CLT", "#15803D");
+        await db.adicionarTagConversa(businessNumberId, de, tagId, "automatico");
+      } catch (err) {
+        console.error("Erro ao adicionar tag do consignado:", err.message);
+      }
       return true;
     }
     switch (estado) {
@@ -4925,6 +4932,9 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
         } else if (t.includes("no momento")) {
           await responder("Sem problemas! Fique à vontade para nos chamar quando precisar 😊");
           await irPara("consignado_encerrado");
+          // Não quis: registra na nota e finaliza a conversa (sai dos atendimentos em aberto).
+          await db.atualizarNotaConversa(de, businessNumberId, [conversaAnterior?.nota, "Consignado CLT: não quis simular"].filter(Boolean).join("\n"));
+          await db.atualizarStatusConversa(de, businessNumberId, "resolvido");
         } else {
           await responder("Quer saber as condições? Toque em uma das opções abaixo.", BOTOES_OFERTA_CONSIGNADO);
         }
@@ -4992,9 +5002,33 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
         }
         break;
       }
-      default:
-        // consignado_encerrado e consignado_concluido: a pessoa já respondeu; não mandamos mais nada.
+      default: {
+        // consignado_encerrado e consignado_concluido: a pessoa já passou pelo fluxo e escreveu de novo.
+        // Não recomeça o fluxo: responde de acordo com a conversa (e avisa o horário, se for o caso).
+        const situacao = estado === "consignado_concluido"
+          ? "O cliente já escolheu simular, enviou nome, CPF e data de nascimento e autorizou a consulta. Está aguardando um atendente continuar o atendimento."
+          : "O cliente disse que no momento não quer simular o consignado CLT. Seja cordial; se ele mudar de ideia, um atendente retoma.";
+        const horario = horarioComercialCotaCerta()
+          ? "Estamos dentro do horário de atendimento (seg a sex 9h-18h, sáb 9h-12h). O atendente pode levar alguns minutos para responder."
+          : "Estamos FORA do horário (atendimento seg a sex 9h-18h, sáb 9h-12h). Avise que o atendente retorna no próximo expediente.";
+        let resposta = "";
+        try {
+          resposta = await gemini.responderConversaWhatsapp({
+            mensagens: await db.ultimasMensagens(de, businessNumberId, 15),
+            situacao,
+            horarioAtendimento: horario,
+          });
+        } catch (err) {
+          console.error("Gemini não respondeu no consignado:", err.message);
+        }
+        if (!resposta) {
+          resposta = estado === "consignado_concluido"
+            ? "Já recebi seus dados! Um atendente continua com você por aqui assim que possível 😊"
+            : "Tudo bem! Se mudar de ideia, é só chamar por aqui 😊";
+        }
+        await responder(resposta);
         break;
+      }
     }
     return true;
   } catch (err) {

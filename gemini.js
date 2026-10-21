@@ -360,4 +360,32 @@ Responda somente JSON: {"resposta":"texto curto para o cliente"}`;
   return typeof json.resposta === "string" ? json.resposta.trim().slice(0, 320) : "";
 }
 
-module.exports = { sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite, interpretarValorParcela, responderConversaCltSite, responderConversaSite };
+// Resposta de WhatsApp que leva em conta a conversa inteira — usada quando o cliente escreve de novo
+// depois de já ter passado pelo fluxo do consignado CLT (não recomeça o fluxo, responde ao que ele disse).
+async function responderConversaWhatsapp({ mensagens, situacao, horarioAtendimento }) {
+  const transcricao = mensagens
+    .map((m) => `${m.direction === "in" ? "Cliente" : "FelizCred"}: ${m.body || `[${m.type || "mídia"}]`}`)
+    .join("\n");
+  const prompt = `Você é Felipe, consultor da FelizCred (correspondente bancária), conversando pelo WhatsApp.
+Escreva em português brasileiro simples, acolhedor e curto: no máximo 3 frases e 300 caracteres. Um emoji leve no máximo.
+
+SITUAÇÃO ATUAL: ${situacao}
+HORÁRIO DE ATENDIMENTO: ${horarioAtendimento}
+
+REGRAS INVIOLÁVEIS:
+- Responda ao que o cliente acabou de dizer, de acordo com a conversa abaixo. Nunca recomece o fluxo nem repita a apresentação ou a oferta.
+- Nunca invente valor, parcela, taxa, prazo, aprovação, margem ou política de banco.
+- Nunca peça senha, código recebido ou foto de documento.
+- Se o cliente já enviou os dados, diga que já estão com a gente e que um atendente continua por aqui; se estivermos fora do horário, avise quando o atendimento volta.
+- Se o cliente apenas cumprimentar ou agradecer, responda de forma breve e natural.
+- Se não souber, diga isso claramente.
+
+CONVERSA (mais antiga primeiro):
+${transcricao.slice(-4000)}
+
+Responda somente JSON: {"resposta":"texto curto para o cliente"}`;
+  const json = await chamarGemini(prompt, GEMINI_MODEL_LITE);
+  return typeof json.resposta === "string" ? json.resposta.trim().slice(0, 400) : "";
+}
+
+module.exports = { responderConversaWhatsapp, sugerirPipeline, sugerirResposta, analisarEtapaParada, corrigirTexto, classificarProdutoSite, interpretarValorParcela, responderConversaCltSite, responderConversaSite };
