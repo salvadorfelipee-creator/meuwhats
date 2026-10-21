@@ -26,7 +26,7 @@ const google = require("./google");
 const mcp = require("./mcp");
 const gemini = require("./gemini");
 const siteChatRules = require("./site-chat-rules");
-const { notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarEmail } = require("./email");
+const { salvarContatoBrevo, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarEmail } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -5953,6 +5953,15 @@ const server = http.createServer(async (req, res) => {
           whatsappOptInText: WHATSAPP_OPT_IN_TEXT,
         });
         enviarInicioChatFelizcred({ nome: name, email }).catch((err) => console.error(`E-mail inicial do chat não enviado (${id}):`, err.message));
+        // Salva quem preencheu o formulário do site: lista de contatos do Brevo e Google Contatos
+        // (prefixo "SITE" pra distinguir dos outros funis). Em segundo plano, nunca atrasa o chat.
+        salvarContatoBrevo({ email, nome: name, telefone: contact, origem: "site-chat" }).catch((err) => console.error(`Contato do site não salvo no Brevo (${id}):`, err.message));
+        if (google.configurado()) {
+          const digitosContato = contact.replace(/\D/g, "");
+          google
+            .criarContato({ nome: `SITE - ${name}`, telefone: digitosContato.startsWith("55") ? digitosContato : `55${digitosContato}`, email })
+            .catch((err) => console.error(`Contato do site não salvo no Google (${id}):`, err.message));
+        }
         if (produtoTag === "Empréstimo CLT") {
           await db.siteChatFunilEvento(id, "entrada", "inicio", "facta");
           await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");

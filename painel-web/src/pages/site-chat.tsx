@@ -1,6 +1,6 @@
 import * as React from "react"
 import { ArrowLeft, AtSign, Bell, BellOff, Check, ChevronDown, FileText, Globe2, Landmark, MessageCircle, Mic, Paperclip, Phone, RotateCcw, Search, Send, Smile, UserRound, X } from "lucide-react"
-import { api, type SiteChatClt, type SiteChatConversation, type SiteChatMessage } from "@/lib/api"
+import { api, PIPELINE_ESTAGIOS, type SiteChatClt, type SiteChatConversation, type SiteChatMessage } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -189,6 +189,37 @@ export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
           </div></div>}
         </>}
       </main>
+      {selecionada && (
+        <aside className="hidden w-[300px] shrink-0 overflow-y-auto border-l bg-background xl:block">
+          <div className="flex h-14 items-center border-b px-4"><p className="text-sm font-semibold">Detalhes do contato</p></div>
+          <div className="space-y-5 p-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><UserRound className="h-4 w-4" /></span>
+              <div className="min-w-0"><p className="truncate text-sm font-semibold">{selecionada.name}</p><p className="text-xs text-muted-foreground">Chat do site</p></div>
+            </div>
+            <dl className="space-y-3 text-sm">
+              <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Celular</dt><dd>{selecionada.contact ? <a className="text-emerald-700 underline underline-offset-2" href={`https://wa.me/55${selecionada.contact.replace(/\D/g, "").replace(/^55/, "")}`} target="_blank" rel="noreferrer">{selecionada.contact}</a> : "—"}</dd></div>
+              <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">E-mail</dt><dd className="break-all">{selecionada.email || "—"}</dd></div>
+              <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Produto de interesse</dt><dd>{selecionada.produto_tag || "—"}</dd></div>
+              <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Começou em</dt><dd>{new Date(selecionada.created_at).toLocaleString("pt-BR")}</dd></div>
+              <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Última mensagem do cliente</dt><dd>{selecionada.last_visitor_at ? new Date(selecionada.last_visitor_at).toLocaleString("pt-BR") : "—"}</dd></div>
+              {selecionada.page_url && <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Página de origem</dt><dd className="break-all text-xs">{selecionada.page_url}</dd></div>}
+              {selecionada.human_intent_stage === "requested" && <div className="rounded-md bg-amber-100 px-2 py-1.5 text-xs font-medium text-amber-800">Pediu atendimento humano</div>}
+            </dl>
+            <div>
+              <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Etapa do pipeline</label>
+              <select
+                value={selecionada.pipeline_estagio || ""}
+                onChange={async (e) => { await api.siteChatPipeline(selecionada.id, e.target.value); carregarConversa(selecionada.id, true); carregarLista() }}
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="" disabled>Sem etapa definida</option>
+                {PIPELINE_ESTAGIOS.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              </select>
+            </div>
+          </div>
+        </aside>
+      )}
     </div>
   )
 }

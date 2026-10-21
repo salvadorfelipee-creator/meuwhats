@@ -54,6 +54,39 @@ function enviarEmail({ to, toNome, subject, html, from, fromNome }) {
   });
 }
 
+// Salva/atualiza o contato na lista de contatos do Brevo (o envio de e-mail sozinho não cadastra
+// ninguém). updateEnabled evita erro quando o e-mail já existe.
+function salvarContatoBrevo({ email, nome, telefone, origem }) {
+  return new Promise((resolve, reject) => {
+    if (!BREVO_API_KEY) return reject(new Error("BREVO_API_KEY não configurada"));
+    if (!email) return reject(new Error("E-mail não informado"));
+    const digitos = String(telefone || "").replace(/\D/g, "");
+    const attributes = { FIRSTNAME: String(nome || "").split(" ")[0] || undefined, LASTNAME: String(nome || "").split(" ").slice(1).join(" ") || undefined, ORIGEM: origem || undefined };
+    if (digitos.length >= 10) attributes.SMS = digitos.startsWith("55") ? `+${digitos}` : `+55${digitos}`;
+    const body = JSON.stringify({ email, attributes, updateEnabled: true });
+    const req = https.request(
+      {
+        method: "POST",
+        hostname: "api.brevo.com",
+        path: "/v3/contacts",
+        headers: { "api-key": BREVO_API_KEY, "Content-Type": "application/json", Accept: "application/json", "Content-Length": Buffer.byteLength(body) },
+      },
+      (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          const texto = Buffer.concat(chunks).toString("utf8");
+          if (res.statusCode >= 200 && res.statusCode < 300) return resolve(texto);
+          reject(new Error(`Brevo respondeu ${res.statusCode}: ${texto.slice(0, 300)}`));
+        });
+      }
+    );
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
 function escapeHtml(s) {
   return String(s || "")
     .replace(/&/g, "&amp;")
@@ -146,4 +179,4 @@ async function enviarAtualizacaoChatFelizcred({ nome, email, titulo, mensagem })
   await enviarEmail({ to: email, toNome: nome || email, from: FELIZCRED_EMAIL_FROM, fromNome: FELIZCRED_EMAIL_FROM_NOME, subject: titulo, html });
 }
 
-module.exports = { enviarEmail, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred };
+module.exports = { salvarContatoBrevo, enviarEmail, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred };

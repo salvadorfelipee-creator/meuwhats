@@ -553,6 +553,16 @@ function ChannelChatsPage() {
     return alvo.includes(search.toLowerCase())
   })
 
+  // WhatsApp/Instagram e as conversas abertas do site na mesma ordem: a mais recente primeiro.
+  const itensLista: { site?: SiteChatConversation; conv?: Conversation; t: number }[] = [
+    ...(todos && canalSite
+      ? siteAbertas
+          .filter((c) => `${c.name} ${c.contact || ""}`.toLowerCase().includes(search.toLowerCase()))
+          .map((c) => ({ site: c, t: c.updated_at }))
+      : []),
+    ...listaFiltrada.map((c) => ({ conv: c, t: c.last_message_at || 0 })),
+  ].sort((x, y) => y.t - x.t)
+
   async function enviar() {
     if (!current || !selected || !texto.trim()) return
     setEnviando(true)
@@ -949,26 +959,30 @@ function ChannelChatsPage() {
               </p>
             )}
             <div className="flex flex-col gap-1 p-2">
-            {todos && canalSite && siteAbertas.filter((c) => `${c.name} ${c.contact || ""}`.toLowerCase().includes(search.toLowerCase())).map((c) => (
-              <button
-                key={`site|${c.id}`}
-                onClick={() => {
-                  setCurrent(canalSite)
-                  abrirConversa("site", c.id)
-                }}
-                className="w-full p-2.5 rounded-lg text-left hover:bg-accent/50 flex items-center gap-2.5"
-              >
-                <span className="h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
-                  <Globe2 className="h-4 w-4" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium">{c.name}</span>
-                  <span className="block truncate text-xs text-muted-foreground">Site · {c.last_message || "Conversa iniciada"}</span>
-                </span>
-                <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(c.updated_at)}</span>
-              </button>
-            ))}
-            {listaFiltrada.map((c) => {
+            {itensLista.map((item) => {
+              if (item.site) {
+                const c = item.site
+                return (
+                  <button
+                  key={`site|${c.id}`}
+                  onClick={() => {
+                    if (canalSite) setCurrent(canalSite)
+                    abrirConversa("site", c.id)
+                  }}
+                  className="w-full p-2.5 rounded-lg text-left hover:bg-accent/50 flex items-center gap-2.5"
+                >
+                  <span className="h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
+                    <Globe2 className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium">{c.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">Site · {c.last_message || "Conversa iniciada"}</span>
+                  </span>
+                  <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(c.updated_at)}</span>
+                </button>
+                )
+              }
+              const c = item.conv!
               const canalId = todos ? c.business_number_id : current?.id
               const naoLida = canalId ? unreadConversations.has(`${canalId}|${c.phone}`) : false
               // Pisca só pra quem bate a regra de urgência (ver conversaEhUrgente em api.ts) —
