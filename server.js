@@ -5164,6 +5164,12 @@ async function bateuGatilhoDeFluxoDinamico(businessNumberId, corpo, de) {
 // tudo, inclusive marcar o fluxo_passo. Reaproveitado tanto na reabertura por "menu" quanto
 // no disparo automático por inatividade, pra não duplicar a lógica dos dois lugares.
 async function dispararInicioFluxo(fluxo, de, businessNumberId) {
+  // Menu antigo de 5 opções aposentado nos números da oferta do consignado CLT: "menu", "reabrir fluxo" e a entrada
+  // padrão agora abrem a mesma oferta dos dois números.
+  if (fluxo === FLUXO_FELIZCRED && NUMEROS_CONSIGNADO.includes(businessNumberId)) {
+    await iniciarOfertaConsignado(de, businessNumberId);
+    return;
+  }
   if (fluxo.aoIniciar) {
     await fluxo.aoIniciar(de, businessNumberId);
     return;
@@ -9442,6 +9448,9 @@ setInterval(async () => {
 // com o TOTAL de conversas existentes no banco.
 let precomputandoCopiloto = false;
 setInterval(async () => {
+  // Desligado por padrão (gasta cota do Gemini sem ninguém pedir): a sugestão da IA agora só sai quando o atendente
+  // clica em "Analisar conversa". COPILOTO_PRECALCULO=true religa o cálculo antecipado.
+  if (process.env.COPILOTO_PRECALCULO !== "true") return;
   if (precomputandoCopiloto) return;
   precomputandoCopiloto = true;
   try {
