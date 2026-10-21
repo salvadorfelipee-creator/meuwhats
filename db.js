@@ -1376,6 +1376,18 @@ async function adicionarTagConversa(businessNumberId, phone, tagId, origem) {
   await atividadeRegistrar({ businessId: businessNumberId, phone, tipo: "tag_add", descricao: `Tag "${tag.rows[0]?.nome || tagId}" adicionada`, origem });
 }
 
+// Aplica a tag só se a conversa ainda não tem (adicionarTagConversa registra atividade a cada chamada).
+async function adicionarTagConversaSeAusente(businessNumberId, phone, tagId, origem) {
+  await ready;
+  const ja = await client.execute({
+    sql: `SELECT 1 FROM conversation_tags WHERE business_number_id = ? AND phone = ? AND tag_id = ?`,
+    args: [businessNumberId, phone, tagId],
+  });
+  if (ja.rows[0]) return false;
+  await adicionarTagConversa(businessNumberId, phone, tagId, origem);
+  return true;
+}
+
 async function removerTagConversa(businessNumberId, phone, tagId) {
   await ready;
   const tag = await client.execute({ sql: `SELECT nome FROM tags WHERE id = ?`, args: [tagId] });
@@ -3383,16 +3395,22 @@ async function pipelineAlertaConfigDefinir(estagioId, minutos) {
 // ao mesmo tempo (guard no lado do server.js).
 async function conversasParaPrecomputarCopiloto() {
   await ready;
-  const result = await client.execute(
-    `SELECT phone, business_number_id, last_message_at
+  // Sem filtro de fluxo_passo: se o robô respondeu, a última mensagem já é nossa e a conversa
+  // sai sozinha daqui. Os 45s dão tempo do robô responder antes de gastar uma chamada de IA;
+  // só conversas dos últimos 3 dias (backlog antigo não consome a cota).
+  const result = await client.execute({
+    sql: `SELECT phone, business_number_id, last_message_at
      FROM conversations
      WHERE status != 'resolvido'
        AND last_inbound_at IS NOT NULL
        AND last_inbound_at = last_message_at
-       AND fluxo_passo IS NULL
+       AND last_message_at < ?
+       AND last_message_at > ?
        AND (copiloto_cache_em IS NULL OR copiloto_cache_em != last_message_at)
+     ORDER BY last_message_at DESC
      LIMIT 15`,
-  );
+    args: [Date.now() - 45 * 1000, Date.now() - 3 * 24 * 60 * 60 * 1000],
+  });
   return result.rows;
 }
 
@@ -4254,6 +4272,7 @@ module.exports = {
   criarTag,
   apagarTag,
   adicionarTagConversa,
+  adicionarTagConversaSeAusente,
   removerTagConversa,
   tagsDaConversa,
   analyticsResumo,

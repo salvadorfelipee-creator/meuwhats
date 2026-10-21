@@ -1510,7 +1510,8 @@ function ChannelChatsPage() {
                     em registrarUsoRespostaPronta) ficam à mão sem precisar abrir menu nenhum;
                     "..." abre a lista completa, "+" cria uma nova sem sair da conversa. Clique
                     com o botão direito num atalho edita na hora. */}
-                <div className="px-2 pt-2 flex items-center gap-1.5 flex-wrap">
+                <div className="px-2 pt-2.5 flex justify-center">
+                <div className="w-full max-w-[640px] flex items-center justify-center gap-2 flex-wrap">
                   {[...respostas]
                     .sort((a, b) => (b.uso_count || 0) - (a.uso_count || 0))
                     .slice(0, 8)
@@ -1525,8 +1526,10 @@ function ChannelChatsPage() {
                           e.preventDefault()
                           setRespostaEditando(r)
                         }}
-                        title="Clique com o botão direito pra editar"
-                        className="text-[11px] font-medium px-2 py-1 rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground"
+                        title={`${r.texto}
+
+(botão direito para editar)`}
+                        className="max-w-[160px] truncate text-xs font-medium px-3 py-1.5 rounded-xl border bg-background shadow-sm hover:bg-accent hover:border-primary/40 text-foreground transition-colors"
                       >
                         {r.atalho}
                       </button>
@@ -1535,9 +1538,9 @@ function ChannelChatsPage() {
                     <DropdownMenuTrigger asChild>
                       <button
                         title="Ver todas as respostas prontas"
-                        className="h-[22px] w-[22px] rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
+                        className="h-7 w-7 rounded-xl border bg-background shadow-sm hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
                       >
-                        <MoreHorizontal className="h-3 w-3" />
+                        <MoreHorizontal className="h-3.5 w-3.5" />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto w-64">
@@ -1580,10 +1583,11 @@ function ChannelChatsPage() {
                   <button
                     onClick={() => setRespostaEditando("novo")}
                     title="Nova resposta pronta"
-                    className="h-[22px] w-[22px] rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
+                    className="h-7 w-7 rounded-xl border border-dashed bg-background hover:bg-accent text-muted-foreground hover:text-foreground flex items-center justify-center"
                   >
-                    <Plus className="h-3 w-3" />
+                    <Plus className="h-3.5 w-3.5" />
                   </button>
+                </div>
                 </div>
 
                 <div className="px-2 pb-3 pt-1.5 flex justify-center">

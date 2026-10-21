@@ -5003,8 +5003,7 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
       case "consignado_confirma": {
         const [nome, cpf, nasc] = dados;
         if (t.includes("confirmo")) {
-          const linha = `Consignado CLT (WhatsApp): ${nome} | CPF ${cpf} | nasc. ${nasc} | consulta autorizada pelo cliente em ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
-          await db.atualizarNotaConversa(de, businessNumberId, [conversaAnterior?.nota, linha].filter(Boolean).join("\n"));
+          // Sem nota automática: nome, CPF e nascimento já estão na conversa e no nome do contato.
           await db.atualizarStatusConversa(de, businessNumberId, "andamento");
           // Cliente confirmou os dados: entra em qualificação, para aparecer na etapa certa do pipeline.
           await db.atualizarPipelineConversa(de, businessNumberId, "qualificacao", "fluxo_consignado");
@@ -5126,6 +5125,13 @@ async function processarEntry(entry) {
         await db.upsertConversation(de, businessNumberId, nome, quando);
         const cpfNaMensagem = tipo === "text" ? extrairCpfDaMensagem(msg.text?.body) : null;
         sincronizarContatoGoogle(de, businessNumberId, nome, cpfNaMensagem ? nomeContatoComCpf(cpfNaMensagem, nome) : null);
+        // Tag "Consignado CLT" automática: quem fala com a Campanha CLT, ou cita CLT/consignado/carteira
+        // assinada, ganha a tag sem depender de ter passado pelo botão do menu.
+        if (businessNumberId !== CIAHOT_NUMBER_ID && (businessNumberId === CAMPANHA_CLT_NUMBER_ID || (tipo === "text" && /(clt|consignado|carteira assinada)/i.test(msg.text?.body || "")))) {
+          db.tagEncontrarOuCriar(businessNumberId, "Consignado CLT", "#15803D")
+            .then((tagId) => db.adicionarTagConversaSeAusente(businessNumberId, de, tagId, "automatico"))
+            .catch((err) => console.error("Erro ao aplicar tag Consignado CLT:", err.message));
+        }
 
         const base = {
           phone: de,
