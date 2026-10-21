@@ -126,6 +126,11 @@ async function factaRequest({ target = "online", method = "GET", path, query, bo
     options.body = new URLSearchParams(Object.entries(body || {}).filter(([, v]) => v !== undefined && v !== null));
   }
   const response = await fetch(url, options);
+  if (!response.ok || path === "/solicita-autorizacao-consulta") {
+    // Log sem CPF nem corpo da requisição: só status e início da resposta, para diagnóstico.
+    const preview = (await response.clone().text()).slice(0, 300).replace(/\s+/g, " ");
+    console.error(new Date().toISOString(), "facta", target, path, response.status, preview);
+  }
   const text = await response.text();
   let payload;
   try { payload = text ? JSON.parse(text) : null; } catch { payload = { raw: text.slice(0, 2000) }; }

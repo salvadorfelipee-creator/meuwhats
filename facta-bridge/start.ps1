@@ -18,4 +18,6 @@ if (Test-Path -LiteralPath $envFile) {
     }
 }
 
-& node (Join-Path $bridgeDir "server.js")
+$logDir = Join-Path $bridgeDir "logs"
+New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+& node (Join-Path $bridgeDir "server.js") *>> (Join-Path $logDir "bridge.out.log")
