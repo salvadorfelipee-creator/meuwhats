@@ -518,7 +518,7 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
     const canaisDaEmpresa = channels.filter((c) => c.company === current.company && c.kind !== "site")
     setCarregando(true)
     const site = current.company === "felizcred"
-      ? api.siteChatConversas().then((lista) => lista.map((c): Conversation => ({
+      ? api.siteChatConversas().then((lista) => lista.filter((c) => c.status !== "closed").map((c): Conversation => ({
           phone: c.id, business_number_id: "site", name: c.name, email: c.contact,
           status: c.status === "closed" ? "resolvido" : "novo", last_message_at: c.updated_at,
           last_body: c.last_message || null,

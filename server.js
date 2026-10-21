@@ -7717,7 +7717,9 @@ const server = http.createServer(async (req, res) => {
       const limite = Math.min(Math.max(Number(body.limite) || 300, 1), 500);
       const lote = plano.apagar.slice(0, limite);
       const apagadas = await db.apagarConversasLimpeza(lote);
-      return send(res, 200, { confirmado: true, ...resumo, salvosNoGoogle, apagadasNestaChamada: apagadas, restantes: plano.apagar.length - apagadas });
+      // Pipeline e Avisos também listam o chat do site — finaliza as conversas dele sem atividade hoje.
+      const siteFinalizadas = await db.siteChatFinalizarAntigas(desde);
+      return send(res, 200, { confirmado: true, ...resumo, salvosNoGoogle, apagadasNestaChamada: apagadas, restantes: plano.apagar.length - apagadas, siteFinalizadas });
     }
 
     // POST /painel/api/broadcast-reenfileirar/:businessId — devolve à fila os envios que falharam com o erro

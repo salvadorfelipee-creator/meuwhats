@@ -170,7 +170,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       }
       const recemSite = []
       for (const c of siteLista) {
-        if (!c.unread) continue
+        if (!c.unread || c.status === "closed") continue
         const chave = chaveConversa("site", c.id)
         next.add(chave)
         nextAlerts.push({

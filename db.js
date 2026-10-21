@@ -3740,6 +3740,14 @@ async function siteChatListar() {
   return result.rows;
 }
 
+// Finaliza as conversas abertas do chat do site sem atividade desde `desde` (ms) — mesmo corte da limpeza de
+// conversas do WhatsApp. Só fecha (não apaga): se o visitante voltar a escrever, a conversa reabre sozinha.
+async function siteChatFinalizarAntigas(desde) {
+  await ready;
+  const r = await client.execute({ sql: `UPDATE site_chat_conversations SET status = 'closed' WHERE status = 'open' AND updated_at < ?`, args: [desde] });
+  return Number(r.rowsAffected || 0);
+}
+
 async function siteChatMarcarLida(id) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET last_read_at = ? WHERE id = ?`, args: [Date.now(), id] });
@@ -4128,6 +4136,7 @@ module.exports = {
   apagarConversa,
   planoLimpezaConversas,
   broadcastDiagnostico,
+  siteChatFinalizarAntigas,
   broadcastReenfileirarErro,
   apagarConversasLimpeza,
   listarParaLembreteInstagram,
