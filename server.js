@@ -6026,13 +6026,17 @@ const server = http.createServer(async (req, res) => {
             try { saved = JSON.parse(atual.facta_worker_json || "{}").preAuthorization || {}; } catch {}
             const fullName = String(body.name || saved.nome || conversation.name || "").trim().replace(/\s+/g, " ").slice(0, 120);
             const phone = String(body.phone || atual.phone || "").replace(/\D/g, "");
+            // O cliente pode corrigir o CPF no formulário de reenvio; sem CPF válido, mantém o salvo.
+            const cpfNovo = String(body.cpf || "").replace(/\D/g, "");
+            const cpf = novosaque.cpfValido(cpfNovo) ? cpfNovo : atual.cpf;
             if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
-            const authorization = await facta.solicitarAutorizacao({ nome: fullName, cpf: atual.cpf, celular: formatarCelularFacta(phone) });
+            const authorization = await facta.solicitarAutorizacao({ nome: fullName, cpf: cpf, celular: formatarCelularFacta(phone) });
             const authMessage = mensagemFacta(authorization);
             const failed = respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage);
             const row = await db.siteChatCltAtualizar(id, {
               phone,
+              cpf,
               facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }),
               etapa: failed ? "erro_autorizacao" : "autorizacao_enviada",
               status_novosaque: failed ? "ERRO_AUTORIZACAO" : "AUTORIZACAO_REENVIADA",
