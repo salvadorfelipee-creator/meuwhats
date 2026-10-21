@@ -269,12 +269,13 @@ function ChannelChatsPage() {
     markConversationSeen,
     setActiveConversation,
     alvoAbrir,
-    abrirConversa,
     limparAlvoAbrir,
   } = useUnread()
   const { identidade } = useAuth()
   const [conversations, setConversations] = React.useState<Conversation[]>([])
   const [selected, setSelected] = React.useState<string | null>(null)
+  // Conversa do chat do site aberta DENTRO da lista unificada (sem trocar de canal): id da conversa do site.
+  const [siteSel, setSiteSel] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<Message[]>([])
   const [search, setSearch] = React.useState("")
   const [texto, setTexto] = React.useState("")
@@ -447,6 +448,7 @@ function ChannelChatsPage() {
   React.useEffect(() => {
     setSelected(null)
     setSelectedBiz(null)
+    setSiteSel(null)
     setMessages([])
     setConversations([])
     carregarConversas()
@@ -463,6 +465,12 @@ function ChannelChatsPage() {
   // (mesma troca de canal zera `selected` pra null primeiro).
   React.useEffect(() => {
     if (!alvoAbrir || !current) return
+    if (todos && alvoAbrir.channelId === "site") {
+      setSelected(null)
+      setSiteSel(alvoAbrir.phone)
+      limparAlvoAbrir()
+      return
+    }
     if (todos && canaisTodos.some((c) => c.id === alvoAbrir.channelId)) {
       setSelectedBiz(alvoAbrir.channelId)
       setSelected(alvoAbrir.phone)
@@ -966,10 +974,10 @@ function ChannelChatsPage() {
                   <button
                   key={`site|${c.id}`}
                   onClick={() => {
-                    if (canalSite) setCurrent(canalSite)
-                    abrirConversa("site", c.id)
+                    setSelected(null)
+                    setSiteSel(c.id)
                   }}
-                  className="w-full p-2.5 rounded-lg text-left hover:bg-accent/50 flex items-center gap-2.5"
+                  className={`w-full p-2.5 rounded-lg text-left flex items-center gap-2.5 ${siteSel === c.id ? "bg-accent" : "hover:bg-accent/50"}`}
                 >
                   <span className="h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
                     <Globe2 className="h-4 w-4" />
@@ -1001,6 +1009,7 @@ function ChannelChatsPage() {
               <button
                 key={`${c.business_number_id}|${c.phone}`}
                 onClick={() => {
+                  setSiteSel(null)
                   setSelected(c.phone)
                   if (todos) setSelectedBiz(c.business_number_id)
                   if (canalId) markConversationSeen(canalId, c.phone)
@@ -1107,8 +1116,10 @@ function ChannelChatsPage() {
       </div>
 
       {/* Janela de conversa */}
-      <div className="flex-1 min-w-0 border-l">
-        {!conversaAtual ? (
+      <div className="relative flex-1 min-w-0 border-l">
+        {siteSel && todos ? (
+          <SiteChatPage embedded soConversaId={siteSel} />
+        ) : !conversaAtual ? (
           <div className="flex flex-col h-screen items-center justify-center text-muted-foreground gap-2">
             <MessagesSquare className="h-8 w-8" />
             <p className="text-sm">Selecione uma conversa</p>

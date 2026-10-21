@@ -26,7 +26,9 @@ function arquivoParaBase64(file: File) {
   })
 }
 
-export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
+// soConversaId: modo "só a conversa" — usado dentro da lista unificada da FelizCred (chats.tsx): mostra apenas a
+// conversa e os detalhes, sem a lista do site, que já está na lista única ao lado.
+export function SiteChatPage({ embedded = false, soConversaId = null }: { embedded?: boolean; soConversaId?: string | null }) {
   const { channels, current, setCurrent } = useChannel()
   const { notifPermission, requestNotifPermission, unreadConversations, markConversationSeen, setActiveConversation, alvoAbrir, limparAlvoAbrir } = useUnread()
   const [conversas, setConversas] = React.useState<SiteChatConversation[]>([])
@@ -60,10 +62,14 @@ export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
   }, [markConversationSeen])
 
   React.useEffect(() => {
+    if (soConversaId) { setCarregando(false); return }
     carregarLista()
     const id = window.setInterval(() => { if (!document.hidden) carregarLista() }, 5000)
     return () => window.clearInterval(id)
-  }, [carregarLista])
+  }, [carregarLista, soConversaId])
+  React.useEffect(() => {
+    if (soConversaId) { setSelecionada(null); setMensagens([]); setClt(null); carregarConversa(soConversaId) }
+  }, [soConversaId, carregarConversa])
   const selecionadaId = selecionada?.id
   React.useEffect(() => {
     if (!selecionadaId) return
@@ -141,7 +147,7 @@ export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className={cn("flex h-screen w-full min-w-0 overflow-hidden bg-background", embedded && "absolute inset-0", !embedded && "p-0")}>
-      <aside className={cn("w-full shrink-0 border-r md:flex md:w-[340px] md:flex-col", selecionada ? "hidden" : "flex flex-col")}>
+      {!soConversaId && <aside className={cn("w-full shrink-0 border-r md:flex md:w-[340px] md:flex-col", selecionada ? "hidden" : "flex flex-col")}>
         <div className="flex h-14 shrink-0 items-center justify-between border-b px-3">
           <div className="flex items-center gap-1"><SidebarTrigger /><DropdownMenu><DropdownMenuTrigger asChild><button className="flex items-center gap-1 rounded-md px-1 py-0.5 text-left hover:bg-accent"><div><p className="text-sm font-semibold">Conversas</p><p className="flex items-center gap-1 text-xs text-muted-foreground"><Globe2 className="h-3 w-3" /> Site FelizCred</p></div><ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /></button></DropdownMenuTrigger><DropdownMenuContent align="start" className="w-64">{(["felizcred","cotacerta","ciahot"] as const).map((company, index) => { const items=channels.filter((c)=>c.company===company); if(!items.length)return null; return <React.Fragment key={company}>{index>0&&<DropdownMenuSeparator/>}<DropdownMenuLabel>{COMPANY_LABELS[company]}</DropdownMenuLabel>{items.map((c)=><DropdownMenuItem key={c.id} onClick={()=>setCurrent(c)} className="gap-2">{c.kind==="site"?<Globe2 className="h-4 w-4"/>:c.kind==="instagram"?<AtSign className="h-4 w-4"/>:<Phone className="h-4 w-4"/>}<span className="flex-1">{c.label}</span>{current?.id===c.id&&<Check className="h-3.5 w-3.5"/>}</DropdownMenuItem>)}</React.Fragment>})}</DropdownMenuContent></DropdownMenu></div>
           <div className="flex items-center gap-1">
@@ -161,8 +167,8 @@ export function SiteChatPage({ embedded = false }: { embedded?: boolean }) {
             </button>
           })}
         </div>
-      </aside>
-      <main className={cn("min-w-0 flex-1 flex-col", selecionada ? "flex" : "hidden md:flex")}>
+      </aside>}
+      <main className={cn("min-w-0 flex-1 flex-col", selecionada || soConversaId ? "flex" : "hidden md:flex")}>
         {!selecionada ? <div className="flex flex-1 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-8 w-8 text-muted-foreground/50" /><p className="mt-3 text-sm">Selecione uma conversa</p></div></div> : <>
           <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4"><Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelecionada(null)}><ArrowLeft className="h-4 w-4" /></Button><div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><UserRound className="h-4 w-4" /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{selecionada.name}</p>{selecionada.human_intent_stage === "requested" && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Aguardando você</span>}</div><p className="truncate text-xs text-muted-foreground">{[selecionada.contact, selecionada.email, selecionada.produto_tag].filter(Boolean).join(" · ")}</p></div><Button variant="outline" size="sm" className="gap-1.5" onClick={alterarStatus}>{selecionada.status === "open" ? <Check className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}{selecionada.status === "open" ? "Encerrar" : "Reabrir"}</Button></header>
           <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-5"><div className="mx-auto flex max-w-3xl flex-col gap-3">
