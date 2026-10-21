@@ -7855,6 +7855,20 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ips: [...ips], modoDireto: process.env.FACTA_DIRECT === "true" });
     }
 
+    // GET /painel/api/facta/teste — só leitura: gera o token e consulta o status de autorização de um CPF
+    // (?cpf=...) pelo caminho em uso (ponte ou direto). Devolve só o resumo, sem dados do trabalhador.
+    if (req.method === "GET" && path_ === "/painel/api/facta/teste") {
+      if (!requireAuth(req, res)) return;
+      const cpf = String(url.searchParams.get("cpf") || "").replace(/\D/g, "");
+      if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Informe ?cpf= válido" });
+      try {
+        const resposta = await facta.consultarTrabalhador(cpf);
+        return send(res, 200, { ok: true, modoDireto: process.env.FACTA_DIRECT === "true", erro: respostaFactaComErro(resposta), mensagem: mensagemFacta(resposta, ""), linhas: dadosTrabalhadorFacta(resposta).length });
+      } catch (err) {
+        return send(res, 200, { ok: false, modoDireto: process.env.FACTA_DIRECT === "true", status: err.httpStatus || null, erro: String(err.message || "").slice(0, 200) });
+      }
+    }
+
     // GET /painel/api/diagnostico-broadcast/:businessId — só leitura: status da fila de envios agendados
     // (contagens, erros agrupados e próximos itens). Usado para checar por que um envio não saiu.
     const matchDiagnostico = path_.match(/^\/painel\/api\/diagnostico-broadcast\/([^/]+)$/);
