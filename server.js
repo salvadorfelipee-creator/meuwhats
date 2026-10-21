@@ -26,7 +26,7 @@ const google = require("./google");
 const mcp = require("./mcp");
 const gemini = require("./gemini");
 const siteChatRules = require("./site-chat-rules");
-const { salvarContatoBrevo, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarEmail } = require("./email");
+const { garantirListaBrevo, garantirModelosBrevo, enviarModeloFelizcred, salvarContatoBrevo, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarEmail } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -319,6 +319,36 @@ async function notificarEtapaFactaPorEmail(row, etapa) {
   if (!conteudo) return;
   await enviarAtualizacaoChatFelizcred({ nome: conversation.name, email: conversation.email, titulo: conteudo[0], mensagem: conteudo[1] });
 }
+
+// E-mail de cliente de verdade: fora endereços de teste (example.com, domínio da própria FelizCred, "teste"/"auditoria").
+function emailDeClienteReal(email) {
+  const e = String(email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return false;
+  return !/@example\.|@felizcred\.com\.br$|^teste|auditoria/.test(e);
+}
+
+// Varredura: cliente do chat do site que parou no meio (2h a 48h sem escrever) recebe UM e-mail de retomada, conforme
+// a situação: autorização pendente, problema na consulta ou simulação salva. Marca antes de enviar, para nunca repetir.
+async function enviarRetomadasDoSite() {
+  if (process.env.EMAIL_RETOMADA_ATIVA !== "true") return; // só liga depois que os modelos forem aprovados
+  const agora = Date.now();
+  const candidatas = await db.siteChatParaRetomada(agora - 48 * 3600_000, agora - 2 * 3600_000);
+  for (const c of candidatas) {
+    if (!emailDeClienteReal(c.email)) continue;
+    const etapa = String(c.etapa || "");
+    const modelo = /^(autorizacao_enviada|aguardando_autorizacao)$/.test(etapa) ? "felizcred-autorizacao-pendente"
+      : /^erro/.test(etapa) ? "felizcred-problema-na-consulta"
+      : "felizcred-retomar-simulacao";
+    try {
+      await db.siteChatEmailMarcar(c.id, "email_retomada_at", Date.now());
+      await enviarModeloFelizcred({ modelo, email: c.email, nome: c.name });
+      console.log(`E-mail de retomada (${modelo}) enviado para a conversa ${c.id}`);
+    } catch (err) {
+      console.error(`E-mail de retomada não enviado (${c.id}):`, err.message);
+    }
+  }
+}
+setInterval(() => { enviarRetomadasDoSite().catch((err) => console.error("Erro na varredura de retomada por e-mail:", err.message)); }, 15 * 60_000);
 
 // A autorização do cliente na Facta vale por um tempo. Antes de pedir uma nova, confere se a consulta já
 // responde com dados do trabalhador: se sim, o cliente pula a etapa de autorizar de novo.
@@ -5961,7 +5991,9 @@ const server = http.createServer(async (req, res) => {
         enviarInicioChatFelizcred({ nome: name, email }).catch((err) => console.error(`E-mail inicial do chat não enviado (${id}):`, err.message));
         // Salva quem preencheu o formulário do site: lista de contatos do Brevo e Google Contatos
         // (prefixo "SITE" pra distinguir dos outros funis). Em segundo plano, nunca atrasa o chat.
-        salvarContatoBrevo({ email, nome: name, telefone: contact, origem: "site-chat" }).catch((err) => console.error(`Contato do site não salvo no Brevo (${id}):`, err.message));
+        garantirListaBrevo()
+          .then((listaId) => salvarContatoBrevo({ email, nome: name, telefone: contact, origem: "site-chat", listIds: [listaId] }))
+          .catch((err) => console.error(`Contato do site não salvo no Brevo (${id}):`, err.message));
         if (google.configurado()) {
           const digitosContato = contact.replace(/\D/g, "");
           google
@@ -6409,6 +6441,14 @@ const server = http.createServer(async (req, res) => {
       if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." });
       await db.siteChatMensagemAtendente(conversation.id, usuario.nome || "Atendimento FelizCred", message, media);
       if (conversation.human_intent_stage === "requested") await db.siteChatDefinirIntencaoHumano(conversation.id, "human_active");
+      // Cliente que já saiu do chat (sem escrever há mais de 5 min) recebe a resposta por e-mail, no máximo 1 a cada 30 min.
+      const saiuDoChat = !conversation.last_visitor_at || Date.now() - Number(conversation.last_visitor_at) > 5 * 60_000;
+      const emailRecente = conversation.email_resposta_at && Date.now() - Number(conversation.email_resposta_at) < 30 * 60_000;
+      if (process.env.EMAIL_RETOMADA_ATIVA === "true" && conversation.email && emailDeClienteReal(conversation.email) && saiuDoChat && !emailRecente) {
+        db.siteChatEmailMarcar(conversation.id, "email_resposta_at", Date.now())
+          .then(() => enviarModeloFelizcred({ modelo: "felizcred-resposta-atendente", email: conversation.email, nome: conversation.name, mensagem: message || "Enviamos um arquivo para você no chat." }))
+          .catch((err) => console.error(`E-mail de resposta do atendente não enviado (${conversation.id}):`, err.message));
+      }
       return send(res, 201, { ok: true });
     }
 
@@ -7869,6 +7909,29 @@ const server = http.createServer(async (req, res) => {
       }
       const tam = (nome) => String(process.env[nome] || "").length;
       return send(res, 200, { ips: [...ips], modoDireto: process.env.FACTA_DIRECT === "true", tamanhos: { usuario: tam("FACTA_USERNAME"), senha: tam("FACTA_PASSWORD"), ambiente: String(process.env.FACTA_ENV || "") } });
+    }
+
+    // POST /painel/api/brevo/preparar — cria no Brevo a lista "Site FelizCred" e os 4 modelos de e-mail (se ainda não
+    // existem) e põe na lista os contatos reais do chat do site que informaram e-mail. Pode repetir sem duplicar.
+    if (req.method === "POST" && path_ === "/painel/api/brevo/preparar") {
+      if (!requireAuth(req, res)) return;
+      try {
+        const listaId = await garantirListaBrevo();
+        const modelos = await garantirModelosBrevo();
+        const conversas = (await db.siteChatListar()).filter((c) => c.email && emailDeClienteReal(c.email));
+        const vistos = new Set();
+        let adicionados = 0;
+        for (const c of conversas) {
+          const chave = String(c.email).trim().toLowerCase();
+          if (vistos.has(chave)) continue;
+          vistos.add(chave);
+          await salvarContatoBrevo({ email: c.email, nome: c.name, telefone: c.contact, origem: "site-chat", listIds: [listaId] });
+          adicionados++;
+        }
+        return send(res, 200, { listaId, modelos, contatosNaLista: adicionados });
+      } catch (err) {
+        return send(res, 502, { error: String(err.message || err).slice(0, 300) });
+      }
     }
 
     // GET /painel/api/turso/uso — consumo do mês do banco (Turso) contra os limites do plano grátis, para o aviso do

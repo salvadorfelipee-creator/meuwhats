@@ -203,6 +203,13 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "whatsapp_opt_in_text")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN whatsapp_opt_in_text TEXT`);
   }
+  // Quando o e-mail de retomada (cliente parou no meio) e o de "o atendente respondeu" foram enviados pela última vez.
+  if (!infoSiteChat.rows.some((r) => r.name === "email_retomada_at")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN email_retomada_at INTEGER`);
+  }
+  if (!infoSiteChat.rows.some((r) => r.name === "email_resposta_at")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN email_resposta_at INTEGER`);
+  }
   await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_funnel_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id TEXT NOT NULL,
@@ -3794,6 +3801,26 @@ async function siteChatDefinirNome(id, name) {
   await client.execute({ sql: `UPDATE site_chat_conversations SET name = ? WHERE id = ?`, args: [name, id] });
 }
 
+// Conversas abertas do site com e-mail, cujo cliente parou de escrever entre `desde` e `ate` (ms) e que ainda não
+// receberam o e-mail de retomada. Junta a etapa da consulta CLT (pode ser nula).
+async function siteChatParaRetomada(desde, ate) {
+  await ready;
+  const r = await client.execute({
+    sql: `SELECT c.id, c.name, c.email, c.produto_tag, t.etapa
+          FROM site_chat_conversations c LEFT JOIN site_chat_clt t ON t.conversation_id = c.id
+          WHERE c.status = 'open' AND c.email IS NOT NULL AND c.email != ''
+            AND c.email_retomada_at IS NULL AND c.last_visitor_at BETWEEN ? AND ?`,
+    args: [desde, ate],
+  });
+  return r.rows.map((x) => ({ ...x }));
+}
+
+async function siteChatEmailMarcar(id, campo, ts) {
+  await ready;
+  if (!["email_retomada_at", "email_resposta_at"].includes(campo)) throw new Error("campo inválido");
+  await client.execute({ sql: `UPDATE site_chat_conversations SET ${campo} = ? WHERE id = ?`, args: [ts, id] });
+}
+
 async function siteChatMarcarLida(id) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET last_read_at = ? WHERE id = ?`, args: [Date.now(), id] });
@@ -4183,6 +4210,8 @@ module.exports = {
   planoLimpezaConversas,
   broadcastDiagnostico,
   siteChatDefinirNome,
+  siteChatParaRetomada,
+  siteChatEmailMarcar,
   pausarBot,
   botEstaPausado,
   siteChatFinalizarAntigas,
