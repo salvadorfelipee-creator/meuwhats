@@ -5994,7 +5994,7 @@ const server = http.createServer(async (req, res) => {
             if (respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage)) {
               await db.siteChatFunilEvento(id, "saida", "erro_autorizacao", "facta", "erro_autorizacao");
               row = await db.siteChatCltAtualizar(id, { etapa: "erro_autorizacao", status_novosaque: "ERRO_AUTORIZACAO", error_message: authMessage });
-              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", `Não conseguimos enviar a autorização: ${authMessage}`);
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(authMessage));
             } else {
               await db.siteChatFunilEvento(id, "autorizacao_enviada", "autorizacao_enviada", "facta");
               const alreadyAuthorized = /n[aã]o necessita de autoriza/i.test(authMessage);
@@ -6203,6 +6203,13 @@ const server = http.createServer(async (req, res) => {
           await db.siteChatFunilEvento(id, "intencao_humano", "duvida", conversation.produto_tag || null);
           await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Claro. Para eu ajudar primeiro, diga em poucas palavras qual é a sua dúvida.");
           return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: false }, corsHeaders);
+        }
+        // Enquanto a autorização está com erro, qualquer mensagem recebe a orientação fixa: sem Gemini
+        // e sem o aviso de repetição, que levava o cliente para o WhatsApp sem resolver nada.
+        const cltErro = conversation.produto_tag === "Empréstimo CLT" ? await db.siteChatCltObter(id).catch(() => null) : null;
+        if (message && cltErro?.etapa === "erro_autorizacao") {
+          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(cltErro.error_message));
+          return send(res, 201, { ok: true, clt: true, cltStep: "erro_autorizacao" }, corsHeaders);
         }
         // Escalonamento determinístico: se o visitante precisou repetir a mesma solicitação,
         // não deixamos o Gemini insistir na mesma resposta. A mensagem atual já foi salva acima,

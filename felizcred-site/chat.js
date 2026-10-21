@@ -63,7 +63,7 @@
   }
   function sessionIsValid(session) { return !!(session?.id && session?.token && session?.email && Number(session.expiresAt) > Date.now()); }
   function resetSession() {
-    localStorage.removeItem(STORAGE); state.session = null; state.messages = []; state.clt = null; state.cltCpf = ""; state.selectedOffer = null;
+    localStorage.removeItem(STORAGE); state.session = null; state.messages = []; state.clt = null; state.cltCpf = ""; state.cltName = ""; state.cltPhone = ""; state.selectedOffer = null;
     root.classList.remove("has-conversation", "is-contracting", "is-expanded"); recoveryForm.hidden = true; startForm.hidden = false; goTo(0); renderClt();
   }
   function loadSession() { try { const saved = JSON.parse(localStorage.getItem(STORAGE) || "null"); state.session = sessionIsValid(saved) ? saved : null; } catch { state.session = null; } if (!state.session) localStorage.removeItem(STORAGE); else root.classList.add("has-conversation"); }
@@ -130,8 +130,12 @@
     }
     if (c === "start") {
       const phone = String(state.session?.contact || "").replace(/\D/g, "");
-      const phoneField = /^\d{10,11}$/.test(phone) ? `<input type="hidden" name="phone" value="${esc(phone)}">` : `<label>Celular com DDD<input name="phone" inputmode="tel" autocomplete="tel" maxlength="16" required placeholder="(47) 99999-9999"></label>`;
-      cltEl.innerHTML = `<form class="fc-clt-card" data-action="start"><span class="fc-clt-step">1 de 5 · Autorização</span><h3>Vamos enviar sua autorização pela Facta</h3><p>Confirme seu nome completo e CPF. O telefone informado no início será usado pela Facta para enviar o link no WhatsApp.</p><label>Nome completo<input name="name" autocomplete="name" required placeholder="Como aparece no documento" value="${esc(state.session?.name || "")}"></label><label>CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" required placeholder="000.000.000-00"></label>${phoneField}<label class="fc-clt-consent"><input type="checkbox" required> Autorizo o envio destes dados à Facta para solicitar a consulta.</label><button class="fc-chat-primary">Enviar autorização no WhatsApp</button><small class="fc-clt-safe">A autorização permite consultar vínculo e margem. Ela não cria empréstimo.</small></form>`;
+      // O celular fica sempre visível e editável: se a Facta recusar o número, o cliente troca só ele.
+      const phoneField = `<label>Celular do WhatsApp que vai receber o link<input name="phone" inputmode="tel" autocomplete="tel" maxlength="16" required value="${esc(state.cltPhone || phone)}" placeholder="(47) 99999-9999"></label>`;
+      const intro = state.retryingAuthorization
+        ? "<p><b>Revise os dados abaixo e envie de novo.</b> Nome, CPF e celular continuam preenchidos. Se o celular for o que deu erro, troque só ele.</p>"
+        : "<p>Confirme seu nome completo, CPF e o celular do WhatsApp que vai receber o link.</p>";
+      cltEl.innerHTML = `<form class="fc-clt-card" data-action="start"><span class="fc-clt-step">1 de 5 · Autorização</span><h3>Vamos enviar sua autorização pela Facta</h3>${intro}<label>Nome completo<input name="name" autocomplete="name" required placeholder="Como aparece no documento" value="${esc(state.cltName || state.session?.name || "")}"></label><label>CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" required placeholder="000.000.000-00" value="${esc(state.cltCpf || "")}"></label>${phoneField}<label class="fc-clt-consent"><input type="checkbox" required> Autorizo o envio destes dados à Facta para solicitar a consulta.</label><button class="fc-chat-primary">Enviar autorização no WhatsApp</button><small class="fc-clt-safe">A autorização permite consultar vínculo e margem. Ela não cria empréstimo.</small></form>`;
       return;
     }
     if (c.provider === "facta" && c.etapa === "solicitando_autorizacao") {
@@ -145,9 +149,8 @@
     }
     if (c.provider === "facta" && ["erro_autorizacao", "erro_integracao"].includes(c.etapa)) {
       const integrationError = c.etapa === "erro_integracao";
-      const statusKey = `${c.etapa}:${c.status || ""}:${c.error || ""}`;
-      if (state.dismissedCltStatus === statusKey) { cltEl.classList.remove("show"); cltEl.innerHTML = ""; return; }
-      cltEl.innerHTML = `<div class="fc-clt-card fc-clt-status-card"><button type="button" class="fc-clt-dismiss" data-dismiss-clt-status aria-label="Fechar aviso">×</button><span class="fc-clt-step">${integrationError ? "Falha de conexão" : "Dados não aceitos"}</span><h3>${integrationError ? "A Facta não recebeu a solicitação" : "A autorização não foi enviada"}</h3><p><strong>Retorno:</strong> ${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p><p class="fc-clt-reassurance">Seus dados ficaram salvos e nenhum contrato foi criado.</p><div class="fc-clt-actions"><button type="button" class="fc-chat-primary" data-resend-authorization>${integrationError ? "Tentar novamente" : "Corrigir dados"}</button><button type="button" class="fc-clt-secondary" data-dismiss-clt-status>Voltar à conversa</button></div></div>`;
+      const phoneErro = /telefone j[aá] informado/i.test(String(c.error || ""));
+      cltEl.innerHTML = `<div class="fc-clt-card fc-clt-status-card"><span class="fc-clt-step">${integrationError ? "Falha de conexão" : "Dados não aceitos"}</span><h3>${integrationError ? "A Facta não recebeu a solicitação" : "A autorização não foi enviada"}</h3>${phoneErro ? "<p><strong>Celular já usado:</strong> este número já está ligado a outro CPF na Facta, então o link não chega nele. Toque em <strong>Corrigir dados</strong>, troque apenas o celular pelo número do WhatsApp que você usa agora e envie de novo.</p>" : `<p><strong>Retorno:</strong> ${esc(c.error || "A Facta recusou a solicitação de autorização.")}</p>`}<p class="fc-clt-reassurance">Seus dados ficaram salvos e nenhum contrato foi criado.</p><div class="fc-clt-actions"><button type="button" class="fc-chat-primary" data-resend-authorization>${integrationError ? "Tentar novamente" : "Corrigir dados"}</button></div></div>`;
       return;
     }
     if (c.provider === "facta" && c.etapa === "ofertas_disponiveis") {
@@ -323,6 +326,8 @@
     try {
       if (e.target.dataset.action === "start") {
         state.cltCpf = String(form.get("cpf") || "");
+        state.cltName = String(form.get("name") || "");
+        state.cltPhone = String(form.get("phone") || "");
         const path = state.retryingAuthorization ? "resend-authorization" : "start";
         const data = await api(`/${state.session.id}/clt/${path}`, { method: "POST", body: JSON.stringify({ name: form.get("name"), cpf: state.cltCpf, phone: form.get("phone") }) }); state.clt = data.clt; state.retryingAuthorization = false;
       } else if (e.target.dataset.action === "facta-personal") {
