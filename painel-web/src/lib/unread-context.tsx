@@ -18,6 +18,7 @@ type UnreadContextValue = {
   // de quem está logado nem de etapa/Responsável (ver conversaSemRespostaHaMuitoTempo em api.ts).
   overdueConversations: Set<string>
   hasAnyUnread: boolean
+  alerts: InboxAlert[]
   markSeen: (channelId: string) => void
   markConversationSeen: (channelId: string, phone: string) => void
   setActiveConversation: (channelId: string | null, phone: string | null) => void
@@ -32,6 +33,18 @@ type UnreadContextValue = {
   // ChatsPage funciona por dentro — mesmo mecanismo de alvoAbrir que o clique em notificação já
   // usa, só exposto como função pública também.
   abrirConversa: (channelId: string, phone: string) => void
+}
+
+export type InboxAlert = {
+  key: string
+  channelId: string
+  conversationId: string
+  channelLabel: string
+  channelKind: "whatsapp" | "instagram" | "site"
+  name: string
+  body: string
+  timestamp: number
+  urgent: boolean
 }
 
 function chaveConversa(channelId: string, phone: string) {
@@ -78,6 +91,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
   const { setCurrent, channels } = useChannel()
   const [unreadConversations, setUnreadConversations] = React.useState<Set<string>>(new Set())
   const [overdueConversations, setOverdueConversations] = React.useState<Set<string>>(new Set())
+  const [alerts, setAlerts] = React.useState<InboxAlert[]>([])
   const [alvoAbrir, setAlvoAbrir] = React.useState<{ channelId: string; phone: string } | null>(null)
   const limparAlvoAbrir = React.useCallback(() => setAlvoAbrir(null), [])
   const abrirConversa = React.useCallback(
@@ -127,6 +141,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       // assim que o fluxo automático respondia sozinho logo depois do cliente.
       const next = new Set<string>()
       const nextOverdue = new Set<string>()
+      const nextAlerts: InboxAlert[] = []
       const recemNaoLidas: typeof lista = []
       const recemAtrasadas: typeof lista = []
       for (const c of lista) {
@@ -134,8 +149,21 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
         const chId = c.channel === "instagram" ? "instagram" : c.business_number_id
         const chave = chaveConversa(chId, c.phone)
         next.add(chave)
+        const canal = channelsRef.current.find((ch) => ch.id === chId)
+        const atrasada = conversaSemRespostaHaMuitoTempo(c)
+        nextAlerts.push({
+          key: chave,
+          channelId: chId,
+          conversationId: c.phone,
+          channelLabel: canal?.label || chId,
+          channelKind: c.channel === "instagram" ? "instagram" : "whatsapp",
+          name: c.name || c.phone,
+          body: c.last_body || "Nova mensagem",
+          timestamp: Number(c.last_message_at || c.last_inbound_at || Date.now()),
+          urgent: atrasada,
+        })
         if (firstCheckRef.current && !unreadConversationsRef.current.has(chave)) recemNaoLidas.push(c)
-        if (conversaSemRespostaHaMuitoTempo(c)) {
+        if (atrasada) {
           nextOverdue.add(chave)
           if (firstCheckRef.current && !overdueConversationsRef.current.has(chave)) recemAtrasadas.push(c)
         }
@@ -145,6 +173,17 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
         if (!c.unread) continue
         const chave = chaveConversa("site", c.id)
         next.add(chave)
+        nextAlerts.push({
+          key: chave,
+          channelId: "site",
+          conversationId: c.id,
+          channelLabel: "Site FelizCred",
+          channelKind: "site",
+          name: c.name || "Visitante do site",
+          body: c.last_message || (c.produto_tag ? `Interesse: ${c.produto_tag}` : "Nova mensagem pelo site"),
+          timestamp: Number(c.updated_at || c.last_visitor_at || Date.now()),
+          urgent: c.human_intent_stage === "requested",
+        })
         if (firstCheckRef.current && !unreadConversationsRef.current.has(chave)) recemSite.push(c)
       }
       firstCheckRef.current = true
@@ -230,6 +269,11 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
         if (prev.size === nextOverdue.size && [...prev].every((k) => nextOverdue.has(k))) return prev
         return nextOverdue
       })
+      nextAlerts.sort((a, b) => Number(b.urgent) - Number(a.urgent) || b.timestamp - a.timestamp)
+      setAlerts((prev) => {
+        if (prev.length === nextAlerts.length && prev.every((item, index) => item.key === nextAlerts[index]?.key && item.timestamp === nextAlerts[index]?.timestamp && item.urgent === nextAlerts[index]?.urgent)) return prev
+        return nextAlerts
+      })
     }
 
     tick()
@@ -263,6 +307,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       }
       return mudou ? next : prev
     })
+    setAlerts((prev) => prev.filter((alert) => alert.channelId !== channelId))
   }, [])
 
   const markConversationSeen = React.useCallback((channelId: string, phone: string) => {
@@ -279,6 +324,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       next.delete(chave)
       return next
     })
+    setAlerts((prev) => prev.filter((alert) => alert.key !== chave))
   }, [])
 
   const unreadChannels = React.useMemo(() => {
@@ -293,6 +339,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       unreadConversations,
       overdueConversations,
       hasAnyUnread: unreadConversations.size > 0,
+      alerts,
       markSeen,
       markConversationSeen,
       setActiveConversation,
@@ -306,6 +353,7 @@ export function UnreadProvider({ children }: { children: React.ReactNode }) {
       unreadChannels,
       unreadConversations,
       overdueConversations,
+      alerts,
       markSeen,
       markConversationSeen,
       setActiveConversation,

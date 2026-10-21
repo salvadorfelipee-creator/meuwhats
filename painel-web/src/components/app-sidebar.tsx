@@ -23,6 +23,7 @@ import { useUnread } from "@/lib/unread-context"
 import { useAuth } from "@/lib/auth-context"
 import { RetornosNavItem } from "@/components/retornos-nav-item"
 import { MinhasConversasMenuItem } from "@/components/minhas-conversas-menu"
+import { NotificationCenter } from "@/components/notification-center"
 import {
   MessageCircle,
   CalendarDays,
@@ -124,6 +125,8 @@ export function AppSidebar({
                   <Menu />
                 </SidebarMenuButton>
               </SidebarMenuItem>
+
+              <NotificationCenter onOpenConversation={onAbrirConversa} />
 
               {NAV_ITEMS_ANTES.map((item) => (
                 <SidebarMenuItem key={item.id}>
