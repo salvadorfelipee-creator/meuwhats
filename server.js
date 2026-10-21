@@ -4838,7 +4838,9 @@ async function montarFluxoDinamico(fluxoRow) {
 // Oferta do consignado CLT para quem responde aos templates bomdia/boatarde. Estados guardados em
 // conversations.fluxo_passo: consignado_oferta (aguardando o botão) → consignado_chat (link do chat
 // enviado) ou consignado_encerrado (disse "no momento não"). Quem já está em outro funil não entra aqui.
-const TEMPLATES_CONSIGNADO = ["bomdia", "boatarde"];
+// O texto gravado do envio é o preview do template ("Olá bom dia!", "Olá, boa tarde!"), não o nome técnico —
+// por isso se confere também o texto com espaço.
+const TEMPLATES_CONSIGNADO = ["bomdia", "bom dia", "boatarde", "boa tarde"];
 const NUMEROS_CONSIGNADO = [CAMPANHA_CLT_NUMBER_ID, FELIZCRED_PRINCIPAL_NUMBER_ID];
 const TEXTO_OFERTA_CONSIGNADO =
   "Oi, tudo bem? Quem fala é o Felipe, consultor da FelizCred, parceira de bancos como Pan, C6, BMG e Facta.\n\n" +
