@@ -4672,7 +4672,9 @@ async function getFluxo(businessNumberId, phone, fluxoPassoAtual) {
   }
   if (businessNumberId === FELIZCRED_PRINCIPAL_NUMBER_ID) {
     if (String(fluxoPassoAtual || "").startsWith("fgtsad_")) return FLUXO_FGTS_ANUNCIO;
-    if (await db.recebeuTemplate(phone, businessNumberId, "amigo_indicou")) return FLUXO_AMIGO_INDICOU;
+    // ARQUIVADO em 21/10/2026 — campanha anterior ("amigo_indicou"). Desligado a pedido: quem recebeu
+    // o template não cai mais nesse fluxo. Código mantido (mesmo padrão dos outros arquivados).
+    // if (await db.recebeuTemplate(phone, businessNumberId, "amigo_indicou")) return FLUXO_AMIGO_INDICOU;
   }
   if (FLUXOS_POR_NUMERO[businessNumberId]) return FLUXOS_POR_NUMERO[businessNumberId];
   // Número sem fluxo fixo escrito em código (ex.: número novo de um cliente) — tenta o motor

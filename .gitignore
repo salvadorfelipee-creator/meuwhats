@@ -42,3 +42,9 @@ __pycache__/
 # por isso o Git normalmente pula sozinho, mas a entrada fica aqui como reforço.
 especita clinica/
 whatsapp especita/
+
+# Material pessoal/jurídico e logs locais — nunca versionar
+processo/
+debug.log
+# Capturas de tela de revisão de design (binários, não são o site)
+.impeccable/review/
