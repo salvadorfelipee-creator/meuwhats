@@ -287,6 +287,11 @@ const ready = (async () => {
   if (!infoConversations.rows.some((r) => r.name === "instagram_lembrete_at")) {
     await client.execute(`ALTER TABLE conversations ADD COLUMN instagram_lembrete_at INTEGER`);
   }
+  // bot_pausado_ate = até quando os envios automáticos ficam parados nessa conversa (atendente humano
+  // respondeu pelo painel — ver pausarBot). NULL/passado = bot ligado.
+  if (!infoConversations.rows.some((r) => r.name === "bot_pausado_ate")) {
+    await client.execute(`ALTER TABLE conversations ADD COLUMN bot_pausado_ate INTEGER`);
+  }
   // resolvido_em = timestamp de quando o status virou 'resolvido' pela ÚLTIMA vez (ver
   // atualizarStatusConversa) — sem isso não dava pra medir "tempo até resolver" no Analytics,
   // só o status atual, sem saber quando ele mudou.
@@ -1087,6 +1092,24 @@ async function tentarMarcarJanelaLembreteEnviado(phone, businessNumberId) {
     args: [Date.now(), phone, businessNumberId],
   });
   return result.rowsAffected > 0;
+}
+
+// Pausa (ate = ms epoch) ou religa (ate = null) os envios automáticos de uma conversa.
+async function pausarBot(phone, businessNumberId, ate) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE conversations SET bot_pausado_ate = ? WHERE phone = ? AND business_number_id = ?`,
+    args: [ate, phone, businessNumberId],
+  });
+}
+
+async function botEstaPausado(phone, businessNumberId) {
+  await ready;
+  const r = await client.execute({
+    sql: `SELECT bot_pausado_ate FROM conversations WHERE phone = ? AND business_number_id = ?`,
+    args: [phone, businessNumberId],
+  });
+  return Number(r.rows[0]?.bot_pausado_ate || 0) > Date.now();
 }
 
 async function getConversation(phone, businessNumberId) {
@@ -4136,6 +4159,8 @@ module.exports = {
   apagarConversa,
   planoLimpezaConversas,
   broadcastDiagnostico,
+  pausarBot,
+  botEstaPausado,
   siteChatFinalizarAntigas,
   broadcastReenfileirarErro,
   apagarConversasLimpeza,
