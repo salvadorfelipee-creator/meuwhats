@@ -7,7 +7,30 @@ function config() {
   return { baseUrl, secret };
 }
 
+// Modo direto (FACTA_DIRECT=true): o próprio servidor fala com a Facta, sem a ponte no computador. Exige que o IP de
+// saída do servidor esteja liberado no painel da Facta e FACTA_USERNAME/FACTA_PASSWORD/FACTA_ENV nas variáveis.
+async function requestDireto(target, method, path, { query, body } = {}) {
+  const { factaRequest } = require("./facta-bridge/server");
+  let payload;
+  try {
+    payload = await factaRequest({ target, method, path, query, body });
+  } catch (err) {
+    const error = new Error(err.message);
+    error.httpStatus = err.upstreamStatus || err.status || 500;
+    error.factaResponse = err.upstream;
+    throw error;
+  }
+  if (!payload?.ok) {
+    const error = new Error(payload?.body?.mensagem || payload?.body?.message || `Falha na Facta (${payload?.status})`);
+    error.httpStatus = payload?.status;
+    error.factaResponse = payload?.body;
+    throw error;
+  }
+  return payload.body;
+}
+
 async function request(target, method, path, { query, body } = {}) {
+  if (process.env.FACTA_DIRECT === "true") return requestDireto(target, method, path, { query, body });
   const { baseUrl, secret } = config();
   const response = await fetch(`${baseUrl}/v1/facta/request`, {
     method: "POST",

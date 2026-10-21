@@ -168,4 +168,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { ALLOWED, extractToken, secretMatches, server };
+module.exports = { ALLOWED, extractToken, secretMatches, server, factaRequest };

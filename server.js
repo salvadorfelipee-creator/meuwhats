@@ -7840,6 +7840,21 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { reenfileirados });
     }
 
+    // GET /painel/api/facta/ip-saida — mostra os IPs públicos que ESTE servidor usa para sair à internet (vários
+    // testes, porque o provedor pode alternar entre alguns). São os que precisam estar liberados no painel da Facta.
+    if (req.method === "GET" && path_ === "/painel/api/facta/ip-saida") {
+      if (!requireAuth(req, res)) return;
+      const ips = new Set();
+      for (let i = 0; i < 8; i++) {
+        try {
+          const r = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(8000) });
+          const j = await r.json();
+          if (j?.ip) ips.add(j.ip);
+        } catch {}
+      }
+      return send(res, 200, { ips: [...ips], modoDireto: process.env.FACTA_DIRECT === "true" });
+    }
+
     // GET /painel/api/diagnostico-broadcast/:businessId — só leitura: status da fila de envios agendados
     // (contagens, erros agrupados e próximos itens). Usado para checar por que um envio não saiu.
     const matchDiagnostico = path_.match(/^\/painel\/api\/diagnostico-broadcast\/([^/]+)$/);
