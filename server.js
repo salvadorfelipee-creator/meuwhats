@@ -643,6 +643,7 @@ function resolverTokenParametro(texto, nome) {
 // setInterval do broadcast_agendado, mais abaixo). Retorna { ok, error }, nunca lança.
 // `params` (opcional): lista de textos, 1 por variável {{1}},{{2}}... do template, cada um
 // podendo usar os tokens {{nome}}/{{data}} — sem isso, mantém o padrão antigo (só {{1}}=nome).
+const TEMPLATES_SEM_VARIAVEIS = ["bomdia", "boatarde"];
 async function enviarUmBroadcast(businessId, { phone, name, template, language, bodyPreview, params }) {
   const telefoneLimpo = normalizarTelefoneBR(phone);
   const nome = (name || "").trim();
@@ -654,7 +655,11 @@ async function enviarUmBroadcast(businessId, { phone, name, template, language, 
     };
   }
   try {
+    // bomdia/boatarde não têm variável no corpo: mandar o nome como parâmetro faz o Meta recusar
+    // (erro #132000). Por isso esses dois não recebem componentes.
+    const semVariaveis = TEMPLATES_SEM_VARIAVEIS.includes(template);
     const components =
+      semVariaveis ? undefined :
       params && params.length
         ? [{ type: "body", parameters: params.map((p) => ({ type: "text", text: resolverTokenParametro(p, nome) })) }]
         : nome
@@ -7616,6 +7621,16 @@ const server = http.createServer(async (req, res) => {
       const lote = plano.apagar.slice(0, limite);
       const apagadas = await db.apagarConversasLimpeza(lote);
       return send(res, 200, { confirmado: true, ...resumo, salvosNoGoogle, apagadasNestaChamada: apagadas, restantes: plano.apagar.length - apagadas });
+    }
+
+    // POST /painel/api/broadcast-reenfileirar/:businessId — devolve à fila os envios que falharam com o erro
+    // #132000 (parâmetros não batem), espaçados de 12 min a partir de agora, um por vez.
+    const matchReenfileirar = path_.match(/^\/painel\/api\/broadcast-reenfileirar\/([^/]+)$/);
+    if (req.method === "POST" && matchReenfileirar) {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      const reenfileirados = await db.broadcastReenfileirarErro(decodeURIComponent(matchReenfileirar[1]), "132000", Date.now(), 12 * 60 * 1000);
+      return send(res, 200, { reenfileirados });
     }
 
     // GET /painel/api/diagnostico-broadcast/:businessId — só leitura: status da fila de envios agendados

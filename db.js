@@ -3995,6 +3995,22 @@ async function broadcastDiagnostico(businessId) {
   return { agora: Date.now(), porStatus, erros, proximos };
 }
 
+// Devolve à fila os envios com erro que contêm `trecho` (ex.: "132000"), um a cada `espacoMs`, a partir de `agora`.
+async function broadcastReenfileirarErro(businessId, trecho, agora, espacoMs) {
+  await ready;
+  const itens = (await client.execute({
+    sql: `SELECT id FROM broadcast_agendado WHERE business_id = ? AND status = 'error' AND erro LIKE ? ORDER BY id ASC`,
+    args: [businessId, `%${trecho}%`],
+  })).rows;
+  for (let i = 0; i < itens.length; i++) {
+    await client.execute({
+      sql: `UPDATE broadcast_agendado SET status = 'pending', erro = NULL, claimed_at = NULL, agendado_para = ? WHERE id = ?`,
+      args: [agora + (i + 1) * espacoMs, itens[i].id],
+    });
+  }
+  return itens.length;
+}
+
 module.exports = {
   hashSenha,
   verificarSenha,
@@ -4112,6 +4128,7 @@ module.exports = {
   apagarConversa,
   planoLimpezaConversas,
   broadcastDiagnostico,
+  broadcastReenfileirarErro,
   apagarConversasLimpeza,
   listarParaLembreteInstagram,
   tentarMarcarInstagramLembreteEnviado,
