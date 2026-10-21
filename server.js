@@ -7618,6 +7618,14 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { confirmado: true, ...resumo, salvosNoGoogle, apagadasNestaChamada: apagadas, restantes: plano.apagar.length - apagadas });
     }
 
+    // GET /painel/api/diagnostico-broadcast/:businessId — só leitura: status da fila de envios agendados
+    // (contagens, erros agrupados e próximos itens). Usado para checar por que um envio não saiu.
+    const matchDiagnostico = path_.match(/^\/painel\/api\/diagnostico-broadcast\/([^/]+)$/);
+    if (req.method === "GET" && matchDiagnostico) {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.broadcastDiagnostico(decodeURIComponent(matchDiagnostico[1])));
+    }
+
     // POST /painel/api/broadcast-agendar/:businessId — enfileira envios de template cada um
     // com SEU horário exato (`agendadoPara`, ms epoch), em vez de intervalo fixo — pra
     // campanhas com janela diária (ex.: 5 por dia, seg-sex, 9h-17h). Mesma fila e mesmo

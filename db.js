@@ -3975,6 +3975,26 @@ async function apagarConversasLimpeza(itens) {
   return itens.length;
 }
 
+// Diagnóstico somente leitura da fila de broadcast de um número: contagem por status, erros agrupados
+// e os próximos itens pendentes. Não altera nada.
+async function broadcastDiagnostico(businessId) {
+  await ready;
+  const porStatus = (await client.execute({
+    sql: `SELECT status, COUNT(*) AS n FROM broadcast_agendado WHERE business_id = ? GROUP BY status`,
+    args: [businessId],
+  })).rows.map((r) => ({ status: r.status, n: Number(r.n) }));
+  const erros = (await client.execute({
+    sql: `SELECT erro, COUNT(*) AS n FROM broadcast_agendado WHERE business_id = ? AND status = 'error' GROUP BY erro ORDER BY n DESC LIMIT 10`,
+    args: [businessId],
+  })).rows.map((r) => ({ erro: r.erro, n: Number(r.n) }));
+  const proximos = (await client.execute({
+    sql: `SELECT id, phone, template, agendado_para, status, claimed_at FROM broadcast_agendado
+          WHERE business_id = ? AND status IN ('pending', 'processing') ORDER BY agendado_para ASC LIMIT 5`,
+    args: [businessId],
+  })).rows.map((r) => ({ ...r, agendado_para: Number(r.agendado_para), claimed_at: r.claimed_at == null ? null : Number(r.claimed_at) }));
+  return { agora: Date.now(), porStatus, erros, proximos };
+}
+
 module.exports = {
   hashSenha,
   verificarSenha,
@@ -4091,6 +4111,7 @@ module.exports = {
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,
+  broadcastDiagnostico,
   apagarConversasLimpeza,
   listarParaLembreteInstagram,
   tentarMarcarInstagramLembreteEnviado,
