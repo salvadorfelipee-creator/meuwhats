@@ -20,4 +20,4 @@ if (Test-Path -LiteralPath $envFile) {
 
 $logDir = Join-Path $bridgeDir "logs"
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
-& node (Join-Path $bridgeDir "server.js") *>> (Join-Path $logDir "bridge.out.log")
+& node (Join-Path $bridgeDir "server.js") 2>&1 | Out-File -Append -Encoding utf8 (Join-Path $logDir "bridge.out.log")
