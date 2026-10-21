@@ -4842,14 +4842,6 @@ const BOTOES_OFERTA_CONSIGNADO = [
   { id: "consig_saber", title: "Desejo saber mais" },
   { id: "consig_nao", title: "No momento não" },
 ];
-const BOTOES_MODO_CONSIGNADO = [
-  { id: "consig_aqui", title: "Simular aqui" },
-  { id: "consig_site", title: "Chat do site" },
-];
-const BOTOES_CONFIRMA_CONSIGNADO = [
-  { id: "consig_ok", title: "Confirmo" },
-  { id: "consig_corrigir", title: "Corrigir" },
-];
 const CTA_CHAT_CONSIGNADO = { buttonText: "Chat ao vivo" };
 
 function linkChatConsignado(phone) {
@@ -4857,36 +4849,9 @@ function linkChatConsignado(phone) {
   return `https://www.felizcred.com.br/?chat=abrir&wa=${digitos}`;
 }
 
-function cpfDeTexto(texto) {
-  const digitos = String(texto || "").replace(/\D/g, "");
-  return novosaque.cpfValido(digitos) ? digitos : null;
-}
-
-function nomeCompletoDeTexto(texto) {
-  const nome = String(texto || "").trim().replace(/\s+/g, " ");
-  const partes = nome.split(" ").filter(Boolean);
-  return partes.length >= 2 && nome.length <= 120 && /^[\p{L} .'-]+$/u.test(nome) ? nome : null;
-}
-
-// Data dd/mm/aaaa válida e idade entre 18 e 100 anos.
-function nascimentoDeTexto(texto) {
-  const m = String(texto || "").trim().match(/^(\d{2})[\/.\-](\d{2})[\/.\-](\d{4})$/);
-  if (!m) return null;
-  const dia = Number(m[1]);
-  const mes = Number(m[2]);
-  const ano = Number(m[3]);
-  const data = new Date(Date.UTC(ano, mes - 1, dia));
-  if (data.getUTCFullYear() !== ano || data.getUTCMonth() !== mes - 1 || data.getUTCDate() !== dia) return null;
-  const idade = (Date.now() - data.getTime()) / (365.25 * 24 * 3600 * 1000);
-  return idade >= 18 && idade <= 100 ? `${m[1]}/${m[2]}/${m[3]}` : null;
-}
-
-// Oferta do consignado CLT para quem responde aos templates bomdia/boatarde. Estado guardado em
-// conversations.fluxo_passo, no formato "estado|dado1|dado2". Fluxo:
-//   consignado_oferta → consignado_modo → consignado_chat (link do site)
-//   consignado_modo → consignado_nome → consignado_cpf → consignado_nasc → consignado_confirma → consignado_concluido
-//   consignado_oferta → consignado_encerrado ("no momento não")
-// Quem já está em outro funil não entra aqui.
+// Oferta do consignado CLT para quem responde aos templates bomdia/boatarde. Estado em
+// conversations.fluxo_passo: consignado_oferta → consignado_chat (link do chat do site), ou
+// consignado_encerrado ("no momento não"). Quem já está em outro funil não entra aqui.
 async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conversaAnterior, base }) {
   if (!NUMEROS_CONSIGNADO.includes(businessNumberId)) return false;
   const texto =
@@ -4895,111 +4860,37 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
     tipo === "interactive" ? msg.interactive?.button_reply?.title || "" : "";
   if (!texto || pediuPararMensagens(texto)) return false;
 
-  const passoCompleto = String(conversaAnterior?.fluxo_passo || "");
-  const ehConsignado = passoCompleto.startsWith("consignado_");
-  if (!ehConsignado && passoCompleto && passoCompleto !== "menu_inicial") return false;
+  const passo = String(conversaAnterior?.fluxo_passo || "");
+  const ehConsignado = passo.startsWith("consignado_");
+  if (!ehConsignado && passo && passo !== "menu_inicial") return false;
   if (!ehConsignado) {
     const recebeu = await Promise.all(TEMPLATES_CONSIGNADO.map((t) => db.recebeuTemplate(de, businessNumberId, t)));
     if (!recebeu.some(Boolean)) return false;
   }
 
-  const [estado, ...dados] = passoCompleto.split("|");
   const t = normalizar(texto);
   const responder = (corpo, botoes, cta) => enviarRespostaAutomatica(businessNumberId, de, corpo, botoes, null, cta);
-  const irPara = (passo) => db.setFluxoPasso(de, businessNumberId, passo);
+  const irPara = (novoPasso) => db.setFluxoPasso(de, businessNumberId, novoPasso);
 
   try {
     await db.insertMessage({ ...base, type: tipo === "text" ? "text" : "button", body: texto });
     if (!ehConsignado) {
       await responder(TEXTO_OFERTA_CONSIGNADO, BOTOES_OFERTA_CONSIGNADO);
       await irPara("consignado_oferta");
-      return true;
+    } else if (passo === "consignado_oferta") {
+      if (t.includes("desejo")) {
+        await responder("Para simular e ver as condições, toque no botão abaixo e fale com a gente pelo chat do site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
+        await irPara("consignado_chat");
+      } else if (t.includes("no momento")) {
+        await responder("Sem problemas! Fique à vontade para nos chamar quando precisar 😊");
+        await irPara("consignado_encerrado");
+      } else {
+        await responder("Quer saber as condições? Toque em uma das opções abaixo.", BOTOES_OFERTA_CONSIGNADO);
+      }
+    } else if (passo === "consignado_chat") {
+      await responder("Para continuar, toque no botão abaixo e fale com a gente pelo chat do site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
     }
-    switch (estado) {
-      case "consignado_oferta":
-        if (t.includes("desejo")) {
-          await responder("Quer simular aqui mesmo pelo WhatsApp ou prefere o chat do site?", BOTOES_MODO_CONSIGNADO);
-          await irPara("consignado_modo");
-        } else if (t.includes("no momento")) {
-          await responder("Sem problemas! Fique à vontade para nos chamar quando precisar 😊");
-          await irPara("consignado_encerrado");
-        } else {
-          await responder("Quer saber as condições? Toque em uma das opções abaixo.", BOTOES_OFERTA_CONSIGNADO);
-        }
-        break;
-      case "consignado_modo":
-        if (t.includes("simular aqui")) {
-          await responder("Ótimo! Me manda seu *nome completo*, como está no documento.");
-          await irPara("consignado_nome");
-        } else if (t.includes("chat do site")) {
-          await responder("Toque no botão abaixo para abrir o chat e continuar pelo site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
-          await irPara("consignado_chat");
-        } else {
-          await responder("Escolha uma opção abaixo:", BOTOES_MODO_CONSIGNADO);
-        }
-        break;
-      case "consignado_nome": {
-        const nome = nomeCompletoDeTexto(texto);
-        if (!nome) {
-          await responder("Preciso do nome completo, com nome e sobrenome, como está no documento.");
-        } else {
-          await responder("Obrigado! Agora me manda seu *CPF*, só os números.");
-          await irPara(`consignado_cpf|${nome}`);
-        }
-        break;
-      }
-      case "consignado_cpf": {
-        const cpf = cpfDeTexto(texto);
-        if (!cpf) {
-          await responder("Esse CPF não parece válido. Pode digitar de novo, só os números?");
-        } else {
-          await responder("Perfeito. Qual é a sua *data de nascimento*? (dd/mm/aaaa)");
-          await irPara(`consignado_nasc|${dados[0]}|${cpf}`);
-        }
-        break;
-      }
-      case "consignado_nasc": {
-        const nasc = nascimentoDeTexto(texto);
-        if (!nasc) {
-          await responder("Não entendi a data. Manda no formato dd/mm/aaaa, por exemplo 15/03/1985.");
-        } else {
-          const [nome, cpf] = dados;
-          await responder(
-            `Confira seus dados:\n\nNome: ${nome}\nCPF: ${cpf}\nNascimento: ${nasc}\n\n` +
-              "Ao confirmar, você autoriza a consulta do seu vínculo e margem para a simulação. Isso não é contratação.",
-            BOTOES_CONFIRMA_CONSIGNADO
-          );
-          await irPara(`consignado_confirma|${nome}|${cpf}|${nasc}`);
-        }
-        break;
-      }
-      case "consignado_confirma": {
-        const [nome, cpf, nasc] = dados;
-        if (t.includes("confirmo")) {
-          const linha = `Consignado CLT (WhatsApp): ${nome} | CPF ${cpf} | nasc. ${nasc} | consulta autorizada pelo cliente em ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`;
-          await db.atualizarNotaConversa(de, businessNumberId, [conversaAnterior?.nota, linha].filter(Boolean).join("\n"));
-          await db.atualizarStatusConversa(de, businessNumberId, "andamento");
-          if (google.configurado()) {
-            google.garantirContato({ telefone: de, nomePerfil: nomeContatoComCpf(cpf, nome) })
-              .catch((err) => console.error("Erro ao salvar contato do consignado no Google:", err.message));
-          }
-          await responder("Recebi seus dados, obrigado! Um atendente vai verificar sua situação e continuar com você por aqui.");
-          await irPara("consignado_concluido");
-        } else if (t.includes("corrigir")) {
-          await responder("Sem problema. Me manda seu *nome completo*, como está no documento.");
-          await irPara("consignado_nome");
-        } else {
-          await responder("Toque em Confirmo para seguir, ou em Corrigir para ajustar os dados.", BOTOES_CONFIRMA_CONSIGNADO);
-        }
-        break;
-      }
-      case "consignado_chat":
-        await responder("Para continuar, toque no botão abaixo e fale com a gente pelo chat do site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
-        break;
-      default:
-        // consignado_encerrado e consignado_concluido: a pessoa já respondeu; não mandamos mais nada.
-        break;
-    }
+    // consignado_encerrado: a pessoa já disse que não quer; não mandamos mais nada.
     return true;
   } catch (err) {
     console.error("Erro ao tratar resposta do consignado:", err.message);
