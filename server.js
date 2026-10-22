@@ -4949,6 +4949,17 @@ const BOTOES_OFERTA_CONSIGNADO = [
 ];
 const TEXTO_INICIAR_CONSIGNADO = "Para fazer a simulação, eu só preciso de algumas informações para gerar um link de autorização de consulta.";
 const BOTOES_INICIAR_CONSIGNADO = [{ id: "consig_iniciar", title: "Iniciar a simulação" }];
+// Modo da simulação do consignado depois de "Desejo simular": por padrão, o cliente vai para o CHAT DO SITE (botão
+// "Chat ao vivo", celular já preenchido). CONSIGNADO_MODO=whatsapp volta a coletar nome/CPF/nascimento pelo WhatsApp.
+const CONSIGNADO_MODO_SITE = process.env.CONSIGNADO_MODO !== "whatsapp";
+const TEXTO_IR_PARA_CHAT_CONSIGNADO = "Para fazer a simulação, toque no botão abaixo e continue pelo chat seguro do site. Lá pedimos só o necessário e você acompanha cada etapa.";
+const CTA_CHAT_CONSIGNADO = { buttonText: "Chat ao vivo" };
+
+function linkChatConsignado(phone) {
+  const digitos = String(phone || "").replace(/\D/g, "").replace(/^55/, "");
+  return `https://www.felizcred.com.br/?chat=abrir&wa=${digitos}&utm_source=whatsapp&utm_medium=consignado`;
+}
+
 const BOTOES_CONFIRMA_CONSIGNADO = [
   { id: "consig_ok", title: "Confirmo" },
   { id: "consig_corrigir", title: "Corrigir" },
@@ -5030,8 +5041,13 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
     switch (estado) {
       case "consignado_oferta":
         if (t.includes("desejo") || t.includes("simular")) {
-          await responder(TEXTO_INICIAR_CONSIGNADO, BOTOES_INICIAR_CONSIGNADO);
-          await irPara("consignado_iniciar");
+          if (CONSIGNADO_MODO_SITE) {
+            await responder(TEXTO_IR_PARA_CHAT_CONSIGNADO, null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
+            await irPara("consignado_chat");
+          } else {
+            await responder(TEXTO_INICIAR_CONSIGNADO, BOTOES_INICIAR_CONSIGNADO);
+            await irPara("consignado_iniciar");
+          }
         } else if (t.includes("no momento")) {
           await responder("Sem problemas! Fique à vontade para nos chamar quando precisar 😊");
           await irPara("consignado_encerrado");
@@ -5106,6 +5122,10 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
         }
         break;
       }
+      case "consignado_chat":
+        // Já recebeu o link do chat do site: qualquer nova mensagem recebe o botão de novo.
+        await responder("Para continuar a simulação, toque no botão abaixo e fale com a gente pelo chat do site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
+        break;
       default: {
         // consignado_encerrado e consignado_concluido: a pessoa já passou pelo fluxo e escreveu de novo.
         // Não recomeça o fluxo: responde de acordo com a conversa (e avisa o horário, se for o caso).
