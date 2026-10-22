@@ -1463,9 +1463,44 @@ async function iniciarFluxoFgtsMenu(de, businessNumberId) {
     de,
     "Para fazer a simulação do saque do FGTS, é necessário autorizar a *J17* lá no aplicativo do FGTS " +
       "(Meu FGTS > Autorizações). Depois de autorizar, é só me mandar o seu CPF que a gente já parte " +
-      "pro atendimento. 😊"
+      "pro atendimento. 😊\n\n" +
+      "*Atenção:* o saque do FGTS só pode ser feito uma vez por ano. Quem já sacou este ano não consegue " +
+      "fazer de novo. Se você não lembra se já sacou, é só me avisar que eu te explico como conferir."
   );
   await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
+}
+
+// Cliente que "não lembra" se já sacou no ano: ensina onde ver a data do último saque no app e espera a data.
+// Quem não responde é encerrado (lembrete do passo fgts_data_saque) — muita gente só repete a consulta.
+const REGEX_NAO_LEMBRA_SAQUE = /n[ãa]o\s+(me\s+)?(lembro|recordo|sei)|nem\s+lembro|esqueci/i;
+const REGEX_DATA_SAQUE =
+  /\b\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}\b|\b\d{1,2}[\/.\-]\d{4}\b|\b(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\.?\s*(de\s+)?\d{2,4}\b/i;
+const TEXTO_COMO_VER_DATA_SAQUE =
+  "Tudo bem! Abra o aplicativo do FGTS, toque em *Mais* (no rodapé) e depois em *Empréstimos realizados*. " +
+  "Lá aparece a data do seu último saque. Me informe essa data aqui, por favor. 😊\n\n" +
+  "Lembrando: quem já sacou este ano não consegue fazer de novo.";
+const TEXTO_RECEBEU_DATA_SAQUE =
+  "Obrigado! Anotei a data do último saque. Agora é só aguardar que a gente confere e te responde por aqui. 😊";
+const TEXTO_ENCERRA_SEM_DATA_SAQUE =
+  "Como não recebi a data do último saque, vou encerrar este atendimento por aqui. " +
+  "Quando tiver a data, é só me chamar de novo que a gente continua. 😊";
+
+async function handlerDataSaqueFgts(de, businessNumberId, corpo) {
+  if (REGEX_DATA_SAQUE.test(corpo)) {
+    logFunil(businessNumberId, de, "fgts_data_saque_informada");
+    await enviarRespostaAutomatica(businessNumberId, de, TEXTO_RECEBEU_DATA_SAQUE);
+    await db.setFluxoPasso(de, businessNumberId, null);
+    return;
+  }
+  if ((corpo.match(REGEX_CPF) || [])[0]) return handlerCapturaDadosFgts(de, businessNumberId, corpo);
+  // Qualquer outra coisa: não repete a explicação, só continua esperando (e reinicia o relógio do encerramento).
+  await db.setFluxoPasso(de, businessNumberId, "fgts_data_saque");
+}
+
+async function encerrarFgtsSemData(de, businessNumberId) {
+  await enviarRespostaAutomatica(businessNumberId, de, TEXTO_ENCERRA_SEM_DATA_SAQUE);
+  await db.setFluxoPasso(de, businessNumberId, null);
+  logFunil(businessNumberId, de, "fgts_encerrado_sem_data");
 }
 
 // Lista de produtos oferecida quando a revisão de FGTS não se aplica
@@ -1511,6 +1546,7 @@ const LEMBRETE_MINUTOS = {
   carro_garantia_dados: 15,
   financiamento_dados: 15,
   fgts_cpf: 15,
+  fgts_data_saque: 60,
   campanha_clt_dados: [15, 240],
   cltorig_cpf: 15,
   cltorig_email: 15,
@@ -3714,6 +3750,12 @@ async function processarEtapaNsEnviandoKycTravada(row) {
 async function handlerCapturaDadosFgts(de, businessNumberId, corpo) {
   const cpf = (corpo.match(REGEX_CPF) || [])[0]?.replace(/\D/g, "");
   if (!cpf) {
+    if (REGEX_NAO_LEMBRA_SAQUE.test(corpo) || REGEX_DATA_SAQUE.test(corpo)) {
+      if (REGEX_DATA_SAQUE.test(corpo)) return handlerDataSaqueFgts(de, businessNumberId, corpo);
+      await enviarRespostaAutomatica(businessNumberId, de, TEXTO_COMO_VER_DATA_SAQUE);
+      await db.setFluxoPasso(de, businessNumberId, "fgts_data_saque");
+      return;
+    }
     await db.setFluxoPasso(de, businessNumberId, "fgts_cpf");
     return;
   }
@@ -4098,7 +4140,9 @@ const FLUXO_FELIZCRED = {
   fluxoBotoes: FLUXO_BOTOES,
   lembreteMinutos: LEMBRETE_MINUTOS,
   lembreteTextos: LEMBRETE_TEXTOS,
+  lembreteHandlers: { fgts_data_saque: encerrarFgtsSemData },
   capturaTexto: {
+    fgts_data_saque: handlerDataSaqueFgts,
     gerente_autorizo: handlerConfirmacaoAgenda,
     menu_inicial: handlerMenuPrincipal,
     clt_3mais: handlerCapturaDadosClt,
