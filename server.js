@@ -4950,10 +4950,10 @@ const BOTOES_OFERTA_CONSIGNADO = [
 const TEXTO_INICIAR_CONSIGNADO = "Para fazer a simulação, eu só preciso de algumas informações para gerar um link de autorização de consulta.";
 const BOTOES_INICIAR_CONSIGNADO = [{ id: "consig_iniciar", title: "Iniciar a simulação" }];
 // Modo da simulação do consignado depois de "Desejo simular": por padrão, o cliente vai para o CHAT DO SITE (botão
-// "Chat ao vivo", celular já preenchido). CONSIGNADO_MODO=whatsapp volta a coletar nome/CPF/nascimento pelo WhatsApp.
+// "Falar com atendimento", celular já preenchido). CONSIGNADO_MODO=whatsapp volta a coletar nome/CPF/nascimento pelo WhatsApp.
 const CONSIGNADO_MODO_SITE = process.env.CONSIGNADO_MODO !== "whatsapp";
 const TEXTO_IR_PARA_CHAT_CONSIGNADO = "Para fazer a simulação, toque no botão abaixo e continue pelo chat seguro do site. Lá pedimos só o necessário e você acompanha cada etapa.";
-const CTA_CHAT_CONSIGNADO = { buttonText: "Chat ao vivo" };
+const CTA_CHAT_CONSIGNADO = { buttonText: "Falar com atendimento" };
 
 function linkChatConsignado(phone) {
   const digitos = String(phone || "").replace(/\D/g, "").replace(/^55/, "");
