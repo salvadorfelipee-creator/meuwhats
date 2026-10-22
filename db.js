@@ -1145,6 +1145,18 @@ async function getUltimaMensagemRecebida(phone, businessNumberId) {
   return result.rows[0]?.ultimo || null;
 }
 
+// Corpo da última mensagem NOSSA (saída) na conversa — usado pra nunca repetir a mesma resposta
+// automática duas vezes seguidas (consome a janela gratuita à toa).
+async function getUltimoCorpoEnviado(phone, businessNumberId) {
+  await ready;
+  const result = await client.execute({
+    sql: `SELECT body FROM messages WHERE phone = ? AND business_number_id = ? AND direction = 'out'
+          AND COALESCE(status, '') != 'failed' ORDER BY created_at DESC, id DESC LIMIT 1`,
+    args: [phone, businessNumberId],
+  });
+  return result.rows[0]?.body || null;
+}
+
 // Já recebeu template de campanha (broadcast) desse número nos últimos `diasLimite` dias? —
 // trava contra reenvio pra quem já foi contactado (ver DIAS_BLOQUEIO_REENVIO_TEMPLATE em
 // server.js). Só mensagem de SAÍDA tipo 'template', não conta nada do fluxo automático.
@@ -4215,6 +4227,7 @@ module.exports = {
   upsertConversation,
   getConversation,
   getUltimaMensagemRecebida,
+  getUltimoCorpoEnviado,
   jaRecebeuTemplateRecente,
   recebeuTemplate,
   getMensagemPorWaId,

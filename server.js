@@ -4966,9 +4966,36 @@ const BOTOES_CONFIRMA_CONSIGNADO = [
 ];
 
 // Apresentação + oferta do consignado CLT (2 mensagens), marca o passo e põe a tag do produto na conversa.
+// Nunca repete a mesma oferta duas vezes seguidas: se a última mensagem enviada já foi a oferta (ou uma variação
+// dela), manda uma variação diferente da última. Cliente que manda várias mensagens seguidas não gasta a janela
+// gratuita com 3 textos iguais. Mensagens simultâneas do mesmo contato são tratadas uma por vez (trava em memória).
+const VARIACOES_OFERTA_CONSIGNADO = [
+  "Para continuar, é só tocar em *Desejo simular* que eu já te passo o próximo passo. 😊",
+  "Se ainda quiser ver o valor liberado para você, toque em *Desejo simular*. Se preferir deixar para depois, toque em *No momento não*.",
+  "Posso simular agora para você? É rápido e sem compromisso. Toque em *Desejo simular* para começar.",
+];
+const ofertaConsignadoEmAndamento = new Set();
+
 async function iniciarOfertaConsignado(de, businessNumberId) {
-  await enviarRespostaAutomatica(businessNumberId, de, TEXTO_APRESENTACAO_CONSIGNADO);
-  await enviarRespostaAutomatica(businessNumberId, de, TEXTO_OFERTA_CONSIGNADO, BOTOES_OFERTA_CONSIGNADO);
+  const chave = `${businessNumberId}:${de}`;
+  if (ofertaConsignadoEmAndamento.has(chave)) return;
+  ofertaConsignadoEmAndamento.add(chave);
+  try {
+    const ultimo = String((await db.getUltimoCorpoEnviado(de, businessNumberId)) || "");
+    const repetiria =
+      ultimo.startsWith(TEXTO_OFERTA_CONSIGNADO) ||
+      ultimo.startsWith(TEXTO_APRESENTACAO_CONSIGNADO) ||
+      VARIACOES_OFERTA_CONSIGNADO.some((v) => ultimo.startsWith(v));
+    if (repetiria) {
+      const variacao = VARIACOES_OFERTA_CONSIGNADO.find((v) => !ultimo.startsWith(v));
+      await enviarRespostaAutomatica(businessNumberId, de, variacao, BOTOES_OFERTA_CONSIGNADO);
+    } else {
+      await enviarRespostaAutomatica(businessNumberId, de, TEXTO_APRESENTACAO_CONSIGNADO);
+      await enviarRespostaAutomatica(businessNumberId, de, TEXTO_OFERTA_CONSIGNADO, BOTOES_OFERTA_CONSIGNADO);
+    }
+  } finally {
+    ofertaConsignadoEmAndamento.delete(chave);
+  }
   await db.setFluxoPasso(de, businessNumberId, "consignado_oferta");
   try {
     const tagId = await db.tagEncontrarOuCriar(businessNumberId, "Consignado CLT", "#15803D");
