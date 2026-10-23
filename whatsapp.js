@@ -115,33 +115,13 @@ async function sendVideo(fromPhoneNumberId, to, videoUrl, caption) {
 // por link: a Meta valida o arquivo na hora (formato/codec) e devolve o motivo exato se ele não servir.
 async function uploadMedia(fromPhoneNumberId, buffer, mimeType, filename) {
   const boundary = `----meuwhats${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
-  const campo = (nome, valor) => Buffer.from(`--${boundary}
-
-Content-Disposition: form-data; name="${nome}"
-
-
-
-${valor}
-
-`);
+  const campo = (nome, valor) => Buffer.from("--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + nome + "\"\r\n\r\n" + valor + "\r\n");
   const corpo = Buffer.concat([
     campo("messaging_product", "whatsapp"),
     campo("type", mimeType),
-    Buffer.from(`--${boundary}
-
-Content-Disposition: form-data; name="file"; filename="${filename}"
-
-Content-Type: ${mimeType}
-
-
-
-`),
+    Buffer.from("--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"\r\nContent-Type: " + mimeType + "\r\n\r\n"),
     buffer,
-    Buffer.from(`
-
---${boundary}--
-
-`),
+    Buffer.from("\r\n--" + boundary + "--\r\n"),
   ]);
   const { status, buffer: resp } = await graphRequest("POST", "graph.facebook.com", `/${GRAPH_VERSION}/${fromPhoneNumberId}/media`, {
     headers: { "Content-Type": `multipart/form-data; boundary=${boundary}`, "Content-Length": corpo.length },
