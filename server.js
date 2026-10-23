@@ -384,7 +384,9 @@ setInterval(() => { enviarRetomadasDoSite().catch((err) => console.error("Erro n
 // Quem parou no meio da simulação do site (e aceitou receber WhatsApp) recebe UMA mensagem: "mudou de ideia ou ficou
 // com dúvida?", com 3 botões. Só das 9h às 20h (Brasília), de segunda a sábado, no máximo 3 por rodada e nada para quem
 // já conversa conosco pelo WhatsApp. Depende do template aprovado na Meta; enquanto não existir, nada é enviado.
-const RETOMADA_SITE_TEMPLATE = process.env.RETOMADA_SITE_WHATSAPP_TEMPLATE || "felizcred_site_retomada";
+// v2: o primeiro modelo (felizcred_site_retomada) foi cadastrado na Meta com acentos corrompidos; o nome v2 contém o antigo,
+// então o reconhecimento de quem já recebeu (recebeuTemplate usa LIKE) continua funcionando para os dois.
+const RETOMADA_SITE_TEMPLATE = process.env.RETOMADA_SITE_WHATSAPP_TEMPLATE || "felizcred_site_retomada_v2";
 async function enviarRetomadasSiteWhatsapp() {
   if (process.env.RETOMADA_SITE_WHATSAPP_ATIVA === "false") return;
   const agoraBr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false, weekday: "short" }).formatToParts(new Date());
@@ -5272,7 +5274,8 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
   if (["", "menu_inicial"].includes(estadoAtual) && (await db.recebeuTemplate(de, businessNumberId, RETOMADA_SITE_TEMPLATE))) {
     await db.insertMessage({ ...base, type: tipo === "text" ? "text" : "button", body: texto });
     const resposta = normalizar(texto);
-    if (resposta.includes("nao quero")) {
+    // Aceita também o texto com acento corrompido do modelo antigo ("N?o quero mais").
+    if (/n.{1,3}o quero|quero mais/.test(resposta)) {
       await enviarRespostaAutomatica(businessNumberId, de, "Tudo bem! Se mudar de ideia, é só chamar por aqui 😊");
       await db.setFluxoPasso(de, businessNumberId, "consignado_encerrado");
       await db.atualizarNotaConversa(de, businessNumberId, [conversaAnterior?.nota, "Site: parou a simulação e disse que não quer mais"].filter(Boolean).join("\n"));
