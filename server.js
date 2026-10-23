@@ -99,7 +99,8 @@ function siteChatCltPublico(row) {
       status: row.status_novosaque || null,
       waitingSince: row.authorization_requested_at || row.created_at || null,
       checkedAt: row.authorization_checked_at || null,
-      offers: offers.map((o, index) => ({
+      maxInstallment: Number(row.margem_disponivel || 0),
+      offers: selecionarOfertasFacta(offers).map((o, index) => ({
         // A mesma tabela aparece em vários prazos: o id precisa incluir o prazo, senão escolher 36x selecionava o 24x.
         id: `${o.codigoTabela ?? index}:${o.prazo}`,
         tableCode: o.codigoTabela,
@@ -228,6 +229,34 @@ function respostaFactaComErro(payload) {
 function dadosTrabalhadorFacta(payload) {
   const rows = payload?.dados_trabalhador?.dados || payload?.dados?.dados || payload?.dados || [];
   return Array.isArray(rows) ? rows : [];
+}
+
+// Comissão da Facta por tabela do banco e prazo (% sobre o valor líquido), da tela de convênios de 23/10/2026.
+// Chave "tabela:prazo". O que não está aqui tem comissão menor que a menor da lista (2,70%) e fica por último.
+const COMISSAO_FACTA = {
+  "71080:60": 6.75, "71072:48": 5.85, "71064:36": 5.4, "71218:60": 5.4, "71218:48": 4.95, "71129:60": 4.95,
+  "71110:48": 4.5, "71056:24": 4.5, "71218:36": 4.5, "71218:24": 4.05, "71102:36": 4.05, "71153:48": 4.05,
+  "71196:48": 4.05, "71145:36": 3.85, "71188:36": 3.6, "71226:60": 3.6, "71226:48": 3.15, "71099:24": 3.15,
+  "71137:24": 3.15, "71234:48": 2.95, "71234:36": 2.95, "71226:36": 2.95, "71226:24": 2.7,
+};
+
+function comissaoOfertaFacta(o) {
+  const tabelaBanco = String(o?.tabela || "").match(/[0-9]+/)?.[0];
+  return COMISSAO_FACTA[`${tabelaBanco}:${Number(o?.prazo)}`] ?? 0;
+}
+
+// Regra de apresentação: sempre a tabela de maior comissão em cada prazo. Duas opções: o MAIOR prazo e o de 24 meses
+// (se não houver 24, o menor prazo disponível). Só um prazo disponível = só uma opção.
+function selecionarOfertasFacta(offers) {
+  const valor = (o) => Number(o.valor_liquido || o.contrato || 0);
+  const melhorDoPrazo = (prazo) => offers
+    .filter((o) => Number(o.prazo) === prazo)
+    .sort((a, b) => comissaoOfertaFacta(b) - comissaoOfertaFacta(a) || valor(b) - valor(a))[0];
+  const prazos = [...new Set(offers.map((o) => Number(o.prazo)))].sort((a, b) => a - b);
+  if (!prazos.length) return [];
+  const maior = prazos[prazos.length - 1];
+  const segundo = prazos.includes(24) ? 24 : prazos[0];
+  return [...new Set([maior, segundo])].map(melhorDoPrazo).filter(Boolean);
 }
 
 function ofertasFacta(payload) {
@@ -6302,7 +6331,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
-      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|personal-data|assistant)$/i);
+      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|personal-data|assistant)$/i);
       if (cltMatch) {
         const id = cltMatch[1];
         const action = cltMatch[2].toLowerCase();
@@ -6414,6 +6443,27 @@ const server = http.createServer(async (req, res) => {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Sua autorização ainda está válida. Já estamos consultando suas condições.");
               return send(res, 200, { clt: siteChatCltPublico(await sincronizarSiteChatFacta(row)) }, corsHeaders);
             }
+            return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          if (action === "resimulate" && atual?.provider === "facta") {
+            // O cliente pode escolher qualquer parcela até o máximo da margem: refaz a consulta com o valor digitado.
+            if (atual.etapa !== "ofertas_disponiveis") return send(res, 400, { error: "Essa simulação não está disponível agora." }, corsHeaders);
+            const pedido = numeroFacta(body.installmentValue);
+            const maximo = Number(atual.margem_disponivel || 0);
+            if (!(pedido > 0)) return send(res, 400, { error: "Digite o valor da parcela, por exemplo 250,00." }, corsHeaders);
+            if (pedido > maximo + 0.005) return send(res, 400, { error: `Essa parcela passa do máximo disponível de R$ ${maximo.toFixed(2).replace(".", ",")}. Digite um valor menor.` }, corsHeaders);
+            let workerResim = {};
+            try { workerResim = JSON.parse(atual.facta_worker_json || "{}"); } catch {}
+            const operacoes = await facta.consultarOperacoes({
+              opcao_valor: 2,
+              valor_parcela: pedido.toFixed(2),
+              cpf: atual.cpf,
+              data_nascimento: normalizarDataFacta(workerResim.dataNascimento),
+              valor_renda: numeroFacta(workerResim.valorTotalVencimentos).toFixed(2),
+            });
+            const novasOfertas = respostaFactaComErro(operacoes) ? [] : ofertasFacta(operacoes);
+            if (!novasOfertas.length) return send(res, 400, { error: "Não encontramos condições para essa parcela. Tente outro valor." }, corsHeaders);
+            const row = await db.siteChatCltAtualizar(id, { offers_json: JSON.stringify(novasOfertas), error_message: null });
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
           if (action === "select-offer") {

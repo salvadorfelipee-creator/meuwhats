@@ -199,6 +199,7 @@
 .fc-clt-offer span, .fc-clt-offer small { font-size: 11px; }
 .fc-clt-link { justify-self: start; border: 0; background: transparent; color: var(--fc-green-dark); cursor: pointer; font: 650 12px "DM Sans", sans-serif; }
 .fc-clt-resim { display: grid; gap: 9px; }
+.fc-clt-resim[hidden] { display: none; }
 .fc-clt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .fc-clt-consent { grid-template-columns: 18px 1fr !important; align-items: start; font-weight: 500 !important; line-height: 1.35; }
 .fc-clt-consent input { width: 16px; height: 16px; }
