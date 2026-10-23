@@ -9460,11 +9460,22 @@ setInterval(async () => {
 // 2026-08-22 (Turso travou a conta inteira por estourar cota de leitura): com a reserva em
 // dia, dá pra trocar TURSO_DATABASE_URL/TURSO_AUTH_TOKEN pro banco de backup sem perder
 // histórico de conversa. Primeira rodada 2min depois do boot (não espera 24h pro 1º backup).
+// A cada deploy o Render reinicia o processo, e o backup copia o banco INTEIRO pela rede
+// (gasta banda de saída — estourou os 5 GB grátis em 23/10/2026 com ~170 deploys no mês).
+// Por isso grava a data do último backup no banco e só refaz se passaram 24h.
+async function backupSeVencido() {
+  try {
+    const ultimo = Number(await db.reelsConfigGet("backup_reserva_ultimo")) || 0;
+    if (Date.now() - ultimo < 23 * 60 * 60 * 1000) return;
+    const r = await backup.rodarBackup();
+    if (!r.pulado) await db.reelsConfigSet("backup_reserva_ultimo", String(Date.now()));
+  } catch (err) {
+    console.error("Erro no backup pra conta de reserva:", err.message);
+  }
+}
 setTimeout(() => {
-  backup.rodarBackup().catch((err) => console.error("Erro no backup pra conta de reserva:", err.message));
-  setInterval(() => {
-    backup.rodarBackup().catch((err) => console.error("Erro no backup pra conta de reserva:", err.message));
-  }, 24 * 60 * 60 * 1000);
+  backupSeVencido();
+  setInterval(backupSeVencido, 24 * 60 * 60 * 1000);
 }, 2 * 60 * 1000);
 
 // ─── ALERTA DE ETAPA PARADA (nota interna gerada por IA) ────────────────────────────────────
