@@ -26,6 +26,7 @@ import { MinhasConversasMenuItem } from "@/components/minhas-conversas-menu"
 import { NotificationCenter } from "@/components/notification-center"
 import { FactaStatusLed } from "@/components/facta-status-led"
 import { TursoUsoAviso } from "@/components/turso-uso-aviso"
+import { BandaUsoAviso } from "@/components/banda-uso-aviso"
 import {
   MessageCircle,
   CalendarDays,
@@ -169,6 +170,7 @@ export function AppSidebar({
         <SidebarMenu>
           <FactaStatusLed />
           <TursoUsoAviso />
+          <BandaUsoAviso />
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

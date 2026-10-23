@@ -17,6 +17,7 @@ const publique = require("./publique");
 const reels = require("./reels");
 const agenda = require("./agenda");
 const backup = require("./backup");
+const banda = require("./banda");
 const r2 = require("./r2");
 const unnotech = require("./unnotech");
 const novosaque = require("./novosaque");
@@ -8121,6 +8122,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { configurado: true, ...global.__tursoUso });
     }
 
+    // GET /painel/api/banda/uso — estimativa da banda de saída do mês contra os 5 GB grátis do Render (ver banda.js).
+    if (req.method === "GET" && path_ === "/painel/api/banda/uso") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await banda.uso());
+    }
+
     // GET /painel/api/facta/status — luz do painel: a ligação com a Facta (IP liberado, credenciais e serviço no ar)
     // está funcionando? Faz uma consulta leve só de leitura e guarda o resultado por 45s.
     if (req.method === "GET" && path_ === "/painel/api/facta/status") {
@@ -9473,6 +9480,7 @@ async function backupSeVencido() {
     console.error("Erro no backup pra conta de reserva:", err.message);
   }
 }
+banda.iniciar(db);
 setTimeout(() => {
   backupSeVencido();
   setInterval(backupSeVencido, 24 * 60 * 60 * 1000);
