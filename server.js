@@ -5010,6 +5010,7 @@ const BOTOES_INICIAR_CONSIGNADO = [{ id: "consig_iniciar", title: "Iniciar a sim
 // "Falar com atendimento", celular já preenchido). CONSIGNADO_MODO=whatsapp volta a coletar nome/CPF/nascimento pelo WhatsApp.
 const CONSIGNADO_MODO_SITE = process.env.CONSIGNADO_MODO !== "whatsapp";
 const TEXTO_IR_PARA_CHAT_CONSIGNADO = "Para fazer a simulação, toque no botão abaixo e continue pelo chat seguro do site. Lá pedimos só o necessário e você acompanha cada etapa.";
+const REGEX_INTENCAO_FGTS = /fgts|saque|antecip/i;
 // O texto do botão cta_url aceita no máximo 20 caracteres: acima disso a Meta recusa a mensagem e o cliente fica sem
 // resposta ("Falar com atendimento" tem 21 e travou o fluxo em 23/10/2026).
 const CTA_CHAT_CONSIGNADO = { buttonText: "Abrir atendimento" };
@@ -5111,6 +5112,16 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
   const passoCompleto = String(conversaAnterior?.fluxo_passo || "");
   const ehConsignado = passoCompleto.startsWith("consignado_");
   if (!ehConsignado && passoCompleto && passoCompleto !== "menu_inicial") return false;
+  // Quem escreve sobre FGTS/saque/antecipação (texto livre) vai para o fluxo do FGTS em vez da oferta do consignado,
+  // inclusive depois de "No momento não". Antes o Gemini respondia "um atendente vai te ajudar" e o fluxo do FGTS
+  // (autorizar a J17 e mandar o CPF) nunca abria. Quem já deu os dados do consignado (concluído) segue com atendente.
+  const estadoAtual = passoCompleto.split("|")[0];
+  const querFgts = tipo === "text" && REGEX_INTENCAO_FGTS.test(texto);
+  if (querFgts && ["", "menu_inicial", "consignado_oferta", "consignado_encerrado"].includes(estadoAtual)) {
+    await db.insertMessage({ ...base, type: "text", body: texto });
+    await iniciarFluxoFgtsMenu(de, businessNumberId);
+    return true;
+  }
   if (!ehConsignado) {
     // Os dois números usam a mesma oferta: quem recebeu o template (ou escreve texto livre, sem
     // anúncio/palavra-chave de outro fluxo) entra nela. Histórico de template pode ter sido limpo.
