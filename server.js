@@ -969,12 +969,12 @@ function decodificarAudioBase64(dataUrl) {
   return { buffer: Buffer.from(match[2], "base64"), contentType: match[1], ext: EXT_BY_MIME[match[1]] || "ogg" };
 }
 
-// Todo áudio vira Ogg/Opus mono 48 kHz antes de ir pro WhatsApp: o Chrome grava em WebM (a Meta recusa), e
+// Todo áudio vira Ogg/Opus mono 16 kHz (igual à nota de voz do próprio WhatsApp) antes de ir pro WhatsApp: o Chrome grava em WebM (a Meta recusa), e
 // arquivo enviado como ogg pode ser Vorbis/estéreo — o cliente recebia "algo de errado com o arquivo de áudio".
 // Só Opus mono em Ogg toca como nota de voz no celular.
 function transcodarParaOggOpus(buffer) {
   return new Promise((resolve, reject) => {
-    const ffmpeg = spawn(ffmpegPath, ["-i", "pipe:0", "-vn", "-ac", "1", "-ar", "48000", "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-f", "ogg", "pipe:1"]);
+    const ffmpeg = spawn(ffmpegPath, ["-i", "pipe:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libopus", "-b:a", "20k", "-application", "voip", "-f", "ogg", "pipe:1"]);
     const chunks = [];
     let stderr = "";
     ffmpeg.stdout.on("data", (chunk) => chunks.push(chunk));
