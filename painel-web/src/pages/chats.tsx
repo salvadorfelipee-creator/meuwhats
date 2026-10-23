@@ -355,6 +355,13 @@ function ChannelChatsPage() {
   // (o Dialog tem padding/max-height pensados pra formulário, não pra mídia em tela cheia).
   const [lightbox, setLightbox] = React.useState<{ url: string; tipo: "image" | "video" } | null>(null)
 
+  // Imagem colada com Ctrl+V, aguardando confirmação de envio.
+  const [colada, setColada] = React.useState<{ file: File; url: string } | null>(null)
+  React.useEffect(() => {
+    if (!colada) return
+    return () => URL.revokeObjectURL(colada.url)
+  }, [colada])
+
   // Seletor de emoji (emoji-picker-react, lazy) — insere no textarea na posição do cursor.
   const [emojiOpen, setEmojiOpen] = React.useState(false)
   const textareaRef = React.useRef<HTMLTextAreaElement>(null)
@@ -1770,6 +1777,13 @@ function ChannelChatsPage() {
                       ref={textareaRef}
                       value={texto}
                       onChange={(e) => setTexto(e.target.value)}
+                      onPaste={(e) => {
+                        const item = Array.from(e.clipboardData.items).find((i) => i.kind === "file" && i.type.startsWith("image/"))
+                        const file = item?.getAsFile()
+                        if (!file) return
+                        e.preventDefault()
+                        setColada({ file, url: URL.createObjectURL(file) })
+                      }}
                       placeholder="Digite uma mensagem"
                       className="min-h-9 max-h-40 w-full resize-none overflow-y-auto border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                       rows={1}
@@ -1824,6 +1838,52 @@ function ChannelChatsPage() {
         onOpenChange={(open) => !open && setRespostaEditando(null)}
         onSaved={carregarRespostas}
       />
+
+      {/* Prévia de imagem colada (Ctrl+V) — confirma antes de enviar, como no WhatsApp Web. O texto
+          da caixa vai como legenda. */}
+      {colada && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4" onClick={() => setColada(null)}>
+          <div
+            className="bg-background rounded-xl p-4 max-w-lg w-full flex flex-col gap-3"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setColada(null)
+            }}
+          >
+            <img src={colada.url} alt="" className="max-h-[60vh] w-full object-contain rounded-lg bg-muted" />
+            <Textarea
+              autoFocus
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              placeholder="Adicionar legenda (opcional)"
+              rows={2}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  const f = colada.file
+                  setColada(null)
+                  enviarMidia(f)
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setColada(null)}>
+                Cancelar
+              </Button>
+              <Button
+                disabled={enviando}
+                onClick={() => {
+                  const f = colada.file
+                  setColada(null)
+                  enviarMidia(f)
+                }}
+              >
+                Enviar imagem
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox — overlay próprio (não é o componente Dialog) pra ocupar a tela inteira sem
           disputar com o padding/max-height pensados pra formulário. */}
