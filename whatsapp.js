@@ -111,7 +111,49 @@ async function sendVideo(fromPhoneNumberId, to, videoUrl, caption) {
 }
 
 // Igual a sendImage, mas áudio — mesmo mecanismo de URL pública (WhatsApp busca o link).
-async function sendAudio(fromPhoneNumberId, to, audioUrl) {
+// Sobe o arquivo direto para a Meta (POST /{phone-id}/media) e devolve o id da mídia. Diferente de mandar
+// por link: a Meta valida o arquivo na hora (formato/codec) e devolve o motivo exato se ele não servir.
+async function uploadMedia(fromPhoneNumberId, buffer, mimeType, filename) {
+  const boundary = `----meuwhats${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
+  const campo = (nome, valor) => Buffer.from(`--${boundary}
+
+Content-Disposition: form-data; name="${nome}"
+
+
+
+${valor}
+
+`);
+  const corpo = Buffer.concat([
+    campo("messaging_product", "whatsapp"),
+    campo("type", mimeType),
+    Buffer.from(`--${boundary}
+
+Content-Disposition: form-data; name="file"; filename="${filename}"
+
+Content-Type: ${mimeType}
+
+
+
+`),
+    buffer,
+    Buffer.from(`
+
+--${boundary}--
+
+`),
+  ]);
+  const { status, buffer: resp } = await graphRequest("POST", "graph.facebook.com", `/${GRAPH_VERSION}/${fromPhoneNumberId}/media`, {
+    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}`, "Content-Length": corpo.length },
+    body: corpo,
+  });
+  const json = JSON.parse(resp.toString("utf8") || "{}");
+  if (status >= 400 || !json.id) throw new Error(`Falha ao subir mídia para a Meta: ${JSON.stringify(json)}`);
+  return json.id;
+}
+
+// `audio` = URL pública (link) OU { id } de uma mídia já enviada com uploadMedia.
+async function sendAudio(fromPhoneNumberId, to, audio) {
   garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
@@ -122,7 +164,7 @@ async function sendAudio(fromPhoneNumberId, to, audioUrl) {
         messaging_product: "whatsapp",
         to,
         type: "audio",
-        audio: { link: audioUrl },
+        audio: typeof audio === "string" ? { link: audio } : { id: audio.id },
       },
     }
   );
@@ -471,6 +513,7 @@ module.exports = {
   sendImage,
   sendVideo,
   sendAudio,
+  uploadMedia,
   sendDocument,
   sendButtons,
   sendList,

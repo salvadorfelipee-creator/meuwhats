@@ -956,7 +956,7 @@ async function salvarAudioR2(dataUrl) {
   const ext = "ogg";
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   await r2.enviarVideo(`clientes/${filename}`, buffer, contentType);
-  return { url: await r2.urlAssinada(`clientes/${filename}`, 900), mediaPath: `/media/${filename}` };
+  return { url: await r2.urlAssinada(`clientes/${filename}`, 900), mediaPath: `/media/${filename}`, buffer };
 }
 
 // Versão em disco, só pro chat do site (salvarMidiaSite) — não passa pelo WhatsApp.
@@ -7339,6 +7339,7 @@ const server = http.createServer(async (req, res) => {
       let imagemUrl = null;
       let videoUrl = null;
       let audioUrl = null;
+      let audioBuffer = null;
       let audioMediaPath = null;
       let documentUrl = null;
       if (body.imagemBase64) {
@@ -7359,6 +7360,7 @@ const server = http.createServer(async (req, res) => {
         try {
           const salvo = await salvarAudioR2(body.audioBase64);
           audioUrl = salvo.url;
+          audioBuffer = salvo.buffer;
           audioMediaPath = salvo.mediaPath;
         } catch (err) {
           return send(res, 400, { error: err.message });
@@ -7379,7 +7381,8 @@ const server = http.createServer(async (req, res) => {
           : videoUrl
           ? await wa.sendVideo(businessId, phone, videoUrl, texto || undefined)
           : audioUrl
-          ? await wa.sendAudio(businessId, phone, audioUrl)
+          // Sobe o arquivo direto para a Meta e manda pelo id (a Meta valida o áudio na hora e diz o motivo se recusar).
+          ? await wa.sendAudio(businessId, phone, { id: await wa.uploadMedia(businessId, audioBuffer, "audio/ogg", "audio.ogg") })
           : documentUrl
           ? await wa.sendDocument(businessId, phone, documentUrl, body.documentNome || undefined, texto || undefined)
           : await wa.sendText(businessId, phone, texto, replyToWaId || undefined);
