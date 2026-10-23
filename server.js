@@ -1176,13 +1176,25 @@ const RESPOSTAS_BOTAO = {
 async function enviarRespostaAutomatica(businessNumberId, phone, texto, botoes, lista, cta) {
   // Atendente humano respondeu pelo painel: bot pausado nessa conversa até religar ou vencer a janela.
   if (await db.botEstaPausado(phone, businessNumberId)) return;
-  const result = cta
-    ? await wa.sendCtaUrl(businessNumberId, phone, texto, cta.buttonText, cta.url)
-    : lista
-    ? await wa.sendList(businessNumberId, phone, texto, lista.botao, lista.opcoes)
-    : botoes
-    ? await wa.sendButtons(businessNumberId, phone, texto, botoes)
-    : await wa.sendText(businessNumberId, phone, texto);
+  // Botão de link recusado pela Meta (texto longo, URL inválida...): o cliente não pode ficar sem resposta, então
+  // manda o mesmo texto com o link escrito.
+  let result = null;
+  if (cta) {
+    try {
+      result = await wa.sendCtaUrl(businessNumberId, phone, texto, cta.buttonText, cta.url);
+    } catch (err) {
+      console.error("Botão de link recusado, enviando o link em texto:", err.message);
+      return enviarRespostaAutomatica(businessNumberId, phone, `${texto}
+
+${cta.url}`);
+    }
+  } else {
+    result = lista
+      ? await wa.sendList(businessNumberId, phone, texto, lista.botao, lista.opcoes)
+      : botoes
+      ? await wa.sendButtons(businessNumberId, phone, texto, botoes)
+      : await wa.sendText(businessNumberId, phone, texto);
+  }
   const waId = result.messages?.[0]?.id || null;
   const now = Date.now();
   // No histórico do painel, botões/opções (ou o link do cta) aparecem listados abaixo do texto
@@ -4998,7 +5010,9 @@ const BOTOES_INICIAR_CONSIGNADO = [{ id: "consig_iniciar", title: "Iniciar a sim
 // "Falar com atendimento", celular já preenchido). CONSIGNADO_MODO=whatsapp volta a coletar nome/CPF/nascimento pelo WhatsApp.
 const CONSIGNADO_MODO_SITE = process.env.CONSIGNADO_MODO !== "whatsapp";
 const TEXTO_IR_PARA_CHAT_CONSIGNADO = "Para fazer a simulação, toque no botão abaixo e continue pelo chat seguro do site. Lá pedimos só o necessário e você acompanha cada etapa.";
-const CTA_CHAT_CONSIGNADO = { buttonText: "Falar com atendimento" };
+// O texto do botão cta_url aceita no máximo 20 caracteres: acima disso a Meta recusa a mensagem e o cliente fica sem
+// resposta ("Falar com atendimento" tem 21 e travou o fluxo em 23/10/2026).
+const CTA_CHAT_CONSIGNADO = { buttonText: "Abrir atendimento" };
 
 function linkChatConsignado(phone) {
   const digitos = String(phone || "").replace(/\D/g, "").replace(/^55/, "");
@@ -5020,6 +5034,12 @@ const VARIACOES_OFERTA_CONSIGNADO = [
   "Posso simular agora para você? É rápido e sem compromisso. Toque em *Desejo simular* para começar.",
 ];
 const ofertaConsignadoEmAndamento = new Set();
+
+// A última mensagem enviada a esse contato (automática ou não) foi há menos de `minutos`?
+async function respondeuHaPouco(de, businessNumberId, minutos) {
+  const [ultima] = (await db.ultimasMensagens(de, businessNumberId, 5)).filter((m) => m.direction === "out" && m.status !== "failed").slice(-1);
+  return !!ultima && Date.now() - Number(ultima.created_at) < minutos * 60 * 1000;
+}
 
 async function iniciarOfertaConsignado(de, businessNumberId) {
   const chave = `${businessNumberId}:${de}`;
@@ -5195,7 +5215,9 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
         break;
       }
       case "consignado_chat":
-        // Já recebeu o link do chat do site: qualquer nova mensagem recebe o botão de novo.
+        // Já recebeu o link do chat do site: reenvia o botão, mas no máximo 1 vez a cada 30 min (não gasta mensagem
+        // repetindo o mesmo link para quem manda várias mensagens seguidas).
+        if (await respondeuHaPouco(de, businessNumberId, 30)) break;
         await responder("Para continuar a simulação, toque no botão abaixo e fale com a gente pelo chat do site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
         break;
       default: {
@@ -5207,6 +5229,9 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
         const horario = horarioComercialCotaCerta()
           ? "Estamos dentro do horário de atendimento (seg a sex 9h-18h, sáb 9h-12h). O atendente pode levar alguns minutos para responder."
           : "Estamos FORA do horário (atendimento seg a sex 9h-18h, sáb 9h-12h). Avise que o atendente retorna no próximo expediente.";
+        // Fluxo já terminou e um atendente vai assumir: no máximo 1 resposta automática a cada 3 h, para não gastar
+        // mensagem (nem irritar o cliente) a cada nova mensagem enquanto ninguém humano respondeu.
+        if (await respondeuHaPouco(de, businessNumberId, 180)) break;
         let resposta = "";
         try {
           resposta = await gemini.responderConversaWhatsapp({
