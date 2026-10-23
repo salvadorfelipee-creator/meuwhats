@@ -20,6 +20,8 @@ const backup = require("./backup");
 const banda = require("./banda");
 const r2 = require("./r2");
 const unnotech = require("./unnotech");
+const siteUnno = require("./site-unnotech");
+const unnoSite = siteUnno.criarAdaptador({ db, unnotech, mensagemAtendente: (id, texto) => db.siteChatMensagemAtendente(id, "Assistente FelizCred", texto) });
 const novosaque = require("./novosaque");
 const facta = require("./facta");
 const flowCrypto = require("./flow-crypto");
@@ -84,8 +86,36 @@ function siteChatTokenValido(conversation, token) {
   return recebido.length === esperado.length && crypto.timingSafeEqual(recebido, esperado);
 }
 
+function siteChatCltPublicoUnnotech(row) {
+  const blob = unnoSite.lerBlob(row);
+  let escolhida = null;
+  try { escolhida = JSON.parse(row.facta_offer_json || "null"); } catch {}
+  let anterior = null;
+  if (blob.anterior) anterior = { banco: "Facta", etapa: blob.anterior.etapa || null, error: blob.anterior.error || null };
+  return {
+    provider: "unnotech",
+    etapa: row.etapa,
+    status: row.status_novosaque || null,
+    bankLabel: "bancos parceiros",
+    consentUrl: row.terms_link || null,
+    waitingSince: row.authorization_requested_at || row.created_at || null,
+    checkedAt: row.authorization_checked_at || null,
+    maxInstallment: Number(row.margem_disponivel || 0),
+    employer: blob.employer_name || null,
+    offers: siteUnno.selecionarOfertas(unnoSite.lerOfertas(row)).map(siteUnno.ofertaPublica),
+    selectedOffer: escolhida ? { installments: Number(escolhida.installment_count || 0), installmentValue: Number(escolhida.installment_amount || 0), disbursedAmount: Number(escolhida.net_amount || 0) } : null,
+    customerDefaults: { nome: "", celular: row.phone || "" },
+    contractLink: row.contract_link || null,
+    proposalCode: row.codigo_proposta ? String(row.codigo_proposta).slice(0, 8).toUpperCase() : null,
+    previous: anterior,
+    error: row.error_message || null,
+    trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/minha-simulacao/?t=${encodeURIComponent(row.tracking_token)}` : null,
+  };
+}
+
 function siteChatCltPublico(row) {
   if (!row) return null;
+  if (row.provider === "unnotech") return siteChatCltPublicoUnnotech(row);
   let offers = [];
   try { offers = JSON.parse(row.offers_json || "[]"); } catch {}
   if (row.provider === "facta") {
@@ -531,10 +561,30 @@ async function sincronizarSiteChatFacta(row) {
   });
 }
 
+// Resultados definitivos da Facta (não adianta tentar de novo): a simulação segue automaticamente nos bancos parceiros.
+const ETAPAS_FACTA_SEM_CONDICAO = ["sem_margem", "nao_elegivel", "sem_oferta", "politica_reprovada"];
+async function tentarOutrosBancos(row, manual = false) {
+  if (!row || row.provider !== "facta" || !unnoSite.configurado()) return row;
+  const conversa = await db.siteChatObter(row.conversation_id);
+  const anterior = { provider: "facta", etapa: row.etapa, error: row.error_message || null };
+  const novo = await unnoSite.iniciar(row, conversa, anterior);
+  return novo || row;
+}
+
 async function sincronizarSiteChatClt(row) {
+  if (row?.provider === "unnotech") {
+    try {
+      return await unnoSite.sincronizar(row);
+    } catch (err) {
+      console.error(`Erro ao sincronizar Unnotech no site (${row.conversation_id}):`, err.message);
+      return row;
+    }
+  }
   if (row?.provider === "facta") {
     try {
-      return await sincronizarSiteChatFacta(row);
+      const atualizada = await sincronizarSiteChatFacta(row);
+      if (atualizada && ETAPAS_FACTA_SEM_CONDICAO.includes(atualizada.etapa) && atualizada.etapa !== row.etapa) return await tentarOutrosBancos(atualizada);
+      return atualizada;
     } catch (err) {
       console.error(`Erro ao sincronizar Facta no site (${row.conversation_id}):`, err.message);
       const retornoFacta = `${err.message} ${JSON.stringify(err.factaResponse || "")}`;
@@ -6425,7 +6475,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
-      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|access-email|personal-data|assistant)$/i);
+      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|access-email|other-banks|personal-data|assistant)$/i);
       if (cltMatch) {
         const id = cltMatch[1];
         const action = cltMatch[2].toLowerCase();
@@ -6570,6 +6620,38 @@ const server = http.createServer(async (req, res) => {
             if (!novasOfertas.length) return send(res, 400, { error: "Não encontramos condições para essa parcela. Tente outro valor." }, corsHeaders);
             const row = await db.siteChatCltAtualizar(id, { offers_json: JSON.stringify(novasOfertas), error_message: null });
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          if (action === "other-banks") {
+            // Botão "Tentar com outros bancos" (quando a Facta falhou por motivo que pode não se repetir nos outros).
+            if (atual.provider !== "facta" || !["erro_autorizacao", "erro_consulta", "erro_integracao", ...ETAPAS_FACTA_SEM_CONDICAO].includes(atual.etapa)) return send(res, 409, { error: "Essa opção não está disponível agora." }, corsHeaders);
+            const novo = await tentarOutrosBancos(atual, true);
+            if (novo.provider !== "unnotech") return send(res, 400, { error: "Ainda não conseguimos consultar outros bancos. Fale com o Felipe para ajudar." }, corsHeaders);
+            return send(res, 200, { clt: siteChatCltPublico(novo) }, corsHeaders);
+          }
+          if (action === "select-offer" && atual.provider === "unnotech") {
+            const novo = await unnoSite.escolherOferta(atual, body.offerId);
+            if (!novo) return send(res, 400, { error: "Essa condição não está mais disponível. Escolha outra." }, corsHeaders);
+            await db.siteChatFunilEvento(id, "oferta_selecionada", "dados_pessoais", "unnotech");
+            return send(res, 200, { clt: siteChatCltPublico(novo) }, corsHeaders);
+          }
+          if (action === "personal-data" && atual.provider === "unnotech") {
+            try {
+              const novo = await unnoSite.enviarDados(atual, body.customer || {});
+              return send(res, 200, { clt: siteChatCltPublico(novo) }, corsHeaders);
+            } catch (err) {
+              return send(res, 400, { error: String(err.message || "Não foi possível gerar a proposta agora.").slice(0, 300) }, corsHeaders);
+            }
+          }
+          if (action === "resimulate" && atual.provider === "unnotech") {
+            const pedido = numeroFacta(body.installmentValue);
+            const maximo = Number(atual.margem_disponivel || 0);
+            if (!(pedido > 0)) return send(res, 400, { error: "Digite o valor da parcela, por exemplo 250,00." }, corsHeaders);
+            if (pedido > maximo + 0.005) return send(res, 400, { error: `Essa parcela passa do máximo disponível de R$ ${maximo.toFixed(2).replace(".", ",")}. Digite um valor menor.` }, corsHeaders);
+            try {
+              return send(res, 200, { clt: siteChatCltPublico(await unnoSite.resimular(atual, pedido)) }, corsHeaders);
+            } catch (err) {
+              return send(res, 400, { error: String(err.message || "Não foi possível refazer a simulação agora.").slice(0, 300) }, corsHeaders);
+            }
           }
           if (action === "select-offer") {
             let offers = [];

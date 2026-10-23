@@ -128,7 +128,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="/chat.css?v=20261017-5"/>
+<link rel="stylesheet" href="./chat.css?v=20261017-5"/>
 <style>
   :root {
     --green: #00C853;
@@ -869,7 +869,7 @@
     .motion-enabled .motion-item { opacity:1; transform:none; }
   }
 </style>
-<link rel="stylesheet" href="/redesign.css?v=20261017-1">
+<link rel="stylesheet" href="./redesign.css?v=20261023-1">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMXC2DFR5G"></script>
 <script>
@@ -942,14 +942,92 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         </div>
       </div>
     </div>
-    <div class="hero-product" aria-label="Formas de atendimento FelizCred">
-      <ul class="hero-options" aria-label="Etapas disponíveis">
-        <li class="hero-option-highlight" aria-hidden="true"></li>
-        <li class="hero-option is-active" aria-current="true" data-demo="clt"><span class="option-mark">CLT</span><span><b>Empréstimo CLT</b><small>Simulação guiada pela Facta</small></span></li>
-        <li class="hero-option" data-demo="fgts"><span class="option-mark">FG</span><span><b>Antecipação FGTS</b><small>Orientação sem perder o contexto</small></span></li>
-        <li class="hero-option" data-demo="track"><span class="option-mark">24</span><span><b>Acompanhe pelo chat</b><small>Volte e consulte o andamento</small></span></li>
-        <li class="hero-option" data-demo="safe"><span class="option-mark">✓</span><span><b>Dados protegidos</b><small>Só pedimos o necessário</small></span></li>
-      </ul>
+    <div class="hero-product chat-demo" aria-label="Demonstração ilustrativa da jornada de contratação">
+      <div class="demo-window">
+        <div class="demo-window-bar">
+          <span class="demo-avatar" aria-hidden="true">FC</span>
+          <span class="demo-contact"><strong>FelizCred</strong><span>Atendimento acompanhado</span></span>
+          <span class="demo-secure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7.5 10V7a4.5 4.5 0 0 1 9 0v3"/><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M12 14v2.5"/></svg><span>Ambiente seguro</span></span>
+        </div>
+
+        <div class="demo-journey-nav" role="tablist" aria-label="Etapas da demonstração">
+          <button class="demo-step is-active" type="button" role="tab" aria-selected="true" data-demo-step="0">Chamar</button>
+          <button class="demo-step" type="button" role="tab" aria-selected="false" data-demo-step="1">Autorizar</button>
+          <button class="demo-step" type="button" role="tab" aria-selected="false" data-demo-step="2">Simular</button>
+          <button class="demo-step" type="button" role="tab" aria-selected="false" data-demo-step="3">Dados</button>
+          <button class="demo-step" type="button" role="tab" aria-selected="false" data-demo-step="4">Assinar</button>
+          <button class="demo-step" type="button" role="tab" aria-selected="false" data-demo-step="5">Pix</button>
+        </div>
+
+        <div class="demo-chat" aria-live="polite" aria-atomic="true">
+          <section class="demo-scene" data-demo-scene="0">
+            <span class="demo-time">Agora</span>
+            <div class="demo-message demo-message--client">Oi! Quero simular meu empréstimo CLT.<small>10:24</small></div>
+            <div class="demo-message"><strong>Olá, Ana. Eu acompanho você.</strong>Primeiro, vamos pedir sua autorização para consultar vínculo e margem.<small>10:24</small></div>
+            <div class="demo-action"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7.5 10V7a4.5 4.5 0 0 1 9 0v3"/><rect x="5" y="10" width="14" height="10" rx="3"/><path d="m9.5 15 1.7 1.7 3.8-4"/></svg>Autorizar consulta com segurança</div>
+          </section>
+
+          <section class="demo-scene" data-demo-scene="1">
+            <span class="demo-time">Autorização</span>
+            <div class="demo-status"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/></svg>Autorização recebida</div>
+            <div class="demo-message"><strong>Tudo certo.</strong>Agora estou consultando as condições disponíveis para o seu perfil.<small>10:26</small></div>
+            <div class="demo-thinking" aria-label="Consultando"><i></i><i></i><i></i></div>
+          </section>
+
+          <section class="demo-scene" data-demo-scene="2">
+            <span class="demo-time">Simulação</span>
+            <div class="demo-message"><strong>Sua simulação está pronta.</strong>Compare as condições e escolha somente se fizer sentido para você.<small>10:27</small></div>
+            <div class="demo-offer">
+              <div class="demo-offer-head"><span>Condições encontradas</span><strong>Escolha com calma</strong></div>
+              <div class="demo-offer-lines"><span>Valor liberado</span><span>Parcelas</span><span>Prazo</span></div>
+              <small>Valores, taxas e aprovação final dependem da análise da instituição financeira.</small>
+            </div>
+            <div class="demo-message demo-message--client">Quero seguir com a opção que escolhi.<small>10:28</small></div>
+          </section>
+
+          <section class="demo-scene" data-demo-scene="3">
+            <span class="demo-time">Seus dados</span>
+            <div class="demo-message"><strong>Perfeito.</strong>Preencha apenas os dados necessários no formulário protegido.<small>10:28</small></div>
+            <div class="demo-form-summary">
+              <strong>Dados conferidos</strong>
+              <span class="demo-form-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg>Dados pessoais e endereço</span>
+              <span class="demo-form-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg>Conta de recebimento e chave Pix</span>
+              <span class="demo-form-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg>Consentimento confirmado</span>
+            </div>
+            <div class="demo-message demo-message--client">Dados enviados.<small>10:31</small></div>
+          </section>
+
+          <section class="demo-scene" data-demo-scene="4">
+            <span class="demo-time">Assinatura</span>
+            <div class="demo-message"><strong>Proposta gerada.</strong>Abra o ambiente seguro da Facta para revisar o contrato, assinar e concluir a validação facial.<small>10:32</small></div>
+            <div class="demo-link-card">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8.5 12.5 6 15a4 4 0 0 0 5.7 5.6l3-3"/><path d="m15.5 11.5 2.5-2.5a4 4 0 0 0-5.7-5.6l-3 3M8.8 15.2l6.4-6.4"/></svg>
+              <span class="demo-link-copy"><strong>Link seguro da proposta</strong><span>Revise valor, parcelas, taxa e CET antes de assinar.</span><span class="demo-link-cta">Revisar e assinar</span></span>
+            </div>
+            <div class="demo-message demo-message--client">Foto enviada e assinatura concluída.<small>10:36</small></div>
+          </section>
+
+          <section class="demo-scene" data-demo-scene="5">
+            <span class="demo-time">Conclusão</span>
+            <div class="demo-receipt">
+              <span class="demo-receipt-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg></span>
+              <strong>Pix recebido</strong>
+              <span>Contratação concluída e registrada no acompanhamento.</span>
+            </div>
+            <div class="demo-message"><strong>Tudo certo, Ana.</strong>Você pode voltar ao mesmo chat para consultar o andamento quando precisar.<small>10:38</small></div>
+            <div class="demo-message demo-message--client">Recebi. Obrigada!<small>10:38</small></div>
+          </section>
+        </div>
+
+        <div class="demo-window-footer">
+          <span class="demo-stage-copy"><strong data-demo-title>Início da conversa</strong><span data-demo-counter>Etapa 1 de 6</span></span>
+          <button class="demo-control" type="button" aria-label="Pausar demonstração" aria-pressed="false" data-demo-toggle>
+            <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h3v14H7zm7 0h3v14h-3z"/></svg>
+            <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg>
+          </button>
+        </div>
+      </div>
+      <p class="demo-disclaimer">Demonstração ilustrativa. Condições, aprovação e prazo de liberação dependem da instituição financeira.</p>
     </div>
   </div>
 </section>
@@ -1510,34 +1588,94 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     window.dataLayer?.push({ event: 'site_chat_cta_click', cta_text: trigger.textContent.trim() });
   });
 
-  const demoButtons = [...document.querySelectorAll('.hero-option')];
-  const demoPanel = document.querySelector('.hero-product');
-  const demoHighlight = document.querySelector('.hero-option-highlight');
-  let demoIndex = 0;
-  let demoTimer;
-  const activateDemo = index => {
-    demoIndex = (index + demoButtons.length) % demoButtons.length;
-    demoButtons.forEach((button, position) => {
-      const active = position === demoIndex;
-      button.classList.toggle('is-active', active);
-      if (active) button.setAttribute('aria-current', 'true');
-      else button.removeAttribute('aria-current');
-    });
-    const activeButton = demoButtons[demoIndex];
-    if (activeButton && demoHighlight) {
-      demoHighlight.style.width = `${activeButton.offsetWidth}px`;
-      demoHighlight.style.height = `${activeButton.offsetHeight}px`;
-      demoHighlight.style.transform = `translate3d(${activeButton.offsetLeft}px,${activeButton.offsetTop}px,0)`;
+  // A conversa-prova avança sozinha, aceita navegação manual e pausa quando não está em uso.
+  const chatDemo = document.querySelector('.chat-demo');
+  if (chatDemo) {
+    const demoSteps = [...chatDemo.querySelectorAll('[data-demo-step]')];
+    const demoScenes = [...chatDemo.querySelectorAll('[data-demo-scene]')];
+    const demoToggle = chatDemo.querySelector('[data-demo-toggle]');
+    const demoTitle = chatDemo.querySelector('[data-demo-title]');
+    const demoCounter = chatDemo.querySelector('[data-demo-counter]');
+    const demoTitles = ['Início da conversa', 'Autorização segura', 'Consulta em andamento', 'Envio dos dados', 'Revisão e assinatura', 'Crédito concluído'];
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    let demoIndex = 0;
+    let demoTimer = 0;
+    let userPaused = reducedMotion.matches;
+    let interactionPaused = false;
+    let demoInView = true;
+
+    chatDemo.classList.add('is-enhanced');
+
+    const updateDemoControl = () => {
+      demoToggle?.classList.toggle('is-paused', userPaused);
+      demoToggle?.setAttribute('aria-pressed', String(userPaused));
+      demoToggle?.setAttribute('aria-label', userPaused ? 'Reproduzir demonstração' : 'Pausar demonstração');
+    };
+
+    const syncDemoTimer = () => {
+      window.clearInterval(demoTimer);
+      demoTimer = 0;
+      if (userPaused || interactionPaused || !demoInView || document.hidden || demoScenes.length < 2) return;
+      demoTimer = window.setInterval(() => showDemoStep(demoIndex + 1), 3600);
+    };
+
+    function showDemoStep(index, restartTimer = false) {
+      demoIndex = (index + demoScenes.length) % demoScenes.length;
+      demoSteps.forEach((step, position) => {
+        const active = position === demoIndex;
+        step.classList.toggle('is-active', active);
+        step.classList.toggle('is-complete', position < demoIndex);
+        step.setAttribute('aria-selected', String(active));
+        step.tabIndex = active ? 0 : -1;
+      });
+      demoScenes.forEach((scene, position) => {
+        const active = position === demoIndex;
+        scene.hidden = !active;
+        scene.classList.remove('is-entering');
+        if (active && !reducedMotion.matches) {
+          void scene.offsetWidth;
+          scene.classList.add('is-entering');
+        }
+      });
+      if (demoTitle) demoTitle.textContent = demoTitles[demoIndex];
+      if (demoCounter) demoCounter.textContent = `Etapa ${demoIndex + 1} de ${demoScenes.length}`;
+      if (restartTimer) syncDemoTimer();
     }
-  };
-  const startDemo = () => {
-    if (demoButtons.length < 2) return;
-    window.clearInterval(demoTimer);
-    demoTimer = window.setInterval(() => activateDemo(demoIndex + 1), 3000);
-  };
-  window.addEventListener('resize', () => activateDemo(demoIndex));
-  activateDemo(0);
-  startDemo();
+
+    demoSteps.forEach((step, index) => step.addEventListener('click', () => showDemoStep(index, true)));
+    demoToggle?.addEventListener('click', () => {
+      userPaused = !userPaused;
+      updateDemoControl();
+      syncDemoTimer();
+    });
+    chatDemo.addEventListener('mouseenter', () => { interactionPaused = true; syncDemoTimer(); });
+    chatDemo.addEventListener('mouseleave', () => { interactionPaused = false; syncDemoTimer(); });
+    chatDemo.addEventListener('focusin', () => { interactionPaused = true; syncDemoTimer(); });
+    chatDemo.addEventListener('focusout', event => {
+      if (chatDemo.contains(event.relatedTarget)) return;
+      interactionPaused = false;
+      syncDemoTimer();
+    });
+    document.addEventListener('visibilitychange', syncDemoTimer);
+    reducedMotion.addEventListener?.('change', event => {
+      userPaused = event.matches;
+      updateDemoControl();
+      showDemoStep(demoIndex);
+      syncDemoTimer();
+    });
+    if ('IntersectionObserver' in window) {
+      const demoObserver = new IntersectionObserver(([entry]) => {
+        demoInView = entry.isIntersecting;
+        document.body.classList.toggle('demo-showcase-visible', entry.isIntersecting);
+        syncDemoTimer();
+      }, { threshold:.2 });
+      demoObserver.observe(chatDemo);
+    }
+
+    showDemoStep(0);
+    updateDemoControl();
+    syncDemoTimer();
+  }
 
   const productsSection = document.getElementById('produtos');
   if (productsSection) {
@@ -1547,6 +1685,6 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     productsThemeObserver.observe(productsSection);
   }
 </script>
-<script src="/chat.js?v=20261017-7" defer></script>
+<script src="./chat.js?v=20261023-1" defer></script>
 </body>
 </html>

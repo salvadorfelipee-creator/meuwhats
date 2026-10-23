@@ -4,6 +4,7 @@
   const SESSION_TTL = 6 * 60 * 60 * 1000;
   const NUDGE_STORAGE = "felizcred_chat_nudge_shown_at";
   const NUDGE_TTL = 24 * 60 * 60 * 1000;
+  const FELIPE_IMAGE = new URL("assets/img/chat/felipe-atendimento-profissional-512.png", document.currentScript?.src || window.location.href).href;
   const state = { session: null, messages: [], open: false, lastAgentCount: null, refreshing: false, step: 0, audioCtx: null, recorder: null, stream: null, chunks: [], clt: null, cltCpf: "", selectedOffer: null, authorizationOpened: false, cltCheckedAt: null, dismissedCltStatus: null, reasoningTimer: null, retryingAuthorization: false, userIsReadingHistory: false };
   const iconChat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/><path d="M8 9h8M8 13h5"/></svg>';
   const iconClose = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
@@ -13,9 +14,9 @@
   root.className = "fc-chat-root";
   root.innerHTML = `
     <aside class="fc-chat-nudge" aria-live="polite"><button type="button" aria-label="Fazer simulação de empréstimo"><span>Felipe, da FelizCred</span><strong>Faça aqui sua simulação e aprovação do seu empréstimo.</strong><small>Eu acompanho você em cada etapa.</small></button></aside>
-    <button class="fc-chat-launcher" type="button" aria-label="Abrir atendimento com Felipe, da FelizCred" aria-expanded="false"><img src="/assets/img/chat/felipe-atendimento-profissional-512.png" alt="Felipe, atendimento FelizCred"><span class="fc-chat-online" aria-hidden="true"></span><span class="fc-chat-launcher-copy"><b>Fale com Felipe</b><small>Simule agora</small></span><span class="fc-chat-unread">1</span></button>
+    <button class="fc-chat-launcher" type="button" aria-label="Abrir atendimento com Felipe, da FelizCred" aria-expanded="false"><img src="${FELIPE_IMAGE}" alt="Felipe, atendimento FelizCred"><span class="fc-chat-online" aria-hidden="true"></span><span class="fc-chat-launcher-copy"><b>Fale com Felipe</b><small>Simule agora</small></span><span class="fc-chat-unread">1</span></button>
     <section class="fc-chat" role="dialog" aria-label="Chat com a FelizCred" aria-hidden="true">
-      <header class="fc-chat-head"><div class="fc-chat-brand"><img src="/assets/img/chat/felipe-atendimento-profissional-512.png" alt="Felipe, atendimento FelizCred"><i aria-hidden="true"></i></div><div class="fc-chat-head-copy"><span>Atendimento FelizCred</span><p class="fc-chat-title">Felipe</p><p class="fc-chat-status">Assistente online agora</p></div><button class="fc-chat-expand" type="button" aria-label="Expandir chat" aria-pressed="false">${iconExpand}</button><button class="fc-chat-close" type="button" aria-label="Minimizar chat">${iconClose}</button></header>
+      <header class="fc-chat-head"><div class="fc-chat-brand"><img src="${FELIPE_IMAGE}" alt="Felipe, atendimento FelizCred"><i aria-hidden="true"></i></div><div class="fc-chat-head-copy"><span>Atendimento FelizCred</span><p class="fc-chat-title">Felipe</p><p class="fc-chat-status">Assistente online agora</p></div><button class="fc-chat-expand" type="button" aria-label="Expandir chat" aria-pressed="false">${iconExpand}</button><button class="fc-chat-close" type="button" aria-label="Minimizar chat">${iconClose}</button></header>
       <div class="fc-chat-offline" role="status">Você está sem internet. Sua conversa continua salva neste dispositivo.</div>
       <div class="fc-chat-assurance"><span><i></i> Conexão segura</span><span>Seus dados só são pedidos quando necessários</span></div>
       <div class="fc-chat-start"><div class="fc-chat-progress"><span></span></div>
@@ -153,6 +154,10 @@
     if (status) status.textContent = c?.etapa === "proposta_em_analise" ? "Proposta em análise" : c?.etapa === "proposta_concluida" ? "Proposta concluída" : c ? "Simulação Facta em andamento" : "Assistente online agora";
     if (!c) { cltEl.classList.remove("show"); cltEl.innerHTML = ""; return; }
     cltEl.classList.add("show");
+    if (c && c.provider === "unnotech") {
+      cltEl.innerHTML = `<div class="fc-clt-card fc-clt-status-card"><span class="fc-clt-step">Bancos parceiros</span><h3>Sua simulação continua no painel</h3><p>No painel você autoriza a consulta, vê as condições e acompanha cada etapa pelo celular.</p><div class="fc-clt-actions"><a class="fc-chat-primary" href="/minha-simulacao/" style="display:block;text-align:center;text-decoration:none">Abrir meu painel</a></div></div>`;
+      return;
+    }
     if (c === "eligibility") {
       cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">Antes de começar</span><h3>Para fazer a simulação do seu consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual.</h3><div class="fc-clt-actions"><button type="button" class="fc-chat-primary" data-tenure="yes">Tenho mais de 3 meses</button><button type="button" class="fc-clt-secondary" data-tenure="no">Ainda não tenho</button></div></div>`;
       return;

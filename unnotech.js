@@ -261,10 +261,30 @@ async function consultarProposta(proposalUuid) {
 // que o FGTS não tem: autorização do trabalhador, consulta de margem, escolha parcela x
 // valor líquido).
 
-async function criarSolicitacaoClt(cpf, phone, email, idempotencyKey) {
+// user_uuid (operador que conduz a venda) é obrigatório desde 05/10/2026: vem de UNNOTECH_USER_UUID ou, se não houver, é
+// descoberto uma vez na API de usuários (escopo users:read) e guardado em memória.
+let userUuidCache = null;
+async function obterUserUuid() {
+  if (process.env.UNNOTECH_USER_UUID) return process.env.UNNOTECH_USER_UUID;
+  if (userUuidCache) return userUuidCache;
+  const { status, body } = await chamarAutenticado("GET", "/api/v1/users");
+  if (status >= 400) throw new Error(`Falha ao listar usuários da Unnotech: ${JSON.stringify(body)}`);
+  const itens = body?.items || body?.content || body?.data || (Array.isArray(body) ? body : []);
+  const ativo = (Array.isArray(itens) ? itens : []).find((u) => String(u.status || "ACTIVE").toUpperCase() === "ACTIVE");
+  const uuid = ativo && (ativo.user_id || ativo.uuid || ativo.user_uuid || ativo.userUuid || ativo.id);
+  if (!uuid) throw new Error("Nenhum operador ativo encontrado na Unnotech (defina UNNOTECH_USER_UUID)");
+  userUuidCache = String(uuid);
+  return userUuidCache;
+}
+
+// `extras`: { userUuid, name, birthDate (AAAA-MM-DD) } — todos opcionais; name/birthDate ampliam quantas financeiras cotam.
+async function criarSolicitacaoClt(cpf, phone, email, idempotencyKey, extras = {}) {
+  const customer = { cpf, phone: String(phone || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, ""), email };
+  if (extras.name) customer.name = extras.name;
+  if (extras.birthDate) customer.birth_date = extras.birthDate;
   const { status, body } = await chamarAutenticado("POST", "/api/v1/clt/applications", {
     idempotencyKey,
-    body: { customer: { cpf, phone, email } },
+    body: { customer, user_uuid: extras.userUuid || (await obterUserUuid()) },
   });
   if (status >= 400) {
     // .codigo propagado (achado na revisão final) — sem isso, não dava pra distinguir um 409 de
@@ -406,6 +426,7 @@ module.exports = {
   unnotechRequest,
   getAccessToken,
   chamarAutenticado,
+  obterUserUuid,
   criarSolicitacao,
   consultarStatus,
   consultarSolicitacaoCompleta,
