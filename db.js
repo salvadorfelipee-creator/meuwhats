@@ -1188,6 +1188,47 @@ async function recebeuTemplate(phone, businessNumberId, nomeTemplate) {
   return result.rows.length > 0;
 }
 
+// Conversas abertas cuja ÚLTIMA mensagem é um template nosso (nomes em `nomes`) já lido pelo cliente
+// há mais de `limiarMs` (e até `janelaMs` atrás), sem nenhuma resposta depois. Um único SELECT —
+// a mensagem mais recente de cada conversa sai do índice (phone, business_number_id, created_at).
+async function templatesLidosSemResposta(numeros, nomes, limiarMs, janelaMs) {
+  await ready;
+  if (!numeros.length || !nomes.length) return [];
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `SELECT c.phone, c.business_number_id, c.nota
+          FROM conversations c
+          JOIN messages m ON m.phone = c.phone AND m.business_number_id = c.business_number_id
+          WHERE c.business_number_id IN (${numeros.map(() => "?").join(",")})
+            AND COALESCE(c.status, 'novo') != 'resolvido'
+            AND c.last_message_at < ? AND c.last_message_at > ?
+            AND m.created_at = (SELECT MAX(x.created_at) FROM messages x WHERE x.phone = c.phone AND x.business_number_id = c.business_number_id)
+            AND m.direction = 'out' AND m.type = 'template' AND m.status = 'read'
+            AND (${nomes.map(() => "m.body LIKE ?").join(" OR ")})`,
+    args: [...numeros, agora - limiarMs, agora - janelaMs, ...nomes.map((n) => `%${n}%`)],
+  });
+  return result.rows;
+}
+
+// Conversas do consignado CLT que passaram de "Desejo simular" (fluxo_passo consignado_* exceto oferta/
+// encerrado) e ainda não têm a tag `nomeTag` — usado só para completar quem escolheu antes da tag existir.
+async function conversasConsignadoSemTag(numeros, nomeTag) {
+  await ready;
+  if (!numeros.length) return [];
+  const result = await client.execute({
+    sql: `SELECT c.phone, c.business_number_id FROM conversations c
+          WHERE c.business_number_id IN (${numeros.map(() => "?").join(",")})
+            AND c.fluxo_passo LIKE 'consignado_%'
+            AND c.fluxo_passo NOT LIKE 'consignado_oferta%' AND c.fluxo_passo NOT LIKE 'consignado_encerrado%'
+            AND NOT EXISTS (
+              SELECT 1 FROM conversation_tags ct JOIN tags t ON t.id = ct.tag_id
+              WHERE ct.business_number_id = c.business_number_id AND ct.phone = c.phone AND t.nome = ? COLLATE NOCASE
+            )`,
+    args: [...numeros, nomeTag],
+  });
+  return result.rows;
+}
+
 const STATUS_VALIDOS = ["novo", "andamento", "resolvido"];
 
 async function atualizarStatusConversa(phone, businessNumberId, status) {
@@ -4230,6 +4271,8 @@ module.exports = {
   getUltimoCorpoEnviado,
   jaRecebeuTemplateRecente,
   recebeuTemplate,
+  templatesLidosSemResposta,
+  conversasConsignadoSemTag,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,

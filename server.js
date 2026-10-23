@@ -5071,6 +5071,50 @@ async function iniciarOfertaConsignado(de, businessNumberId) {
   }
 }
 
+// Quem tocou em "Desejo simular" ganha a tag "Interessado" (o fluxo continua pelo passo normal).
+const TAG_SIMULACAO_CONSIGNADO = "Interessado";
+async function marcarInteressadoConsignado(de, businessNumberId) {
+  try {
+    const tagId = await db.tagEncontrarOuCriar(businessNumberId, TAG_SIMULACAO_CONSIGNADO, "#2563EB");
+    await db.adicionarTagConversaSeAusente(businessNumberId, de, tagId, "automatico");
+  } catch (err) {
+    console.error("Erro ao adicionar tag de interesse no consignado:", err.message);
+  }
+}
+
+// Template bomdia/boatarde lido pelo cliente que não respondeu em 30 min: registra na nota e finaliza a
+// conversa (mesmo tratamento de "No momento não"). Varredura a cada 5 min; só olha os últimos 7 dias.
+const CONSIGNADO_SEM_RESPOSTA_MS = 30 * 60 * 1000;
+const NOTA_CONSIGNADO_SEM_RESPOSTA = "Consignado CLT: leu a mensagem e não respondeu em 30 min";
+let encerrandoLidosSemResposta = false;
+async function encerrarLidosSemResposta() {
+  if (encerrandoLidosSemResposta) return;
+  encerrandoLidosSemResposta = true;
+  try {
+    const conversas = await db.templatesLidosSemResposta(NUMEROS_CONSIGNADO, TEMPLATES_CONSIGNADO, CONSIGNADO_SEM_RESPOSTA_MS, 7 * 24 * 60 * 60 * 1000);
+    for (const c of conversas) {
+      try {
+        if (!String(c.nota || "").includes(NOTA_CONSIGNADO_SEM_RESPOSTA)) {
+          await db.atualizarNotaConversa(c.phone, c.business_number_id, [c.nota, NOTA_CONSIGNADO_SEM_RESPOSTA].filter(Boolean).join("\n"));
+        }
+        await db.atualizarStatusConversa(c.phone, c.business_number_id, "resolvido");
+      } catch (err) {
+        console.error(`Erro ao encerrar conversa lida sem resposta ${c.phone}:`, err.message);
+      }
+    }
+    // Completa a tag de quem já tinha escolhido "Desejo simular" antes de ela existir (vira vazio depois da 1ª vez).
+    for (const c of await db.conversasConsignadoSemTag(NUMEROS_CONSIGNADO, TAG_SIMULACAO_CONSIGNADO)) {
+      await marcarInteressadoConsignado(c.phone, c.business_number_id);
+    }
+  } catch (err) {
+    console.error("Erro ao encerrar conversas lidas sem resposta:", err.message);
+  } finally {
+    encerrandoLidosSemResposta = false;
+  }
+}
+setTimeout(encerrarLidosSemResposta, 60 * 1000);
+setInterval(encerrarLidosSemResposta, 5 * 60 * 1000);
+
 function cpfDeTexto(texto) {
   const digitos = String(texto || "").replace(/\D/g, "");
   return novosaque.cpfValido(digitos) ? digitos : null;
@@ -5144,6 +5188,7 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
     switch (estado) {
       case "consignado_oferta":
         if (t.includes("desejo") || t.includes("simular")) {
+          await marcarInteressadoConsignado(de, businessNumberId);
           if (CONSIGNADO_MODO_SITE) {
             await responder(TEXTO_IR_PARA_CHAT_CONSIGNADO, null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
             await irPara("consignado_chat");
