@@ -224,6 +224,56 @@ const AUDIO_MIME_FALLBACK = "audio/webm;codecs=opus"
 // mais antigas" dobra essa janela a cada clique, em vez de reler a conversa inteira do zero.
 const JANELA_HISTORICO_MS = 60 * 24 * 60 * 60 * 1000
 
+// Rascunhos por conversa (texto digitado e não enviado) — guardados no navegador, igual ao
+// WhatsApp: a conversa sobe pro topo da lista com "Rascunho: ..." até a mensagem ser enviada.
+const RASCUNHOS_STORAGE_KEY = "painel_rascunhos"
+type Rascunho = { texto: string; t: number }
+
+function lerRascunhos(): Record<string, Rascunho> {
+  try {
+    const bruto = localStorage.getItem(RASCUNHOS_STORAGE_KEY)
+    return bruto ? JSON.parse(bruto) : {}
+  } catch {
+    return {}
+  }
+}
+
+// Autocorreção silenciosa: só o que é inequívoco (acento, vírgula/pontuação, maiúscula) ou um
+// errinho de digitação numa palavra só. Tudo que mexe em número ou em mais de uma palavra segue
+// como balão clicável.
+function semAcento(s: string) {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]/gu, "")
+}
+
+function distanciaEdicao(a: string, b: string) {
+  const prev = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0]
+    prev[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j]
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1))
+      diag = tmp
+    }
+  }
+  return prev[b.length]
+}
+
+function correcaoEhSimples({ errado, certo }: { errado: string; certo: string }) {
+  if (/\d/.test(errado) || /\d/.test(certo)) return false
+  const a = semAcento(errado)
+  const b = semAcento(certo)
+  if (!a || !b) return false
+  if (a === b) return true
+  const umaPalavra = (s: string) => !/\s/.test(s.trim())
+  if (!umaPalavra(errado) || !umaPalavra(certo)) return false
+  return distanciaEdicao(a, b) <= (Math.min(a.length, b.length) >= 5 ? 2 : 1)
+}
+
 // Tipos de mensagem que o backend só grava como texto genérico "[mensagem do tipo X]" (ver
 // server.js — só text/button/interactive/image/audio/video/document têm tratamento dedicado;
 // location/contacts/reaction/sticker caem no else e não guardam coordenada/vCard/alvo da
@@ -313,6 +363,13 @@ function ChannelChatsPage() {
   const [correcoes, setCorrecoes] = React.useState<{ errado: string; certo: string }[]>([])
   const [corretorErro, setCorretorErro] = React.useState<string | null>(null)
   const corretorTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const textoRef = React.useRef("")
+
+  // Rascunhos: chave "canal|telefone" → texto não enviado. `rascunhoChaveRef` diz de qual conversa
+  // é o texto que está na caixa agora (muda junto com a seleção, antes de qualquer gravação).
+  const [rascunhos, setRascunhos] = React.useState<Record<string, Rascunho>>(lerRascunhos)
+  const rascunhosRef = React.useRef(rascunhos)
+  const rascunhoChaveRef = React.useRef<string | null>(null)
 
   // Gravação de áudio (nota de voz real, pelo microfone do navegador)
   const [gravando, setGravando] = React.useState(false)
@@ -553,6 +610,39 @@ function ChannelChatsPage() {
   const conversaAtual =
     conversations.find((c) => c.phone === selected && (!todos || c.business_number_id === current?.id)) || null
 
+  const chaveAtual = current && selected ? `${current.id}|${selected}` : null
+
+  React.useEffect(() => {
+    rascunhosRef.current = rascunhos
+    try {
+      localStorage.setItem(RASCUNHOS_STORAGE_KEY, JSON.stringify(rascunhos))
+    } catch {
+      /* sem storage: rascunho vale só até recarregar */
+    }
+  }, [rascunhos])
+
+  // Trocou de conversa: a caixa passa a mostrar o rascunho DAQUELA conversa (ou vazia).
+  React.useEffect(() => {
+    rascunhoChaveRef.current = chaveAtual
+    setTexto(chaveAtual ? rascunhosRef.current[chaveAtual]?.texto ?? "" : "")
+  }, [chaveAtual])
+
+  // Digitou: guarda (ou apaga, se esvaziou/enviou) o rascunho da conversa aberta.
+  React.useEffect(() => {
+    textoRef.current = texto
+    const chave = rascunhoChaveRef.current
+    if (!chave) return
+    setRascunhos((atual) => {
+      if (!texto.trim()) {
+        if (!(chave in atual)) return atual
+        const { [chave]: _removido, ...resto } = atual
+        return resto
+      }
+      if (atual[chave]?.texto === texto) return atual
+      return { ...atual, [chave]: { texto, t: Date.now() } }
+    })
+  }, [texto])
+
   const listaFiltrada = conversations.filter((c) => {
     const alvo = `${c.name || ""} ${c.phone}`.toLowerCase()
     return alvo.includes(search.toLowerCase())
@@ -565,7 +655,12 @@ function ChannelChatsPage() {
           .filter((c) => `${c.name} ${c.contact || ""}`.toLowerCase().includes(search.toLowerCase()))
           .map((c) => ({ site: c, t: c.updated_at }))
       : []),
-    ...listaFiltrada.map((c) => ({ conv: c, t: c.last_message_at || 0 })),
+    // Conversa com rascunho (que não é a aberta agora) sobe pro topo, igual ao WhatsApp.
+    ...listaFiltrada.map((c) => {
+      const chave = `${todos ? c.business_number_id : current?.id}|${c.phone}`
+      const rascunho = chave !== chaveAtual ? rascunhos[chave] : undefined
+      return { conv: c, t: rascunho ? 1e14 + rascunho.t : c.last_message_at || 0 }
+    }),
   ].sort((x, y) => y.t - x.t)
 
   async function enviar() {
@@ -650,8 +745,29 @@ function ChannelChatsPage() {
       api
         .corrigirTexto(texto)
         .then((r) => {
-          setCorrecoes(r.correcoes || [])
           setCorretorErro(null)
+          const todas = r.correcoes || []
+          // Só mexe se a pessoa não digitou nada enquanto a IA respondia.
+          if (textoRef.current !== texto) return
+          const simples = todas.filter(correcaoEhSimples)
+          const restantes = todas.filter((c) => !simples.includes(c))
+          if (simples.length > 0) {
+            const el = textareaRef.current
+            const focado = !!el && document.activeElement === el
+            let cursor = el?.selectionStart ?? texto.length
+            let novo = texto
+            for (const c of simples) {
+              const idx = novo.indexOf(c.errado)
+              if (idx === -1) continue
+              novo = novo.slice(0, idx) + c.certo + novo.slice(idx + c.errado.length)
+              if (cursor >= idx + c.errado.length) cursor += c.certo.length - c.errado.length
+            }
+            if (novo !== texto) {
+              setTexto(novo)
+              if (focado) requestAnimationFrame(() => el?.setSelectionRange(cursor, cursor))
+            }
+          }
+          setCorrecoes(restantes.filter((c) => textoRef.current.includes(c.errado)))
         })
         .catch(() => {
           setCorrecoes([])
@@ -997,6 +1113,7 @@ function ChannelChatsPage() {
               // respondeu há mais de 30min — independente de etapa/status/quem está logado.
               const semResposta = canalId ? overdueConversations.has(`${canalId}|${c.phone}`) : false
               const espera = tempoEspera(c)
+              const rascunhoLista = `${canalId}|${c.phone}` !== chaveAtual ? rascunhos[`${canalId}|${c.phone}`] : undefined
               const campos = camposDe(c)
               const tags = tagsDe(c)
               const estagiosLista = pipelineEstagiosPara(current?.label)
@@ -1060,10 +1177,17 @@ function ChannelChatsPage() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between gap-2 mt-0.5">
+                      {rascunhoLista ? (
+                        <p className="truncate min-w-0 flex-1 text-xs text-muted-foreground">
+                          <span className="font-medium text-green-600 dark:text-green-500">Rascunho: </span>
+                          {rascunhoLista.texto}
+                        </p>
+                      ) : (
                       <p className={`truncate min-w-0 flex-1 text-xs ${naoLida ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
                         {c.last_direction === "out" ? (c.last_origem ? "Você: " : "Automático: ") : ""}
                         {c.last_body || "—"}
                       </p>
+                      )}
                       {/* Não existe contagem de mensagem não lida por conversa, só um booleano —
                           bolinha simples em vez de número inventado. Pisca (ping) só quando é
                           urgente pra essa pessoa; calma (sólida) quando é só "tem mensagem nova". */}

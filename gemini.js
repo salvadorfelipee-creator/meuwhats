@@ -261,7 +261,7 @@ async function analisarEtapaParada({ mensagens, estagioNome, dias }) {
 // cima do trecho errado. Separado de sugerirResposta de propósito — aqui o INSUMO é o que a
 // pessoa já escreveu, não a conversa.
 async function corrigirTexto(texto) {
-  const prompt = `Corrija ortografia, acentuação e gramática do texto abaixo, em português do Brasil, SEM mudar o sentido, o tom nem o tamanho — é uma mensagem de WhatsApp de atendimento, mantenha informal se já for informal. Aponte CADA erro separadamente (um por trecho), não reescreva a frase inteira. Responda SOMENTE com um JSON válido, sem texto antes ou depois, neste formato:
+  const prompt = `Corrija ortografia, acentuação, vírgulas e gramática do texto abaixo, em português do Brasil, SEM mudar o sentido, o tom nem o tamanho — é uma mensagem de WhatsApp de atendimento, mantenha informal se já for informal. Aponte CADA erro separadamente (um por trecho), não reescreva a frase inteira. Responda SOMENTE com um JSON válido, sem texto antes ou depois, neste formato:
 
 {"correcoes": [{"errado": "trecho exatamente como está no texto original — uma palavra ou expressão curta, nunca a frase inteira", "certo": "a correção desse trecho"}]}
 
