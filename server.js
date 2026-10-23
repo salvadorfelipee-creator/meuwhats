@@ -5132,6 +5132,7 @@ async function marcarInteressadoConsignado(de, businessNumberId) {
 
 // Template bomdia/boatarde lido pelo cliente que não respondeu em 30 min: registra na nota e finaliza a
 // conversa (mesmo tratamento de "No momento não"). Varredura a cada 10 min; só olha o último dia (usa índice em last_message_at, para não ler a tabela toda).
+const SITE_CHAT_BOT_PAUSA_MS = 30 * 60 * 1000;
 const CONSIGNADO_SEM_RESPOSTA_MS = 30 * 60 * 1000;
 const NOTA_CONSIGNADO_SEM_RESPOSTA = "Consignado CLT: leu a mensagem e não respondeu em 30 min";
 let encerrandoLidosSemResposta = false;
@@ -6586,6 +6587,10 @@ const server = http.createServer(async (req, res) => {
         try { media = salvarMidiaSite(req, body); } catch (err) { return send(res, 400, { error: err.message }, corsHeaders); }
         if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." }, corsHeaders);
         await db.siteChatMensagemVisitante(id, conversation.name, message, media);
+        // Atendente respondeu há pouco pelo painel (ou ainda está na conversa): o assistente automático fica calado.
+        if (Number(conversation.bot_pausado_ate || 0) > Date.now()) {
+          return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: true, botPausado: true }, corsHeaders);
+        }
         const normalizadaHumano = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
         const pediuHumano = /\b(falar|conversar|chamar).{0,18}\b(humano|pessoa|atendente|atendimento)\b|\bquero (?:um |uma )?(?:humano|atendente)\b/i.test(message);
         const confirmouHumano = /^(sim|s|quero|pode|confirmo|sim por favor|quero sim)[!. ]*$/.test(normalizadaHumano);
@@ -6629,7 +6634,10 @@ const server = http.createServer(async (req, res) => {
         // e sem o aviso de repetição, que levava o cliente para o WhatsApp sem resolver nada.
         const cltErro = conversation.produto_tag === "Empréstimo CLT" ? await db.siteChatCltObter(id).catch(() => null) : null;
         if (message && cltErro?.etapa === "erro_autorizacao") {
-          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(cltErro.error_message));
+          // Não repete o mesmo aviso: se a última mensagem do atendimento já é essa, o cliente só vê ela uma vez.
+          const textoErro = siteChatRules.mensagemErroAutorizacao(cltErro.error_message);
+          const ultimaDoAtendimento = [...(await db.siteChatMensagens(id))].reverse().find((m) => m.direction === "agent");
+          if (ultimaDoAtendimento?.body !== textoErro) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", textoErro);
           return send(res, 201, { ok: true, clt: true, cltStep: "erro_autorizacao" }, corsHeaders);
         }
         // Escalonamento determinístico: se o visitante precisou repetir a mesma solicitação,
@@ -6785,6 +6793,8 @@ const server = http.createServer(async (req, res) => {
       try { media = salvarMidiaSite(req, body); } catch (err) { return send(res, 400, { error: err.message }); }
       if (!message && !media.url) return send(res, 400, { error: "Escreva uma mensagem ou envie um arquivo." });
       await db.siteChatMensagemAtendente(conversation.id, usuario.nome || "Atendimento FelizCred", message, media);
+      // Enquanto o atendente conversa, o assistente não responde por cima (renova a cada resposta; "Devolver ao bot" libera antes).
+      await db.siteChatPausarBot(conversation.id, Date.now() + SITE_CHAT_BOT_PAUSA_MS);
       if (conversation.human_intent_stage === "requested") await db.siteChatDefinirIntencaoHumano(conversation.id, "human_active");
       // Cliente que já saiu do chat (sem escrever há mais de 5 min) recebe a resposta por e-mail, no máximo 1 a cada 30 min.
       const saiuDoChat = !conversation.last_visitor_at || Date.now() - Number(conversation.last_visitor_at) > 5 * 60_000;
@@ -6795,6 +6805,14 @@ const server = http.createServer(async (req, res) => {
           .catch((err) => console.error(`E-mail de resposta do atendente não enviado (${conversation.id}):`, err.message));
       }
       return send(res, 201, { ok: true });
+    }
+
+    const painelSiteChatBotMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)\/bot$/i);
+    if (painelSiteChatBotMatch && req.method === "PATCH") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      await db.siteChatPausarBot(painelSiteChatBotMatch[1], body.pausado ? Date.now() + SITE_CHAT_BOT_PAUSA_MS : null);
+      return send(res, 200, { ok: true });
     }
 
     const painelSiteChatStatusMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)\/status$/i);

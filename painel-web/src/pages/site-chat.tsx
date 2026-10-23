@@ -1,5 +1,5 @@
 import * as React from "react"
-import { ArrowLeft, AtSign, Bell, BellOff, Check, ChevronDown, FileText, Globe2, Landmark, MessageCircle, Mic, Paperclip, Phone, RotateCcw, Search, Send, Smile, UserRound, X } from "lucide-react"
+import { ArrowLeft, AtSign, Bell, Bot, BellOff, Check, ChevronDown, FileText, Globe2, Landmark, MessageCircle, Mic, Paperclip, Phone, RotateCcw, Search, Send, Smile, UserRound, X } from "lucide-react"
 import { api, PIPELINE_ESTAGIOS, type SiteChatClt, type SiteChatConversation, type SiteChatMessage } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -139,6 +139,11 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
     }
     recorder.stop()
   }
+  async function alternarBot(pausado: boolean) {
+    if (!selecionada) return
+    await api.siteChatBot(selecionada.id, pausado)
+    await Promise.all([carregarConversa(selecionada.id), carregarLista()])
+  }
   async function alterarStatus() {
     if (!selecionada) return
     await api.siteChatStatus(selecionada.id, selecionada.status === "open" ? "closed" : "open")
@@ -170,7 +175,7 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
       </aside>}
       <main className={cn("min-w-0 flex-1 flex-col", selecionada || soConversaId ? "flex" : "hidden md:flex")}>
         {!selecionada ? <div className="flex flex-1 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-8 w-8 text-muted-foreground/50" /><p className="mt-3 text-sm">Selecione uma conversa</p></div></div> : <>
-          <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4"><Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelecionada(null)}><ArrowLeft className="h-4 w-4" /></Button><div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><UserRound className="h-4 w-4" /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{selecionada.name}</p>{selecionada.human_intent_stage === "requested" && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Aguardando você</span>}</div><p className="truncate text-xs text-muted-foreground">{[selecionada.contact, selecionada.email, selecionada.produto_tag].filter(Boolean).join(" · ")}</p></div><Button variant="outline" size="sm" className="gap-1.5" onClick={alterarStatus}>{selecionada.status === "open" ? <Check className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}{selecionada.status === "open" ? "Encerrar" : "Reabrir"}</Button></header>
+          <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4"><Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelecionada(null)}><ArrowLeft className="h-4 w-4" /></Button><div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><UserRound className="h-4 w-4" /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{selecionada.name}</p>{selecionada.human_intent_stage === "requested" && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Aguardando você</span>}</div><p className="truncate text-xs text-muted-foreground">{[selecionada.contact, selecionada.email, selecionada.produto_tag].filter(Boolean).join(" · ")}</p></div>{Number(selecionada.bot_pausado_ate || 0) > Date.now() ? <Button variant="outline" size="sm" className="gap-1.5" title="O assistente automático está calado porque você respondeu. Clique para ele voltar a responder o cliente." onClick={() => alternarBot(false)}><Bot className="h-3.5 w-3.5" />Devolver ao bot</Button> : null}<Button variant="outline" size="sm" className="gap-1.5" onClick={alterarStatus}>{selecionada.status === "open" ? <Check className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}{selecionada.status === "open" ? "Encerrar" : "Reabrir"}</Button></header>
           <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-5"><div className="mx-auto flex max-w-3xl flex-col gap-3">
             <div className="mb-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground"><Globe2 className="h-3.5 w-3.5" /> Conversa iniciada em {new Date(selecionada.created_at).toLocaleString("pt-BR")}</div>
             {clt?.provider === "facta" && <section className="mb-2 rounded-2xl border bg-background p-4 shadow-sm" aria-label="Andamento da proposta Facta">

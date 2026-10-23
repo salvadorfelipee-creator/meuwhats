@@ -95,6 +95,7 @@ export type SiteChatConversation = {
   produto_tag?: string | null
   human_intent_stage?: "awaiting_question" | "awaiting_confirmation" | "requested" | "human_active" | null
   human_handoff_requested_at?: number | null
+  bot_pausado_ate?: number | null
 }
 
 export type SiteChatMessage = {
@@ -562,6 +563,11 @@ export const api = {
     request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    }),
+  siteChatBot: (id: string, pausado: boolean) =>
+    request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/bot`, {
+      method: "PATCH",
+      body: JSON.stringify({ pausado }),
     }),
   siteChatPipeline: (id: string, estagio: string) =>
     request<{ ok: true }>(`/painel/api/site-chat/conversations/${encodeURIComponent(id)}/pipeline`, {

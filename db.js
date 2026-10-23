@@ -186,6 +186,10 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "human_handoff_requested_at")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN human_handoff_requested_at INTEGER`);
   }
+  // bot_pausado_ate = até quando o assistente automático do site fica calado (atendente respondeu pelo painel).
+  if (!infoSiteChat.rows.some((r) => r.name === "bot_pausado_ate")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN bot_pausado_ate INTEGER`);
+  }
   if (!infoSiteChat.rows.some((r) => r.name === "human_intent_stage")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN human_intent_stage TEXT`);
   }
@@ -3843,6 +3847,11 @@ async function siteChatMensagemAtendente(id, senderName, body, media = {}) {
   ]);
 }
 
+async function siteChatPausarBot(id, ate) {
+  await ready;
+  await client.execute({ sql: `UPDATE site_chat_conversations SET bot_pausado_ate = ? WHERE id = ?`, args: [ate || null, id] });
+}
+
 async function siteChatListar() {
   await ready;
   const result = await client.execute(`
@@ -4274,6 +4283,7 @@ module.exports = {
   getUltimoCorpoEnviado,
   jaRecebeuTemplateRecente,
   recebeuTemplate,
+  siteChatPausarBot,
   templatesLidosSemResposta,
   conversasConsignadoSemTag,
   getMensagemPorWaId,
