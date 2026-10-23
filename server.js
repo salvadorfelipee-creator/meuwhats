@@ -8100,6 +8100,11 @@ const server = http.createServer(async (req, res) => {
     // integrações não têm token de consulta de uso guardado ainda (seriam credenciais NOVAS,
     // diferentes das que já usamos pra conectar) — o frontend mostra como pendência em vez de
     // inventar número.
+    // Versão publicada (commit do Render) — serve para conferir se um deploy já entrou no ar.
+    if (req.method === "GET" && path_ === "/versao") {
+      return send(res, 200, { commit: (process.env.RENDER_GIT_COMMIT || "local").slice(0, 7) });
+    }
+
     if (req.method === "GET" && path_ === "/painel/api/integracoes/status") {
       if (!requireAuth(req, res)) return;
       const [whatsapp, r2UsedBytes] = await Promise.all([
