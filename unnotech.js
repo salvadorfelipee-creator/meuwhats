@@ -405,6 +405,7 @@ function escolherMelhorOferta(offers, idsJaTentados = []) {
 module.exports = {
   unnotechRequest,
   getAccessToken,
+  chamarAutenticado,
   criarSolicitacao,
   consultarStatus,
   consultarSolicitacaoCompleta,

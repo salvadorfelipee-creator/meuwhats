@@ -8376,6 +8376,27 @@ const server = http.createServer(async (req, res) => {
 
     // GET /painel/api/facta/ip-saida — mostra os IPs públicos que ESTE servidor usa para sair à internet (vários
     // testes, porque o provedor pode alternar entre alguns). São os que precisam estar liberados no painel da Facta.
+    // GET /painel/api/unnotech/teste — só leitura: confere se as credenciais da Unnotech estão no servidor, se o token sai
+    // e quais usuários (operadores) a chave enxerga. Nunca devolve token nem segredo.
+    if (req.method === "GET" && path_ === "/painel/api/unnotech/teste") {
+      if (!requireAuth(req, res)) return;
+      const tam = (nome) => String(process.env[nome] || "").length;
+      const resultado = { variaveis: { UNNOTECH_CLIENT_ID: tam("UNNOTECH_CLIENT_ID"), UNNOTECH_CLIENT_SECRET: tam("UNNOTECH_CLIENT_SECRET"), UNNOTECH_USER_UUID: tam("UNNOTECH_USER_UUID") } };
+      try {
+        await unnotech.getAccessToken();
+        resultado.token = "ok";
+        const usuarios = await unnotech.chamarAutenticado("GET", "/api/v1/users");
+        resultado.usuarios_status = usuarios.status;
+        const itens = usuarios.body?.items || usuarios.body?.content || usuarios.body?.data || (Array.isArray(usuarios.body) ? usuarios.body : []);
+        resultado.usuarios = (Array.isArray(itens) ? itens : []).slice(0, 10).map((u) => ({ uuid: u.uuid || u.id, nome: u.name || u.nome, email: u.email, status: u.status }));
+        if (usuarios.status >= 400) resultado.usuarios_erro = usuarios.body;
+      } catch (err) {
+        resultado.token = "falhou";
+        resultado.erro = String(err.message || err).slice(0, 400);
+      }
+      return send(res, 200, resultado);
+    }
+
     if (req.method === "GET" && path_ === "/painel/api/facta/ip-saida") {
       if (!requireAuth(req, res)) return;
       const ips = new Set();
