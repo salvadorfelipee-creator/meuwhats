@@ -969,12 +969,12 @@ function decodificarAudioBase64(dataUrl) {
   return { buffer: Buffer.from(match[2], "base64"), contentType: match[1], ext: EXT_BY_MIME[match[1]] || "ogg" };
 }
 
-// Todo áudio vira Ogg/Opus mono 16 kHz (igual à nota de voz do próprio WhatsApp) antes de ir pro WhatsApp: o Chrome grava em WebM (a Meta recusa), e
-// arquivo enviado como ogg pode ser Vorbis/estéreo — o cliente recebia "algo de errado com o arquivo de áudio".
-// Só Opus mono em Ogg toca como nota de voz no celular.
-function transcodarParaOggOpus(buffer) {
+// Todo áudio vira MP3 mono antes de ir pro WhatsApp: o Chrome grava em WebM (a Meta recusa) e o Ogg/Opus gerado
+// pelo ffmpeg chegava no celular com "algo de errado com o arquivo de áudio" (testado em Android, 23/10/2026).
+// MP3 toca em qualquer celular (aparece como arquivo de áudio, não como nota de voz).
+function transcodarParaMp3(buffer) {
   return new Promise((resolve, reject) => {
-    const ffmpeg = spawn(ffmpegPath, ["-i", "pipe:0", "-vn", "-ac", "1", "-ar", "16000", "-c:a", "libopus", "-b:a", "20k", "-application", "voip", "-f", "ogg", "pipe:1"]);
+    const ffmpeg = spawn(ffmpegPath, ["-i", "pipe:0", "-vn", "-ac", "1", "-ar", "44100", "-c:a", "libmp3lame", "-b:a", "64k", "-f", "mp3", "pipe:1"]);
     const chunks = [];
     let stderr = "";
     ffmpeg.stdout.on("data", (chunk) => chunks.push(chunk));
@@ -993,9 +993,9 @@ function transcodarParaOggOpus(buffer) {
 // Devolve { url (assinada, pro WhatsApp buscar), mediaPath (persistente, pro painel) }.
 async function salvarAudioR2(dataUrl) {
   const decodificado = decodificarAudioBase64(dataUrl);
-  const buffer = await transcodarParaOggOpus(decodificado.buffer);
-  const contentType = "audio/ogg; codecs=opus";
-  const ext = "ogg";
+  const buffer = await transcodarParaMp3(decodificado.buffer);
+  const contentType = "audio/mpeg";
+  const ext = "mp3";
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   await r2.enviarVideo(`clientes/${filename}`, buffer, contentType);
   return { url: await r2.urlAssinada(`clientes/${filename}`, 900), mediaPath: `/media/${filename}`, buffer };
@@ -7483,7 +7483,7 @@ const server = http.createServer(async (req, res) => {
           ? await wa.sendVideo(businessId, phone, videoUrl, texto || undefined)
           : audioUrl
           // Sobe o arquivo direto para a Meta e manda pelo id (a Meta valida o áudio na hora e diz o motivo se recusar).
-          ? await wa.sendAudio(businessId, phone, { id: await wa.uploadMedia(businessId, audioBuffer, "audio/ogg", "audio.ogg") })
+          ? await wa.sendAudio(businessId, phone, { id: await wa.uploadMedia(businessId, audioBuffer, "audio/mpeg", "audio.mp3") })
           : documentUrl
           ? await wa.sendDocument(businessId, phone, documentUrl, body.documentNome || undefined, texto || undefined)
           : await wa.sendText(businessId, phone, texto, replyToWaId || undefined);
