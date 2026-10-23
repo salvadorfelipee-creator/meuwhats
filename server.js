@@ -8388,7 +8388,7 @@ const server = http.createServer(async (req, res) => {
         const usuarios = await unnotech.chamarAutenticado("GET", "/api/v1/users");
         resultado.usuarios_status = usuarios.status;
         const itens = usuarios.body?.items || usuarios.body?.content || usuarios.body?.data || (Array.isArray(usuarios.body) ? usuarios.body : []);
-        resultado.usuarios = (Array.isArray(itens) ? itens : []).slice(0, 10).map((u) => ({ ids: Object.fromEntries(Object.entries(u).filter(([k]) => /uuid|^id$/i.test(k))), nome: u.name || u.nome || u.full_name, email: u.email, status: u.status }));
+        resultado.usuarios = (Array.isArray(itens) ? itens : []).slice(0, 10).map((u) => ({ campos: Object.keys(u), ids: Object.fromEntries(Object.entries(u).filter(([k]) => /uuid|id/i.test(k))), nome: u.name || u.nome || u.full_name, email: u.email, status: u.status }));
         if (usuarios.status >= 400) resultado.usuarios_erro = usuarios.body;
       } catch (err) {
         resultado.token = "falhou";
