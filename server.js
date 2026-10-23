@@ -5158,7 +5158,11 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
           await db.atualizarNotaConversa(de, businessNumberId, [conversaAnterior?.nota, "Consignado CLT: não quis simular"].filter(Boolean).join("\n"));
           await db.atualizarStatusConversa(de, businessNumberId, "resolvido");
         } else {
-          await responder("Quer saber as condições? Toque em uma das opções abaixo.", BOTOES_OFERTA_CONSIGNADO);
+          // Texto livre sem escolher botão: lembra das opções uma vez só (não é chat, não repete a cada mensagem).
+          const ultimoCorpo = String((await db.getUltimoCorpoEnviado(de, businessNumberId)) || "");
+          if (!ultimoCorpo.startsWith("Quer saber as condições?")) {
+            await responder("Quer saber as condições? Toque em uma das opções abaixo.", BOTOES_OFERTA_CONSIGNADO);
+          }
         }
         break;
       case "consignado_iniciar":
@@ -5417,6 +5421,9 @@ async function processarEntry(entry) {
               console.error("Erro ao iniciar atalho clt1:", err.message);
             }
           } else if (await bateuGatilhoDeFluxoDinamico(businessNumberId, corpo, de)) {
+            mensagemJaTratada = true;
+          } else if (fluxo === FLUXO_FELIZCRED && ["fgts", "saque"].includes(normalizarTexto(corpo)) && ["fgts_cpf", "fgts_data_saque"].includes(conversaAnterior?.fluxo_passo)) {
+            // Já recebeu a explicação do FGTS e está esperando o CPF/data: repetir "fgts" não manda a mesma explicação de novo.
             mensagemJaTratada = true;
           } else if (fluxo === FLUXO_FELIZCRED && ["fgts", "saque"].includes(normalizarTexto(corpo))) {
             // "fgts"/"saque" funciona como atalho a qualquer momento (mesmo espírito do "menu"
