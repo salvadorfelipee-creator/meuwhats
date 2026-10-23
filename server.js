@@ -898,14 +898,12 @@ function decodificarAudioBase64(dataUrl) {
   return { buffer: Buffer.from(match[2], "base64"), contentType: match[1], ext: EXT_BY_MIME[match[1]] || "ogg" };
 }
 
-// A Cloud API só aceita estes por link; o Chrome grava em WebM (mesmo Opus por dentro) e a Meta
-// recusa com "Unsupported Audio mime type".
-const AUDIO_MIME_ACEITOS_WHATSAPP = new Set(["audio/aac", "audio/mp4", "audio/amr", "audio/mpeg", "audio/ogg"]);
-
-// Reempacota WebM/Opus -> Ogg/Opus em memória (pipe do ffmpeg), sem tocar o disco.
+// Todo áudio vira Ogg/Opus mono 48 kHz antes de ir pro WhatsApp: o Chrome grava em WebM (a Meta recusa), e
+// arquivo enviado como ogg pode ser Vorbis/estéreo — o cliente recebia "algo de errado com o arquivo de áudio".
+// Só Opus mono em Ogg toca como nota de voz no celular.
 function transcodarParaOggOpus(buffer) {
   return new Promise((resolve, reject) => {
-    const ffmpeg = spawn(ffmpegPath, ["-i", "pipe:0", "-c:a", "libopus", "-f", "ogg", "pipe:1"]);
+    const ffmpeg = spawn(ffmpegPath, ["-i", "pipe:0", "-vn", "-ac", "1", "-ar", "48000", "-c:a", "libopus", "-b:a", "32k", "-application", "voip", "-f", "ogg", "pipe:1"]);
     const chunks = [];
     let stderr = "";
     ffmpeg.stdout.on("data", (chunk) => chunks.push(chunk));
@@ -923,12 +921,10 @@ function transcodarParaOggOpus(buffer) {
 // Converte se preciso e grava no R2 (clientes/) — persiste a deploy, o painel toca via /media/.
 // Devolve { url (assinada, pro WhatsApp buscar), mediaPath (persistente, pro painel) }.
 async function salvarAudioR2(dataUrl) {
-  let { buffer, contentType, ext } = decodificarAudioBase64(dataUrl);
-  if (!AUDIO_MIME_ACEITOS_WHATSAPP.has(contentType)) {
-    buffer = await transcodarParaOggOpus(buffer);
-    contentType = "audio/ogg";
-    ext = "ogg";
-  }
+  const decodificado = decodificarAudioBase64(dataUrl);
+  const buffer = await transcodarParaOggOpus(decodificado.buffer);
+  const contentType = "audio/ogg; codecs=opus";
+  const ext = "ogg";
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   await r2.enviarVideo(`clientes/${filename}`, buffer, contentType);
   return { url: await r2.urlAssinada(`clientes/${filename}`, 900), mediaPath: `/media/${filename}` };
