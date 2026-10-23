@@ -40,14 +40,36 @@ function ofertasValidas(offers) {
   return (offers || []).filter((o) => o.status === "AVAILABLE" && (!o.expires_at || new Date(o.expires_at).getTime() > agora));
 }
 
-// Mesma regra de apresentação da Facta (maior prazo + 24x, ou o menor prazo se não houver 24x; um prazo só = uma opção).
-// A comissão das tabelas da Unnotech ainda não foi informada: em cada prazo vale a condição que mais entrega ao
-// cliente (maior valor líquido; empate = menor parcela), que é a ordem que a própria Unnotech já devolve.
+// Comissão da Unnotech (tela "Comissão Unificada" de 23/10/2026): % sobre o valor líquido por tabela, com ou sem seguro,
+// e faixa de prazo. A lista veio ordenada da maior para a menor e foi cortada em 2,4%: o que não está aqui vale 0 (fica
+// por último). Atualizar quando a Unnotech mudar a comissão.
+const COMISSAO_UNNO = [
+  ["BUZIOS", true, 25, 36, 9.6], ["BUZIOS", true, 19, 24, 7.2], ["ITAPEMA", true, 46, 46, 6.4], ["JURERE", true, 48, 48, 5.2],
+  ["BUZIOS", true, 16, 18, 5.2], ["ITAPEMA", true, 36, 36, 5.1], ["COPACABANA", true, 36, 36, 4.4], ["ITAPEMA", true, 24, 24, 4.25],
+  ["JURERE", true, 42, 42, 4.2], ["BUZIOS", true, 15, 15, 4.0], ["BUZIOS", false, 25, 36, 3.6], ["JURERE", true, 36, 36, 3.6],
+  ["CAMPECHE", true, 36, 36, 3.6], ["BUZIOS", false, 19, 24, 3.2], ["BUZIOS", false, 16, 18, 2.8], ["COPACABANA", false, 36, 36, 2.8],
+  ["COPACABANA", true, 24, 35, 2.8], ["JURERE", true, 30, 30, 2.6], ["BUZIOS", false, 15, 15, 2.4],
+];
+
+function semAcento(texto) {
+  return String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+}
+
+function comissaoOferta(o) {
+  const nome = semAcento(o.table_name);
+  const prazo = Number(o.installment_count);
+  const comSeguro = o.insurance_included === true || /COM SEGURO/.test(nome);
+  const regra = COMISSAO_UNNO.find(([tabela, seguro, de, ate]) => nome.includes(tabela) && seguro === comSeguro && prazo >= de && prazo <= ate);
+  return regra ? regra[4] : 0;
+}
+
+// Mesma regra de apresentação da Facta: em cada prazo vale a tabela de MAIOR COMISSÃO (empate = mais dinheiro na mão);
+// mostra o maior prazo e o de 24x (sem 24x, o menor prazo); um prazo só = uma opção.
 function selecionarOfertas(offers) {
   const validas = ofertasValidas(offers);
   const melhor = (prazo) => validas
     .filter((o) => Number(o.installment_count) === prazo)
-    .sort((a, b) => Number(b.net_amount) - Number(a.net_amount) || Number(a.installment_amount) - Number(b.installment_amount))[0];
+    .sort((a, b) => comissaoOferta(b) - comissaoOferta(a) || Number(b.net_amount) - Number(a.net_amount) || Number(a.installment_amount) - Number(b.installment_amount))[0];
   const prazos = [...new Set(validas.map((o) => Number(o.installment_count)))].sort((a, b) => a - b);
   if (!prazos.length) return [];
   const maior = prazos[prazos.length - 1];
@@ -69,7 +91,7 @@ function ofertaPublica(o) {
   };
 }
 
-function criarAdaptador({ db, unnotech, mensagemAtendente }) {
+function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () => {} }) {
   const falar = async (row, texto) => {
     try { await mensagemAtendente(row.conversation_id, texto); } catch (err) { console.error("Mensagem do assistente (Unnotech) não gravada:", err.message); }
   };
@@ -190,6 +212,9 @@ function criarAdaptador({ db, unnotech, mensagemAtendente }) {
     else if (["SIGNED", "ENDORSED"].includes(status.status)) campos.etapa = "proposta_em_analise";
     else if (["FAILED", "REJECTED", "CANCELLED"].includes(status.status)) { campos.etapa = "proposta_cancelada"; campos.error_message = "O contrato não foi finalizado. Nossa equipe já recebeu a atualização."; }
     const novo = await atualizar(row, campos);
+    // Avisos por WhatsApp e e-mail: contrato pronto para assinar (1 vez) e mudanças de etapa.
+    if (campos.contract_link && !row.contract_link) notificar(novo, "aguardando_assinatura_facta").catch(() => {});
+    if (campos.etapa && campos.etapa !== row.etapa) notificar(novo, campos.etapa).catch(() => {});
     if (campos.etapa && campos.etapa !== row.etapa) {
       if (campos.etapa === "proposta_em_analise") await falar(row, "Sua assinatura foi recebida. Agora o banco confirma a averbação e o pagamento; acompanhe por aqui.");
       if (campos.etapa === "proposta_concluida") await falar(row, "O banco confirmou o pagamento. Confira a conta informada na contratação.");
@@ -252,4 +277,4 @@ function criarAdaptador({ db, unnotech, mensagemAtendente }) {
   return { configurado, iniciar, sincronizar, escolherOferta, enviarDados, resimular, selecionarOfertas, ofertaPublica, lerBlob, lerOfertas };
 }
 
-module.exports = { criarAdaptador, configurado, selecionarOfertas, ofertaPublica, ofertasValidas };
+module.exports = { criarAdaptador, configurado, selecionarOfertas, ofertaPublica, ofertasValidas, comissaoOferta };

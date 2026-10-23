@@ -21,7 +21,14 @@ const banda = require("./banda");
 const r2 = require("./r2");
 const unnotech = require("./unnotech");
 const siteUnno = require("./site-unnotech");
-const unnoSite = siteUnno.criarAdaptador({ db, unnotech, mensagemAtendente: (id, texto) => db.siteChatMensagemAtendente(id, "Assistente FelizCred", texto) });
+const unnoSite = siteUnno.criarAdaptador({
+  db, unnotech,
+  mensagemAtendente: (id, texto) => db.siteChatMensagemAtendente(id, "Assistente FelizCred", texto),
+  notificar: async (row, etapa) => {
+    await notificarEtapaFactaNoWhatsApp(row, etapa, "financeira parceira").catch(() => {});
+    await notificarEtapaFactaPorEmail(row, etapa, "banco parceiro").catch((err) => console.error(`E-mail da etapa ${etapa} não enviado (${row.conversation_id}):`, err.message));
+  },
+});
 const novosaque = require("./novosaque");
 const facta = require("./facta");
 const flowCrypto = require("./flow-crypto");
@@ -333,12 +340,13 @@ async function notificarContratoCltNoWhatsApp(row) {
   }
 }
 
-async function notificarEtapaFactaNoWhatsApp(row, etapa) {
+// Modelos já aprovados na Meta (templates/whatsapp/jornada-clt-meta.json) são o padrão; as variáveis só trocam o nome.
+async function notificarEtapaFactaNoWhatsApp(row, etapa, banco = "Facta") {
   if (!row?.phone) return;
   const templates = {
-    proposta_em_analise: process.env.FACTA_SITE_WHATSAPP_ANALISE_TEMPLATE,
-    proposta_concluida: process.env.FACTA_SITE_WHATSAPP_CONCLUIDA_TEMPLATE,
-    proposta_cancelada: process.env.FACTA_SITE_WHATSAPP_ENCERRADA_TEMPLATE,
+    proposta_em_analise: process.env.FACTA_SITE_WHATSAPP_ANALISE_TEMPLATE || "felizcred_clt_proposta_em_analise",
+    proposta_concluida: process.env.FACTA_SITE_WHATSAPP_CONCLUIDA_TEMPLATE || "felizcred_clt_proposta_concluida",
+    proposta_cancelada: process.env.FACTA_SITE_WHATSAPP_ENCERRADA_TEMPLATE || "felizcred_clt_contrato_nao_finalizado",
   };
   const template = String(templates[etapa] || "").trim();
   if (!template) return;
@@ -354,7 +362,7 @@ async function notificarEtapaFactaNoWhatsApp(row, etapa) {
     const firstName = String(conversation?.name || "cliente").trim().split(/\s+/)[0];
     const bodyParameters = etapa === "proposta_cancelada"
       ? [firstName, row.codigo_proposta || "em acompanhamento"]
-      : [firstName, row.codigo_proposta || "em acompanhamento", "Facta"];
+      : [firstName, row.codigo_proposta || "em acompanhamento", banco];
     const components = [{
       type: "body",
       parameters: bodyParameters.map((text) => ({ type: "text", text: String(text) })),
@@ -368,13 +376,13 @@ async function notificarEtapaFactaNoWhatsApp(row, etapa) {
   }
 }
 
-async function notificarEtapaFactaPorEmail(row, etapa) {
+async function notificarEtapaFactaPorEmail(row, etapa, banco = "Facta") {
   const conversation = row?.conversation_id ? await db.siteChatObter(row.conversation_id) : null;
   if (!conversation?.email) return;
   const conteudo = {
-    aguardando_assinatura_facta: ["Sua proposta está pronta para assinatura", "Abra o chat da FelizCred para revisar as condições e acessar a assinatura segura da Facta."],
-    proposta_em_analise: ["Sua proposta Facta está em análise", "A assinatura foi recebida. Você pode acompanhar cada atualização pelo chat da FelizCred."],
-    proposta_concluida: ["Sua proposta Facta foi concluída", "Confira o crédito na conta informada. Se precisar, converse conosco pelo chat do site."],
+    aguardando_assinatura_facta: ["Sua proposta está pronta para assinatura", `Abra seu painel na FelizCred para revisar as condições e acessar a assinatura segura (${banco}).`],
+    proposta_em_analise: [`Sua proposta está em análise (${banco})`, "A assinatura foi recebida. Você pode acompanhar cada atualização pelo chat da FelizCred."],
+    proposta_concluida: [`Sua proposta foi concluída (${banco})`, "Confira o crédito na conta informada. Se precisar, converse conosco pelo chat do site."],
     proposta_cancelada: ["Seu contrato não foi finalizado", "Nossa equipe recebeu a atualização e verificará os detalhes. Aguarde nosso atendimento pelo chat da FelizCred."],
   }[etapa];
   if (!conteudo) return;

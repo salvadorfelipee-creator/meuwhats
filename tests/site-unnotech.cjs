@@ -16,6 +16,18 @@ assert.deepStrictEqual(selecionarOfertas([oferta("x", 36, 900), oferta("y", 12, 
 assert.strictEqual(selecionarOfertas([oferta("x", 36, 900)]).length, 1, "um prazo só = uma opção");
 assert.strictEqual(selecionarOfertas([{ ...oferta("z", 24, 800), status: "REJECTED" }]).length, 0, "recusadas não entram");
 
+// ── comissão da Unnotech decide a tabela de cada prazo ──────────────────────
+const tab = (id, prazo, liquido, nome, seguro) => ({ ...oferta(id, prazo, liquido), table_name: nome, insurance_included: seguro });
+const comissao = selecionarOfertas([
+  tab("j36", 36, 2000, "JURERÊ - COM SEGURO", true),        // 3,6% a 36x
+  tab("b36", 36, 1800, "BÚZIOS - COM SEGURO", true),        // 9,6% a 25-36x → ganha mesmo com menos dinheiro
+  tab("b24", 24, 1200, "BÚZIOS - COM SEGURO", true),        // 7,2% a 19-24x
+  tab("i24", 24, 1500, "ITAPEMA - COM SEGURO", true),       // 4,25% a 24x
+]);
+assert.deepStrictEqual(comissao.map((o) => o.offer_id), ["b36", "b24"], "maior comissão manda em cada prazo");
+assert.strictEqual(require("../site-unnotech").comissaoOferta(tab("x", 36, 1, "BÚZIOS - SEM SEGURO", false)), 3.6, "sem seguro 25-36x = 3,6%");
+assert.strictEqual(require("../site-unnotech").comissaoOferta(tab("x", 50, 1, "OUTRA TABELA", false)), 0, "fora da lista = 0");
+
 // ── fluxo ponta a ponta com Unnotech simulada ────────────────────────────────
 let linha = { conversation_id: "c1", provider: "facta", cpf: "12345678909", phone: "47999990000", etapa: "sem_oferta", facta_worker_json: JSON.stringify({ nome: "Maria", dataNascimento: "01/02/1990" }) };
 const mensagens = [];
@@ -36,7 +48,8 @@ const unnotech = {
   consultarProposta: async () => ({ signature_link: "https://assinar.test/1" }),
   escolherMelhorOferta: (o, ja) => o.find((x) => !ja.includes(x.offer_id)) || null,
 };
-const unno = criarAdaptador({ db, unnotech, mensagemAtendente: async (_i, t) => mensagens.push(t) });
+const avisos = [];
+const unno = criarAdaptador({ db, unnotech, mensagemAtendente: async (_i, t) => mensagens.push(t), notificar: async (_r, etapa) => avisos.push(etapa) });
 
 (async () => {
   const novo = await unno.iniciar(linha, { email: "m@x.com", name: "Maria Silva" }, { provider: "facta", etapa: "sem_oferta" });
@@ -84,6 +97,7 @@ const unno = criarAdaptador({ db, unnotech, mensagemAtendente: async (_i, t) => 
   estado.status = "DISBURSED"; linha.authorization_checked_at = null;
   r = await unno.sincronizar(linha);
   assert.strictEqual(r.etapa, "proposta_concluida");
+  assert.deepStrictEqual(avisos, ["aguardando_assinatura_facta", "proposta_em_analise", "proposta_concluida"], "avisos de WhatsApp/e-mail em cada etapa");
 
   // sem margem encerra
   linha = { ...linha, etapa: "autorizacao_enviada", provider: "unnotech", authorization_checked_at: null };
