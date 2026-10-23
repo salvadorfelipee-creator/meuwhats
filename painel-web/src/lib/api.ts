@@ -122,6 +122,8 @@ export type SiteChatClt = {
     installmentValue: number
     disbursedAmount: number
   } | null
+  maxInstallment?: number
+  offers?: { id: string; tableName?: string; installments: number; installmentValue: number; disbursedAmount: number; rate?: number }[]
   error?: string | null
 }
 
