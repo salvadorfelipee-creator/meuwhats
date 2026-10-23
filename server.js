@@ -5102,7 +5102,7 @@ async function marcarInteressadoConsignado(de, businessNumberId) {
 }
 
 // Template bomdia/boatarde lido pelo cliente que não respondeu em 30 min: registra na nota e finaliza a
-// conversa (mesmo tratamento de "No momento não"). Varredura a cada 10 min; só olha os últimos 3 dias (usa índice em last_message_at, para não ler a tabela toda).
+// conversa (mesmo tratamento de "No momento não"). Varredura a cada 10 min; só olha o último dia (usa índice em last_message_at, para não ler a tabela toda).
 const CONSIGNADO_SEM_RESPOSTA_MS = 30 * 60 * 1000;
 const NOTA_CONSIGNADO_SEM_RESPOSTA = "Consignado CLT: leu a mensagem e não respondeu em 30 min";
 let encerrandoLidosSemResposta = false;
@@ -5110,7 +5110,7 @@ async function encerrarLidosSemResposta() {
   if (encerrandoLidosSemResposta) return;
   encerrandoLidosSemResposta = true;
   try {
-    const conversas = await db.templatesLidosSemResposta(NUMEROS_CONSIGNADO, TEMPLATES_CONSIGNADO, CONSIGNADO_SEM_RESPOSTA_MS, 3 * 24 * 60 * 60 * 1000);
+    const conversas = await db.templatesLidosSemResposta(NUMEROS_CONSIGNADO, TEMPLATES_CONSIGNADO, CONSIGNADO_SEM_RESPOSTA_MS, 24 * 60 * 60 * 1000);
     for (const c of conversas) {
       try {
         if (!String(c.nota || "").includes(NOTA_CONSIGNADO_SEM_RESPOSTA)) {
