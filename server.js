@@ -27,7 +27,7 @@ const google = require("./google");
 const mcp = require("./mcp");
 const gemini = require("./gemini");
 const siteChatRules = require("./site-chat-rules");
-const { garantirListaBrevo, garantirModelosBrevo, enviarModeloFelizcred, salvarContatoBrevo, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarEmail } = require("./email");
+const { garantirListaBrevo, garantirModelosBrevo, enviarModeloFelizcred, salvarContatoBrevo, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarAcessoSimulacaoFelizcred, enviarEmail } = require("./email");
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -381,6 +381,44 @@ async function enviarRetomadasDoSite() {
 }
 setInterval(() => { enviarRetomadasDoSite().catch((err) => console.error("Erro na varredura de retomada por e-mail:", err.message)); }, 15 * 60_000);
 
+// Quem parou no meio da simulação do site (e aceitou receber WhatsApp) recebe UMA mensagem: "mudou de ideia ou ficou
+// com dúvida?", com 3 botões. Só das 9h às 20h (Brasília), de segunda a sábado, no máximo 3 por rodada e nada para quem
+// já conversa conosco pelo WhatsApp. Depende do template aprovado na Meta; enquanto não existir, nada é enviado.
+const RETOMADA_SITE_TEMPLATE = process.env.RETOMADA_SITE_WHATSAPP_TEMPLATE || "felizcred_site_retomada";
+async function enviarRetomadasSiteWhatsapp() {
+  if (process.env.RETOMADA_SITE_WHATSAPP_ATIVA === "false") return;
+  const agoraBr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false, weekday: "short" }).formatToParts(new Date());
+  const hora = Number(agoraBr.find((p) => p.type === "hour").value) % 24;
+  const diaSemana = agoraBr.find((p) => p.type === "weekday").value;
+  if (hora < 9 || hora >= 20 || diaSemana === "Sun") return;
+  const agora = Date.now();
+  const businessId = process.env.NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID || CAMPANHA_CLT_NUMBER_ID;
+  const candidatas = await db.siteChatParaRetomadaWhatsapp(agora - 8 * 24 * 3600_000, agora - 2 * 3600_000);
+  let enviados = 0;
+  for (const c of candidatas) {
+    if (enviados >= 3) break;
+    const phone = normalizarTelefoneBR(c.clt_phone || c.contact);
+    if (!phone) { await db.siteChatMarcarRetomadaWhatsapp(c.id); continue; }
+    let jaConversa = false;
+    for (const numero of NUMEROS_CONSIGNADO) {
+      const conversa = await db.getConversation(phone, numero);
+      if (conversa?.last_inbound_at && agora - Number(conversa.last_inbound_at) < 8 * 24 * 3600_000) jaConversa = true;
+    }
+    if (jaConversa) { await db.siteChatMarcarRetomadaWhatsapp(c.id); continue; }
+    if (!(await db.siteChatMarcarRetomadaWhatsapp(c.id))) continue;
+    const primeiroNome = String(c.name || "").trim().split(/\s+/)[0] || "tudo bem";
+    const resultado = await enviarUmBroadcast(businessId, { phone, name: primeiroNome, template: RETOMADA_SITE_TEMPLATE, language: "pt_BR", params: [primeiroNome] });
+    if (resultado.ok) { enviados++; continue; }
+    if (/132001|does not exist|n[aã]o existe|not approved/i.test(String(resultado.error))) {
+      await db.siteChatDesmarcarRetomadaWhatsapp(c.id); // template ainda não aprovado: tenta de novo mais tarde
+      console.error("Retomada do site pelo WhatsApp: template ainda não disponível na Meta.");
+      return;
+    }
+    console.error(`Retomada do site pelo WhatsApp não enviada (${c.id}): ${resultado.error}`);
+  }
+}
+setInterval(() => { enviarRetomadasSiteWhatsapp().catch((err) => console.error("Erro na retomada do site pelo WhatsApp:", err.message)); }, 10 * 60_000);
+
 // A autorização do cliente na Facta vale por um tempo. Antes de pedir uma nova, confere se a consulta já
 // responde com dados do trabalhador: se sim, o cliente pula a etapa de autorizar de novo.
 async function autorizacaoFactaVigente(cpf) {
@@ -441,6 +479,10 @@ async function sincronizarSiteChatFacta(row) {
   if (respostaFactaComErro(response)) {
     const message = mensagemFacta(response);
     if (/token expirado|necess[aá]rio.*autoriza|n[aã]o autoriz/i.test(message)) {
+      return db.siteChatCltAtualizar(row.conversation_id, { status_novosaque: "AGUARDANDO_AUTORIZACAO", error_message: null });
+    }
+    // Lentidão da Facta não é fim da simulação: tenta de novo na próxima verificação (até 10 min desde o pedido).
+    if (/demorou|tempo esgotado|timeout|indispon/i.test(message) && Date.now() - Number(row.authorization_requested_at || 0) < 10 * 60_000) {
       return db.siteChatCltAtualizar(row.conversation_id, { status_novosaque: "AGUARDANDO_AUTORIZACAO", error_message: null });
     }
     return db.siteChatCltAtualizar(row.conversation_id, { etapa: "erro_consulta", status_novosaque: "ERRO_CONSULTA", error_message: message });
@@ -5226,6 +5268,32 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
     await iniciarFluxoFgtsMenu(de, businessNumberId);
     return true;
   }
+  // Resposta à mensagem "mudou de ideia ou ficou com dúvida?" (quem parou a simulação no site): 3 botões.
+  if (["", "menu_inicial"].includes(estadoAtual) && (await db.recebeuTemplate(de, businessNumberId, RETOMADA_SITE_TEMPLATE))) {
+    await db.insertMessage({ ...base, type: tipo === "text" ? "text" : "button", body: texto });
+    const resposta = normalizar(texto);
+    if (resposta.includes("nao quero")) {
+      await enviarRespostaAutomatica(businessNumberId, de, "Tudo bem! Se mudar de ideia, é só chamar por aqui 😊");
+      await db.setFluxoPasso(de, businessNumberId, "consignado_encerrado");
+      await db.atualizarNotaConversa(de, businessNumberId, [conversaAnterior?.nota, "Site: parou a simulação e disse que não quer mais"].filter(Boolean).join("\n"));
+      await db.atualizarStatusConversa(de, businessNumberId, "resolvido");
+    } else if (resposta.includes("continuar")) {
+      await enviarRespostaAutomatica(businessNumberId, de, "Que bom! Toque no botão abaixo para continuar de onde você parou 😊", null, null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
+      await db.setFluxoPasso(de, businessNumberId, "consignado_chat");
+    } else {
+      // "Tenho uma dúvida" ou qualquer texto: um atendente assume (a conversa pulsa no painel).
+      await enviarRespostaAutomatica(businessNumberId, de, "Claro! Me conta qual é a sua dúvida por aqui que um atendente já te responde 😊");
+      await db.setFluxoPasso(de, businessNumberId, "consignado_concluido");
+      await db.atualizarStatusConversa(de, businessNumberId, "andamento");
+      try {
+        const tagId = await db.tagEncontrarOuCriar(businessNumberId, "Consignado CLT", "#15803D");
+        await db.adicionarTagConversa(businessNumberId, de, tagId, "automatico");
+      } catch (err) {
+        console.error("Erro ao adicionar tag na retomada do site:", err.message);
+      }
+    }
+    return true;
+  }
   if (!ehConsignado) {
     // Os dois números usam a mesma oferta: quem recebeu o template (ou escreve texto livre, sem
     // anúncio/palavra-chave de outro fluxo) entra nela. Histórico de template pode ter sido limpo.
@@ -6259,6 +6327,28 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { proposal: acompanhamentoCltPublico(row, conversation) }, corsHeaders);
       }
 
+      // Entrada pelo link do e-mail ("Acessar minha simulação"): troca o código do link por uma sessão nova do chat e
+      // confirma o e-mail. Funciona em qualquer aparelho; vale por 30 dias desde a última atividade.
+      if (req.method === "POST" && path_ === "/site-chat/access") {
+        if (!siteChatRecoveryRateLimit(req)) return send(res, 429, { error: "Muitas tentativas. Aguarde dez minutos e tente novamente." }, corsHeaders);
+        const body = await parseBody(req);
+        const cltAcesso = await db.siteChatCltObterPorTrackingToken(String(body.token || ""));
+        const conversaAcesso = cltAcesso ? await db.siteChatObter(cltAcesso.conversation_id) : null;
+        if (!conversaAcesso || Date.now() - Number(conversaAcesso.updated_at || 0) > 30 * 24 * 3600_000) {
+          return send(res, 404, { error: "Esse link expirou. Abra o chat e informe seus dados para continuar." }, corsHeaders);
+        }
+        const token = crypto.randomBytes(32).toString("hex");
+        const conversation = await db.siteChatRenovarToken(conversaAcesso.id, crypto.createHash("sha256").update(token).digest("hex"));
+        await db.siteChatMarcarEmailConfirmado(conversation.id);
+        const clt = await garantirTrackingToken(await sincronizarSiteChatClt(cltAcesso));
+        return send(res, 200, {
+          conversation: { id: conversation.id, name: conversation.name, contact: conversation.contact, email: conversation.email, status: conversation.status },
+          token,
+          messages: await db.siteChatMensagens(conversation.id),
+          clt: siteChatCltPublico(clt),
+        }, corsHeaders);
+      }
+
       if (req.method === "POST" && path_ === "/site-chat/recover") {
         if (!siteChatRecoveryRateLimit(req)) return send(res, 429, { error: "Muitas tentativas. Aguarde dez minutos e tente novamente." }, corsHeaders);
         const body = await parseBody(req);
@@ -6332,7 +6422,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
-      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|personal-data|assistant)$/i);
+      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|access-email|personal-data|assistant)$/i);
       if (cltMatch) {
         const id = cltMatch[1];
         const action = cltMatch[2].toLowerCase();
@@ -6445,6 +6535,17 @@ const server = http.createServer(async (req, res) => {
               return send(res, 200, { clt: siteChatCltPublico(await sincronizarSiteChatFacta(row)) }, corsHeaders);
             }
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          if (action === "access-email") {
+            // "Salvar minha simulação": manda o link de acesso (sem senha) para o e-mail que o cliente já informou.
+            const emailCliente = String(conversation.email || "").trim();
+            if (!emailCliente) return send(res, 400, { error: "Não temos um e-mail para enviar o acesso." }, corsHeaders);
+            if (!atual) return send(res, 400, { error: "A simulação ainda não começou." }, corsHeaders);
+            const comToken = await garantirTrackingToken(atual);
+            const link = `https://www.felizcred.com.br/?chat=acessar&t=${encodeURIComponent(comToken.tracking_token)}&utm_source=email&utm_medium=acesso`;
+            await enviarAcessoSimulacaoFelizcred({ nome: conversation.name, email: emailCliente, link });
+            const [usuario, dominio] = emailCliente.split("@");
+            return send(res, 200, { sent: true, email: `${usuario.slice(0, 2)}${"*".repeat(Math.max(usuario.length - 2, 1))}@${dominio}` }, corsHeaders);
           }
           if (action === "resimulate" && atual?.provider === "facta") {
             // O cliente pode escolher qualquer parcela até o máximo da margem: refaz a consulta com o valor digitado.

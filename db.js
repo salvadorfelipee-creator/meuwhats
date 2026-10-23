@@ -215,6 +215,14 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "email_resposta_at")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN email_resposta_at INTEGER`);
   }
+  // Mensagem de WhatsApp "você mudou de ideia?" para quem parou no meio da simulação (uma vez só) e e-mail
+  // confirmado pelo link de acesso ("Salvar minha simulação").
+  if (!infoSiteChat.rows.some((r) => r.name === "retomada_whatsapp_at")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN retomada_whatsapp_at INTEGER`);
+  }
+  if (!infoSiteChat.rows.some((r) => r.name === "email_confirmado_at")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN email_confirmado_at INTEGER`);
+  }
   await client.execute(`CREATE TABLE IF NOT EXISTS site_chat_funnel_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     conversation_id TEXT NOT NULL,
@@ -3891,6 +3899,46 @@ async function siteChatParaRetomada(desde, ate) {
   return r.rows.map((x) => ({ ...x }));
 }
 
+// Quem parou no meio da simulação e autorizou receber WhatsApp: candidatos à mensagem "mudou de ideia?". Fora quem já
+// recebeu, quem pediu para parar, quem está com atendente e quem já está em contrato/análise.
+async function siteChatParaRetomadaWhatsapp(desde, ate) {
+  await ready;
+  const r = await client.execute({
+    sql: `SELECT c.id, c.name, c.contact, t.phone AS clt_phone, t.etapa
+          FROM site_chat_conversations c LEFT JOIN site_chat_clt t ON t.conversation_id = c.id
+          WHERE c.whatsapp_opt_in_at IS NOT NULL AND c.whatsapp_opt_out_at IS NULL
+            AND c.retomada_whatsapp_at IS NULL
+            AND c.last_visitor_at BETWEEN ? AND ?
+            AND COALESCE(c.human_intent_stage, '') != 'human_active'
+            AND COALESCE(t.etapa, '') NOT IN ('aguardando_assinatura_facta', 'proposta_em_analise', 'proposta_concluida', 'proposta_cancelada')
+          ORDER BY c.last_visitor_at ASC`,
+    args: [desde, ate],
+  });
+  return r.rows.map((x) => ({ ...x }));
+}
+
+async function siteChatMarcarRetomadaWhatsapp(id) {
+  await ready;
+  const r = await client.execute({
+    sql: `UPDATE site_chat_conversations SET retomada_whatsapp_at = ? WHERE id = ? AND retomada_whatsapp_at IS NULL`,
+    args: [Date.now(), id],
+  });
+  return r.rowsAffected > 0;
+}
+
+async function siteChatDesmarcarRetomadaWhatsapp(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE site_chat_conversations SET retomada_whatsapp_at = NULL WHERE id = ?`, args: [id] });
+}
+
+async function siteChatMarcarEmailConfirmado(id) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE site_chat_conversations SET email_confirmado_at = COALESCE(email_confirmado_at, ?) WHERE id = ?`,
+    args: [Date.now(), id],
+  });
+}
+
 async function siteChatEmailMarcar(id, campo, ts) {
   await ready;
   if (!["email_retomada_at", "email_resposta_at"].includes(campo)) throw new Error("campo inválido");
@@ -4218,6 +4266,10 @@ module.exports = {
   siteChatCriar,
   siteChatRegistrarOptOut,
   siteChatObter,
+  siteChatParaRetomadaWhatsapp,
+  siteChatMarcarRetomadaWhatsapp,
+  siteChatDesmarcarRetomadaWhatsapp,
+  siteChatMarcarEmailConfirmado,
   siteChatRecuperarClt,
   siteChatRenovarToken,
   siteChatMensagens,

@@ -419,12 +419,16 @@ async function listarTemplates(wabaId) {
 // Cria template de texto simples (só corpo, sem variável/botão) na WABA — a Meta analisa e
 // aprova depois (status PENDING até lá). Usado pra replicar um template que já existe em outra
 // WABA (templates são por conta, não compartilhados).
-async function criarTemplateTexto(wabaId, { name, language, category, text }) {
+async function criarTemplateTexto(wabaId, { name, language, category, text, buttons, example }) {
+  // `example`: valores de exemplo das variáveis {{1}}, {{2}}... (a Meta exige quando o texto tem variável).
+  // `buttons`: textos de botões de resposta rápida (o cliente toca e a resposta chega como "button").
+  const components = [{ type: "BODY", text, ...(example?.length ? { example: { body_text: [example] } } : {}) }];
+  if (buttons?.length) components.push({ type: "BUTTONS", buttons: buttons.map((b) => ({ type: "QUICK_REPLY", text: b })) });
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
     `/${GRAPH_VERSION}/${wabaId}/message_templates`,
-    { body: { name, language: language || "pt_BR", category: category || "MARKETING", components: [{ type: "BODY", text }] } }
+    { body: { name, language: language || "pt_BR", category: category || "MARKETING", components } }
   );
   const json = JSON.parse(buffer.toString("utf8") || "{}");
   if (status >= 400) throw new Error(`Falha ao criar template: ${JSON.stringify(json)}`);

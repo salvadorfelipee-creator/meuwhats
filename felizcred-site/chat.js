@@ -113,9 +113,42 @@
     error.textContent = `${message} Tente novamente ou escreva sua dúvida abaixo.`;
     error.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+  // Quando o cliente precisa sair do chat (autorizar no WhatsApp), o chat fecha sozinho e fica um aviso na bolinha. Quando
+  // as condições chegam, avisa de novo e, se ele voltou para a página, o chat abre sozinho já no resultado.
+  const ETAPAS_RESULTADO_CLT = ["ofertas_disponiveis", "sem_margem", "nao_elegivel", "sem_oferta", "erro_consulta", "erro_autorizacao", "politica_reprovada"];
+  function avisoChat(titulo, detalhe) {
+    const t = nudge.querySelector("strong"), d = nudge.querySelector("small");
+    t.textContent = titulo; d.textContent = detalhe; nudge.classList.add("show");
+    if (!state.open) unreadEl.classList.add("show");
+  }
+  function aoMudarEtapaClt(anterior, etapa) {
+    if (etapa === "autorizacao_enviada" && anterior && state.open) {
+      state.minimizadoParaAutorizar = true;
+      setTimeout(() => {
+        if (state.clt?.etapa !== "autorizacao_enviada" || !state.open) return;
+        setOpen(false);
+        setTimeout(() => avisoChat("Abra o WhatsApp e toque no link da Facta", "Quando suas condições chegarem, avisamos aqui."), 450);
+      }, 4500);
+      return;
+    }
+    if (anterior === "autorizacao_enviada" && ETAPAS_RESULTADO_CLT.includes(etapa) && !state.open) {
+      const ok = etapa === "ofertas_disponiveis";
+      if (state.minimizadoParaAutorizar && !document.hidden) { state.minimizadoParaAutorizar = false; setOpen(true); return; }
+      avisoChat(ok ? "Suas condições chegaram! Toque para ver." : "Temos uma atualização da sua simulação.", ok ? "Valores liberados para você." : "Toque para ver o que aconteceu.");
+      if (document.hidden && "Notification" in window && Notification.permission === "granted") new Notification("FelizCred", { body: ok ? "Suas condições chegaram." : "Temos uma atualização da sua simulação." });
+    }
+  }
+  // "Salvar minha simulação": um toque envia o acesso (sem senha) para o e-mail que o cliente já informou no início.
+  function acessoEnviadoPara() { try { return localStorage.getItem(`fc_acesso_${state.session?.id}`) || ""; } catch { return ""; } }
+  function blocoAcessoClt() {
+    const enviado = acessoEnviadoPara();
+    if (enviado) return `<div class="fc-clt-access is-done"><b>✓ Acesso enviado</b><span>Olhe seu e-mail (${esc(enviado)}) e toque em “Acessar minha simulação” para voltar quando quiser.</span></div>`;
+    return `<div class="fc-clt-access"><b>Salvar minha simulação</b><span>Receba o acesso no seu e-mail e volte quando quiser. Sem senha.</span><button type="button" data-send-access>Enviar meu acesso</button><p class="fc-clt-inline-error" hidden></p></div>`;
+  }
   function renderClt() {
     const c = state.clt;
-    root.classList.toggle("is-contracting", !!state.selectedOffer || c?.etapa === "dados_pessoais");
+    { const etapaAtual = typeof c === "string" ? c : c?.etapa; if (etapaAtual && etapaAtual !== state.ultimaEtapaClt) { const anterior = state.ultimaEtapaClt; state.ultimaEtapaClt = etapaAtual; aoMudarEtapaClt(anterior, etapaAtual); } }
+    root.classList.toggle("is-contracting", !!state.selectedOffer || c?.etapa === "dados_pessoais" || c?.etapa === "ofertas_disponiveis");
     const status = $(".fc-chat-status");
     if (status) status.textContent = c?.etapa === "proposta_em_analise" ? "Proposta em análise" : c?.etapa === "proposta_concluida" ? "Proposta concluída" : c ? "Simulação Facta em andamento" : "Assistente online agora";
     if (!c) { cltEl.classList.remove("show"); cltEl.innerHTML = ""; return; }
@@ -154,7 +187,7 @@
       return;
     }
     if (c.provider === "facta" && c.etapa === "ofertas_disponiveis") {
-      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">3 de 5 · Escolha sua condição</span><h3>Estas são as condições encontradas</h3><p>A parcela de ${money(c.maxInstallment || (c.offers[0] && c.offers[0].installmentValue))} é o <b>máximo</b> disponível para você. Se preferir uma parcela menor, toque em “Escolher outra parcela” e digite o valor. O valor que você recebe é uma estimativa; a Facta faz a política de crédito antes de abrir o cadastro da proposta.</p><div class="fc-clt-offers">${c.offers.map((o) => `<button type="button" data-facta-offer="${esc(o.id)}" class="fc-clt-offer"><span>Você recebe</span><strong>${money(o.disbursedAmount)}</strong><small>${o.installments} parcelas de ${money(o.installmentValue)}${o.rate ? ` · Taxa informada ${Number(o.rate).toFixed(2)}%` : ""}${o.insuranceValue ? ` · Inclui seguro de ${money(o.insuranceValue)}` : ""}</small></button>`).join("")}</div><button type="button" class="fc-clt-link" data-lower>Escolher outra parcela</button><form class="fc-clt-resim" data-max="${Number(c.maxInstallment || 0)}" hidden><p>Digite assim: “Quero uma parcela de R$ 250”. O valor precisa ser de até ${money(c.maxInstallment)}.</p><label>Valor desejado da parcela<input name="installmentValue" inputmode="decimal" required placeholder="Ex.: 250,00"></label><p class="fc-clt-inline-error" hidden></p><button class="fc-chat-primary">Ver prazos disponíveis</button></form><div class="fc-clt-notice"><b>Antes de continuar</b><span>Valores e aprovação podem mudar após as validações finais. Você verá o contrato completo antes de assinar.</span></div></div>`;
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">3 de 5 · Escolha sua condição</span><h3>Suas condições estão prontas ✅</h3><p>Parcela máxima: <b>${money(c.maxInstallment || (c.offers[0] && c.offers[0].installmentValue))}</b>. Quer pagar menos por mês? Toque em “Escolher outra parcela”.</p><div class="fc-clt-offers">${c.offers.map((o) => `<button type="button" data-facta-offer="${esc(o.id)}" class="fc-clt-offer"><span>Você recebe</span><strong>${money(o.disbursedAmount)}</strong><small>${o.installments} parcelas de ${money(o.installmentValue)}${o.rate ? ` · Taxa informada ${Number(o.rate).toFixed(2)}%` : ""}${o.insuranceValue ? ` · Inclui seguro de ${money(o.insuranceValue)}` : ""}</small></button>`).join("")}</div><button type="button" class="fc-clt-link" data-lower>Escolher outra parcela</button><form class="fc-clt-resim" data-max="${Number(c.maxInstallment || 0)}" hidden><p>Digite assim: “Quero uma parcela de R$ 250”. O valor precisa ser de até ${money(c.maxInstallment)}.</p><label>Valor desejado da parcela<input name="installmentValue" inputmode="decimal" required placeholder="Ex.: 250,00"></label><p class="fc-clt-inline-error" hidden></p><button class="fc-chat-primary">Ver prazos disponíveis</button></form>${blocoAcessoClt()}<div class="fc-clt-notice"><b>Antes de continuar</b><span>Valores estimados: a aprovação final é da Facta, e você revê o contrato completo antes de assinar.</span></div></div>`;
       return;
     }
     if (c.provider === "facta" && c.etapa === "dados_pessoais") {
@@ -242,6 +275,20 @@
     finally { button.disabled = false; button.textContent = "Consultar meu andamento"; }
   });
   cltEl.addEventListener("click", async (e) => {
+    const sendAccess = e.target.closest("[data-send-access]");
+    if (sendAccess) {
+      sendAccess.disabled = true; sendAccess.textContent = "Enviando…";
+      try {
+        const data = await api(`/${state.session.id}/clt/access-email`, { method: "POST", body: "{}" });
+        try { localStorage.setItem(`fc_acesso_${state.session.id}`, data.email || "seu e-mail"); } catch {}
+        renderClt();
+      } catch (error) {
+        sendAccess.disabled = false; sendAccess.textContent = "Enviar meu acesso";
+        const erro = cltEl.querySelector(".fc-clt-access .fc-clt-inline-error");
+        if (erro) { erro.textContent = error.message || "Não foi possível enviar agora."; erro.hidden = false; }
+      }
+      return;
+    }
     if (e.target.closest("[data-dismiss-clt-status]")) {
       const c = state.clt;
       state.dismissedCltStatus = `${c?.etapa || ""}:${c?.status || ""}:${c?.error || ""}`;
@@ -395,8 +442,25 @@
   if (/^\d{10,11}$/.test(waDigits) && startForm.elements.contact) {
     startForm.elements.contact.value = waDigits.replace(/^(\d{2})(\d{4,5})(\d{4})$/, "($1) $2-$3");
   }
-  const chatAction = new URLSearchParams(location.search).get("chat");
-  if (["abrir", "acompanhar"].includes(chatAction)) setTimeout(() => { setOpen(true); if (chatAction === "acompanhar" && !state.session) $("[data-open-recovery]").click(); }, 180);
+  const chatParams = new URLSearchParams(location.search);
+  const chatAction = chatParams.get("chat");
+  // Link do e-mail ("Acessar minha simulação"): entra direto, sem senha, em qualquer aparelho.
+  async function entrarPorLink(codigo) {
+    setOpen(true);
+    try {
+      const response = await fetch(`${API.replace(/\/conversations$/, "")}/access`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: codigo }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Não foi possível abrir sua simulação.");
+      state.session = { id: data.conversation.id, token: data.token, name: data.conversation.name, contact: data.conversation.contact || "", email: data.conversation.email || "", expiresAt: Date.now() + SESSION_TTL };
+      state.messages = data.messages || []; state.clt = data.clt || null; state.ultimaEtapaClt = typeof state.clt === "object" && state.clt ? state.clt.etapa : state.ultimaEtapaClt;
+      localStorage.setItem(STORAGE, JSON.stringify(state.session));
+      root.classList.add("has-conversation"); renderMessages(); renderClt();
+      history.replaceState(null, "", location.pathname);
+    } catch (err) { showError(err.message); }
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session) { refresh(); refreshClt(); } });
+  if (chatAction === "acessar" && chatParams.get("t")) setTimeout(() => entrarPorLink(chatParams.get("t")), 180);
+  else if (["abrir", "acompanhar"].includes(chatAction)) setTimeout(() => { setOpen(true); if (chatAction === "acompanhar" && !state.session) $("[data-open-recovery]").click(); }, 180);
   else setTimeout(showNudgeOnce, 900);
   goTo(0); refresh(); refreshClt(); setInterval(() => { if (state.session && !sessionIsValid(state.session)) { resetSession(); prepareNudge(); showNudgeOnce(); return; } if (!document.hidden) { refresh(); refreshClt(); } }, 4000);
 })();

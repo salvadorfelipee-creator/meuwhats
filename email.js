@@ -166,6 +166,23 @@ async function enviarInicioChatFelizcred({ nome, email }) {
   await enviarEmail({ to: email, toNome: nome || email, from: FELIZCRED_EMAIL_FROM, fromNome: FELIZCRED_EMAIL_FROM_NOME, subject: "Seu atendimento no chat da FelizCred começou", html });
 }
 
+// Link de acesso (sem senha) para voltar à simulação em qualquer aparelho. Ao tocar, o e-mail fica confirmado.
+async function enviarAcessoSimulacaoFelizcred({ nome, email, link }) {
+  const primeiroNome = (nome || "").trim().split(/\s+/)[0] || "";
+  const saudacao = primeiroNome ? `Olá, ${escapeHtml(primeiroNome)}!` : "Olá!";
+  const html = `
+    <div style="background:#f2f7f4;padding:32px 16px;font-family:Arial,sans-serif;color:#10243b">
+      <div style="max-width:560px;margin:auto;background:#fff;border-radius:16px;padding:28px">
+        <p style="margin:0 0 8px;color:#087a47;font-size:12px;font-weight:700">FELIZCRED</p>
+        <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25">Sua simulação está salva</h1>
+        <p style="margin:0 0 12px;line-height:1.6">${saudacao} Toque no botão abaixo para voltar à sua simulação quando quiser, neste ou em outro aparelho. Não precisa de senha e você não precisa preencher nada de novo.</p>
+        <a href="${escapeHtml(link)}" style="display:inline-block;background:#087a47;color:#fff;text-decoration:none;padding:15px 24px;border-radius:12px;font-weight:700;font-size:16px;margin:8px 0 4px">Acessar minha simulação</a>
+        <p style="margin:22px 0 0;color:#647386;font-size:12px;line-height:1.5">Ao tocar no botão, você também confirma que este e-mail é seu. Se não foi você quem pediu, ignore esta mensagem.</p>
+      </div>
+    </div>`;
+  await enviarEmail({ to: email, toNome: nome || email, from: FELIZCRED_EMAIL_FROM, fromNome: FELIZCRED_EMAIL_FROM_NOME, subject: "Sua simulação na FelizCred está salva", html });
+}
+
 async function enviarAtualizacaoChatFelizcred({ nome, email, titulo, mensagem }) {
   const html = `
     <div style="background:#f2f7f4;padding:32px 16px;font-family:Arial,sans-serif;color:#10243b">
@@ -296,4 +313,4 @@ async function enviarModeloFelizcred({ modelo, email, nome, mensagem }) {
   });
 }
 
-module.exports = { garantirListaBrevo, garantirModelosBrevo, enviarModeloFelizcred, LISTA_SITE_FELIZCRED, salvarContatoBrevo, enviarEmail, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred };
+module.exports = { garantirListaBrevo, garantirModelosBrevo, enviarModeloFelizcred, LISTA_SITE_FELIZCRED, salvarContatoBrevo, enviarEmail, notificarLeadCotaCerta, enviarBoasVindasFelizcred, enviarInicioChatFelizcred, enviarAtualizacaoChatFelizcred, enviarAcessoSimulacaoFelizcred };
