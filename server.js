@@ -1469,14 +1469,30 @@ async function responderFgtsJaConsultado(de, businessNumberId) {
 // checagem em processarEntry, mesmo espírito da palavra-chave "menu"). Mesmo texto/fluxo já
 // usado no Instagram (autorizar a J17, depois mandar o CPF) — consistência entre os dois canais,
 // ver INSTAGRAM_OPCOES_MENU.
+const TEXTO_PERGUNTA_JA_SACOU =
+  "Antes de começar: o saque do FGTS só pode ser feito *uma vez por ano*. Você já sacou este ano?";
+const BOTOES_JA_SACOU = [
+  { id: "fgts_sacou_sim", title: "Sim, já saquei" },
+  { id: "fgts_sacou_nao", title: "Não sacei" },
+  { id: "fgts_sacou_nao_lembro", title: "Não lembro" },
+];
+const TEXTO_AUTORIZAR_J17 =
+  "Para fazer a simulação do saque do FGTS, é necessário autorizar a *J17* lá no aplicativo do FGTS " +
+  "(Meu FGTS > Autorizações). Depois de autorizar, é só me mandar o seu CPF que a gente já parte " +
+  "pro atendimento. 😊";
+
 async function iniciarFluxoFgtsMenu(de, businessNumberId) {
   if (await fgtsJaConsultado(de, businessNumberId)) return responderFgtsJaConsultado(de, businessNumberId);
+  // Felizcred e Campanha CLT: pergunta logo no início se já sacou este ano, para não gastar atendente com quem não pode.
+  if (NUMEROS_CONSIGNADO.includes(businessNumberId)) {
+    await enviarRespostaAutomatica(businessNumberId, de, TEXTO_PERGUNTA_JA_SACOU, BOTOES_JA_SACOU);
+    await db.setFluxoPasso(de, businessNumberId, "fgts_sacou");
+    return;
+  }
   await enviarRespostaAutomatica(
     businessNumberId,
     de,
-    "Para fazer a simulação do saque do FGTS, é necessário autorizar a *J17* lá no aplicativo do FGTS " +
-      "(Meu FGTS > Autorizações). Depois de autorizar, é só me mandar o seu CPF que a gente já parte " +
-      "pro atendimento. 😊\n\n" +
+    TEXTO_AUTORIZAR_J17 + "\n\n" +
       "*Atenção:* o saque do FGTS só pode ser feito uma vez por ano. Quem já sacou este ano não consegue " +
       "fazer de novo. Se você não lembra se já sacou, é só me avisar que eu te explico como conferir."
   );
@@ -5011,6 +5027,9 @@ const BOTOES_INICIAR_CONSIGNADO = [{ id: "consig_iniciar", title: "Iniciar a sim
 const CONSIGNADO_MODO_SITE = process.env.CONSIGNADO_MODO !== "whatsapp";
 const TEXTO_IR_PARA_CHAT_CONSIGNADO = "Para fazer a simulação, toque no botão abaixo e continue pelo chat seguro do site. Lá pedimos só o necessário e você acompanha cada etapa.";
 const REGEX_INTENCAO_FGTS = /fgts|saque|antecip/i;
+// Mensagem automática de outra empresa (ex.: "X agradece seu contato"): não responde, não abre fluxo, não manda lembrete.
+// Se uma pessoa de verdade escrever depois, a conversa começa normalmente.
+const REGEX_AUTORESPOSTA_EMPRESA = /agradece (o |seu )?contato|mensagem autom[aá]tica|resposta autom[aá]tica|estamos fora do hor[aá]rio de atendimento|no momento n[aã]o (podemos|estamos) (atender|dispon)/i;
 // O texto do botão cta_url aceita no máximo 20 caracteres: acima disso a Meta recusa a mensagem e o cliente fica sem
 // resposta ("Falar com atendimento" tem 21 e travou o fluxo em 23/10/2026).
 const CTA_CHAT_CONSIGNADO = { buttonText: "Abrir atendimento" };
@@ -5083,7 +5102,7 @@ async function marcarInteressadoConsignado(de, businessNumberId) {
 }
 
 // Template bomdia/boatarde lido pelo cliente que não respondeu em 30 min: registra na nota e finaliza a
-// conversa (mesmo tratamento de "No momento não"). Varredura a cada 5 min; só olha os últimos 7 dias.
+// conversa (mesmo tratamento de "No momento não"). Varredura a cada 10 min; só olha os últimos 3 dias (usa índice em last_message_at, para não ler a tabela toda).
 const CONSIGNADO_SEM_RESPOSTA_MS = 30 * 60 * 1000;
 const NOTA_CONSIGNADO_SEM_RESPOSTA = "Consignado CLT: leu a mensagem e não respondeu em 30 min";
 let encerrandoLidosSemResposta = false;
@@ -5091,7 +5110,7 @@ async function encerrarLidosSemResposta() {
   if (encerrandoLidosSemResposta) return;
   encerrandoLidosSemResposta = true;
   try {
-    const conversas = await db.templatesLidosSemResposta(NUMEROS_CONSIGNADO, TEMPLATES_CONSIGNADO, CONSIGNADO_SEM_RESPOSTA_MS, 7 * 24 * 60 * 60 * 1000);
+    const conversas = await db.templatesLidosSemResposta(NUMEROS_CONSIGNADO, TEMPLATES_CONSIGNADO, CONSIGNADO_SEM_RESPOSTA_MS, 3 * 24 * 60 * 60 * 1000);
     for (const c of conversas) {
       try {
         if (!String(c.nota || "").includes(NOTA_CONSIGNADO_SEM_RESPOSTA)) {
@@ -5102,18 +5121,24 @@ async function encerrarLidosSemResposta() {
         console.error(`Erro ao encerrar conversa lida sem resposta ${c.phone}:`, err.message);
       }
     }
-    // Completa a tag de quem já tinha escolhido "Desejo simular" antes de ela existir (vira vazio depois da 1ª vez).
-    for (const c of await db.conversasConsignadoSemTag(NUMEROS_CONSIGNADO, TAG_SIMULACAO_CONSIGNADO)) {
-      await marcarInteressadoConsignado(c.phone, c.business_number_id);
-    }
   } catch (err) {
     console.error("Erro ao encerrar conversas lidas sem resposta:", err.message);
   } finally {
     encerrandoLidosSemResposta = false;
   }
 }
+// Uma única vez ao subir: completa a tag de quem escolheu "Desejo simular" antes de ela existir.
+setTimeout(async () => {
+  try {
+    for (const c of await db.conversasConsignadoSemTag(NUMEROS_CONSIGNADO, TAG_SIMULACAO_CONSIGNADO)) {
+      await marcarInteressadoConsignado(c.phone, c.business_number_id);
+    }
+  } catch (err) {
+    console.error("Erro ao completar tag de interesse no consignado:", err.message);
+  }
+}, 2 * 60 * 1000);
 setTimeout(encerrarLidosSemResposta, 60 * 1000);
-setInterval(encerrarLidosSemResposta, 5 * 60 * 1000);
+setInterval(encerrarLidosSemResposta, 10 * 60 * 1000);
 
 function cpfDeTexto(texto) {
   const digitos = String(texto || "").replace(/\D/g, "");
@@ -5152,9 +5177,14 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
     tipo === "interactive" ? msg.interactive?.button_reply?.title || "" : "";
   if (!texto || pediuPararMensagens(texto)) return false;
   if (await db.botEstaPausado(de, businessNumberId)) return false; // atendente humano em atendimento
+  if (tipo === "text" && texto.length >= 25 && REGEX_AUTORESPOSTA_EMPRESA.test(texto)) {
+    await db.insertMessage({ ...base, type: "text", body: texto });
+    await db.tentarMarcarInstagramLembreteEnviado(de, businessNumberId); // também não recebe o lembrete do Instagram
+    return true;
+  }
 
   const passoCompleto = String(conversaAnterior?.fluxo_passo || "");
-  const ehConsignado = passoCompleto.startsWith("consignado_");
+  const ehConsignado = passoCompleto.startsWith("consignado_") || passoCompleto === "fgts_sacou";
   if (!ehConsignado && passoCompleto && passoCompleto !== "menu_inicial") return false;
   // Quem escreve sobre FGTS/saque/antecipação (texto livre) vai para o fluxo do FGTS em vez da oferta do consignado,
   // inclusive depois de "No momento não". Antes o Gemini respondia "um atendente vai te ajudar" e o fluxo do FGTS
@@ -5186,6 +5216,30 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
       return true;
     }
     switch (estado) {
+      case "fgts_sacou": {
+        // Resposta à pergunta "já sacou este ano?" (botões ou texto livre).
+        if (t.includes("lembro")) {
+          await responder(TEXTO_COMO_VER_DATA_SAQUE);
+          await irPara("fgts_data_saque");
+        } else if (t.startsWith("nao") || t.includes("nao sa")) {
+          await responder(TEXTO_AUTORIZAR_J17);
+          await irPara("fgts_cpf");
+        } else if (t.startsWith("sim") || t.includes("ja sa") || t.includes("sacei")) {
+          await responder(
+            "Entendi! Quem já sacou este ano não consegue sacar de novo agora: a Caixa só libera uma vez a cada 12 meses, " +
+              "contando da data do último saque."
+          );
+          await responder(
+            "Mas posso simular o *consignado CLT* para você, com o primeiro desconto apenas para *60 dias*. Quer simular?",
+            BOTOES_OFERTA_CONSIGNADO
+          );
+          await irPara("consignado_oferta");
+        } else {
+          const ultimoCorpo = String((await db.getUltimoCorpoEnviado(de, businessNumberId)) || "");
+          if (!ultimoCorpo.startsWith("Antes de começar")) await responder(TEXTO_PERGUNTA_JA_SACOU, BOTOES_JA_SACOU);
+        }
+        break;
+      }
       case "consignado_oferta":
         if (t.includes("desejo") || t.includes("simular")) {
           await marcarInteressadoConsignado(de, businessNumberId);

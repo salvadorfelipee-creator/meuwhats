@@ -1123,6 +1123,10 @@ function ChannelChatsPage() {
               const rascunhoLista = `${canalId}|${c.phone}` !== chaveAtual ? rascunhos[`${canalId}|${c.phone}`] : undefined
               const campos = camposDe(c)
               const tags = tagsDe(c)
+              // Cliente que pediu simulação (tocou em "Desejo simular", foi para o chat do site ou deu os dados) e ainda
+              // não foi aberto por ninguém: a conversa pulsa na cor do produto (tag "Consignado CLT" = verde) até abrir.
+              const interessado = naoLida && (/^consignado_(chat|concluido)/.test(c.fluxo_passo || "") || tags.some((t) => /interessado/i.test(t.nome)))
+              const corProduto = interessado ? (tags.find((t) => /consignado|clt/i.test(t.nome))?.cor || "#15803D") : null
               const estagiosLista = pipelineEstagiosPara(current?.label)
               const estagio = estagiosLista.find((e) => e.id === c.pipeline_estagio)
               const ehInstagram = c.channel === "instagram" || c.business_number_id === "instagram" || (!todos && current?.id === "instagram")
@@ -1138,11 +1142,14 @@ function ChannelChatsPage() {
                 className={`w-full p-2.5 rounded-lg cursor-pointer text-left transition-colors relative ${
                   selected === c.phone && (!todos || current?.id === c.business_number_id)
                     ? "bg-accent"
+                    : interessado
+                    ? "animate-pulse"
                     : semResposta
                     ? "bg-red-500/10 dark:bg-red-500/15 animate-pulse"
                     : "hover:bg-accent/50"
                 } ${naoLida ? "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary" : ""}`}
-                title={semResposta ? "Sem nenhuma resposta (bot ou humano) há mais de 30 minutos" : undefined}
+                style={interessado && corProduto && !(selected === c.phone && (!todos || current?.id === c.business_number_id)) ? { backgroundColor: `${corProduto}26`, boxShadow: `inset 3px 0 0 ${corProduto}` } : undefined}
+                title={interessado ? "Pediu simulação — ainda não atendida" : semResposta ? "Sem nenhuma resposta (bot ou humano) há mais de 30 minutos" : undefined}
               >
                 <div className="flex flex-row gap-2.5 items-start">
                   <div className="relative shrink-0">
@@ -1199,11 +1206,17 @@ function ChannelChatsPage() {
                           bolinha simples em vez de número inventado. Pisca (ping) só quando é
                           urgente pra essa pessoa; calma (sólida) quando é só "tem mensagem nova". */}
                       {naoLida && (
-                        <span className={urgente ? "relative flex h-2 w-2 shrink-0" : "flex h-2 w-2 shrink-0"}>
-                          {urgente && (
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                        <span className={urgente || interessado ? "relative flex h-2 w-2 shrink-0" : "flex h-2 w-2 shrink-0"}>
+                          {(urgente || interessado) && (
+                            <span
+                              className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${interessado ? "" : "bg-red-500"}`}
+                              style={interessado && corProduto ? { backgroundColor: corProduto } : undefined}
+                            />
                           )}
-                          <span className={`relative inline-flex h-2 w-2 rounded-full ${urgente ? "bg-red-500" : "bg-primary"}`} />
+                          <span
+                            className={`relative inline-flex h-2 w-2 rounded-full ${interessado ? "" : urgente ? "bg-red-500" : "bg-primary"}`}
+                            style={interessado && corProduto ? { backgroundColor: corProduto } : undefined}
+                          />
                         </span>
                       )}
                     </div>

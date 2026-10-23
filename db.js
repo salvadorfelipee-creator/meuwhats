@@ -94,6 +94,7 @@ const ready = (async () => {
   );
 
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_phone ON messages(phone, business_number_id)`);
+  await client.execute(`CREATE INDEX IF NOT EXISTS idx_conversations_last_message ON conversations(last_message_at)`);
   await client.execute(`CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_message_id)`);
   // Cobre "achar a mensagem mais recente de uma conversa" (ver listConversations) sem varrer
   // o histórico inteiro do contato — sem esse índice, ORDER BY created_at DESC LIMIT 1 só
@@ -1077,14 +1078,15 @@ async function tentarMarcarLembreteEnviado(phone, businessNumberId, esperado) {
 
 // Conversas com fluxo em aberto há quase 24h (janela do WhatsApp pra mensagem
 // livre) que ainda não receberam o aviso de "continua aí?" — manda-se UM só,
-// entre 20h e 24h de silêncio, pra tentar reabrir a janela antes que feche.
+// entre 20h e 24h depois da ÚLTIMA MENSAGEM DO CLIENTE (a janela do WhatsApp conta só a do cliente; contar a última
+// mensagem enviada por nós empurrava o aviso para depois das 24h e ele falhava), pra tentar reabrir a janela antes que feche.
 async function listarJanelasParaManter() {
   await ready;
   const agora = Date.now();
   const result = await client.execute({
     sql: `SELECT phone, business_number_id, fluxo_passo FROM conversations
           WHERE fluxo_passo IS NOT NULL AND janela_lembrete_at IS NULL
-            AND last_message_at <= ? AND last_message_at > ?`,
+            AND last_inbound_at <= ? AND last_inbound_at > ?`,
     args: [agora - 20 * 60 * 60 * 1000, agora - 24 * 60 * 60 * 1000],
   });
   return result.rows;
@@ -1880,8 +1882,9 @@ async function listarParaLembreteInstagram(businessNumberIds, horasSilencio) {
     sql: `SELECT phone, business_number_id FROM conversations
           WHERE business_number_id IN (${placeholders})
             AND instagram_lembrete_at IS NULL
-            AND last_message_at IS NOT NULL AND last_message_at < ?`,
-    args: [...businessNumberIds, limite],
+            AND last_message_at IS NOT NULL AND last_message_at < ?
+            AND last_inbound_at IS NOT NULL AND last_inbound_at > ?`,
+    args: [...businessNumberIds, limite, Date.now() - 24 * 60 * 60 * 1000],
   });
   return result.rows;
 }
