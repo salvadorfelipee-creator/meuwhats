@@ -113,6 +113,13 @@
     error.textContent = `${message} Tente novamente ou escreva sua dúvida abaixo.`;
     error.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
+  // A Facta devolve a mesma parcela em várias tabelas e prazos (dezenas de cartões quase iguais). Mostra só a melhor
+  // condição de cada prazo, a que libera mais dinheiro, em ordem de prazo.
+  function melhoresOfertasPorPrazo(offers) {
+    const melhor = new Map();
+    for (const o of offers || []) { const atual = melhor.get(o.installments); if (!atual || Number(o.disbursedAmount) > Number(atual.disbursedAmount)) melhor.set(o.installments, o); }
+    return [...melhor.values()].sort((a, b) => Number(a.installments) - Number(b.installments));
+  }
   function renderClt() {
     const c = state.clt;
     root.classList.toggle("is-contracting", !!state.selectedOffer || c?.etapa === "dados_pessoais");
@@ -154,7 +161,7 @@
       return;
     }
     if (c.provider === "facta" && c.etapa === "ofertas_disponiveis") {
-      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">3 de 5 · Escolha sua condição</span><h3>Estas são as condições encontradas</h3><p>O valor mostrado é líquido estimado. Ao escolher, a Facta fará a política de crédito antes de abrir o cadastro da proposta.</p><div class="fc-clt-offers">${c.offers.map((o) => `<button type="button" data-facta-offer="${esc(o.id)}" class="fc-clt-offer"><span>${o.installments} parcelas de</span><strong>${money(o.installmentValue)}</strong><small>Valor líquido ${money(o.disbursedAmount)}${o.rate ? ` · Taxa informada ${Number(o.rate).toFixed(2)}%` : ""}${o.insuranceValue ? ` · Inclui seguro de ${money(o.insuranceValue)}` : ""}</small></button>`).join("")}</div><div class="fc-clt-notice"><b>Antes de continuar</b><span>Valores e aprovação podem mudar após as validações finais. Você verá o contrato completo antes de assinar.</span></div></div>`;
+      cltEl.innerHTML = `<div class="fc-clt-card"><span class="fc-clt-step">3 de 5 · Escolha sua condição</span><h3>Estas são as condições encontradas</h3><p>O valor mostrado é líquido estimado. Ao escolher, a Facta fará a política de crédito antes de abrir o cadastro da proposta.</p><div class="fc-clt-offers">${melhoresOfertasPorPrazo(c.offers).map((o) => `<button type="button" data-facta-offer="${esc(o.id)}" class="fc-clt-offer"><span>Você recebe</span><strong>${money(o.disbursedAmount)}</strong><small>${o.installments} parcelas de ${money(o.installmentValue)}${o.rate ? ` · Taxa informada ${Number(o.rate).toFixed(2)}%` : ""}${o.insuranceValue ? ` · Inclui seguro de ${money(o.insuranceValue)}` : ""}</small></button>`).join("")}</div><div class="fc-clt-notice"><b>Antes de continuar</b><span>Valores e aprovação podem mudar após as validações finais. Você verá o contrato completo antes de assinar.</span></div></div>`;
       return;
     }
     if (c.provider === "facta" && c.etapa === "dados_pessoais") {

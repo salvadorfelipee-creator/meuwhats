@@ -100,7 +100,8 @@ function siteChatCltPublico(row) {
       waitingSince: row.authorization_requested_at || row.created_at || null,
       checkedAt: row.authorization_checked_at || null,
       offers: offers.map((o, index) => ({
-        id: String(o.codigoTabela || index),
+        // A mesma tabela aparece em vários prazos: o id precisa incluir o prazo, senão escolher 36x selecionava o 24x.
+        id: `${o.codigoTabela ?? index}:${o.prazo}`,
         tableCode: o.codigoTabela,
         tableName: o.tabela,
         installments: Number(o.prazo || 0),
@@ -441,6 +442,9 @@ async function sincronizarSiteChatFacta(row) {
     await db.siteChatFunilEvento(row.conversation_id, "saida", "sem_oferta", "facta", "sem_oferta");
     return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_oferta", status_novosaque: "SEM_OPERACOES", margem_disponivel: margem, facta_worker_json: JSON.stringify(worker), error_message: null });
   }
+  // Duas sincronizações simultâneas chegavam aqui juntas e a mensagem saía duplicada: relê a etapa antes de registrar.
+  const jaRegistrada = await db.siteChatCltObter(row.conversation_id);
+  if (jaRegistrada?.etapa === "ofertas_disponiveis") return jaRegistrada;
   await db.siteChatFunilEvento(row.conversation_id, "oferta_disponivel", "ofertas_disponiveis", "facta");
   await db.siteChatDefinirPipeline(row.conversation_id, "proposta");
   await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Autorização confirmada. Encontramos condições para você escolher. Os valores ainda passam pela política final da Facta.");
@@ -6419,7 +6423,7 @@ const server = http.createServer(async (req, res) => {
           if (action === "select-offer") {
             let offers = [];
             try { offers = JSON.parse(atual.offers_json || "[]"); } catch {}
-            const offer = offers.find((o, index) => String(o.codigoTabela || index) === String(body.offerId));
+            const offer = offers.find((o, index) => `${o.codigoTabela ?? index}:${o.prazo}` === String(body.offerId));
             if (!offer || atual.etapa !== "ofertas_disponiveis") return send(res, 400, { error: "Escolha uma condição disponível." }, corsHeaders);
             let worker = {};
             try { worker = JSON.parse(atual.facta_worker_json || "{}"); } catch {}
@@ -9224,6 +9228,8 @@ setInterval(async () => {
       // primeiro. tentarMarcarJanelaLembreteEnviado acima já marca como tratado, então não
       // reaparece nas próximas voltas do verificador.
       if (fluxoDoContato.semAvisoJanela) continue;
+      // Felizcred e Campanha CLT: o aviso "Ainda por aí?" foi retirado (pedido do usuário em 23/10/2026).
+      if (NUMEROS_CONSIGNADO.includes(p.business_number_id)) continue;
       if (fluxoDoContato.semAvisoJanelaEmPassos?.includes(p.fluxo_passo)) continue;
       try {
         const manterJanela = fluxoDoContato.lembreteTextos.manter_janela || LEMBRETE_TEXTOS_COTACERTA.manter_janela;
@@ -9258,6 +9264,9 @@ const LEMBRETE_INSTAGRAM_POR_NUMERO = {
 };
 setInterval(async () => {
   try {
+    // Só entre 9h e 20h (Brasília); fora disso espera o próximo ciclo, desde que ainda esteja dentro das 24h do cliente.
+    const horaBrasilia = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }).format(new Date())) % 24;
+    if (horaBrasilia < 9 || horaBrasilia >= 20) return;
     const numeros = Object.keys(LEMBRETE_INSTAGRAM_POR_NUMERO);
     const pendentes = await db.listarParaLembreteInstagram(numeros, HORAS_SILENCIO_LEMBRETE_INSTAGRAM);
     for (const p of pendentes) {
