@@ -9,4 +9,3 @@ $bridge = Start-Process powershell.exe -WindowStyle Hidden -PassThru -ArgumentLi
 Start-Sleep -Seconds 2
 if ($bridge.HasExited) { throw "A ponte Facta não iniciou. Verifique as variáveis de ambiente." }
 
-& (Join-Path $bridgeDir "start-tunnel.ps1")

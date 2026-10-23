@@ -1,54 +1,38 @@
-# Ponte local da Facta (solução provisória)
+# Acesso à Facta (modo direto)
 
-## Situação
+## Situação atual (desde 20/10/2026)
 
-A Facta aceita no máximo dois IPv4 individuais na lista de acesso. O serviço `meuwhats`, no
-plano gratuito do Render, sai por faixas compartilhadas e pode trocar de IP. Por isso, as
-requisições à Facta passam provisoriamente por este computador, cujo IP público é cadastrado na
-Facta.
+**Não usamos mais ngrok nem túnel.** O servidor do Render fala direto com a API da Facta
+(`FACTA_DIRECT=true`). A Facta aceita no máximo dois IPv4 individuais na lista de acesso; hoje
+estão cadastrados:
 
-> **Pendência obrigatória:** migrar a ponte para uma infraestrutura com IP fixo quando a operação
-> estiver estabilizada. Esta solução depende de o computador permanecer ligado, conectado à
-> internet e sem suspensão.
+- IP de saída do Render (`meuwhats`): `74.220.48.71` (conferir em `GET /painel/api/facta/ip-saida`);
+- IP deste computador: `179.221.201.100`, para o lote de consultas offline.
 
-Configuração inicial realizada em 16/10/2026:
+Se o Render trocar de IP, as consultas online falham com erro de acesso: ler o IP novo na rota
+acima e atualizar o cadastro no painel da Facta. O mesmo vale se o IP de casa mudar (conferir
+em `https://api.ipify.org`).
 
-- domínio fixo gratuito: `https://anatomist-upward-flashy.ngrok-free.dev`;
-- IP cadastrado na Facta: `179.221.201.100`;
-- tarefa do Windows: `FelizCred Facta Bridge`;
-- serviço Render: `meuwhats`;
-- produção da API Facta permanece ativa.
+## Como rodar o lote offline neste computador
 
-## Arquitetura
+Não precisa de ponte, túnel nem servidor ligado. Usa as credenciais salvas nas variáveis de
+ambiente do usuário do Windows (`FACTA_USERNAME`, `FACTA_PASSWORD`, `FACTA_ENV`):
 
-`Render -> túnel HTTPS autenticado -> facta-bridge (127.0.0.1:8787) -> API Facta`
+```powershell
+$env:FACTA_DIRECT = "true"
+node scripts/consultar-lote-facta.js cpfs.txt saida.json
+```
 
-- As credenciais da Facta ficam nas variáveis protegidas do usuário do Windows. O arquivo
-  `facta-bridge/.env` é aceito apenas para desenvolvimento e permanece ignorado pelo Git.
-- O Render recebe somente a URL do túnel e uma chave compartilhada.
-- A ponte só permite uma lista fechada de rotas Facta; ela não é um proxy aberto.
-- O token da Facta é mantido em memória e renovado antes de expirar.
+- `cpfs.txt`: um CPF por linha. `saida.json`: resposta bruta de cada CPF (fica fora do Git).
+- O script espera 3,2 s entre consultas (a Facta exige no mínimo 3 s). Parar se vier 429/bloqueio.
+- Se vier erro de IP/acesso, o IP de casa mudou: atualizar na Facta (não contornar).
 
-## Dependências operacionais
+## A ponte local (`facta-bridge/`) — só legado
 
-1. Manter o computador ligado e impedir suspensão automática.
-2. Manter a ponte e o túnel configurados para iniciar com o Windows.
-3. Se o IP público da internet mudar, atualizar o cadastro no painel da Facta.
-4. Não enviar nem versionar o arquivo `.env`.
-5. Se o computador for desligado, nenhuma consulta nova à Facta funcionará até ele voltar.
-
-## Diagnóstico
-
-- Local: `http://127.0.0.1:8787/health`
-- Público: `https://anatomist-upward-flashy.ngrok-free.dev/health`
-- O endpoint público `/health` deve responder `ok: true` enquanto computador e túnel estiverem ativos.
-- Erros da Facta são registrados sem imprimir usuário, senha ou token.
-
-## Migração futura
-
-Substituir `FACTA_BRIDGE_URL` por um gateway hospedado com IPv4 de saída reservado. O módulo
-`facta.js` e o restante do atendimento não precisarão conhecer as credenciais da Facta nem ser
-reescritos.
+`facta-bridge/server.js` continua no repositório porque o modo direto reutiliza o código dele
+(`factaRequest`). O servidor HTTP da ponte (`start.ps1`, `watchdog.ps1`, `start-all.ps1`) não é
+necessário; a tarefa do Windows "FelizCred Facta Bridge" está desativada de propósito. As
+variáveis `FACTA_BRIDGE_URL`/`FACTA_BRIDGE_SECRET` só servem se `FACTA_DIRECT` for removido.
 
 ## Fluxo do chat do site
 
@@ -104,18 +88,13 @@ Isso não significa que todo o produto esteja liberado: token online, perfil do 
 
 ## Estado da implantação
 
-- [x] Conta e domínio gratuito do ngrok.
 - [x] Credenciais Facta renovadas e armazenadas fora do repositório.
-- [x] IP público cadastrado no painel Facta.
-- [x] Ponte local autenticada e lista fechada de endpoints.
-- [x] URL e segredo configurados no Render.
-- [x] Inicialização automática no login do Windows.
-- [x] Suspensão e hibernação automáticas desativadas para não interromper a ponte.
-- [x] Teste ponta a ponta com documento deliberadamente inválido (autenticação e IP aceitos).
+- [x] IPs do Render e deste computador cadastrados no painel Facta.
+- [x] Modo direto (`FACTA_DIRECT=true`) ativo no Render; ngrok e túnel removidos.
 - [x] Validar e classificar respostas da base offline.
 - [x] Implementar no chat a jornada online até a geração do link de assinatura.
 - [x] Implementar o acompanhamento da proposta após a assinatura.
 - [ ] Obter da Facta a liberação do token da API online bloqueado pelo Cloudflare.
 - [ ] Confirmar com a Facta o `login_certificado` de produção e se há código master ou gerente obrigatório.
 - [ ] Homologar uma proposta completa antes de liberar a criação de propostas em produção.
-- [ ] Migrar para infraestrutura com IP fixo e disponibilidade contínua.
+- [ ] IP de saída do Render pode mudar (plano gratuito): considerar IP fixo no futuro.

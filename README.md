@@ -130,8 +130,8 @@ porém, ficam seguros no Turso, independente de reinícios.
 | `NOVOSAQUE_API_KEY` | Chave de API da Novo Saque (originação de crédito CLT, 2º banco) | — |
 | `NOVOSAQUE_FLOW_ID` | ID do WhatsApp Flow de coleta de dados (`flows/novosaque-clt-cadastro.json`) | — |
 | `NOVOSAQUE_BASE_HOST` | Host da API da Novo Saque | `api.novosaque.dev.br` (sandbox) |
-| `FACTA_BRIDGE_URL` | URL HTTPS da ponte local provisória da Facta | — |
-| `FACTA_BRIDGE_SECRET` | Chave compartilhada entre Render e ponte local | — |
+| `FACTA_DIRECT` | `true` = o servidor fala direto com a Facta (modo atual; sem ponte nem ngrok) — ver `docs/FACTA-PONTE-LOCAL.md` | — |
+| `FACTA_BRIDGE_URL` / `FACTA_BRIDGE_SECRET` | Legado: só usados se `FACTA_DIRECT` não for `true` | — |
 | `FACEBOOK_PAGE_ACCESS_TOKEN` | Token de acesso da Página do Facebook (`pages_manage_posts` + `pages_manage_metadata`) | — |
 | `FACEBOOK_PAGE_ID` | ID numérico da Página do Facebook | — |
 | `TWITTER_API_KEY` / `TWITTER_API_SECRET` | Chaves do App no X Developer Portal | — |
