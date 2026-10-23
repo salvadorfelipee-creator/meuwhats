@@ -6542,7 +6542,7 @@ const server = http.createServer(async (req, res) => {
             if (!emailCliente) return send(res, 400, { error: "Não temos um e-mail para enviar o acesso." }, corsHeaders);
             if (!atual) return send(res, 400, { error: "A simulação ainda não começou." }, corsHeaders);
             const comToken = await garantirTrackingToken(atual);
-            const link = `https://www.felizcred.com.br/?chat=acessar&t=${encodeURIComponent(comToken.tracking_token)}&utm_source=email&utm_medium=acesso`;
+            const link = `https://www.felizcred.com.br/minha-simulacao/?t=${encodeURIComponent(comToken.tracking_token)}&utm_source=email&utm_medium=acesso`;
             await enviarAcessoSimulacaoFelizcred({ nome: conversation.name, email: emailCliente, link });
             const [usuario, dominio] = emailCliente.split("@");
             return send(res, 200, { sent: true, email: `${usuario.slice(0, 2)}${"*".repeat(Math.max(usuario.length - 2, 1))}@${dominio}` }, corsHeaders);
