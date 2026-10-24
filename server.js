@@ -443,7 +443,7 @@ async function recebeuModeloRecente(phone, dias) {
   return false;
 }
 async function enviarRetomadasSiteWhatsapp() {
-  if (process.env.RETOMADA_SITE_WHATSAPP_ATIVA === "false") return;
+  if (process.env.RETOMADA_SITE_WHATSAPP_ATIVA !== "true") return; // desligado por decisão do dono (24/10/2026): retomada só por e-mail
   const agoraBr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false, weekday: "short" }).formatToParts(new Date());
   const hora = Number(agoraBr.find((p) => p.type === "hour").value) % 24;
   const diaSemana = agoraBr.find((p) => p.type === "weekday").value;
@@ -482,7 +482,7 @@ setInterval(() => { enviarRetomadasSiteWhatsapp().catch((err) => console.error("
 // não respondeu nada. Depende do modelo `felizcred_site_lembrete_v1` (botão de link) aprovado na Meta; até lá nada sai.
 const LEMBRETE_SITE_TEMPLATE = process.env.LEMBRETE_SITE_WHATSAPP_TEMPLATE || "felizcred_site_lembrete_v1";
 async function enviarLembreteSiteWhatsapp() {
-  if (process.env.RETOMADA_SITE_WHATSAPP_ATIVA === "false") return;
+  if (process.env.RETOMADA_SITE_WHATSAPP_ATIVA !== "true") return; // desligado por decisão do dono (24/10/2026): retomada só por e-mail
   const agoraBr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false, weekday: "short" }).formatToParts(new Date());
   const hora = Number(agoraBr.find((p) => p.type === "hour").value) % 24;
   if (hora < 9 || hora >= 20 || agoraBr.find((p) => p.type === "weekday").value === "Sun") return;
