@@ -133,6 +133,25 @@ label.rot { display: block; margin: 20px 0 0; font-size: 13px; font-weight: 700;
 .aba[aria-current="page"] { color: var(--verde); font-weight: 700; }
 .aba .cont { position: absolute; top: 0; right: 10px; display: grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--alerta); color: #fff; font-size: 10px; font-weight: 700; }
 svg { flex: none; }
+.suporte { display: flex; gap: 14px; align-items: center; margin: 18px 20px 0; padding: 16px 18px; border-radius: 18px; background: var(--navy); color: #fff; }
+.suporte .f { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--verde); font: 700 16px "Sora", sans-serif; }
+.suporte .t { flex: 1; min-width: 0; }
+.suporte .t b { display: block; font-size: 15px; }
+.suporte .t small { display: block; margin-top: 2px; font-size: 13px; line-height: 1.4; color: #b8c7d6; }
+.suporte .btn-claro { flex: none; min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px; background: #fff; color: var(--navy); font-size: 14px; font-weight: 700; }
+.suporte.fora { flex-direction: column; align-items: stretch; gap: 10px; background: #f3dfe0; color: #5e2a31; border: 1px solid #e2bcc0; }
+.suporte.fora .cab { display: flex; align-items: center; gap: 12px; }
+.suporte.fora .cab b { font-size: 15px; }
+.suporte.fora p { margin: 0; font-size: 13px; line-height: 1.5; color: #7d4a50; }
+.suporte.fora .btn-claro { width: 100%; }
+.suporte.fora .f { background: #b4636b; }
+.suporte.fora .btn-claro { background: #fff; color: #7a2f38; border: 1px solid #e2bcc0; }
+.aviso-fora { margin: 0; padding: 12px 16px; background: #f3dfe0; color: #6e343b; font-size: 13px; line-height: 1.45; }
+@keyframes respira { 0%, 100% { box-shadow: 0 0 0 0 rgba(8, 122, 71, 0); } 50% { box-shadow: 0 0 0 7px rgba(8, 122, 71, .13); } }
+.opcao.pulsa { animation: respira 2.6s ease-in-out infinite; align-items: flex-start; }
+.opcao.pulsa .selo { display: inline-block; margin-bottom: 6px; padding: 3px 9px; border-radius: 999px; background: #e8f3ec; color: #4c7a62; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+.opcao.pulsa .ico { margin-top: 4px; }
+@media (prefers-reduced-motion: reduce) { .opcao.pulsa { animation: none; } }
 .rodape-nota { margin: 16px 20px 0; padding: 14px 16px; border-radius: 14px; background: var(--navy); color: #fff; font-size: 13px; line-height: 1.5; }
 .centro { text-align: center; }
 .erro-tela { display: grid; place-items: center; gap: 14px; min-height: 100dvh; padding: 32px 24px; text-align: center; }

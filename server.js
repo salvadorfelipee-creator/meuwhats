@@ -285,6 +285,10 @@ function comissaoOfertaFacta(o) {
 // Regra de apresentação: sempre a tabela de maior comissão em cada prazo. Duas opções: o MAIOR prazo e o de 24 meses
 // (se não houver 24, o menor prazo disponível). Só um prazo disponível = só uma opção.
 function selecionarOfertasFacta(offers) {
+  // Regra do dono: nenhuma oferta com seguro, a não ser que não exista outra. As que sobrarem aparecem mesmo com comissão
+  // menor (ou fora da lista de comissões).
+  const semSeguro = offers.filter((o) => !(Number(o.valor_seguro) > 0));
+  if (semSeguro.length) offers = semSeguro;
   const valor = (o) => Number(o.valor_liquido || o.contrato || 0);
   const melhorDoPrazo = (prazo) => offers
     .filter((o) => Number(o.prazo) === prazo)

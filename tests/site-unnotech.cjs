@@ -28,6 +28,12 @@ assert.deepStrictEqual(comissao.map((o) => o.offer_id), ["b36", "b24"], "maior c
 assert.strictEqual(require("../site-unnotech").comissaoOferta(tab("x", 36, 1, "BÚZIOS - SEM SEGURO", false)), 3.6, "sem seguro 25-36x = 3,6%");
 assert.strictEqual(require("../site-unnotech").comissaoOferta(tab("x", 50, 1, "OUTRA TABELA", false)), 0, "fora da lista = 0");
 
+// ── nenhuma oferta com seguro, a não ser que não haja outra ─────────────────
+const seg = (id, prazo, liquido, nome, comSeguro) => ({ ...oferta(id, prazo, liquido), table_name: nome, insurance_included: comSeguro, insurance_amount: comSeguro ? 50 : 0 });
+const preferida = selecionarOfertas([seg("s60", 60, 2000, "BÚZIOS - COM SEGURO", true), seg("n36", 36, 1500, "BÚZIOS - SEM SEGURO", false), seg("n24", 24, 1100, "JURERÊ - SEM SEGURO", false)]);
+assert.deepStrictEqual(preferida.map((o) => o.offer_id), ["n36", "n24"], "com seguro só entra se não houver nenhuma sem seguro");
+assert.deepStrictEqual(selecionarOfertas([seg("s60", 60, 2000, "BÚZIOS - COM SEGURO", true), seg("s24", 24, 1000, "BÚZIOS - COM SEGURO", true)]).map((o) => o.offer_id), ["s60", "s24"], "sem alternativa, mostra as com seguro");
+
 // ── fluxo ponta a ponta com Unnotech simulada ────────────────────────────────
 let linha = { conversation_id: "c1", provider: "facta", cpf: "12345678909", phone: "47999990000", etapa: "sem_oferta", facta_worker_json: JSON.stringify({ nome: "Maria", dataNascimento: "01/02/1990" }) };
 const mensagens = [];

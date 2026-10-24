@@ -12,6 +12,16 @@
   const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const inputDate = (v) => { const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(v || "")); return m ? `${m[3]}-${m[2]}-${m[1]}` : String(v || ""); };
   const hora = (t) => new Date(Number(t)).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  // Atendimento: seg a sex 9h-18h, sáb 9h-12h (Brasília). Fora disso o cliente é convidado a nos chamar a partir das 9h
+  // (conversa iniciada por ele não gera custo de mensagem para nós).
+  function emExpediente() {
+    const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+    const dia = agora.getDay(), h = agora.getHours() + agora.getMinutes() / 60;
+    if (dia >= 1 && dia <= 5) return h >= 9 && h < 18;
+    if (dia === 6) return h >= 9 && h < 12;
+    return false;
+  }
+  const TEXTO_FORA_HORARIO = "Atendemos de segunda a sexta, das 9h às 18h, e aos sábados, das 9h às 12h. Escreva para nós a partir das 9h e respondemos em seguida. Se preferir, deixe sua mensagem agora.";
   const primeiroNome = () => String(state.session?.name || "").trim().split(/\s+/)[0] || "";
 
   const ICONE = {
@@ -133,8 +143,6 @@
       <p class="rotulo">Não chegou?</p>
       <div class="lista-opcoes">
         <button class="opcao" type="button" data-acao="reenviar"><span><b>Reenviar o link</b></span><span class="seta">${ICONE.seta}</span></button>
-        <button class="opcao" type="button" data-acao="outro-numero"><span><b>Usar outro número de celular</b></span><span class="seta">${ICONE.seta}</span></button>
-        ${state.outroNumero ? `<form class="form" style="margin:0" data-form="outro-numero"><label>Celular com DDD<input name="phone" inputmode="tel" autocomplete="tel" placeholder="(47) 99999-9999" required></label><button class="btn primario">Enviar a autorização para esse número</button></form>` : ""}
         <button class="opcao" type="button" data-acao="conversa"><span><b>Falar com o Felipe</b></span><span class="seta">${ICONE.seta}</span></button>
       </div>
       <div class="aviso-navy"><span class="f">F</span><span>Pode sair do painel: quando as condições chegarem, avisamos você.</span></div>`;
@@ -231,6 +239,11 @@
     return `${topo()}<div class="cabeca"><h1>Seus dados</h1><p class="sub">Para gerar a proposta, a Facta precisa de mais alguns dados. Você revê tudo antes de assinar.</p></div>${erroBox()}<div style="margin-top:14px">${formDados(c.customerDefaults || {}, c.selectedOffer || {})}</div>`;
   }
 
+  // Cartão de suporte: azul-escuro quando estamos atendendo; vermelho apagado fora do horário (sem pressa, só informa).
+  function suporteCartao(titulo) {
+    if (emExpediente()) return `<div class="suporte"><span class="f">F</span><div class="t"><b>${titulo}</b><small>O Felipe responde aqui mesmo.</small></div><button class="btn-claro" type="button" data-acao="conversa">Conversar</button></div>`;
+    return `<div class="suporte fora"><div class="cab"><span class="f">F</span><b>Fora do horário de atendimento</b></div><p>${TEXTO_FORA_HORARIO}</p><button class="btn-claro" type="button" data-acao="conversa">Deixar mensagem</button></div>`;
+  }
   function viewProposta() {
     const c = state.clt;
     const oferta = c.selectedOffer || {};
@@ -251,8 +264,7 @@
         ${oferta.disbursedAmount ? `<div style="margin-top:16px;padding-top:16px;border-top:1px solid #e4ece7"><p class="peq" style="margin:0">Você recebe</p><p class="valor">${money(oferta.disbursedAmount)}</p><p class="prazo">${oferta.installments} parcelas de <b>${money(oferta.installmentValue)}</b></p></div>` : ""}
         ${etapa === "aguardando_assinatura_facta" && c.contractLink ? `<a class="btn primario grande" style="margin-top:20px" href="${esc(c.contractLink)}" target="_blank" rel="noopener">Revisar e assinar</a><p class="centro" style="margin:12px 0 0;font-size:12px;color:#5a6b7b">A assinatura acontece no ambiente seguro do banco.</p>` : ""}</div>
       <p class="rotulo">Próximos passos</p><div class="andamento" style="gap:0">${timeline}</div>
-      <div class="aviso-navy"><span class="f">F</span><span><b>Dúvida sobre o contrato?</b> O Felipe responde aqui mesmo.</span></div>
-      <div style="margin:12px 20px 0"><button class="btn contorno" type="button" data-acao="conversa">Conversar com o Felipe</button></div>`;
+      ${suporteCartao("Dúvida sobre o contrato?")}`;
   }
 
   function viewSemCondicoes() {
@@ -260,7 +272,7 @@
     const titulos = { sem_margem: "Sem margem disponível agora", nao_elegivel: "O vínculo não está elegível agora", sem_oferta: "A Facta não encontrou uma condição", politica_reprovada: "A condição não passou pela política", erro_consulta: "Não conseguimos consultar agora", erro_autorizacao: "A autorização não foi enviada", erro_integracao: "A Facta não respondeu agora", proposta_cancelada: "Seu contrato não foi finalizado" };
     const rotuloChip = c.etapa === "proposta_cancelada" ? "Contrato não finalizado" : "Sem condições agora";
     const motivo = c.error || "A Facta não detalhou o motivo.";
-    const podeOutroCelular = c.etapa === "erro_autorizacao" || /telefone/i.test(String(c.error || ""));
+    const podeOutroCelular = c.provider !== "unnotech" && /telefone.*(outro|cpf)|j[aá] informado/i.test(String(c.error || ""));
     return `${topo()}<div class="cabeca"><h1>Não deu desta vez${primeiroNome() ? ", " + esc(primeiroNome()) : ""}</h1><p class="sub">${esc(titulos[c.etapa] || "A Facta não liberou condições agora")}. Isso é comum e não significa que você não possa ter crédito: a gente continua tentando por você.</p></div>
       ${c.provider === "unnotech" && c.previous ? `<div class="cartao" style="margin-top:18px;padding:14px 18px"><div style="display:flex;align-items:center;justify-content:space-between"><b style="font:700 16px Sora,sans-serif">Facta</b><span class="chip aviso">Sem condições agora</span></div></div>` : ""}
       <div class="cartao" style="margin-top:${c.provider === "unnotech" && c.previous ? 12 : 18}px"><div style="display:flex;align-items:center;justify-content:space-between"><b style="font:700 16px Sora,sans-serif">${c.provider === "unnotech" ? "Bancos parceiros" : "Facta"}</b><span class="chip aviso">${rotuloChip}</span></div><p style="margin:10px 0 0;font-size:14px;line-height:1.5;color:#4b5d6e">Motivo informado: <b style="color:#10243b">${esc(motivo)}</b></p></div>
@@ -268,10 +280,10 @@
       ${avisoBox()}${erroBox()}
       <p class="rotulo">O que você pode fazer agora</p>
       <div class="lista-opcoes">
-        <button class="opcao forte" type="button" data-acao="conversa"><span class="ico verde">F</span><span><b>Falar com o Felipe</b><small>Ele confere seu caso e te responde aqui.</small></span><span class="seta">${ICONE.seta}</span></button>
+        ${c.provider !== "unnotech" && c.etapa !== "proposta_cancelada" ? `<button class="opcao forte pulsa" type="button" data-acao="outros-bancos"${state.carregando === "outros" ? " disabled" : ""}><span class="ico verde">+</span><span><span class="selo">Maior chance de aprovação</span><b>${state.carregando === "outros" ? "Consultando outros bancos…" : "Tentar com outros bancos"}</b><small>Outros bancos analisam de forma diferente. Usamos seus dados salvos, sem refazer o cadastro.</small></span><span class="seta">${ICONE.seta}</span></button>` : ""}
+        <button class="opcao" type="button" data-acao="conversa"><span class="ico verde">F</span><span><b>Falar com o Felipe</b><small>Ele confere seu caso e te responde aqui.</small></span><span class="seta">${ICONE.seta}</span></button>
         ${podeOutroCelular ? `<button class="opcao" type="button" data-acao="outro-numero"><span class="ico">${ICONE.user}</span><span><b>Tentar com outro celular</b><small>Útil quando o número já está ligado a outro CPF.</small></span><span class="seta">${ICONE.seta}</span></button>` : ""}
         ${state.outroNumero ? `<form class="form" style="margin:0" data-form="outro-numero"><label>Celular com DDD<input name="phone" inputmode="tel" autocomplete="tel" placeholder="(47) 99999-9999" required></label><button class="btn primario">Enviar a autorização para esse número</button></form>` : ""}
-        ${c.provider !== "unnotech" && c.etapa !== "proposta_cancelada" ? `<button class="opcao forte" type="button" data-acao="outros-bancos"${state.carregando === "outros" ? " disabled" : ""}><span class="ico verde">+</span><span><b>${state.carregando === "outros" ? "Consultando outros bancos…" : "Tentar com outros bancos"}</b><small>Usamos seus dados salvos, sem refazer o cadastro.</small></span><span class="seta">${ICONE.seta}</span></button>` : ""}
         <button class="opcao" type="button" data-acao="avisar"><span class="ico">${ICONE.chat}</span><span><b>Me avisar quando puder</b><small>Mandamos um aviso quando houver novidade.</small></span><span class="seta">${ICONE.seta}</span></button>
       </div>
       <p class="rodape-nota">Seus dados continuam salvos e protegidos. Você pode pedir a exclusão deles quando quiser, na aba Conta.</p>`;
@@ -298,7 +310,8 @@
   }
 
   function viewConversa() {
-    return `<div class="conversa"><div class="conversa-topo"><span class="f">F<i></i></span><div><b>Felipe</b><small>FelizCred · responde em minutos</small></div></div>
+    return `<div class="conversa"><div class="conversa-topo"><span class="f">F<i></i></span><div><b>Felipe</b><small>FelizCred · ${emExpediente() ? "responde em minutos" : "fora do horário de atendimento"}</small></div></div>
+      ${emExpediente() ? "" : `<p class="aviso-fora">${TEXTO_FORA_HORARIO}</p>`}
       <div class="mensagens" id="mensagens"></div>
       <form class="compor" data-form="mensagem"><input name="texto" type="text" aria-label="Escreva uma mensagem" placeholder="Escreva uma mensagem" autocomplete="off"><button type="submit" aria-label="Enviar">${ICONE.envia}</button></form></div>`;
   }

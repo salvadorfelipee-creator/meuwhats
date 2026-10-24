@@ -65,8 +65,15 @@ function comissaoOferta(o) {
 
 // Mesma regra de apresentação da Facta: em cada prazo vale a tabela de MAIOR COMISSÃO (empate = mais dinheiro na mão);
 // mostra o maior prazo e o de 24x (sem 24x, o menor prazo); um prazo só = uma opção.
+function comSeguro(o) {
+  return o.insurance_included === true || Number(o.insurance_amount) > 0;
+}
+
 function selecionarOfertas(offers) {
-  const validas = ofertasValidas(offers);
+  let validas = ofertasValidas(offers);
+  // Regra do dono: nenhuma oferta com seguro, a não ser que não exista outra. O que sobrar aparece mesmo com comissão menor.
+  const semSeguro = validas.filter((o) => !comSeguro(o));
+  if (semSeguro.length) validas = semSeguro;
   const melhor = (prazo) => validas
     .filter((o) => Number(o.installment_count) === prazo)
     .sort((a, b) => comissaoOferta(b) - comissaoOferta(a) || Number(b.net_amount) - Number(a.net_amount) || Number(a.installment_amount) - Number(b.installment_amount))[0];
