@@ -5386,7 +5386,10 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
     return true;
   }
   // Resposta à mensagem "mudou de ideia ou ficou com dúvida?" (quem parou a simulação no site): 3 botões.
-  if (["", "menu_inicial"].includes(estadoAtual) && (await db.recebeuTemplate(de, businessNumberId, RETOMADA_SITE_TEMPLATE))) {
+  // Os 3 botões valem mesmo sem o registro do envio do modelo (envios de teste/manuais não ficam no histórico):
+  // antes, quem tocava em "Quero continuar" nessas condições ficava sem nenhuma resposta.
+  const botaoRetomada = tipo !== "text" && /^(quero continuar|tenho uma d.vida|n.o quero mais)$/.test(normalizar(texto));
+  if (["", "menu_inicial"].includes(estadoAtual) && (botaoRetomada || (await db.recebeuTemplate(de, businessNumberId, RETOMADA_SITE_TEMPLATE)))) {
     await db.insertMessage({ ...base, type: tipo === "text" ? "text" : "button", body: texto });
     const resposta = normalizar(texto);
     // Aceita também o texto com acento corrompido do modelo antigo ("N?o quero mais").
