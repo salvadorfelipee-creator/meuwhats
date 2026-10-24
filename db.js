@@ -3389,6 +3389,43 @@ async function marcarBrevoContatoSync(phone, businessNumberId) {
 // Mesmo telefone, canal(is) DIFERENTE(S) — pra um atendente notar (sem precisar adivinhar) que
 // esse contato também tem conversa aberta em outro número/canal, e poder saltar pra lá.
 // Puramente informativo (não mescla nada) — devolve só o essencial pra montar o link.
+// O site guarda o celular sem o 55 (11926119697) e o WhatsApp com (5511926119697): gera as formas possíveis para ligar os dois.
+function variantesTelefoneBR(telefone) {
+  const d = String(telefone || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  if (d.length < 10) return [];
+  const formas = new Set([d, `55${d}`]);
+  if (d.length === 10) { const com9 = `${d.slice(0, 2)}9${d.slice(2)}`; formas.add(com9); formas.add(`55${com9}`); }
+  if (d.length === 11 && d[2] === "9") { const sem9 = `${d.slice(0, 2)}${d.slice(3)}`; formas.add(sem9); formas.add(`55${sem9}`); }
+  return [...formas];
+}
+
+// Conversas do chat do site cujo celular (do cadastro ou da consulta CLT) é este telefone.
+async function siteChatPorTelefone(telefone) {
+  await ready;
+  const formas = variantesTelefoneBR(telefone);
+  if (!formas.length) return [];
+  const marcas = formas.map(() => "?").join(",");
+  const r = await client.execute({
+    sql: `SELECT id, name, updated_at FROM site_chat_conversations
+          WHERE contact IN (${marcas}) OR id IN (SELECT conversation_id FROM site_chat_clt WHERE phone IN (${marcas}))
+          ORDER BY updated_at DESC LIMIT 5`,
+    args: [...formas, ...formas],
+  });
+  return r.rows.map((x) => ({ ...x }));
+}
+
+// Conversas de WhatsApp/Instagram desse celular em qualquer número.
+async function conversasPorTelefoneTodosCanais(telefone) {
+  await ready;
+  const formas = variantesTelefoneBR(telefone);
+  if (!formas.length) return [];
+  const r = await client.execute({
+    sql: `SELECT business_number_id, phone, name, last_message_at FROM conversations WHERE phone IN (${formas.map(() => "?").join(",")}) ORDER BY last_message_at DESC`,
+    args: formas,
+  });
+  return r.rows.map((x) => ({ ...x }));
+}
+
 async function conversasDoTelefoneEmOutrosCanais(phone, excluirBusinessNumberId) {
   await ready;
   const result = await client.execute({
@@ -4283,6 +4320,8 @@ module.exports = {
   googleContactResourceNamePorTelefone,
   marcarBrevoContatoSync,
   conversasDoTelefoneEmOutrosCanais,
+  siteChatPorTelefone,
+  conversasPorTelefoneTodosCanais,
   importarContato,
   listMidiasDaConversa,
   conversasEtapaParada,

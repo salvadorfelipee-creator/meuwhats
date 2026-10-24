@@ -334,7 +334,7 @@ export type GoogleContato = { resourceName: string; nome: string | null; telefon
 export type RespostaPronta = { id: number; atalho: string; texto: string; uso_count?: number }
 
 // Mesmo telefone, conversa em outro canal — ver ContactDetails em chats.tsx, só informativo.
-export type OutroCanal = { business_number_id: string; name: string | null; last_message_at: number | null }
+export type OutroCanal = { business_number_id: string; phone?: string; name: string | null; last_message_at: number | null }
 
 export type RetornoComContato = Retorno & {
   name: string | null
@@ -707,6 +707,8 @@ export const api = {
     request<Pick<Message, "id" | "type" | "media_path" | "media_mime" | "created_at">[]>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/midias`,
     ),
+
+  siteChatWhatsapp: (id: string) => request<{ business_number_id: string; phone: string; name: string | null; last_message_at: number | null }[]>(`/painel/api/site-chat/${encodeURIComponent(id)}/whatsapp`),
 
   outrosCanais: (businessId: string, phone: string) =>
     request<OutroCanal[]>(

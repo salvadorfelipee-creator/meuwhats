@@ -30,9 +30,15 @@ function arquivoParaBase64(file: File) {
 // conversa e os detalhes, sem a lista do site, que já está na lista única ao lado.
 export function SiteChatPage({ embedded = false, soConversaId = null }: { embedded?: boolean; soConversaId?: string | null }) {
   const { channels, current, setCurrent } = useChannel()
-  const { notifPermission, requestNotifPermission, unreadConversations, markConversationSeen, setActiveConversation, alvoAbrir, limparAlvoAbrir } = useUnread()
+  const { notifPermission, requestNotifPermission, unreadConversations, markConversationSeen, setActiveConversation, alvoAbrir, limparAlvoAbrir, abrirConversa } = useUnread()
   const [conversas, setConversas] = React.useState<SiteChatConversation[]>([])
   const [selecionada, setSelecionada] = React.useState<SiteChatConversation | null>(null)
+  const [doWhatsapp, setDoWhatsapp] = React.useState<{ business_number_id: string; phone: string; name: string | null }[]>([])
+  React.useEffect(() => {
+    setDoWhatsapp([])
+    if (!selecionada?.id) return
+    api.siteChatWhatsapp(selecionada.id).then(setDoWhatsapp).catch(() => {})
+  }, [selecionada?.id])
   const [mensagens, setMensagens] = React.useState<SiteChatMessage[]>([])
   const [clt, setClt] = React.useState<SiteChatClt | null>(null)
   const [busca, setBusca] = React.useState("")
@@ -209,6 +215,7 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
               <div className="min-w-0"><p className="truncate text-sm font-semibold">{selecionada.name}</p><p className="text-xs text-muted-foreground">Chat do site</p></div>
             </div>
             <dl className="space-y-3 text-sm">
+              <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">WhatsApp do cliente</dt><dd className="flex flex-wrap gap-1.5">{doWhatsapp.length ? doWhatsapp.map((w) => (<button key={`${w.business_number_id}|${w.phone}`} className="inline-flex items-center gap-1 rounded-full border border-emerald-600/40 px-2 py-0.5 text-xs text-emerald-700 hover:bg-emerald-50" onClick={() => abrirConversa(w.business_number_id, w.phone)}><MessageCircle className="h-3 w-3" />{(w.name || w.phone) + " · abrir conversa"}</button>)) : <span className="text-xs text-muted-foreground">Ainda não chamou pelo WhatsApp</span>}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Celular</dt><dd>{selecionada.contact ? <a className="text-emerald-700 underline underline-offset-2" href={`https://wa.me/55${selecionada.contact.replace(/\D/g, "").replace(/^55/, "")}`} target="_blank" rel="noreferrer">{selecionada.contact}</a> : "—"}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">E-mail</dt><dd className="break-all">{selecionada.email || "—"}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Produto de interesse</dt><dd>{selecionada.produto_tag || "—"}</dd></div>

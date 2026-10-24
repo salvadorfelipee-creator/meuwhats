@@ -2726,6 +2726,7 @@ function ContactDetails({
   onUsarTexto: (texto: string) => void
 }) {
   const { current, channels, setCurrent } = useChannel()
+  const { abrirConversa } = useUnread()
   const estagios = pipelineEstagiosPara(current?.label)
 
   const [nota, setNota] = React.useState(conversation.nota || "")
@@ -2927,6 +2928,7 @@ function ContactDetails({
 
   function nomeDoCanal(businessNumberId: string) {
     if (businessNumberId === "instagram") return "Instagram"
+    if (businessNumberId === "site") return "Chat do site"
     return channels.find((c) => c.id === businessNumberId)?.label || businessNumberId
   }
 
@@ -3044,6 +3046,8 @@ function ContactDetails({
               className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-dashed text-muted-foreground hover:bg-accent"
               title="Também conversou por esse canal"
               onClick={() => {
+                // Chat do site e WhatsApp do mesmo celular abrem direto na conversa certa (visão "Todos os canais").
+                if (c.phone) { abrirConversa(c.business_number_id, c.phone); return }
                 const canal = channels.find((ch) => ch.id === c.business_number_id)
                 if (canal) setCurrent(canal)
               }}

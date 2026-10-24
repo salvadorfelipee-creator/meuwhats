@@ -7484,7 +7484,24 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       const businessId = decodeURIComponent(matchOutrosCanais[1]);
       const phone = decodeURIComponent(matchOutrosCanais[2]);
-      return send(res, 200, await db.conversasDoTelefoneEmOutrosCanais(phone, businessId));
+      const outros = await db.conversasDoTelefoneEmOutrosCanais(phone, businessId);
+      // Também o chat do site do mesmo celular (o painel do cliente): "site" abre a conversa do site, `phone` leva o id dela.
+      const doSite = (await db.siteChatPorTelefone(phone)).map((c) => ({ business_number_id: "site", phone: c.id, name: c.name, last_message_at: Number(c.updated_at) || null }));
+      return send(res, 200, [...outros, ...doSite]);
+    }
+
+    // GET /painel/api/site-chat/:id/whatsapp — as conversas de WhatsApp (e Instagram) do mesmo celular do chat do site.
+    const matchSiteWhats = path_.match(/^\/painel\/api\/site-chat\/([^/]+)\/whatsapp$/);
+    if (req.method === "GET" && matchSiteWhats) {
+      if (!requireAuth(req, res)) return;
+      const conversaSite = await db.siteChatObter(decodeURIComponent(matchSiteWhats[1]));
+      if (!conversaSite) return send(res, 404, { error: "Conversa não encontrada" });
+      const cltSite = await db.siteChatCltObter(conversaSite.id);
+      const achadas = new Map();
+      for (const tel of [conversaSite.contact, cltSite?.phone]) {
+        for (const c of await db.conversasPorTelefoneTodosCanais(tel)) achadas.set(`${c.business_number_id}|${c.phone}`, c);
+      }
+      return send(res, 200, [...achadas.values()]);
     }
 
     // PATCH /painel/api/conversations/:businessId/:phone/nome — renomear manualmente. Fallback
