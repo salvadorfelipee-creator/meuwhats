@@ -109,8 +109,11 @@ function siteChatCltPublicoUnnotech(row) {
     checkedAt: row.authorization_checked_at || null,
     maxInstallment: Number(row.margem_disponivel || 0),
     employer: blob.employer_name || null,
-    offers: siteUnno.selecionarOfertas(unnoSite.lerOfertas(row)).map(siteUnno.ofertaPublica),
-    selectedOffer: escolhida ? { installments: Number(escolhida.installment_count || 0), installmentValue: Number(escolhida.installment_amount || 0), disbursedAmount: Number(escolhida.net_amount || 0) } : null,
+    produto: unnoSite.ehFgts(row) ? "FGTS" : "CLT",
+    offers: unnoSite.ehFgts(row) ? unnoSite.lerOfertas(row).map(siteUnno.ofertaPublicaFgts) : siteUnno.selecionarOfertas(unnoSite.lerOfertas(row)).map(siteUnno.ofertaPublica),
+    selectedOffer: escolhida ? (unnoSite.ehFgts(row)
+      ? { installments: (escolhida.installments || []).length, installmentValue: Number(escolhida.installments?.[0]?.amount || 0), disbursedAmount: Number(escolhida.net_amount || 0) }
+      : { installments: Number(escolhida.installment_count || 0), installmentValue: Number(escolhida.installment_amount || 0), disbursedAmount: Number(escolhida.net_amount || 0) }) : null,
     customerDefaults: { nome: "", celular: row.phone || "" },
     contractLink: row.contract_link || null,
     proposalCode: row.codigo_proposta ? String(row.codigo_proposta).slice(0, 8).toUpperCase() : null,
@@ -708,8 +711,8 @@ const INSTAGRAM_OPCOES_MENU = [
     produto: "Saque do FGTS",
     chaves: ["3", "fgts", "saque"],
     resposta:
-      "Para fazer a simulação do saque do FGTS, é necessário autorizar a *J17* lá no aplicativo " +
-      "do FGTS (Meu FGTS > Autorizações). Depois de autorizar, é só me informar o seu CPF que a gente já " +
+      "Para fazer a simulação do saque do FGTS, é necessário autorizar os 3 bancos *J17*, *BMP Sociedade de Crédito Direto* e *BMP Sociedade de Crédito ao Microempreendedor* lá no aplicativo " +
+      "do FGTS (Meu FGTS > Autorizações; vale 90 dias). Depois de autorizar, é só me informar o seu CPF que a gente já " +
       "parte pro atendimento. 😊",
     aguardaDados: "saque_fgts",
   },
@@ -1612,8 +1615,8 @@ const BOTOES_JA_SACOU = [
   { id: "fgts_sacou_nao_lembro", title: "Não lembro" },
 ];
 const TEXTO_AUTORIZAR_J17 =
-  "Para fazer a simulação do saque do FGTS, é necessário autorizar a *J17* lá no aplicativo do FGTS " +
-  "(Meu FGTS > Autorizações). Depois de autorizar, é só me mandar o seu CPF que a gente já parte " +
+  "Para fazer a simulação do saque do FGTS, é necessário autorizar os 3 bancos *J17*, *BMP Sociedade de Crédito Direto* e *BMP Sociedade de Crédito ao Microempreendedor* lá no aplicativo do FGTS " +
+  "(Meu FGTS > Autorizações; a autorização vale 90 dias). Depois de autorizar, é só me mandar o seu CPF que a gente já parte " +
   "pro atendimento. 😊";
 
 async function iniciarFluxoFgtsMenu(de, businessNumberId) {
@@ -1748,7 +1751,7 @@ const LEMBRETE_TEXTOS = {
     "Foto do documento do veículo, endereço completo, profissão e renda, foto do seu documento e e-mail.",
   fgts_cpf:
     "Olá! Só lembrando que pra eu simular o saque do FGTS, preciso do seu CPF 😊 (depois de você já ter " +
-    "autorizado a J17 lá no aplicativo do FGTS).",
+    "autorizado os 3 bancos — J17 e os dois BMP — lá no aplicativo do FGTS).",
   cltorig_cpf: "Olá! Só lembrando que pra eu simular seu consignado CLT, preciso do seu CPF 😊",
   cltorig_email: "Olá! Só lembrando que pra eu abrir sua solicitação de consignado CLT, preciso do seu e-mail 😊",
   campanha_clt_dados: [
@@ -2038,8 +2041,8 @@ async function handlerCapturaDadosFinanciamento(de, businessNumberId, corpo) {
 
 const FGTSORIG_TEXTO_SEM_OFERTA = {
   autorizacao:
-    "Não encontrei oferta disponível agora — provavelmente falta autorizar a J17 no app Meu " +
-    "FGTS (Autorizações). Autoriza lá e manda 'menu' que eu tento de novo.",
+    "Não encontrei oferta disponível agora — provavelmente falta autorizar os 3 bancos (J17 e os dois BMP) no app " +
+    "Meu FGTS (Autorizações). Autoriza lá e manda 'menu' que eu tento de novo.",
   sem_saldo:
     "Pelo que vi, você já usou o saque-aniversário nos últimos 12 meses — a regra só permite " +
     "1 vez nesse período. Pode tentar de novo depois desse prazo.",
@@ -4889,7 +4892,7 @@ const REGEX_FGTS_ANUNCIO = /fgts/i;
 
 const FGTSAD_TEXTO_APRESENTACAO =
   "Olá, me chamo Felipe e vou dar continuidade no seu atendimento! Para simular o saque do seu " +
-  "FGTS, você precisa autorizar a *J17* no app do FGTS (Meu FGTS > Autorizações).";
+  "FGTS, você precisa autorizar os 3 bancos *J17*, *BMP Sociedade de Crédito Direto* e *BMP Sociedade de Crédito ao Microempreendedor* no app do FGTS (Meu FGTS > Autorizações).";
 
 const FGTSAD_TEXTO_PEDIR_CPF = "Certo! Agora me informa o CPF pra eu poder simular.";
 
@@ -6407,7 +6410,7 @@ const server = http.createServer(async (req, res) => {
         await db.siteChatMarcarEmailConfirmado(conversation.id);
         const clt = await garantirTrackingToken(await sincronizarSiteChatClt(cltAcesso));
         return send(res, 200, {
-          conversation: { id: conversation.id, name: conversation.name, contact: conversation.contact, email: conversation.email, status: conversation.status },
+          conversation: { id: conversation.id, name: conversation.name, contact: conversation.contact, email: conversation.email, status: conversation.status, product: conversation.produto_tag || null },
           token,
           messages: await db.siteChatMensagens(conversation.id),
           clt: siteChatCltPublico(clt),
@@ -6487,7 +6490,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
-      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|access-email|other-banks|personal-data|assistant)$/i);
+      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|access-email|other-banks|fgts-start|fgts-requote|personal-data|assistant)$/i);
       if (cltMatch) {
         const id = cltMatch[1];
         const action = cltMatch[2].toLowerCase();
@@ -6514,6 +6517,22 @@ const server = http.createServer(async (req, res) => {
             const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses" });
             if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
             return send(res, 200, { resposta }, corsHeaders);
+          }
+          if (action === "fgts-start") {
+            // Antecipação do FGTS pelo painel: só o CPF. A autorização dos bancos o cliente faz no aplicativo do FGTS.
+            const existente = await db.siteChatCltObter(id);
+            if (existente && !(existente.provider === "unnotech" && unnoSite.ehFgts(existente) && ["sem_oferta", "erro_consulta", "proposta_cancelada"].includes(existente.etapa))) return send(res, 409, { error: "A simulação já foi iniciada." }, corsHeaders);
+            const cpfFgts = String(body.cpf || "").replace(/\D/g, "");
+            if (!unnotech.cpfValido(cpfFgts)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
+            if (!unnoSite.configurado()) return send(res, 503, { error: "A consulta do FGTS está indisponível agora. Fale com o Felipe." }, corsHeaders);
+            const telefoneFgts = String(conversation.contact || "").replace(/\D/g, "");
+            let linhaFgts = await db.siteChatFactaCriar(id, { cpf: cpfFgts, phone: telefoneFgts, etapa: "fgts_cotando", status: "QUOTING", trackingToken: existente?.tracking_token || crypto.randomBytes(32).toString("base64url") });
+            const aberta = await unnoSite.iniciarFgts(linhaFgts, conversation);
+            if (!aberta) return send(res, 502, { error: "Não conseguimos abrir a consulta do FGTS agora. Tente de novo em instantes." }, corsHeaders);
+            await db.siteChatDefinirProduto(id, "FGTS");
+            await db.siteChatDefinirPipeline(id, "qualificacao");
+            await db.siteChatFunilEvento(id, "dados_minimos_enviados", "fgts_cotando", "unnotech");
+            return send(res, 200, { clt: siteChatCltPublico(aberta) }, corsHeaders);
           }
           if (action === "start") {
             if (await db.siteChatCltObter(id)) return send(res, 409, { error: "A simulação já foi iniciada." }, corsHeaders);
@@ -6632,6 +6651,13 @@ const server = http.createServer(async (req, res) => {
             if (!novasOfertas.length) return send(res, 400, { error: "Não encontramos condições para essa parcela. Tente outro valor." }, corsHeaders);
             const row = await db.siteChatCltAtualizar(id, { offers_json: JSON.stringify(novasOfertas), error_message: null });
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          if (action === "fgts-requote") {
+            try {
+              return send(res, 200, { clt: siteChatCltPublico(await unnoSite.requotarFgts(atual)) }, corsHeaders);
+            } catch (err) {
+              return send(res, 400, { error: String(err.message || "Não foi possível consultar de novo agora.").slice(0, 300) }, corsHeaders);
+            }
           }
           if (action === "other-banks") {
             // Botão "Tentar com outros bancos" (quando a Facta falhou por motivo que pode não se repetir nos outros).

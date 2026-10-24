@@ -15,7 +15,7 @@ const crypto = require("crypto");
 
 const PRAZO_AUTORIZACAO_MS = 72 * 3600_000;
 const PRAZO_ETAPA_MS = 45 * 60_000;
-const ETAPAS_EM_ANDAMENTO = ["autorizacao_enviada", "aguardando_autorizacao", "consultando_margem", "simulando"];
+const ETAPAS_EM_ANDAMENTO = ["autorizacao_enviada", "aguardando_autorizacao", "consultando_margem", "simulando", "fgts_cotando"];
 const ETAPAS_ACOMPANHAMENTO = ["aguardando_assinatura_facta", "proposta_em_analise"];
 
 function configurado() {
@@ -98,7 +98,30 @@ function ofertaPublica(o) {
   };
 }
 
+function ehFgts(row) {
+  return lerBlob(row).produto === "FGTS";
+}
+
+// FGTS: a oferta vem com installments[] (parcelas anuais) em vez de installment_count/installment_amount.
+function ofertaPublicaFgts(o) {
+  const parcelas = Array.isArray(o.installments) ? o.installments : [];
+  return {
+    id: String(o.offer_id),
+    tableName: o.table_name,
+    installments: parcelas.length,
+    installmentValue: Number(parcelas[0]?.amount || 0),
+    disbursedAmount: Number(o.net_amount || 0),
+    contractValue: Number(o.gross_amount || o.net_amount || 0),
+    rate: Number(o.monthly_interest_rate || 0),
+    insuranceValue: 0,
+  };
+}
+
 function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () => {} }) {
+  // Mesmas etapas, endpoints diferentes: CLT x FGTS.
+  const apiDe = (row) => (ehFgts(row)
+    ? { status: unnotech.consultarStatus, completa: unnotech.consultarSolicitacaoCompleta, kyc: unnotech.enviarKyc, payload: unnotech.montarPayloadKyc, aceitar: unnotech.aceitarOferta }
+    : { status: unnotech.consultarStatusClt, completa: unnotech.consultarSolicitacaoCompletaClt, kyc: unnotech.enviarKycClt, payload: unnotech.montarPayloadKycClt, aceitar: unnotech.aceitarOfertaClt });
   const falar = async (row, texto) => {
     try { await mensagemAtendente(row.conversation_id, texto); } catch (err) { console.error("Mensagem do assistente (Unnotech) não gravada:", err.message); }
   };
@@ -197,14 +220,15 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
   // Depois do aceite: acompanha até o pagamento. Recusa do banco tenta a próxima oferta do mesmo menu.
   async function acompanhar(row) {
     const blob = lerBlob(row);
-    const status = await unnotech.consultarStatusClt(row.transaction_id);
+    const api = apiDe(row);
+    const status = await api.status(row.transaction_id);
     if (status.status === "CONTRACT_REJECTED") {
       const tentativas = blob.tentativas || [];
       try { const escolhida = JSON.parse(row.facta_offer_json || "null"); if (escolhida && !tentativas.includes(escolhida.offer_id)) tentativas.push(escolhida.offer_id); } catch {}
-      const completa = await unnotech.consultarSolicitacaoCompletaClt(row.transaction_id);
+      const completa = await api.completa(row.transaction_id);
       const proxima = unnotech.escolherMelhorOferta(completa.offers, tentativas);
       if (!proxima) return encerrar(row, "proposta_cancelada", "Os bancos parceiros não aprovaram a contratação. Nossa equipe já recebeu a atualização.");
-      await unnotech.aceitarOfertaClt(row.transaction_id, proxima.offer_id, crypto.randomUUID());
+      await api.aceitar(row.transaction_id, proxima.offer_id, crypto.randomUUID());
       return atualizar(row, { facta_offer_json: JSON.stringify(proxima), facta_worker_json: JSON.stringify({ ...blob, tentativas }), codigo_proposta: null, contract_link: null, status_novosaque: status.status });
     }
     const campos = { status_novosaque: status.status };
@@ -237,7 +261,8 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     if (!emAndamento && !acompanhando) return row;
     if (row.authorization_checked_at && Date.now() - Number(row.authorization_checked_at) < 8_000) return row;
     await atualizar(row, { authorization_checked_at: Date.now() });
-    return emAndamento ? avancar(row) : acompanhar(row);
+    if (emAndamento) return ehFgts(row) ? avancarFgts(row) : avancar(row);
+    return acompanhar(row);
   }
 
   function escolherOferta(row, offerId) {
@@ -257,10 +282,16 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     let oferta;
     try { oferta = JSON.parse(row.facta_offer_json || "null"); } catch {}
     if (!oferta) throw new Error("Escolha uma condição antes de enviar seus dados.");
-    await unnotech.enviarKycClt(row.transaction_id, unnotech.montarPayloadKycClt(row.cpf, dados));
+    const api = apiDe(row);
+    await api.kyc(row.transaction_id, api.payload(row.cpf, dados));
     try {
-      await unnotech.aceitarOfertaClt(row.transaction_id, oferta.offer_id, crypto.randomUUID());
+      await api.aceitar(row.transaction_id, oferta.offer_id, crypto.randomUUID());
     } catch (err) {
+      if (ehFgts(row) && (err.codigo === "OFFER_EXPIRED" || /OFFER_EXPIRED/.test(err.message || ""))) {
+        await unnotech.requotar(row.transaction_id, crypto.randomUUID());
+        await atualizar(row, { etapa: "fgts_cotando", offers_json: "[]", facta_offer_json: null, authorization_requested_at: Date.now(), error_message: null });
+        throw new Error("As condições venceram. Estamos atualizando os valores; escolha de novo em instantes.");
+      }
       if (err.codigo === "OFFER_EXPIRED" || /OFFER_EXPIRED/.test(err.message || "")) {
         // O menu venceu: simula de novo no mesmo valor e volta para a escolha.
         const blob = lerBlob(row);
@@ -281,7 +312,67 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     return atualizar(row, { etapa: "simulando", offers_json: "[]", error_message: null });
   }
 
-  return { configurado, iniciar, sincronizar, escolherOferta, enviarDados, resimular, selecionarOfertas, ofertaPublica, lerBlob, lerOfertas };
+  // ── FGTS (antecipação do saque-aniversário) ───────────────────────────────────────────────────────────────
+  // Só o CPF abre a solicitação; o cliente autoriza os bancos NO APLICATIVO DO FGTS (não há link da Unnotech).
+  // Só a oferta da J17 interessa (regra do dono): outras são ignoradas.
+  async function iniciarFgts(row, conversa) {
+    if (!configurado() || !row?.cpf) return null;
+    let app;
+    try {
+      app = await unnotech.criarSolicitacao(row.cpf, crypto.randomUUID());
+    } catch (err) {
+      console.error(`Unnotech FGTS: não abriu a solicitação (${row.conversation_id}):`, err.message);
+      return null;
+    }
+    return atualizar(row, {
+      provider: "unnotech", transaction_id: app.application_id, etapa: "fgts_cotando", status_novosaque: app.status || "QUOTING",
+      facta_worker_json: JSON.stringify({ produto: "FGTS", tentativas: [] }), offers_json: "[]", facta_offer_json: null,
+      contract_link: null, codigo_proposta: null, terms_link: null, authorization_requested_at: Date.now(), authorization_checked_at: null, error_message: null,
+    });
+  }
+
+  async function avancarFgts(row) {
+    const blob = lerBlob(row);
+    const status = await unnotech.consultarStatus(row.transaction_id);
+    const desde = Number(row.authorization_requested_at || row.created_at || Date.now());
+    const ler = async () => unnotech.consultarSolicitacaoCompleta(row.transaction_id);
+    const motivo = (c) => c.quotes?.find((q) => q.source === "J17" && q.reason)?.reason || c.offers?.find((o) => o.source === "J17" && o.rejection_reason)?.rejection_reason?.message || c.quotes?.find((q) => q.reason)?.reason || "";
+    if (status.status === "OFFERS_AVAILABLE") {
+      const completa = await ler();
+      const oferta = (completa.offers || []).find((o) => o.source === "J17" && o.status === "AVAILABLE");
+      if (oferta) {
+        await db.siteChatFunilEvento(row.conversation_id, "oferta_disponivel", "ofertas_disponiveis", "unnotech").catch(() => {});
+        await falar(row, "Sua consulta do FGTS terminou e há uma condição disponível. Veja os valores no painel.");
+        return atualizar(row, { etapa: "ofertas_disponiveis", offers_json: JSON.stringify([oferta]), status_novosaque: status.status, error_message: null });
+      }
+      if (Number(status.quotes_pending || 0) > 0) return atualizar(row, { status_novosaque: status.status }); // J17 ainda cotando
+    }
+    if (["NO_OFFERS", "EXPIRED", "OFFERS_AVAILABLE"].includes(status.status)) {
+      const completa = await ler();
+      const categoria = unnotech.classificarRecusa(motivo(completa));
+      if (categoria === "autorizacao") return atualizar(row, { etapa: "fgts_autorizar", status_novosaque: status.status, error_message: null });
+      const texto = categoria === "sem_saldo"
+        ? "Não há saldo do FGTS disponível para antecipar agora. Isso pode mudar, por exemplo depois do mês do seu aniversário."
+        : "Os bancos não liberaram uma condição para o seu FGTS agora. Um atendente pode conferir o motivo com você.";
+      return encerrar(row, "sem_oferta", texto);
+    }
+    if (Date.now() - desde > PRAZO_ETAPA_MS) return encerrar(row, "erro_consulta", "A consulta do FGTS demorou mais que o esperado. Um atendente pode ajudar.");
+    return atualizar(row, { status_novosaque: status.status });
+  }
+
+  // "Já autorizei": repete a cotação (consome o limite de simulações do CPF, por isso só sob pedido do cliente).
+  async function requotarFgts(row) {
+    if (!ehFgts(row) || !["fgts_autorizar", "sem_oferta", "erro_consulta"].includes(row.etapa)) throw new Error("Essa opção não está disponível agora.");
+    try {
+      await unnotech.requotar(row.transaction_id, crypto.randomUUID());
+    } catch (err) {
+      if (/RATE_LIMIT/.test(err.message || "")) throw new Error("Muitas consultas seguidas para o seu CPF. Aguarde alguns minutos e tente de novo.");
+      throw err;
+    }
+    return atualizar(row, { etapa: "fgts_cotando", authorization_requested_at: Date.now(), authorization_checked_at: null, error_message: null });
+  }
+
+  return { configurado, iniciar, sincronizar, escolherOferta, enviarDados, resimular, selecionarOfertas, ofertaPublica, ofertaPublicaFgts, lerBlob, lerOfertas, ehFgts, iniciarFgts, requotarFgts };
 }
 
 module.exports = { criarAdaptador, configurado, selecionarOfertas, ofertaPublica, ofertasValidas, comissaoOferta };

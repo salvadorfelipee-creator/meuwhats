@@ -95,10 +95,11 @@ async function chamarAutenticado(method, path, extras = {}) {
   return unnotechRequest(method, path, { ...extras, accessToken: novoToken });
 }
 
-async function criarSolicitacao(cpf, idempotencyKey) {
+async function criarSolicitacao(cpf, idempotencyKey, extras = {}) {
+  // user_uuid do operador é obrigatório desde 05/10/2026 (ver obterUserUuid, mais abaixo).
   const { status, body } = await chamarAutenticado("POST", "/api/v1/fgts/applications", {
     idempotencyKey,
-    body: { customer: { cpf } },
+    body: { customer: { cpf }, user_uuid: extras.userUuid || (await obterUserUuid()) },
   });
   if (status >= 400) throw new Error(`Falha ao abrir solicitação FGTS: ${JSON.stringify(body)}`);
   return body;

@@ -112,3 +112,53 @@ const unno = criarAdaptador({ db, unnotech, mensagemAtendente: async (_i, t) => 
   assert.strictEqual(r.etapa, "sem_margem");
   console.log("OK: adaptador da Unnotech passou em todos os cenários");
 })().catch((e) => { console.error("FALHOU:", e.message); process.exit(1); });
+
+// ── FGTS: cotação, autorização nos bancos (no app do FGTS), oferta J17 e contratação ──────────────────────────
+(async () => {
+  let l = { conversation_id: "f1", provider: "facta", cpf: "12345678909", phone: "47999990000", etapa: "fgts_cotando" };
+  const db2 = { siteChatCltAtualizar: async (_i, c) => { l = { ...l, ...c }; return l; }, siteChatFunilEvento: async () => {} };
+  const st = { status: "QUOTING", quotes_pending: 1 };
+  let completa = { offers: [], quotes: [] };
+  const chamadas2 = [];
+  const un = {
+    criarSolicitacao: async () => ({ application_id: "fg-1", status: "QUOTING" }),
+    consultarStatus: async () => ({ status: st.status, quotes_pending: st.quotes_pending, proposal_uuid: st.proposal }),
+    consultarSolicitacaoCompleta: async () => completa,
+    classificarRecusa: (t) => (String(t).toLowerCase().includes("autoriz") ? "autorizacao" : String(t).toLowerCase().includes("saldo") ? "sem_saldo" : "desconhecido"),
+    requotar: async () => { chamadas2.push("requote"); },
+    enviarKyc: async () => { chamadas2.push("kyc"); }, montarPayloadKyc: (cpf, d) => ({ cpf, nome: d.nome }),
+    aceitarOferta: async (_a, id) => { chamadas2.push("aceitar:" + id); },
+    consultarProposta: async () => ({ signature_link: "https://assinar.test/fgts" }),
+    escolherMelhorOferta: () => null,
+  };
+  const fg = criarAdaptador({ db: db2, unnotech: un, mensagemAtendente: async () => {}, notificar: async () => {} });
+
+  l = await fg.iniciarFgts(l, {});
+  assert.strictEqual(l.etapa, "fgts_cotando");
+  assert.ok(fg.ehFgts(l));
+
+  // J17 recusou por falta de autorização → orienta autorizar os bancos no app
+  Object.assign(st, { status: "NO_OFFERS", quotes_pending: 0 });
+  completa = { offers: [], quotes: [{ source: "J17", reason: "Cliente não autorizou o banco no FGTS" }] };
+  l.authorization_checked_at = null;
+  l = await fg.sincronizar(l);
+  assert.strictEqual(l.etapa, "fgts_autorizar");
+
+  // "Já autorizei" → cota de novo → oferta da J17 (outras ignoradas)
+  l = await fg.requotarFgts(l);
+  assert.strictEqual(l.etapa, "fgts_cotando");
+  Object.assign(st, { status: "OFFERS_AVAILABLE", quotes_pending: 0 });
+  completa = { offers: [{ offer_id: "x", source: "OUTRO", status: "AVAILABLE", net_amount: 999 }, { offer_id: "j", source: "J17", status: "AVAILABLE", net_amount: 1200, installments: [{ amount: 300 }, { amount: 300 }], monthly_interest_rate: 1.79 }] };
+  l.authorization_checked_at = null;
+  l = await fg.sincronizar(l);
+  assert.strictEqual(l.etapa, "ofertas_disponiveis");
+  assert.deepStrictEqual(JSON.parse(l.offers_json).map((o) => o.offer_id), ["j"], "só a J17");
+  assert.strictEqual(fg.ofertaPublicaFgts(JSON.parse(l.offers_json)[0]).installments, 2);
+
+  l = await fg.escolherOferta(l, "j");
+  assert.strictEqual(l.etapa, "dados_pessoais");
+  l = await fg.enviarDados(l, { nome: "Maria", data_nascimento: "1990-02-01", genero: "FEMALE", estado_civil: "SINGLE", escolaridade: "Superior", nome_mae: "Ana", rg_numero: "1", rg_orgao: "SSP", rg_uf: "SC", cep: "88000000", rua: "R", numero: "1", bairro: "B", cidade: "C", uf: "SC", forma_desembolso: "PIX" });
+  assert.strictEqual(l.etapa, "aguardando_assinatura_facta");
+  assert.deepStrictEqual(chamadas2.filter((c) => c !== "requote"), ["kyc", "aceitar:j"]);
+  console.log("OK: FGTS pelo painel passou em todos os cenários");
+})().catch((e) => { console.error("FALHOU (FGTS):", e.message); process.exit(1); });

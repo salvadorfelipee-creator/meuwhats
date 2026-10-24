@@ -48,7 +48,7 @@
   function lerSessao() {
     try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); if (s && s.id && s.token && s.expiresAt > Date.now()) return s; } catch {}
     // Quem acabou de usar o chat do site já tem sessão lá: o painel aproveita.
-    try { const c = JSON.parse(localStorage.getItem(CHAT_KEY) || "null"); if (c && c.id && c.token && c.expiresAt > Date.now()) return { id: c.id, token: c.token, name: c.name, contact: c.contact || "", email: c.email || "", expiresAt: c.expiresAt }; } catch {}
+    try { const c = JSON.parse(localStorage.getItem(CHAT_KEY) || "null"); if (c && c.id && c.token && c.expiresAt > Date.now()) return { id: c.id, token: c.token, name: c.name, contact: c.contact || "", email: c.email || "", product: c.product || "", expiresAt: c.expiresAt }; } catch {}
     return null;
   }
   function guardarSessao(s) {
@@ -68,7 +68,10 @@
   const ETAPAS_AUTORIZACAO = ["solicitando_autorizacao", "autorizacao_enviada", "aguardando_autorizacao", "consultando_margem", "simulando"];
   const nomeBanco = (c) => (c && c.provider === "unnotech" ? "bancos parceiros" : "Facta");
   const ETAPAS_SEM_CONDICAO = ["sem_margem", "nao_elegivel", "sem_oferta", "politica_reprovada", "erro_consulta", "erro_autorizacao", "erro_integracao", "proposta_cancelada"];
+  const ehFgts = () => (state.clt && typeof state.clt === "object" ? state.clt.produto === "FGTS" : /fgts/i.test(String(state.session?.product || "")));
   function indiceEtapa(etapa) {
+    if (etapa === "fgts_cotando") return 0;
+    if (etapa === "fgts_autorizar") return 1;
     if (etapa === "consultando_margem" || etapa === "simulando") return 1;
     if (ETAPAS_AUTORIZACAO.includes(etapa)) return 0;
     if (etapa === "ofertas_disponiveis") return 2;
@@ -78,9 +81,10 @@
     return 0;
   }
   const PASSOS = ["Autorização da consulta", "Condições liberadas", "Escolha da condição", "Seus dados", "Assinatura e pagamento"];
+  const PASSOS_FGTS = ["Consulta do FGTS", "Autorização dos bancos", "Escolha da condição", "Seus dados", "Assinatura e pagamento"];
   function andamento() {
-    const atual = indiceEtapa(state.clt?.etapa);
-    return `<div class="andamento">${PASSOS.map((nome, i) => {
+    const atual = indiceEtapa(state.clt?.etapa) + (ehFgts() && ["ofertas_disponiveis", "dados_pessoais"].includes(state.clt?.etapa) ? 0 : 0);
+    return `<div class="andamento">${(ehFgts() ? PASSOS_FGTS : PASSOS).map((nome, i) => {
       const classe = i < atual ? "feita" : i === atual ? "agora" : "";
       return `<div class="etapa ${classe}"><span class="bola">${i < atual ? ICONE.check : ""}</span><span>${nome}${i === atual ? ' <span style="font-weight:400;color:#4b5d6e">· agora</span>' : ""}</span></div>`;
     }).join("")}</div>`;
@@ -102,7 +106,39 @@
   const erroBox = () => (state.erro ? `<p class="erro" role="alert">${esc(state.erro)}</p>` : "");
   const avisoBox = () => (state.aviso ? `<p class="erro" style="background:#e3f6ec;color:#06603a" role="status">${esc(state.aviso)}</p>` : "");
 
+  const REQUISITOS_FGTS = `<div class="cartao simples" style="margin-top:12px"><b style="font:700 15px Sora,sans-serif">O que é preciso para antecipar</b><ul style="margin:10px 0 0;padding-left:18px;font-size:14px;line-height:1.55;color:#33475b">
+      <li>Estar no <b>saque-aniversário</b> do FGTS e ter saldo.</li>
+      <li>Ter de 18 a 69 anos e o CPF regular na Receita.</li>
+      <li>Receber em conta de <b>sua titularidade</b>. Contas digitais como PagBank, Mercado Pago e PicPay não são aceitas.</li>
+      <li>Uma antecipação por ano. Valor de R$ 100 a R$ 500 por parcela anual (até R$ 2.500).</li>
+      <li>Quem acabou de aderir ao saque-aniversário pode precisar aguardar até 90 dias.</li></ul></div>`;
+  function viewFgtsInicio() {
+    return `${topo()}<div class="cabeca"><h1>Antecipação do FGTS</h1><p class="sub">Informe seu CPF para consultarmos seu saldo. Depois mostramos, passo a passo, como autorizar os bancos no aplicativo do FGTS.</p></div>
+      ${erroBox()}
+      <form class="form" style="margin-top:18px" data-form="fgts-start"><label>Seu CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" required></label><button class="btn primario grande"${state.carregando === "fgts" ? " disabled" : ""}>${state.carregando === "fgts" ? "Consultando…" : "Consultar meu FGTS"}</button></form>
+      <div style="margin:0 20px">${REQUISITOS_FGTS.replace('margin-top:12px', 'margin-top:16px')}</div>`;
+  }
+  function viewFgtsCotando() {
+    return `${topo()}<div class="cabeca"><h1>Consultando seu FGTS</h1><p class="sub">Estamos pedindo as condições aos bancos. Isso leva alguns instantes.</p></div>
+      <div class="espera" style="margin-top:18px"><span class="ponto"><i></i><i></i></span><div><b>Consultando seu saldo</b><p>Atualizamos aqui sozinhos, sem apertar nada.</p></div></div>
+      <p class="rotulo">Seu andamento</p>${andamento()}`;
+  }
+  function viewFgtsAutorizar() {
+    return `${topo()}<div class="cabeca"><h1>Autorize os bancos no app do FGTS</h1><p class="sub">Para consultar seu saldo, o FGTS precisa da sua autorização. Você faz isso direto no aplicativo FGTS, em menos de um minuto.</p></div>
+      <div class="passos">
+        <div class="passo"><span class="n">1</span><p><b>Abra o aplicativo FGTS</b> (ou entre em fgts.caixa.gov.br) e faça login.</p></div>
+        <div class="passo"><span class="n">2</span><p>Vá em <b>Meu FGTS › Autorizações</b> (autorizar bancos a consultar o seu FGTS).</p></div>
+        <div class="passo"><span class="n">3</span><p><b>Autorize estes 3 bancos:</b><br><span style="font-size:14px;color:#33475b">• J17 Sociedade de Crédito Direto S/A<br>• BMP Sociedade de Crédito Direto S.A.<br>• BMP Sociedade de Crédito ao Microempreendedor e à Empresa de Pequeno Porte Ltda</span></p></div>
+        <div class="passo"><span class="n">4</span><p><b>Volte aqui</b> e toque em “Já autorizei”. A autorização vale por 90 dias.</p></div>
+      </div>
+      ${avisoBox()}${erroBox()}
+      <div style="margin:18px 20px 0"><button class="btn primario grande" type="button" data-acao="fgts-requote"${state.carregando === "fgts" ? " disabled" : ""}>${state.carregando === "fgts" ? "Consultando de novo…" : "Já autorizei, consultar de novo"}</button></div>
+      <div style="margin:0 20px">${REQUISITOS_FGTS.replace('margin-top:12px', 'margin-top:16px')}</div>
+      <p class="rotulo">Precisa de ajuda?</p>
+      <div class="lista-opcoes"><button class="opcao" type="button" data-acao="conversa"><span><b>Falar com o Felipe</b><small>Ele te guia pelo aplicativo.</small></span><span class="seta">${ICONE.seta}</span></button></div>`;
+  }
   function viewSemSimulacao() {
+    if (ehFgts()) return viewFgtsInicio();
     return `${topo()}<div class="cabeca"><h1>Oi${primeiroNome() ? ", " + esc(primeiroNome()) : ""}</h1><p class="sub">Sua simulação ainda não começou. Leva menos de um minuto.</p></div>
       <div class="lista-opcoes" style="margin-top:18px"><a class="opcao forte" href="/?chat=abrir"><span class="ico verde">F</span><span><b>Começar minha simulação</b><small>O Felipe te acompanha.</small></span><span class="seta">${ICONE.seta}</span></a></div>`;
   }
@@ -156,15 +192,15 @@
       const rotulo = ofertas.length > 1 ? (i === 0 ? '<span class="chip claro">Mais dinheiro na mão</span>' : '<span class="chip cinza">Prazo mais curto</span>') : '<span class="chip claro">Sua condição</span>';
       return `<div class="cartao ${i === 0 ? "destaque" : "simples"}">${rotulo}
         <p class="peq">Você recebe</p><p class="valor">${money(o.disbursedAmount)}</p>
-        <p class="prazo">${o.installments} parcelas de <b>${money(o.installmentValue)}</b></p>
-        <p class="nota">Valor estimado${o.rate ? ` · Taxa informada ${Number(o.rate).toFixed(2).replace(".", ",")}%` : ""}${o.insuranceValue ? " · Inclui seguro" : ""}</p>
+        <p class="prazo">${c.produto === "FGTS" ? `${o.installments} parcelas anuais de <b>${money(o.installmentValue)}</b>` : `${o.installments} parcelas de <b>${money(o.installmentValue)}</b>`}</p>
+        <p class="nota">${c.produto === "FGTS" ? "Uma parcela por ano, paga automaticamente pelo seu FGTS · " : ""}Valor estimado${o.rate ? ` · Taxa informada ${Number(o.rate).toFixed(2).replace(".", ",")}%` : ""}${o.insuranceValue ? " · Inclui seguro" : ""}</p>
         <button class="btn ${i === 0 ? "primario" : "contorno"}" type="button" data-acao="escolher" data-id="${esc(o.id)}"${state.carregando ? " disabled" : ""}>${state.carregando === o.id ? "Analisando com a Facta…" : "Quero esta condição"}</button></div>`;
     }).join("");
     return `${topo()}<div class="cabeca"><h1>Oi${primeiroNome() ? ", " + esc(primeiroNome()) : ""}</h1><p class="sub">Sua simulação está salva. Escolha como prefere seguir.</p></div>
-      <div class="hero"><span class="chip ok">${ICONE.check} ${c.provider === "unnotech" ? "Bancos parceiros" : "Facta"} · autorização confirmada</span><p class="titulo">Suas condições estão prontas</p><div class="linha"><span>Parcela máxima por mês</span><b>${money(max)}</b></div></div>
+      <div class="hero"><span class="chip ok">${ICONE.check} ${c.provider === "unnotech" ? (c.produto === "FGTS" ? "FGTS" : "Bancos parceiros") : "Facta"} · ${c.produto === "FGTS" ? "consulta concluída" : "autorização confirmada"}</span><p class="titulo">${c.produto === "FGTS" ? "Sua antecipação está pronta" : "Suas condições estão prontas"}</p><div class="linha"><span>${c.produto === "FGTS" ? "Você pode receber" : "Parcela máxima por mês"}</span><b>${c.produto === "FGTS" ? money((ofertas[0] || {}).disbursedAmount) : money(max)}</b></div></div>
       ${erroBox()}
       <p class="rotulo">Escolha sua condição</p>${cartoes}
-      <button class="linha-botao" type="button" data-acao="folha"><span>Quero pagar menos por mês</span>${ICONE.seta}</button>
+      ${c.produto === "FGTS" ? "" : `<button class="linha-botao" type="button" data-acao="folha"><span>Quero pagar menos por mês</span>${ICONE.seta}</button>`}
       <p class="rotulo">Seu andamento</p>${andamento()}
       <p class="rotulo">Bancos consultados</p>${blocoBancos(c)}
       <p class="rodape-nota">Valores estimados. A aprovação final é do banco e você revê o contrato completo antes de assinar.</p>`;
@@ -191,6 +227,7 @@
   const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
   const opcoesUf = (sel) => `<option value="">Selecione</option>${UFS.map((u) => `<option value="${u}"${u === sel ? " selected" : ""}>${u}</option>`).join("")}`;
   function formDadosParceiros(d, offer) {
+    const c0 = state.clt || {};
     return `<form class="form" data-form="dados"><p>Condição escolhida: você recebe aproximadamente <b>${money(offer.disbursedAmount)}</b> e paga ${offer.installments || "—"} parcelas de ${money(offer.installmentValue)}.</p>
       <div class="form-section"><b>Dados pessoais</b><div class="form-grid">
         <label>Nome completo<input name="nome" value="${esc(state.session?.name || d.nome)}" required autocomplete="name"></label>
@@ -226,10 +263,10 @@
         <label>Número da conta<input name="conta" inputmode="numeric"></label>
         <label>Dígito da conta<input name="digito_conta"></label>
       </div></div>
-      <div class="form-section"><b>Seu RH (opcional)</b><div class="form-grid">
+      ${c0.produto === "FGTS" ? "" : `<div class="form-section"><b>Seu RH (opcional)</b><div class="form-grid">
         <label>E-mail do RH<input name="email_rh" type="email"></label>
         <label>Telefone do RH<input name="telefone_rh" inputmode="tel"></label>
-      </div></div>
+      </div></div>`}
       <label class="consent"><input type="checkbox" required> Confirmo que os dados estão corretos e autorizo a geração de uma proposta real. Poderei revisar o contrato antes de assinar.</label>
       <button class="btn primario grande">Gerar proposta para revisão</button></form>`;
   }
@@ -292,6 +329,8 @@
   function viewInicio() {
     const c = state.clt;
     if (!c || c === "start") return viewSemSimulacao();
+    if (c.etapa === "fgts_cotando") return viewFgtsCotando();
+    if (c.etapa === "fgts_autorizar") return viewFgtsAutorizar();
     if (ETAPAS_AUTORIZACAO.includes(c.etapa)) return viewAutorizacao();
     if (c.etapa === "ofertas_disponiveis") return viewOfertas();
     if (c.etapa === "dados_pessoais") return viewDados();
@@ -362,7 +401,7 @@
   }
 
   // ── dados ────────────────────────────────────────────────────────────────
-  const assinaturaClt = (c) => JSON.stringify([c?.etapa, c?.status, c?.error, (c?.offers || []).length, c?.maxInstallment, c?.selectedOffer, c?.contractLink, c?.proposalCode, c?.consentUrl, c?.provider]);
+  const assinaturaClt = (c) => JSON.stringify([c?.etapa, c?.status, c?.error, (c?.offers || []).length, c?.maxInstallment, c?.selectedOffer, c?.contractLink, c?.proposalCode, c?.consentUrl, c?.provider, c?.produto]);
   async function atualizarClt() {
     try {
       const dados = await api(`/conversations/${state.session.id}/clt/status`);
@@ -428,6 +467,11 @@
       await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/resend-authorization`, { method: "POST", body: "{}" }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); state.aviso = "Enviamos o link de novo para o seu WhatsApp."; });
       return;
     }
+    if (acao === "fgts-requote") {
+      state.carregando = "fgts"; render();
+      await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/fgts-requote`, { method: "POST", body: "{}" }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); window.scrollTo(0, 0); });
+      return;
+    }
     if (acao === "outros-bancos") {
       state.carregando = "outros"; render();
       await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/other-banks`, { method: "POST", body: "{}" }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); window.scrollTo(0, 0); });
@@ -449,6 +493,11 @@
       form.reset();
       state.messages = [...state.messages, { direction: "visitor", body: texto, created_at: Date.now() }]; desenharMensagens();
       try { await enviarMensagemSimples(texto); } catch (err) { state.erro = err.message; }
+      return;
+    }
+    if (tipo === "fgts-start") {
+      state.carregando = "fgts"; render();
+      await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/fgts-start`, { method: "POST", body: JSON.stringify({ cpf: dados.get("cpf") }) }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); window.scrollTo(0, 0); });
       return;
     }
     if (tipo === "outro-numero") {
@@ -475,7 +524,7 @@
         const resposta = await fetch(`${API}/access`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: codigo }) });
         const d = await resposta.json().catch(() => ({}));
         if (!resposta.ok) throw new Error(d.error || "Esse link expirou. Abra o chat e informe seus dados para continuar.");
-        guardarSessao({ id: d.conversation.id, token: d.token, name: d.conversation.name, contact: d.conversation.contact || "", email: d.conversation.email || "", expiresAt: Date.now() + DIAS_30 });
+        guardarSessao({ id: d.conversation.id, token: d.token, name: d.conversation.name, contact: d.conversation.contact || "", email: d.conversation.email || "", product: d.conversation.product || "", expiresAt: Date.now() + DIAS_30 });
         state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); state.messages = d.messages || [];
         history.replaceState(null, "", location.pathname);
       } catch (erro) {
