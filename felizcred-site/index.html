@@ -869,7 +869,7 @@
     .motion-enabled .motion-item { opacity:1; transform:none; }
   }
 </style>
-<link rel="stylesheet" href="./redesign.css?v=20261023-1">
+<link rel="stylesheet" href="./redesign.css?v=20261024-2">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMXC2DFR5G"></script>
 <script>
@@ -977,7 +977,13 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     </article>
     <article class="guidance-row reverse">
       <div class="guidance-copy"><span class="guidance-index">02</span><h3>Responda somente o necessário</h3><p>O chat pede cada informação no momento certo e preserva o contexto da sua simulação.</p></div>
-      <div class="guidance-visual conversation-visual" aria-hidden="true"><span class="bubble agent">Vamos começar com algumas informações básicas.</span><span class="bubble visitor">Tudo bem, quero consultar.</span><span class="typing"><i></i><i></i><i></i></span></div>
+      <div class="guidance-visual conversation-visual" aria-hidden="true">
+        <div class="wa-phone" data-wa-demo>
+          <div class="wa-head"><span class="wa-avatar">F</span><div><strong>FelizCred</strong><small>online</small></div></div>
+          <div class="wa-chat"></div>
+          <div class="wa-input"><span>Mensagem</span></div>
+        </div>
+      </div>
     </article>
     <article class="guidance-row">
       <div class="guidance-copy"><span class="guidance-index">03</span><h3>Compare as condições com calma</h3><p>Você visualiza o retorno da análise e avança somente quando as condições fizerem sentido.</p></div>
@@ -1579,6 +1585,97 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     }, { threshold:[0,.28] });
     productsThemeObserver.observe(productsSection);
   }
+</script>
+<script>
+  // Passo 02: conversa de WhatsApp simulada. As mensagens voam de fora do celular e a escolha aparece antes do envio.
+  (() => {
+    const demo = document.querySelector('[data-wa-demo]');
+    if (!demo) return;
+    const chat = demo.querySelector('.wa-chat');
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, reduced ? 0 : ms));
+    const script = [
+      { agent: 'Vamos começar com algumas informações básicas.', wait: 900 },
+      { agent: 'Qual produto você quer consultar?', wait: 1000 },
+      { options: ['Crédito CLT', 'Antecipação FGTS'], pick: 0, pickAt: 900, wait: 1400 },
+      { visitor: 'Crédito CLT', wait: 900 },
+      { typing: true, wait: 1000 },
+      { agent: 'Ótimo! Me envie seu CPF. Só pedimos o necessário.', wait: 1300 },
+      { visitor: '•••.•••.•••-••', wait: 900 },
+      { typing: true, wait: 900 },
+      { agent: 'Perfeito. Sua simulação fica salva aqui no chat.', wait: 2600 }
+    ];
+
+    const add = el => {
+      chat.append(el);
+      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('is-in')));
+      // Quem saiu pelo topo do celular sai do DOM: o chat mostra sempre a parte final.
+      while (chat.firstElementChild && chat.firstElementChild.offsetTop < 0) chat.firstElementChild.remove();
+    };
+    const message = (cls, text) => {
+      const el = document.createElement('div');
+      el.className = `wa-msg ${cls}`;
+      el.textContent = text;
+      const time = document.createElement('small');
+      time.textContent = '10:42';
+      el.append(time);
+      return el;
+    };
+    const play = async () => {
+      for (const step of script) {
+        if (step.agent) add(message('agent', step.agent));
+        if (step.visitor) add(message('visitor', step.visitor));
+        if (step.typing) {
+          const el = document.createElement('div');
+          el.className = 'wa-typing';
+          el.innerHTML = '<i></i><i></i><i></i>';
+          add(el);
+          await sleep(step.wait);
+          el.remove();
+          continue;
+        }
+        if (step.options) {
+          const el = document.createElement('div');
+          el.className = 'wa-options';
+          step.options.forEach(label => {
+            const option = document.createElement('span');
+            option.textContent = label;
+            el.append(option);
+          });
+          add(el);
+          await sleep(step.pickAt);
+          el.children[step.pick].classList.add('is-picked');
+          await sleep(step.wait - step.pickAt);
+          el.remove();
+          continue;
+        }
+        await sleep(step.wait);
+      }
+    };
+    const loop = async () => {
+      await play();
+      if (reduced) return;
+      await sleep(1200);
+      chat.classList.add('is-resetting');
+      await sleep(500);
+      chat.replaceChildren();
+      chat.classList.remove('is-resetting');
+      await sleep(600);
+      loop();
+    };
+
+    // Só começa quando o bloco aparece na tela.
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver(entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        observer.disconnect();
+        loop();
+      }, { threshold: 0.35 });
+      observer.observe(demo);
+    } else {
+      loop();
+    }
+  })();
 </script>
 <script src="./chat.js?v=20261023-1" defer></script>
 </body>
