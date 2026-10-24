@@ -375,4 +375,4 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
   return { configurado, iniciar, sincronizar, escolherOferta, enviarDados, resimular, selecionarOfertas, ofertaPublica, ofertaPublicaFgts, lerBlob, lerOfertas, ehFgts, iniciarFgts, requotarFgts };
 }
 
-module.exports = { criarAdaptador, configurado, selecionarOfertas, ofertaPublica, ofertasValidas, comissaoOferta };
+module.exports = { criarAdaptador, configurado, selecionarOfertas, ofertaPublica, ofertaPublicaFgts, ofertasValidas, comissaoOferta };

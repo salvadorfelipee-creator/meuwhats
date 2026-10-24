@@ -162,3 +162,7 @@ const unno = criarAdaptador({ db, unnotech, mensagemAtendente: async (_i, t) => 
   assert.deepStrictEqual(chamadas2.filter((c) => c !== "requote"), ["kyc", "aceitar:j"]);
   console.log("OK: FGTS pelo painel passou em todos os cenários");
 })().catch((e) => { console.error("FALHOU (FGTS):", e.message); process.exit(1); });
+
+// Regressão: o payload público do FGTS usa ofertaPublicaFgts exportada pelo módulo (faltava o export e o status dava 500).
+assert.strictEqual(typeof require("../site-unnotech").ofertaPublicaFgts, "function", "ofertaPublicaFgts precisa estar exportada");
+console.log("OK: export do FGTS presente");
