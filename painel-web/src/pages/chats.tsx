@@ -8,6 +8,7 @@ import {
   api,
   type Conversation,
   type SiteChatConversation,
+  type OutroCanal,
   type Message,
   type RespostaPronta,
   type TemplateInfo,
@@ -2921,7 +2922,7 @@ function ContactDetails({
   }
 
   // ── Mesmo telefone em outro canal (outro número de WhatsApp, ou Instagram) ────────────────
-  const [outrosCanais, setOutrosCanais] = React.useState<{ business_number_id: string; name: string | null; last_message_at: number | null }[]>([])
+  const [outrosCanais, setOutrosCanais] = React.useState<OutroCanal[]>([])
   React.useEffect(() => {
     api.outrosCanais(businessId, conversation.phone).then(setOutrosCanais).catch(() => {})
   }, [businessId, conversation.phone])
