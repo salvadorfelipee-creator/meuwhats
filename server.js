@@ -432,6 +432,16 @@ setInterval(() => { enviarRetomadasDoSite().catch((err) => console.error("Erro n
 // v2: o primeiro modelo (felizcred_site_retomada) foi cadastrado na Meta com acentos corrompidos; o nome v2 contém o antigo,
 // então o reconhecimento de quem já recebeu (recebeuTemplate usa LIKE) continua funcionando para os dois.
 const RETOMADA_SITE_TEMPLATE = process.env.RETOMADA_SITE_WHATSAPP_TEMPLATE || "felizcred_site_retomada_v2";
+// Celular guardado no site vem sem o 55 (ex.: 47988901697). A conversa do WhatsApp usa 5547988901697: sem o prefixo, o envio
+// ia para uma conversa "duplicada" e as checagens de quem já recebeu modelo/conversou não enxergavam o histórico real.
+function celularComPais(telefone) {
+  const d = String(telefone || "").replace(/\D/g, "");
+  return normalizarTelefoneBR(/^\d{10,11}$/.test(d) ? `55${d}` : d);
+}
+async function recebeuModeloRecente(phone, dias) {
+  for (const numero of NUMEROS_CONSIGNADO) if (await db.jaRecebeuTemplateRecente(phone, numero, dias)) return true;
+  return false;
+}
 async function enviarRetomadasSiteWhatsapp() {
   if (process.env.RETOMADA_SITE_WHATSAPP_ATIVA === "false") return;
   const agoraBr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false, weekday: "short" }).formatToParts(new Date());
@@ -444,8 +454,10 @@ async function enviarRetomadasSiteWhatsapp() {
   let enviados = 0;
   for (const c of candidatas) {
     if (enviados >= 3) break;
-    const phone = normalizarTelefoneBR(c.clt_phone || c.contact);
+    const phone = celularComPais(c.clt_phone || c.contact);
     if (!phone) { await db.siteChatMarcarRetomadaWhatsapp(c.id); continue; }
+    // Quem já recebeu outro modelo (campanha) nos últimos 7 dias, em qualquer um dos dois números, não recebe este por cima.
+    if (await recebeuModeloRecente(phone, 7)) { await db.siteChatMarcarRetomadaWhatsapp(c.id); continue; }
     let jaConversa = false;
     for (const numero of NUMEROS_CONSIGNADO) {
       const conversa = await db.getConversation(phone, numero);
@@ -480,7 +492,7 @@ async function enviarLembreteSiteWhatsapp() {
   let enviados = 0;
   for (const c of candidatas) {
     if (enviados >= 3) break;
-    const phone = normalizarTelefoneBR(c.clt_phone || c.contact);
+    const phone = celularComPais(c.clt_phone || c.contact);
     if (!phone) { await db.siteChatMarcarLembreteWhatsapp(c.id); continue; }
     // Respondeu depois da primeira mensagem (qualquer botão ou texto): já tem atendimento, não recebe o lembrete.
     let respondeu = false;
