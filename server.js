@@ -8501,7 +8501,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && path_ === "/painel/api/unnotech/teste") {
       if (!requireAuth(req, res)) return;
       const tam = (nome) => String(process.env[nome] || "").length;
-      const resultado = { variaveis: { UNNOTECH_CLIENT_ID: tam("UNNOTECH_CLIENT_ID"), UNNOTECH_CLIENT_SECRET: tam("UNNOTECH_CLIENT_SECRET"), UNNOTECH_USER_UUID: tam("UNNOTECH_USER_UUID") } };
+      const resultado = { variaveis: { UNNOTECH_CLIENT_ID: tam("UNNOTECH_CLIENT_ID"), UNNOTECH_CLIENT_SECRET: tam("UNNOTECH_CLIENT_SECRET"), UNNOTECH_USER_UUID: tam("UNNOTECH_USER_UUID"), FGTS_FLOW_ID: tam("FGTS_FLOW_ID"), CLT_FLOW_ID: tam("CLT_FLOW_ID") } };
       try {
         await unnotech.getAccessToken();
         resultado.token = "ok";
