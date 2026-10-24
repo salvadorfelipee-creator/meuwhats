@@ -3931,6 +3931,16 @@ async function siteChatDesmarcarRetomadaWhatsapp(id) {
   await client.execute({ sql: `UPDATE site_chat_conversations SET retomada_whatsapp_at = NULL WHERE id = ?`, args: [id] });
 }
 
+// "Minha conta": o cliente corrige nome, e-mail e celular pelo painel.
+async function siteChatAtualizarDados(id, { name, email, contact }) {
+  await ready;
+  await client.execute({
+    sql: `UPDATE site_chat_conversations SET name = ?, email = ?, contact = ?, updated_at = ? WHERE id = ?`,
+    args: [name, email, contact, Date.now(), id],
+  });
+  return siteChatObter(id);
+}
+
 async function siteChatMarcarEmailConfirmado(id) {
   await ready;
   await client.execute({
@@ -4270,6 +4280,7 @@ module.exports = {
   siteChatMarcarRetomadaWhatsapp,
   siteChatDesmarcarRetomadaWhatsapp,
   siteChatMarcarEmailConfirmado,
+  siteChatAtualizarDados,
   siteChatRecuperarClt,
   siteChatRenovarToken,
   siteChatMensagens,

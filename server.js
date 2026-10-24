@@ -586,6 +586,46 @@ async function tentarOutrosBancos(row, manual = false) {
   return novo || row;
 }
 
+async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
+  // Regra do CPF: o cliente que digitou o CPF e ainda não está no Google Contatos é salvo
+  // como "FGTS <nome> <CPF>". Não bloqueia o atendimento se o Google falhar.
+  if (google.configurado()) {
+    const telefoneGoogle = phone.startsWith("55") && phone.length >= 12 ? phone : `55${phone}`;
+    google.garantirContato({ telefone: telefoneGoogle, nomePerfil: nomeContatoComCpf(cpf, fullName) })
+      .catch((err) => console.error("Erro ao salvar contato do site com CPF no Google:", err.message));
+  }
+  let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO", trackingToken: crypto.randomBytes(32).toString("base64url") });
+  row = await db.siteChatCltAtualizar(id, { facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }), facta_offer_json: null, codigo_proposta: null, contract_link: null });
+  await db.siteChatFunilEvento(id, "dados_minimos_enviados", "cpf_consentimento", "facta");
+  await db.siteChatFunilEvento(id, "provedor_tentado", "solicitando_autorizacao", "facta");
+  await db.siteChatDefinirProduto(id, "Empréstimo CLT");
+  await db.siteChatDefinirPipeline(id, "qualificacao");
+  const authorization = (await autorizacaoFactaVigente(cpf))
+    ? { mensagem: "Cliente não necessita de autorização" }
+    : await facta.solicitarAutorizacao({ nome: fullName, cpf, celular: formatarCelularFacta(phone) });
+  const authMessage = mensagemFacta(authorization);
+  if (respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage)) {
+    await db.siteChatFunilEvento(id, "saida", "erro_autorizacao", "facta", "erro_autorizacao");
+    row = await db.siteChatCltAtualizar(id, { etapa: "erro_autorizacao", status_novosaque: "ERRO_AUTORIZACAO", error_message: authMessage });
+    await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(authMessage));
+  } else {
+    await db.siteChatFunilEvento(id, "autorizacao_enviada", "autorizacao_enviada", "facta");
+    const alreadyAuthorized = /n[aã]o necessita de autoriza/i.test(authMessage);
+    row = await db.siteChatCltAtualizar(id, {
+      etapa: "autorizacao_enviada",
+      status_novosaque: alreadyAuthorized ? "JA_AUTORIZADO" : "AUTORIZACAO_ENVIADA",
+      authorization_requested_at: Date.now(),
+      authorization_checked_at: null,
+      error_message: null,
+    });
+    await db.siteChatMensagemAtendente(id, "Assistente FelizCred", alreadyAuthorized
+      ? "Sua autorização ainda está válida. Já estamos consultando suas condições."
+      : "Enviamos a autorização da Facta para seu WhatsApp. Abra o WhatsApp, toque no link da mensagem e autorize a consulta. Depois volte aqui: sua simulação fica salva nesta mesma tela, é só tocar em Já autorizei.");
+    if (alreadyAuthorized) row = await sincronizarSiteChatFacta(row);
+  }
+  return row;
+}
+
 async function sincronizarSiteChatClt(row) {
   if (row?.provider === "unnotech") {
     try {
@@ -1620,6 +1660,16 @@ const TEXTO_AUTORIZAR_J17 =
   "pro atendimento. 😊";
 
 async function iniciarFluxoFgtsMenu(de, businessNumberId) {
+  // Felizcred e Campanha CLT: todo o atendimento do FGTS é no painel do site. No WhatsApp só uma mensagem curta com o botão.
+  if (NUMEROS_CONSIGNADO.includes(businessNumberId)) {
+    await enviarRespostaAutomatica(
+      businessNumberId, de,
+      "Para simular o seu FGTS, continue pelo seu painel no site: é rápido, fica tudo salvo e o passo a passo para autorizar os bancos aparece lá.",
+      null, null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de, "fgts") }
+    );
+    await db.setFluxoPasso(de, businessNumberId, "consignado_chat");
+    return;
+  }
   if (await fgtsJaConsultado(de, businessNumberId)) return responderFgtsJaConsultado(de, businessNumberId);
   // Felizcred e Campanha CLT: pergunta logo no início se já sacou este ano, para não gastar atendente com quem não pode.
   if (NUMEROS_CONSIGNADO.includes(businessNumberId)) {
@@ -5163,18 +5213,18 @@ const BOTOES_INICIAR_CONSIGNADO = [{ id: "consig_iniciar", title: "Iniciar a sim
 // Modo da simulação do consignado depois de "Desejo simular": por padrão, o cliente vai para o CHAT DO SITE (botão
 // "Falar com atendimento", celular já preenchido). CONSIGNADO_MODO=whatsapp volta a coletar nome/CPF/nascimento pelo WhatsApp.
 const CONSIGNADO_MODO_SITE = process.env.CONSIGNADO_MODO !== "whatsapp";
-const TEXTO_IR_PARA_CHAT_CONSIGNADO = "Para fazer a simulação, toque no botão abaixo e continue pelo chat seguro do site. Lá pedimos só o necessário e você acompanha cada etapa.";
+const TEXTO_IR_PARA_CHAT_CONSIGNADO = "Para fazer a simulação, toque no botão abaixo e continue pelo seu painel no site. Lá pedimos só o necessário, fica tudo salvo e você acompanha cada etapa.";
 const REGEX_INTENCAO_FGTS = /fgts|saque|antecip/i;
 // Mensagem automática de outra empresa (ex.: "X agradece seu contato"): não responde, não abre fluxo, não manda lembrete.
 // Se uma pessoa de verdade escrever depois, a conversa começa normalmente.
 const REGEX_AUTORESPOSTA_EMPRESA = /agradece (o |seu )?contato|mensagem autom[aá]tica|resposta autom[aá]tica|estamos fora do hor[aá]rio de atendimento|no momento n[aã]o (podemos|estamos) (atender|dispon)/i;
 // O texto do botão cta_url aceita no máximo 20 caracteres: acima disso a Meta recusa a mensagem e o cliente fica sem
 // resposta ("Falar com atendimento" tem 21 e travou o fluxo em 23/10/2026).
-const CTA_CHAT_CONSIGNADO = { buttonText: "Abrir atendimento" };
+const CTA_CHAT_CONSIGNADO = { buttonText: "Abrir meu painel" };
 
-function linkChatConsignado(phone) {
+function linkChatConsignado(phone, produto = "clt") {
   const digitos = String(phone || "").replace(/\D/g, "").replace(/^55/, "");
-  return `https://www.felizcred.com.br/?chat=abrir&wa=${digitos}&utm_source=whatsapp&utm_medium=consignado`;
+  return `https://www.felizcred.com.br/minha-simulacao/?novo=${produto}&wa=${digitos}&utm_source=whatsapp&utm_medium=${produto === "fgts" ? "fgts" : "consignado"}`;
 }
 
 const BOTOES_CONFIRMA_CONSIGNADO = [
@@ -5498,7 +5548,7 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
         // Já recebeu o link do chat do site: reenvia o botão, mas no máximo 1 vez a cada 30 min (não gasta mensagem
         // repetindo o mesmo link para quem manda várias mensagens seguidas).
         if (await respondeuHaPouco(de, businessNumberId, 30)) break;
-        await responder("Para continuar a simulação, toque no botão abaixo e fale com a gente pelo chat do site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
+        await responder("Para continuar a simulação, toque no botão abaixo e continue pelo seu painel no site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
         break;
       default: {
         // consignado_encerrado e consignado_concluido: a pessoa já passou pelo fluxo e escreveu de novo.
@@ -6490,7 +6540,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
 
-      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|access-email|other-banks|fgts-start|fgts-requote|personal-data|assistant)$/i);
+      const cltMatch = path_.match(/^\/site-chat\/conversations\/([a-f0-9-]+)\/clt\/(start|status|confirm-authorization|resend-authorization|select-offer|resimulate|access-email|other-banks|fgts-start|fgts-requote|switch-clt|conta-update|personal-data|assistant)$/i);
       if (cltMatch) {
         const id = cltMatch[1];
         const action = cltMatch[2].toLowerCase();
@@ -6518,6 +6568,15 @@ const server = http.createServer(async (req, res) => {
             if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
             return send(res, 200, { resposta }, corsHeaders);
           }
+          if (action === "conta-update") {
+            // "Minha conta": corrige nome, e-mail e celular.
+            const nome = String(body.name || "").trim().replace(/\s+/g, " ").slice(0, 80);
+            const email = String(body.email || "").trim().toLowerCase().slice(0, 160);
+            const contato = String(body.contact || "").replace(/\D/g, "").slice(0, 13);
+            if (nome.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{10,13}$/.test(contato)) return send(res, 400, { error: "Confira nome, e-mail e celular com DDD." }, corsHeaders);
+            const nova = await db.siteChatAtualizarDados(id, { name: nome, email, contact: contato });
+            return send(res, 200, { conversation: { id: nova.id, name: nova.name, contact: nova.contact, email: nova.email } }, corsHeaders);
+          }
           if (action === "fgts-start") {
             // Antecipação do FGTS pelo painel: só o CPF. A autorização dos bancos o cliente faz no aplicativo do FGTS.
             const existente = await db.siteChatCltObter(id);
@@ -6542,42 +6601,7 @@ const server = http.createServer(async (req, res) => {
             if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
             if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
-            // Regra do CPF: o cliente que digitou o CPF e ainda não está no Google Contatos é salvo
-            // como "FGTS <nome> <CPF>". Não bloqueia o atendimento se o Google falhar.
-            if (google.configurado()) {
-              const telefoneGoogle = phone.startsWith("55") && phone.length >= 12 ? phone : `55${phone}`;
-              google.garantirContato({ telefone: telefoneGoogle, nomePerfil: nomeContatoComCpf(cpf, fullName) })
-                .catch((err) => console.error("Erro ao salvar contato do site com CPF no Google:", err.message));
-            }
-            let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO", trackingToken: crypto.randomBytes(32).toString("base64url") });
-            row = await db.siteChatCltAtualizar(id, { facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }) });
-            await db.siteChatFunilEvento(id, "dados_minimos_enviados", "cpf_consentimento", "facta");
-            await db.siteChatFunilEvento(id, "provedor_tentado", "solicitando_autorizacao", "facta");
-            await db.siteChatDefinirProduto(id, "Empréstimo CLT");
-            await db.siteChatDefinirPipeline(id, "qualificacao");
-            const authorization = (await autorizacaoFactaVigente(cpf))
-              ? { mensagem: "Cliente não necessita de autorização" }
-              : await facta.solicitarAutorizacao({ nome: fullName, cpf, celular: formatarCelularFacta(phone) });
-            const authMessage = mensagemFacta(authorization);
-            if (respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage)) {
-              await db.siteChatFunilEvento(id, "saida", "erro_autorizacao", "facta", "erro_autorizacao");
-              row = await db.siteChatCltAtualizar(id, { etapa: "erro_autorizacao", status_novosaque: "ERRO_AUTORIZACAO", error_message: authMessage });
-              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(authMessage));
-            } else {
-              await db.siteChatFunilEvento(id, "autorizacao_enviada", "autorizacao_enviada", "facta");
-              const alreadyAuthorized = /n[aã]o necessita de autoriza/i.test(authMessage);
-              row = await db.siteChatCltAtualizar(id, {
-                etapa: "autorizacao_enviada",
-                status_novosaque: alreadyAuthorized ? "JA_AUTORIZADO" : "AUTORIZACAO_ENVIADA",
-                authorization_requested_at: Date.now(),
-                authorization_checked_at: null,
-                error_message: null,
-              });
-              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", alreadyAuthorized
-                ? "Sua autorização ainda está válida. Já estamos consultando suas condições."
-                : "Enviamos a autorização da Facta para seu WhatsApp. Abra o WhatsApp, toque no link da mensagem e autorize a consulta. Depois volte aqui: sua simulação fica salva nesta mesma tela, é só tocar em Já autorizei.");
-              if (alreadyAuthorized) row = await sincronizarSiteChatFacta(row);
-            }
+            const row = await abrirSimulacaoFactaClt(id, { cpf, phone, fullName });
             return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
           const atual = await db.siteChatCltObter(id);
@@ -6651,6 +6675,16 @@ const server = http.createServer(async (req, res) => {
             if (!novasOfertas.length) return send(res, 400, { error: "Não encontramos condições para essa parcela. Tente outro valor." }, corsHeaders);
             const row = await db.siteChatCltAtualizar(id, { offers_json: JSON.stringify(novasOfertas), error_message: null });
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+          }
+          if (action === "switch-clt") {
+            // FGTS sem disponibilidade: oferece o consignado CLT usando o CPF e o celular já informados.
+            if (!(atual.provider === "unnotech" && unnoSite.ehFgts(atual) && ["sem_oferta", "nao_elegivel", "erro_consulta", "proposta_cancelada", "fgts_autorizar"].includes(atual.etapa))) return send(res, 409, { error: "Essa opção não está disponível agora." }, corsHeaders);
+            const nomeCompleto = String(body.name || conversation.name || "").trim().replace(/\s+/g, " ").slice(0, 120);
+            if (nomeCompleto.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento.", precisaNome: true }, corsHeaders);
+            const telefone = String(atual.phone || conversation.contact || "").replace(/\D/g, "");
+            if (telefone.length < 10) return send(res, 400, { error: "Digite um celular com DDD.", precisaNome: true }, corsHeaders);
+            const aberta = await abrirSimulacaoFactaClt(id, { cpf: atual.cpf, phone: telefone, fullName: nomeCompleto });
+            return send(res, 201, { clt: siteChatCltPublico(aberta) }, corsHeaders);
           }
           if (action === "fgts-requote") {
             try {
@@ -8496,6 +8530,26 @@ const server = http.createServer(async (req, res) => {
 
     // GET /painel/api/facta/ip-saida — mostra os IPs públicos que ESTE servidor usa para sair à internet (vários
     // testes, porque o provedor pode alternar entre alguns). São os que precisam estar liberados no painel da Facta.
+    // GET /painel/api/ambiente/teste — só leitura: quais variáveis de ambiente de cada área estão definidas (nunca mostra valor
+    // de segredo; só o valor de chaves não secretas, como FACTA_ENV ou FACTA_PROPOSAL_ENABLED).
+    if (req.method === "GET" && path_ === "/painel/api/ambiente/teste") {
+      if (!requireAuth(req, res)) return;
+      const grupos = {
+        Facta: ["FACTA_DIRECT", "FACTA_USERNAME", "FACTA_PASSWORD", "FACTA_ENV", "FACTA_LOGIN_CERTIFICADO", "FACTA_PROPOSAL_ENABLED"],
+        Unnotech: ["UNNOTECH_CLIENT_ID", "UNNOTECH_CLIENT_SECRET"],
+        "E-mail": ["BREVO_API_KEY", "FELIZCRED_EMAIL_FROM", "FELIZCRED_EMAIL_FROM_NOME", "EMAIL_RETOMADA_ATIVA"],
+        "WhatsApp": ["ACCESS_TOKEN", "VERIFY_TOKEN", "PHONE_NUMBERS_JSON", "NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID", "RETOMADA_SITE_WHATSAPP_ATIVA", "FGTS_FLOW_ID", "CLT_FLOW_ID", "CONSIGNADO_MODO"],
+        Servidor: ["PUBLIC_URL", "PAINEL_USER", "PAINEL_PASS", "TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN", "GEMINI_API_KEY"],
+      };
+      const abertas = new Set(["FACTA_DIRECT", "FACTA_ENV", "FACTA_PROPOSAL_ENABLED", "EMAIL_RETOMADA_ATIVA", "RETOMADA_SITE_WHATSAPP_ATIVA", "CONSIGNADO_MODO", "PUBLIC_URL", "NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID"]);
+      const saida = {};
+      for (const [grupo, nomes] of Object.entries(grupos)) {
+        saida[grupo] = Object.fromEntries(nomes.map((n) => [n, process.env[n] ? (abertas.has(n) ? `definida (${process.env[n]})` : "definida") : "AUSENTE"]));
+      }
+      saida.PAINEL_PASS_padrao = (process.env.PAINEL_PASS || "admin") === "admin";
+      return send(res, 200, saida);
+    }
+
     // GET /painel/api/unnotech/teste — só leitura: confere se as credenciais da Unnotech estão no servidor, se o token sai
     // e quais usuários (operadores) a chave enxerga. Nunca devolve token nem segredo.
     if (req.method === "GET" && path_ === "/painel/api/unnotech/teste") {

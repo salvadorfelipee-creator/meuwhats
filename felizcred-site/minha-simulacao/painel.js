@@ -5,7 +5,7 @@
   const CHAT_KEY = "felizcred_site_chat_v1";
   const DIAS_30 = 30 * 24 * 3600 * 1000;
   const app = document.getElementById("app");
-  const state = { session: null, clt: null, messages: [], aba: "inicio", folha: false, erro: "", carregando: false, outroNumero: false, aviso: "", valorFolha: "", assinatura: "" };
+  const state = { fluxo: "", jaSacou: "", tresMeses: null, pedirNome: false, session: null, clt: null, messages: [], aba: "inicio", folha: false, erro: "", carregando: false, outroNumero: false, aviso: "", valorFolha: "", assinatura: "" };
   let sondagem = null;
 
   const money = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -68,7 +68,7 @@
   const ETAPAS_AUTORIZACAO = ["solicitando_autorizacao", "autorizacao_enviada", "aguardando_autorizacao", "consultando_margem", "simulando"];
   const nomeBanco = (c) => (c && c.provider === "unnotech" ? "bancos parceiros" : "Facta");
   const ETAPAS_SEM_CONDICAO = ["sem_margem", "nao_elegivel", "sem_oferta", "politica_reprovada", "erro_consulta", "erro_autorizacao", "erro_integracao", "proposta_cancelada"];
-  const ehFgts = () => (state.clt && typeof state.clt === "object" ? state.clt.produto === "FGTS" : /fgts/i.test(String(state.session?.product || "")));
+  const ehFgts = () => (state.clt && typeof state.clt === "object" ? state.clt.produto === "FGTS" : state.fluxo === "fgts");
   function indiceEtapa(etapa) {
     if (etapa === "fgts_cotando") return 0;
     if (etapa === "fgts_autorizar") return 1;
@@ -113,11 +113,45 @@
       <li>Uma antecipação por ano. Valor de R$ 100 a R$ 500 por parcela anual (até R$ 2.500).</li>
       <li>Quem acabou de aderir ao saque-aniversário pode precisar aguardar até 90 dias.</li></ul></div>`;
   function viewFgtsInicio() {
-    return `${topo()}<div class="cabeca"><h1>Antecipação do FGTS</h1><p class="sub">Informe seu CPF para consultarmos seu saldo. Depois mostramos, passo a passo, como autorizar os bancos no aplicativo do FGTS.</p></div>
-      ${erroBox()}
-      <form class="form" style="margin-top:18px" data-form="fgts-start"><label>Seu CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" required></label><button class="btn primario grande"${state.carregando === "fgts" ? " disabled" : ""}>${state.carregando === "fgts" ? "Consultando…" : "Consultar meu FGTS"}</button></form>
-      <div style="margin:0 20px">${REQUISITOS_FGTS.replace('margin-top:12px', 'margin-top:16px')}</div>`;
+    const sacou = state.jaSacou;
+    const chips = ["sim|Sim, já saquei", "nao|Não sacei", "nao_lembro|Não lembro"].map((x) => { const [v, t] = x.split("|"); return `<button type="button" class="ficha${sacou === v ? " on" : ""}" data-acao="ja-sacou" data-valor="${v}">${t}</button>`; }).join("");
+    let corpo = "";
+    if (sacou === "sim") {
+      corpo = `<div class="cartao" style="margin-top:16px"><b style="font:700 16px Sora,sans-serif">Quem já sacou este ano não pode antecipar de novo</b><p style="margin:8px 0 0;font-size:14px;line-height:1.5;color:#4b5d6e">A Caixa só permite uma vez a cada 12 meses. Mas você pode simular o <b>consignado CLT</b>, se tiver carteira assinada.</p></div>
+        <div class="lista-opcoes" style="margin-top:12px"><button class="opcao forte pulsa" type="button" data-acao="trocar-clt"><span class="ico verde">+</span><span><span class="selo">Alternativa para você</span><b>Simular o consignado CLT</b><small>Usa os mesmos dados. Leva menos de um minuto.</small></span><span class="seta">${ICONE.seta}</span></button></div>`;
+    } else if (sacou === "nao_lembro") {
+      corpo = `<div class="cartao simples" style="margin-top:16px"><b style="font:700 15px Sora,sans-serif">Como conferir</b><p style="margin:8px 0 0;font-size:14px;line-height:1.5;color:#4b5d6e">Abra o aplicativo do FGTS, toque em <b>Mais</b> e depois em <b>Empréstimos realizados</b>: lá aparece a data do seu último saque. Se não houver saque neste ano, siga em frente.</p></div>
+        <div class="lista-opcoes" style="margin-top:12px"><button class="opcao" type="button" data-acao="ja-sacou" data-valor="nao"><span><b>Conferi e não sacei este ano</b></span><span class="seta">${ICONE.seta}</span></button><button class="opcao" type="button" data-acao="ja-sacou" data-valor="sim"><span><b>Conferi e já saquei este ano</b></span><span class="seta">${ICONE.seta}</span></button></div>`;
+    } else if (sacou === "nao") {
+      corpo = `${erroBox()}<form class="form" style="margin-top:16px" data-form="fgts-start"><label>Seu CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" required></label><button class="btn primario grande"${state.carregando === "fgts" ? " disabled" : ""}>${state.carregando === "fgts" ? "Consultando…" : "Consultar meu FGTS"}</button></form>`;
+    }
+    return `${topo()}<div class="cabeca"><h1>Antecipação do FGTS</h1><p class="sub">O saque do FGTS só pode ser feito <b>uma vez por ano</b>. Antes de começar:</p></div>
+      <div class="cartao" style="margin-top:18px"><b style="font:700 16px Sora,sans-serif">Você já sacou o FGTS este ano?</b><div class="fichas">${chips}</div></div>
+      ${corpo}
+      ${sacou === "nao" ? `<div style="margin:0 20px">${REQUISITOS_FGTS.replace("margin-top:12px", "margin-top:16px")}</div>` : ""}`;
   }
+
+  function viewCltInicio() {
+    const t = state.tresMeses;
+    const nome = String(state.session?.name || "");
+    const corpoForm = t === true
+      ? `${erroBox()}<form class="form" style="margin-top:16px" data-form="clt-start"><label>Nome completo, como no documento<input name="name" autocomplete="name" required value="${esc(nome.split(/\s+/).filter(Boolean).length >= 2 ? nome : "")}"></label><label>CPF<input name="cpf" inputmode="numeric" autocomplete="off" maxlength="14" placeholder="000.000.000-00" required></label><label>Celular com DDD (receberá a autorização)<input name="phone" inputmode="tel" autocomplete="tel" required value="${esc(String(state.session?.contact || ""))}"></label><button class="btn primario grande"${state.carregando === "clt" ? " disabled" : ""}>${state.carregando === "clt" ? "Enviando…" : "Consultar minhas condições"}</button></form>`
+      : t === false
+      ? `<div class="cartao simples" style="margin-top:16px"><p style="margin:0;font-size:14px;line-height:1.5;color:#4b5d6e">Entendido. Quando completar 3 meses no trabalho atual, volte aqui para consultar suas condições. Se preferir, veja a antecipação do FGTS.</p></div><div class="lista-opcoes" style="margin-top:12px"><button class="opcao" type="button" data-acao="trocar-fgts"><span><b>Ver a antecipação do FGTS</b></span><span class="seta">${ICONE.seta}</span></button></div>`
+      : "";
+    return `${topo()}<div class="cabeca"><h1>Consignado CLT</h1><p class="sub">Para simular, você precisa ter <b>mais de 3 meses</b> de registro no trabalho atual.</p></div>
+      <div class="cartao" style="margin-top:18px"><b style="font:700 16px Sora,sans-serif">Você já completou esse período?</b><div class="fichas"><button type="button" class="ficha${t === true ? " on" : ""}" data-acao="tres-meses" data-valor="sim">Sim, tenho mais de 3 meses</button><button type="button" class="ficha${t === false ? " on" : ""}" data-acao="tres-meses" data-valor="nao">Ainda não</button></div></div>
+      ${corpoForm}`;
+  }
+
+  function viewEscolhaProduto() {
+    return `${topo()}<div class="cabeca"><h1>Oi${primeiroNome() ? ", " + esc(primeiroNome()) : ""}</h1><p class="sub">O que você quer simular?</p></div>
+      <div class="lista-opcoes" style="margin-top:18px">
+        <button class="opcao forte" type="button" data-acao="trocar-fgts"><span class="ico verde">$</span><span><b>Antecipar meu FGTS</b><small>Você autoriza os bancos no aplicativo do FGTS.</small></span><span class="seta">${ICONE.seta}</span></button>
+        <button class="opcao" type="button" data-acao="trocar-clt"><span class="ico verde">C</span><span><b>Consignado CLT</b><small>Para quem tem mais de 3 meses de carteira assinada.</small></span><span class="seta">${ICONE.seta}</span></button>
+      </div>`;
+  }
+
   function viewFgtsCotando() {
     return `${topo()}<div class="cabeca"><h1>Consultando seu FGTS</h1><p class="sub">Estamos pedindo as condições aos bancos. Isso leva alguns instantes.</p></div>
       <div class="espera" style="margin-top:18px"><span class="ponto"><i></i><i></i></span><div><b>Consultando seu saldo</b><p>Atualizamos aqui sozinhos, sem apertar nada.</p></div></div>
@@ -135,10 +169,14 @@
       <div style="margin:18px 20px 0"><button class="btn primario grande" type="button" data-acao="fgts-requote"${state.carregando === "fgts" ? " disabled" : ""}>${state.carregando === "fgts" ? "Consultando de novo…" : "Já autorizei, consultar de novo"}</button></div>
       <div style="margin:0 20px">${REQUISITOS_FGTS.replace('margin-top:12px', 'margin-top:16px')}</div>
       <p class="rotulo">Precisa de ajuda?</p>
-      <div class="lista-opcoes"><button class="opcao" type="button" data-acao="conversa"><span><b>Falar com o Felipe</b><small>Ele te guia pelo aplicativo.</small></span><span class="seta">${ICONE.seta}</span></button></div>`;
+      <div class="lista-opcoes"><button class="opcao" type="button" data-acao="conversa"><span><b>Falar com o Felipe</b><small>Ele te guia pelo aplicativo.</small></span><span class="seta">${ICONE.seta}</span></button>
+      <button class="opcao" type="button" data-acao="para-clt"><span><b>Prefiro simular o consignado CLT</b><small>Se você tem carteira assinada.</small></span><span class="seta">${ICONE.seta}</span></button>
+      ${state.pedirNome ? `<form class="form" style="margin:0" data-form="para-clt"><label>Seu nome completo, como no documento<input name="name" autocomplete="name" required value="${esc(String(state.session?.name || ""))}"></label><button class="btn primario">Continuar para o consignado CLT</button></form>` : ""}</div>`;
   }
   function viewSemSimulacao() {
     if (ehFgts()) return viewFgtsInicio();
+    if (state.fluxo === "clt") return viewCltInicio();
+    return viewEscolhaProduto();
     return `${topo()}<div class="cabeca"><h1>Oi${primeiroNome() ? ", " + esc(primeiroNome()) : ""}</h1><p class="sub">Sua simulação ainda não começou. Leva menos de um minuto.</p></div>
       <div class="lista-opcoes" style="margin-top:18px"><a class="opcao forte" href="/?chat=abrir"><span class="ico verde">F</span><span><b>Começar minha simulação</b><small>O Felipe te acompanha.</small></span><span class="seta">${ICONE.seta}</span></a></div>`;
   }
@@ -306,18 +344,24 @@
 
   function viewSemCondicoes() {
     const c = state.clt;
-    const titulos = { sem_margem: "Sem margem disponível agora", nao_elegivel: "O vínculo não está elegível agora", sem_oferta: "A Facta não encontrou uma condição", politica_reprovada: "A condição não passou pela política", erro_consulta: "Não conseguimos consultar agora", erro_autorizacao: "A autorização não foi enviada", erro_integracao: "A Facta não respondeu agora", proposta_cancelada: "Seu contrato não foi finalizado" };
+    const fgts = c.produto === "FGTS";
+    const titulos = { sem_margem: "Sem margem disponível agora", nao_elegivel: fgts ? "Não há antecipação do FGTS disponível agora" : "O vínculo não está elegível agora", sem_oferta: fgts ? "Não há antecipação do FGTS disponível agora" : "Os bancos não encontraram uma condição", politica_reprovada: "A condição não passou pela política", erro_consulta: "Não conseguimos consultar agora", erro_autorizacao: "A autorização não foi enviada", erro_integracao: "O banco não respondeu agora", proposta_cancelada: "Seu contrato não foi finalizado" };
     const rotuloChip = c.etapa === "proposta_cancelada" ? "Contrato não finalizado" : "Sem condições agora";
-    const motivo = c.error || "A Facta não detalhou o motivo.";
-    const podeOutroCelular = c.provider !== "unnotech" && /telefone.*(outro|cpf)|j[aá] informado/i.test(String(c.error || ""));
-    return `${topo()}<div class="cabeca"><h1>Não deu desta vez${primeiroNome() ? ", " + esc(primeiroNome()) : ""}</h1><p class="sub">${esc(titulos[c.etapa] || "A Facta não liberou condições agora")}. Isso é comum e não significa que você não possa ter crédito: a gente continua tentando por você.</p></div>
+    const motivo = c.error || "O banco não detalhou o motivo.";
+    const podeOutroCelular = !fgts && c.provider !== "unnotech" && /telefone.*(outro|cpf)|j[aá] informado/i.test(String(c.error || ""));
+    const nomeCard = fgts ? "Antecipação do FGTS" : c.provider === "unnotech" ? "Bancos parceiros" : "Facta";
+    const outrosBancos = !fgts && c.provider !== "unnotech" && c.etapa !== "proposta_cancelada"
+      ? `<button class="opcao forte pulsa" type="button" data-acao="outros-bancos"${state.carregando === "outros" ? " disabled" : ""}><span class="ico verde">+</span><span><span class="selo">Maior chance de aprovação</span><b>${state.carregando === "outros" ? "Consultando outros bancos…" : "Tentar com outros bancos"}</b><small>Outros bancos analisam de forma diferente. Usamos seus dados salvos, sem refazer o cadastro.</small></span><span class="seta">${ICONE.seta}</span></button>` : "";
+    const consignado = fgts
+      ? `<button class="opcao forte pulsa" type="button" data-acao="para-clt"${state.carregando === "clt" ? " disabled" : ""}><span class="ico verde">+</span><span><span class="selo">Alternativa para você</span><b>${state.carregando === "clt" ? "Abrindo a simulação…" : "Simular o consignado CLT"}</b><small>Se você tem carteira assinada, usamos o mesmo CPF e celular. Leva menos de um minuto.</small></span><span class="seta">${ICONE.seta}</span></button>
+        ${state.pedirNome ? `<form class="form" style="margin:0" data-form="para-clt"><label>Seu nome completo, como no documento<input name="name" autocomplete="name" required value="${esc(String(state.session?.name || ""))}"></label><button class="btn primario">Continuar para o consignado CLT</button></form>` : ""}` : "";
+    return `${topo()}<div class="cabeca"><h1>Não deu desta vez${primeiroNome() ? ", " + esc(primeiroNome()) : ""}</h1><p class="sub">${esc(titulos[c.etapa] || "Não conseguimos liberar condições agora")}. Isso é comum e não significa que você não possa ter crédito: a gente continua tentando por você.</p></div>
       ${c.provider === "unnotech" && c.previous ? `<div class="cartao" style="margin-top:18px;padding:14px 18px"><div style="display:flex;align-items:center;justify-content:space-between"><b style="font:700 16px Sora,sans-serif">Facta</b><span class="chip aviso">Sem condições agora</span></div></div>` : ""}
-      <div class="cartao" style="margin-top:${c.provider === "unnotech" && c.previous ? 12 : 18}px"><div style="display:flex;align-items:center;justify-content:space-between"><b style="font:700 16px Sora,sans-serif">${c.provider === "unnotech" ? "Bancos parceiros" : "Facta"}</b><span class="chip aviso">${rotuloChip}</span></div><p style="margin:10px 0 0;font-size:14px;line-height:1.5;color:#4b5d6e">Motivo informado: <b style="color:#10243b">${esc(motivo)}</b></p></div>
-      
+      <div class="cartao" style="margin-top:${c.provider === "unnotech" && c.previous ? 12 : 18}px"><div style="display:flex;align-items:center;justify-content:space-between"><b style="font:700 16px Sora,sans-serif">${nomeCard}</b><span class="chip aviso">${rotuloChip}</span></div><p style="margin:10px 0 0;font-size:14px;line-height:1.5;color:#4b5d6e">Motivo informado: <b style="color:#10243b">${esc(motivo)}</b></p></div>
       ${avisoBox()}${erroBox()}
       <p class="rotulo">O que você pode fazer agora</p>
       <div class="lista-opcoes">
-        ${c.provider !== "unnotech" && c.etapa !== "proposta_cancelada" ? `<button class="opcao forte pulsa" type="button" data-acao="outros-bancos"${state.carregando === "outros" ? " disabled" : ""}><span class="ico verde">+</span><span><span class="selo">Maior chance de aprovação</span><b>${state.carregando === "outros" ? "Consultando outros bancos…" : "Tentar com outros bancos"}</b><small>Outros bancos analisam de forma diferente. Usamos seus dados salvos, sem refazer o cadastro.</small></span><span class="seta">${ICONE.seta}</span></button>` : ""}
+        ${consignado}${outrosBancos}
         <button class="opcao" type="button" data-acao="conversa"><span class="ico verde">F</span><span><b>Falar com o Felipe</b><small>Ele confere seu caso e te responde aqui.</small></span><span class="seta">${ICONE.seta}</span></button>
         ${podeOutroCelular ? `<button class="opcao" type="button" data-acao="outro-numero"><span class="ico">${ICONE.user}</span><span><b>Tentar com outro celular</b><small>Útil quando o número já está ligado a outro CPF.</small></span><span class="seta">${ICONE.seta}</span></button>` : ""}
         ${state.outroNumero ? `<form class="form" style="margin:0" data-form="outro-numero"><label>Celular com DDD<input name="phone" inputmode="tel" autocomplete="tel" placeholder="(47) 99999-9999" required></label><button class="btn primario">Enviar a autorização para esse número</button></form>` : ""}
@@ -367,13 +411,17 @@
   }
 
   function viewConta() {
-    const email = String(state.session?.email || "");
-    const [u, d] = email.split("@");
-    const mascarado = d ? `${u.slice(0, 2)}${"*".repeat(Math.max(u.length - 2, 1))}@${d}` : "—";
-    return `${topo()}<div class="cabeca"><h1>Minha conta</h1><p class="sub">Seus dados ficam protegidos e só são usados na sua simulação.</p></div>
-      <div class="cartao" style="margin-top:18px;display:grid;gap:12px"><div><p class="peq" style="margin:0">Nome</p><b>${esc(state.session?.name || "—")}</b></div><div><p class="peq" style="margin:0">E-mail</p><b>${esc(mascarado)}</b></div></div>
-      ${avisoBox()}
-      <div class="lista-opcoes" style="margin-top:18px">
+    return `${topo()}<div class="cabeca"><h1>Minha conta</h1><p class="sub">Seus dados ficam protegidos e só são usados nas suas simulações.</p></div>
+      ${avisoBox()}${erroBox()}
+      <form class="form" style="margin-top:18px" data-form="conta"><b style="font:700 15px Sora,sans-serif">Meus dados</b>
+        <label>Nome<input name="name" autocomplete="name" required value="${esc(state.session?.name || "")}"></label>
+        <label>E-mail<input name="email" type="email" autocomplete="email" required value="${esc(state.session?.email || "")}"></label>
+        <label>Celular com DDD<input name="contact" inputmode="tel" autocomplete="tel" required value="${esc(state.session?.contact || "")}"></label>
+        <button class="btn primario">Salvar alterações</button>
+      </form>
+      <p class="rotulo">Mais opções</p>
+      <div class="lista-opcoes">
+        ${state.clt && ["sem_oferta", "nao_elegivel", "erro_consulta", "proposta_cancelada", "sem_margem", "proposta_concluida"].includes(state.clt.etapa) ? "" : ""}
         <button class="opcao" type="button" data-acao="excluir"><span><b>Pedir a exclusão dos meus dados</b><small>Nossa equipe confirma o pedido por aqui.</small></span><span class="seta">${ICONE.seta}</span></button>
         <button class="opcao" type="button" data-acao="sair"><span><b>Sair deste aparelho</b><small>Para entrar de novo, use o link do e-mail.</small></span><span class="seta">${ICONE.seta}</span></button>
       </div>`;
@@ -467,6 +515,19 @@
       await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/resend-authorization`, { method: "POST", body: "{}" }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); state.aviso = "Enviamos o link de novo para o seu WhatsApp."; });
       return;
     }
+    if (acao === "ja-sacou") { state.jaSacou = alvo.dataset.valor; state.erro = ""; render(); return; }
+    if (acao === "tres-meses") { state.tresMeses = alvo.dataset.valor === "sim"; state.erro = ""; render(); return; }
+    if (acao === "trocar-clt") { state.fluxo = "clt"; state.erro = ""; render(); window.scrollTo(0, 0); return; }
+    if (acao === "trocar-fgts") { state.fluxo = "fgts"; state.erro = ""; render(); window.scrollTo(0, 0); return; }
+    if (acao === "para-clt") {
+      state.carregando = "clt"; render();
+      try {
+        const d = await api(`/conversations/${state.session.id}/clt/switch-clt`, { method: "POST", body: JSON.stringify({ name: state.session?.name }) });
+        state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); state.pedirNome = false; state.erro = ""; state.fluxo = "clt"; window.scrollTo(0, 0);
+      } catch (erro) { state.pedirNome = true; state.erro = erro.message; }
+      state.carregando = false; render();
+      return;
+    }
     if (acao === "fgts-requote") {
       state.carregando = "fgts"; render();
       await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/fgts-requote`, { method: "POST", body: "{}" }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); window.scrollTo(0, 0); });
@@ -495,6 +556,40 @@
       try { await enviarMensagemSimples(texto); } catch (err) { state.erro = err.message; }
       return;
     }
+    if (tipo === "cadastro") {
+      const produto = String(dados.get("produto") || "");
+      if (!produto) return mostrarCadastro("Escolha o que você quer fazer.");
+      const botao = form.querySelector("button"); if (botao) { botao.disabled = true; botao.textContent = "Abrindo…"; }
+      try {
+        const resposta = await fetch(`${API}/conversations`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: dados.get("name"), contact: dados.get("contact"), email: dados.get("email"), whatsappOptIn: dados.has("whatsapp_opt_in"), message: `Tenho interesse em: ${produto === "fgts" ? "FGTS" : "Empréstimo CLT"}`, pageUrl: location.href }) });
+        const d = await resposta.json().catch(() => ({}));
+        if (!resposta.ok) throw new Error(d.error || "Não foi possível começar agora.");
+        state.fluxo = produto;
+        guardarSessao({ id: d.conversation.id, token: d.token, name: String(dados.get("name")).trim(), contact: String(dados.get("contact")).replace(/\D/g, ""), email: String(dados.get("email")).trim().toLowerCase(), product: produto === "fgts" ? "FGTS" : "Empréstimo CLT", expiresAt: Date.now() + DIAS_30 });
+        state.messages = d.messages || [];
+        history.replaceState(null, "", location.pathname);
+        await arrancar();
+      } catch (erro) { mostrarCadastro(erro.message); }
+      return;
+    }
+    if (tipo === "clt-start") {
+      state.carregando = "clt"; render();
+      await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/start`, { method: "POST", body: JSON.stringify({ name: dados.get("name"), cpf: dados.get("cpf"), phone: dados.get("phone") }) }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); window.scrollTo(0, 0); });
+      return;
+    }
+    if (tipo === "para-clt") {
+      state.carregando = "clt"; state.session.name = String(dados.get("name") || state.session.name); render();
+      await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/switch-clt`, { method: "POST", body: JSON.stringify({ name: dados.get("name") }) }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); state.pedirNome = false; state.fluxo = "clt"; window.scrollTo(0, 0); });
+      return;
+    }
+    if (tipo === "conta") {
+      await executar(async () => {
+        const d = await api(`/conversations/${state.session.id}/clt/conta-update`, { method: "POST", body: JSON.stringify({ name: dados.get("name"), email: dados.get("email"), contact: dados.get("contact") }) });
+        guardarSessao({ ...state.session, name: d.conversation.name, email: d.conversation.email, contact: d.conversation.contact });
+        state.aviso = "Dados atualizados.";
+      });
+      return;
+    }
     if (tipo === "fgts-start") {
       state.carregando = "fgts"; render();
       await executar(async () => { const d = await api(`/conversations/${state.session.id}/clt/fgts-start`, { method: "POST", body: JSON.stringify({ cpf: dados.get("cpf") }) }); state.clt = d.clt; state.assinatura = assinaturaClt(d.clt); window.scrollTo(0, 0); });
@@ -517,8 +612,37 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session) { document.title = "Minha simulação | FelizCred"; atualizarClt(); atualizarMensagens(); } });
 
   // ── início ───────────────────────────────────────────────────────────────
+  // Cliente novo (chegou pelo botão do WhatsApp ou pelo site): pede o mínimo e já abre a conversa.
+  function mostrarCadastro(erro = "") {
+    const q = new URLSearchParams(location.search);
+    const celular = String(q.get("wa") || "").replace(/\D/g, "");
+    const escolhido = state.fluxo || "";
+    app.innerHTML = `<div class="topo"><a class="marca" href="/">FelizCred</a></div>
+      <div class="cabeca"><h1>Vamos começar</h1><p class="sub">Leva menos de um minuto. Seus dados ficam salvos no seu painel e você acompanha tudo por aqui.</p></div>
+      ${erro ? `<p class="erro" role="alert">${esc(erro)}</p>` : ""}
+      <form class="form" style="margin-top:18px" data-form="cadastro">
+        ${escolhido ? `<input type="hidden" name="produto" value="${escolhido}">` : `<label>O que você quer fazer?<select name="produto" required><option value="">Selecione</option><option value="fgts">Antecipar meu FGTS</option><option value="clt">Consignado CLT (carteira assinada)</option></select></label>`}
+        <label>Seu nome completo<input name="name" autocomplete="name" required></label>
+        <label>Celular com DDD<input name="contact" inputmode="tel" autocomplete="tel" required value="${esc(celular)}" placeholder="(47) 99999-9999"></label>
+        <label>Seu melhor e-mail<input name="email" type="email" autocomplete="email" required></label>
+        <label class="consent"><input type="checkbox" name="whatsapp_opt_in" checked> Aceito receber no WhatsApp mensagens da FelizCred sobre esta simulação. Posso cancelar a qualquer momento.</label>
+        <button class="btn primario grande">Continuar</button>
+      </form>`;
+  }
+
+  async function arrancar() {
+    render();
+    await Promise.all([atualizarClt(), atualizarMensagens()]);
+    render();
+    let tique = 0;
+    sondagem = setInterval(() => { if (document.hidden) return; atualizarClt(); tique += 1; if (state.aba === "conversa" || tique % 2 === 0) atualizarMensagens(); }, 4000);
+  }
+
   async function iniciar() {
-    const codigo = new URLSearchParams(location.search).get("t");
+    const params = new URLSearchParams(location.search);
+    const novo = String(params.get("novo") || "").toLowerCase();
+    if (novo === "fgts" || novo === "clt") state.fluxo = novo;
+    const codigo = params.get("t");
     if (codigo) {
       try {
         const resposta = await fetch(`${API}/access`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: codigo }) });
@@ -533,14 +657,12 @@
     }
     if (!state.session) {
       const s = lerSessao();
-      if (!s) return telaErro("Abra o link que enviamos para o seu e-mail para ver sua simulação.");
+      if (!s) return mostrarCadastro();
       state.session = s;
     }
-    render();
-    await Promise.all([atualizarClt(), atualizarMensagens()]);
-    render();
-    let tique = 0;
-    sondagem = setInterval(() => { if (document.hidden) return; atualizarClt(); tique += 1; if (state.aba === "conversa" || tique % 2 === 0) atualizarMensagens(); }, 4000);
+    if (!state.fluxo && /fgts/i.test(String(state.session.product || ""))) state.fluxo = "fgts";
+    if (!state.fluxo && /clt/i.test(String(state.session.product || ""))) state.fluxo = "clt";
+    await arrancar();
   }
   iniciar();
 })();
