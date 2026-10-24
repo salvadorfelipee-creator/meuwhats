@@ -870,7 +870,6 @@
   }
 </style>
 <link rel="stylesheet" href="./redesign.css?v=20261023-1">
-<link rel="stylesheet" href="./demo-atendimento.css?v=20261024-1">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZMXC2DFR5G"></script>
 <script>
@@ -928,11 +927,6 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         <a href="#simular" class="btn-primary" data-open-chat>Fazer minha simulação</a>
         <a href="#como-funciona" class="btn-secondary">Ver como funciona</a>
       </div>
-      <div class="hero-demo-benefits" aria-label="Benefícios do atendimento demonstrado">
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg>Escolhas e orientações apresentadas no momento certo</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg>Dados, foto e Pix completamente fictícios nesta demonstração</span>
-        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 12 4 4 8-8"/></svg>Você escolhe quando avançar e pode recomeçar quando quiser</span>
-      </div>
       <div class="hero-stats">
         <div class="stat">
           <div class="stat-num">Grátis</div>
@@ -948,37 +942,8 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         </div>
       </div>
     </div>
-    <div class="hero-product chat-demo fc-demo" data-fc-demo aria-label="Demonstração interativa e local do atendimento FelizCred">
-      <div class="fc-demo-shell">
-        <header class="fc-demo-header">
-          <span class="fc-demo-avatar" aria-hidden="true">FC</span>
-          <span class="fc-demo-person"><strong>Assistente FelizCred</strong><span><i aria-hidden="true"></i>Online para esta demonstração</span></span>
-          <span class="fc-demo-local"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7.5 10V7a4.5 4.5 0 0 1 9 0v3"/><rect x="5" y="10" width="14" height="10" rx="3"/><path d="M12 14v2.5"/></svg><span>Funciona somente neste navegador</span></span>
-        </header>
-        <div class="fc-demo-progress" aria-live="polite">
-          <strong data-fc-demo-stage>Boas-vindas</strong>
-          <span data-fc-demo-count>Etapa 1 de 9</span>
-          <div class="fc-demo-progress-track" aria-hidden="true"><i></i></div>
-        </div>
-        <div class="fc-demo-messages" data-fc-demo-messages aria-live="polite" aria-relevant="additions">
-          <p class="fc-demo-nojs">Ative o JavaScript para usar a demonstração interativa. Nenhum dado será enviado.</p>
-        </div>
-        <div class="fc-demo-footer">
-          <span class="fc-demo-footer-copy"><strong>Demonstração local</strong><span>Escolhas, arquivos e cópias não geram atendimento real.</span></span>
-          <span class="fc-demo-footer-controls">
-            <button class="fc-demo-control" type="button" data-fc-demo-pause aria-label="Pausar demonstração" aria-pressed="false">
-              <svg class="fc-demo-icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h3v14H7zm7 0h3v14h-3z"/></svg>
-              <svg class="fc-demo-icon-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m8 5 11 7-11 7z"/></svg>
-            </button>
-            <button class="fc-demo-control" type="button" data-fc-demo-restart aria-label="Recomeçar demonstração">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6"/><path d="M4 4v4.6h4.6"/></svg>
-            </button>
-          </span>
-        </div>
-      </div>
-      <p class="fc-demo-disclaimer">Simulação visual: não envia dados, não faz upload e não cria cobrança ou Pix real.</p>
-
-      <div class="demo-window" hidden aria-hidden="true">
+    <div class="hero-product chat-demo" aria-label="Demonstração ilustrativa da jornada de contratação">
+      <div class="demo-window">
         <div class="demo-window-bar">
           <span class="demo-avatar" aria-hidden="true">FC</span>
           <span class="demo-contact"><strong>FelizCred</strong><span>Atendimento acompanhado</span></span>
@@ -1062,7 +1027,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
           </button>
         </div>
       </div>
-      <p class="demo-disclaimer" hidden aria-hidden="true">Demonstração ilustrativa. Condições, aprovação e prazo de liberação dependem da instituição financeira.</p>
+      <p class="demo-disclaimer">Demonstração ilustrativa. Condições, aprovação e prazo de liberação dependem da instituição financeira.</p>
     </div>
   </div>
 </section>
@@ -1624,7 +1589,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   });
 
   // A conversa-prova avança sozinha, aceita navegação manual e pausa quando não está em uso.
-  const chatDemo = document.querySelector('.chat-demo-legacy-disabled');
+  const chatDemo = document.querySelector('.chat-demo');
   if (chatDemo) {
     const demoSteps = [...chatDemo.querySelectorAll('[data-demo-step]')];
     const demoScenes = [...chatDemo.querySelectorAll('[data-demo-scene]')];
@@ -1720,7 +1685,6 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     productsThemeObserver.observe(productsSection);
   }
 </script>
-<script src="./demo-atendimento.js?v=20261024-1" defer></script>
 <script src="./chat.js?v=20261023-1" defer></script>
 </body>
 </html>

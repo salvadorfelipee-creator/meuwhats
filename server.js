@@ -365,6 +365,9 @@ async function notificarEtapaFactaNoWhatsApp(row, etapa, banco = "Facta") {
   const phone = normalizarTelefoneBR(row.phone);
   const businessId = process.env.NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID || "1335976862924566";
   try {
+    // Decisão do dono (24/10/2026): fora da janela de 24h o retorno ao cliente é só por e-mail (já enviado em paralelo).
+    const conversaWa = await db.getConversation(phone, businessId);
+    if (!conversaWa?.last_inbound_at || Date.now() - Number(conversaWa.last_inbound_at) > 23 * 3600_000) return;
     const conversation = row.conversation_id ? await db.siteChatObter(row.conversation_id) : null;
     const firstName = String(conversation?.name || "cliente").trim().split(/\s+/)[0];
     const bodyParameters = etapa === "proposta_cancelada"
@@ -585,29 +588,36 @@ async function sincronizarSiteChatFacta(row) {
   }
 
   const rows = dadosTrabalhadorFacta(response);
-  const elegiveis = rows.filter((item) => simFacta(item.elegivel));
-  const worker = elegiveis.sort((a, b) => numeroFacta(b.valorMargemDisponivel) - numeroFacta(a.valorMargemDisponivel))[0];
-  if (!worker) {
+  // Cliente com mais de um vínculo (matrículas): a Facta exige informar a matrícula ao buscar as operações
+  // ("Informe uma {matricula} para prosseguir: 34, ARES08"). Tenta cada vínculo elegível, do maior para o menor
+  // limite, e fica com o primeiro que tiver condições.
+  const elegiveis = rows.filter((item) => simFacta(item.elegivel)).sort((a, b) => numeroFacta(b.valorMargemDisponivel) - numeroFacta(a.valorMargemDisponivel));
+  if (!elegiveis.length) {
     const reason = rows.map((item) => item.erro_mensagem || item.motivoInelegibilidade_descricao).find(Boolean);
     return db.siteChatCltAtualizar(row.conversation_id, { etapa: "nao_elegivel", status_novosaque: "INELEGIVEL", error_message: reason || null });
   }
-  const margem = numeroFacta(worker.valorMargemDisponivel);
-  if (margem <= 0) return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_margem", status_novosaque: "SEM_MARGEM", margem_disponivel: 0, facta_worker_json: JSON.stringify(worker), error_message: null });
+  const primeiro = elegiveis[0];
+  if (numeroFacta(primeiro.valorMargemDisponivel) <= 0) return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_margem", status_novosaque: "SEM_MARGEM", margem_disponivel: 0, facta_worker_json: JSON.stringify(primeiro), error_message: null });
 
-  const operations = await facta.consultarOperacoes({
-    opcao_valor: 2,
-    valor_parcela: margem.toFixed(2),
-    cpf: row.cpf,
-    data_nascimento: normalizarDataFacta(worker.dataNascimento),
-    valor_renda: numeroFacta(worker.valorTotalVencimentos).toFixed(2),
-  });
-  if (respostaFactaComErro(operations)) {
-    return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_oferta", status_novosaque: "SEM_OPERACOES", margem_disponivel: margem, facta_worker_json: JSON.stringify(worker), error_message: mensagemFacta(operations) });
+  let worker = primeiro, margem = numeroFacta(primeiro.valorMargemDisponivel), offers = [], erroOperacoes = null;
+  for (const candidato of elegiveis.slice(0, 5)) {
+    const margemCandidato = numeroFacta(candidato.valorMargemDisponivel);
+    if (margemCandidato <= 0) continue;
+    const operations = await facta.consultarOperacoes({
+      opcao_valor: 2,
+      valor_parcela: margemCandidato.toFixed(2),
+      cpf: row.cpf,
+      data_nascimento: normalizarDataFacta(candidato.dataNascimento),
+      valor_renda: numeroFacta(candidato.valorTotalVencimentos).toFixed(2),
+      ...(candidato.matricula ? { matricula: candidato.matricula } : {}),
+    });
+    if (respostaFactaComErro(operations)) { erroOperacoes = mensagemFacta(operations); continue; }
+    const encontradas = ofertasFacta(operations);
+    if (encontradas.length) { worker = candidato; margem = margemCandidato; offers = encontradas; break; }
   }
-  const offers = ofertasFacta(operations);
   if (!offers.length) {
     await db.siteChatFunilEvento(row.conversation_id, "saida", "sem_oferta", "facta", "sem_oferta");
-    return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_oferta", status_novosaque: "SEM_OPERACOES", margem_disponivel: margem, facta_worker_json: JSON.stringify(worker), error_message: null });
+    return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_oferta", status_novosaque: "SEM_OPERACOES", margem_disponivel: margem, facta_worker_json: JSON.stringify(worker), error_message: erroOperacoes });
   }
   // Duas sincronizações simultâneas chegavam aqui juntas e a mensagem saía duplicada: relê a etapa antes de registrar.
   const jaRegistrada = await db.siteChatCltObter(row.conversation_id);
@@ -9943,7 +9953,7 @@ setInterval(async () => {
     const propostas = await db.siteChatFactaListarEmAcompanhamento();
     for (const proposta of propostas) {
       try {
-        await sincronizarSiteChatFacta(proposta);
+        await sincronizarSiteChatClt(proposta); // com o plano B dos bancos parceiros quando a Facta não libera
       } catch (err) {
         console.error(`Erro ao acompanhar proposta Facta do site ${proposta.conversation_id}:`, err.message);
       }
