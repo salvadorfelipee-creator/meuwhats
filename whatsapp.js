@@ -423,7 +423,7 @@ async function criarTemplateTexto(wabaId, { name, language, category, text, butt
   // `example`: valores de exemplo das variáveis {{1}}, {{2}}... (a Meta exige quando o texto tem variável).
   // `buttons`: textos de botões de resposta rápida (o cliente toca e a resposta chega como "button").
   const components = [{ type: "BODY", text, ...(example?.length ? { example: { body_text: [example] } } : {}) }];
-  if (buttons?.length) components.push({ type: "BUTTONS", buttons: buttons.map((b) => ({ type: "QUICK_REPLY", text: b })) });
+  if (buttons?.length) components.push({ type: "BUTTONS", buttons: buttons.map((b) => (typeof b === "string" ? { type: "QUICK_REPLY", text: b } : { type: "URL", text: b.text, url: b.url })) });
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",

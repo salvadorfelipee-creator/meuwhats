@@ -220,6 +220,9 @@ const ready = (async () => {
   if (!infoSiteChat.rows.some((r) => r.name === "retomada_whatsapp_at")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN retomada_whatsapp_at INTEGER`);
   }
+  if (!infoSiteChat.rows.some((r) => r.name === "retomada2_whatsapp_at")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN retomada2_whatsapp_at INTEGER`);
+  }
   if (!infoSiteChat.rows.some((r) => r.name === "email_confirmado_at")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN email_confirmado_at INTEGER`);
   }
@@ -3917,6 +3920,37 @@ async function siteChatParaRetomadaWhatsapp(desde, ate) {
   return r.rows.map((x) => ({ ...x }));
 }
 
+// Segundo lembrete (só o botão do painel): quem recebeu o primeiro entre `desde` e `ate` e ainda não recebeu este.
+async function siteChatParaLembreteWhatsapp(desde, ate) {
+  await ready;
+  const r = await client.execute({
+    sql: `SELECT c.id, c.name, c.contact, c.retomada_whatsapp_at, t.phone AS clt_phone, t.etapa
+          FROM site_chat_conversations c LEFT JOIN site_chat_clt t ON t.conversation_id = c.id
+          WHERE c.whatsapp_opt_in_at IS NOT NULL AND c.whatsapp_opt_out_at IS NULL
+            AND c.retomada2_whatsapp_at IS NULL
+            AND c.retomada_whatsapp_at BETWEEN ? AND ?
+            AND COALESCE(c.human_intent_stage, '') != 'human_active'
+            AND COALESCE(t.etapa, '') NOT IN ('aguardando_assinatura_facta', 'proposta_em_analise', 'proposta_concluida', 'proposta_cancelada')
+          ORDER BY c.retomada_whatsapp_at ASC`,
+    args: [desde, ate],
+  });
+  return r.rows.map((x) => ({ ...x }));
+}
+
+async function siteChatMarcarLembreteWhatsapp(id) {
+  await ready;
+  const r = await client.execute({
+    sql: `UPDATE site_chat_conversations SET retomada2_whatsapp_at = ? WHERE id = ? AND retomada2_whatsapp_at IS NULL`,
+    args: [Date.now(), id],
+  });
+  return r.rowsAffected > 0;
+}
+
+async function siteChatDesmarcarLembreteWhatsapp(id) {
+  await ready;
+  await client.execute({ sql: `UPDATE site_chat_conversations SET retomada2_whatsapp_at = NULL WHERE id = ?`, args: [id] });
+}
+
 async function siteChatMarcarRetomadaWhatsapp(id) {
   await ready;
   const r = await client.execute({
@@ -4045,7 +4079,7 @@ async function siteChatFunilResumo(desdeMs) {
                    SUM(CASE WHEN c.status = 'open' AND c.updated_at <= ? THEN 1 ELSE 0 END) AS silenciosos
             FROM site_chat_conversations c
             LEFT JOIN site_chat_clt clt ON clt.conversation_id = c.id
-            WHERE c.created_at >= ? AND c.produto_tag = 'Empréstimo CLT'
+            WHERE c.created_at >= ? AND clt.conversation_id IS NOT NULL
             GROUP BY COALESCE(clt.etapa, 'entrada') ORDER BY total DESC`,
       args: [Date.now() - 30 * 60 * 1000, desdeMs],
     }),
@@ -4277,6 +4311,9 @@ module.exports = {
   siteChatRegistrarOptOut,
   siteChatObter,
   siteChatParaRetomadaWhatsapp,
+  siteChatParaLembreteWhatsapp,
+  siteChatMarcarLembreteWhatsapp,
+  siteChatDesmarcarLembreteWhatsapp,
   siteChatMarcarRetomadaWhatsapp,
   siteChatDesmarcarRetomadaWhatsapp,
   siteChatMarcarEmailConfirmado,

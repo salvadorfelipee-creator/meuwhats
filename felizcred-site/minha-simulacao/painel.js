@@ -439,9 +439,23 @@
   }
   function marcarVistas() { try { localStorage.setItem(chaveVisto(), String(Date.now())); } catch {} }
 
+  // Faixa "Você parou em": aparece por alguns segundos quando o cliente volta a um painel já iniciado.
+  const PAROU_EM = {
+    autorizacao_enviada: "autorizar a consulta na Facta", aguardando_autorizacao: "autorizar a consulta na Facta",
+    consultando_margem: "consultar suas condições", simulando: "consultar suas condições",
+    ofertas_disponiveis: "escolher sua condição", dados_pessoais: "preencher seus dados",
+    aguardando_assinatura_facta: "assinar o contrato", proposta_em_analise: "o banco analisando sua proposta",
+    fgts_cotando: "consultar seu FGTS", fgts_autorizar: "autorizar os 3 bancos no app do FGTS",
+  };
+  function faixaRetomada() {
+    const etapa = state.clt?.etapa;
+    if (!state.faixa || !PAROU_EM[etapa]) return "";
+    return `<div class="faixa-retomada" role="status"><strong>Você parou em:</strong> ${PAROU_EM[etapa]}. É só continuar daqui 👇</div>`;
+  }
+
   function render() {
     if (!state.session) return;
-    const corpo = state.aba === "conversa" ? viewConversa() : state.aba === "simulacao" ? viewSimulacao() : state.aba === "conta" ? viewConta() : viewInicio();
+    const corpo = faixaRetomada() + state.aba === "conversa" ? viewConversa() : state.aba === "simulacao" ? viewSimulacao() : state.aba === "conta" ? viewConta() : viewInicio();
     const antes = document.querySelector('[name="texto"]')?.value || "";
     app.innerHTML = `${corpo}${state.folha ? folhaParcela() : ""}${abas()}`;
     if (state.aba === "conversa") { desenharMensagens(); marcarVistas(); const campo = document.querySelector('[name="texto"]'); if (campo) campo.value = antes; window.scrollTo(0, document.body.scrollHeight); }
@@ -633,6 +647,7 @@
   async function arrancar() {
     render();
     await Promise.all([atualizarClt(), atualizarMensagens()]);
+    if (state.volta) { state.faixa = true; setTimeout(() => { state.faixa = false; render(); }, 12000); }
     render();
     let tique = 0;
     sondagem = setInterval(() => { if (document.hidden) return; atualizarClt(); tique += 1; if (state.aba === "conversa" || tique % 2 === 0) atualizarMensagens(); }, 4000);
@@ -658,7 +673,7 @@
     if (!state.session) {
       const s = lerSessao();
       if (!s) return mostrarCadastro();
-      state.session = s;
+      state.session = s; state.volta = true;
     }
     if (!state.fluxo && /fgts/i.test(String(state.session.product || ""))) state.fluxo = "fgts";
     if (!state.fluxo && /clt/i.test(String(state.session.product || ""))) state.fluxo = "clt";

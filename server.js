@@ -466,6 +466,43 @@ async function enviarRetomadasSiteWhatsapp() {
 }
 setInterval(() => { enviarRetomadasSiteWhatsapp().catch((err) => console.error("Erro na retomada do site pelo WhatsApp:", err.message)); }, 10 * 60_000);
 
+// Segundo lembrete, mais curto, só com o botão do painel: 22h a 72h depois da primeira mensagem de retomada, para quem
+// não respondeu nada. Depende do modelo `felizcred_site_lembrete_v1` (botão de link) aprovado na Meta; até lá nada sai.
+const LEMBRETE_SITE_TEMPLATE = process.env.LEMBRETE_SITE_WHATSAPP_TEMPLATE || "felizcred_site_lembrete_v1";
+async function enviarLembreteSiteWhatsapp() {
+  if (process.env.RETOMADA_SITE_WHATSAPP_ATIVA === "false") return;
+  const agoraBr = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false, weekday: "short" }).formatToParts(new Date());
+  const hora = Number(agoraBr.find((p) => p.type === "hour").value) % 24;
+  if (hora < 9 || hora >= 20 || agoraBr.find((p) => p.type === "weekday").value === "Sun") return;
+  const agora = Date.now();
+  const businessId = process.env.NOVOSAQUE_SITE_WHATSAPP_BUSINESS_ID || CAMPANHA_CLT_NUMBER_ID;
+  const candidatas = await db.siteChatParaLembreteWhatsapp(agora - 72 * 3600_000, agora - 22 * 3600_000);
+  let enviados = 0;
+  for (const c of candidatas) {
+    if (enviados >= 3) break;
+    const phone = normalizarTelefoneBR(c.clt_phone || c.contact);
+    if (!phone) { await db.siteChatMarcarLembreteWhatsapp(c.id); continue; }
+    // Respondeu depois da primeira mensagem (qualquer botão ou texto): já tem atendimento, não recebe o lembrete.
+    let respondeu = false;
+    for (const numero of NUMEROS_CONSIGNADO) {
+      const conversa = await db.getConversation(phone, numero);
+      if (conversa?.last_inbound_at && Number(conversa.last_inbound_at) > Number(c.retomada_whatsapp_at)) respondeu = true;
+    }
+    if (respondeu) { await db.siteChatMarcarLembreteWhatsapp(c.id); continue; }
+    if (!(await db.siteChatMarcarLembreteWhatsapp(c.id))) continue;
+    const primeiroNome = String(c.name || "").trim().split(/\s+/)[0] || "tudo bem";
+    const resultado = await enviarUmBroadcast(businessId, { phone, name: primeiroNome, template: LEMBRETE_SITE_TEMPLATE, language: "pt_BR", params: [primeiroNome], ignorarBloqueio: true });
+    if (resultado.ok) { enviados++; continue; }
+    if (/132001|does not exist|n[aã]o existe|not approved/i.test(String(resultado.error))) {
+      await db.siteChatDesmarcarLembreteWhatsapp(c.id); // modelo ainda não aprovado: tenta de novo mais tarde
+      console.error("Lembrete do site pelo WhatsApp: modelo ainda não disponível na Meta.");
+      return;
+    }
+    console.error(`Lembrete do site pelo WhatsApp não enviado (${c.id}): ${resultado.error}`);
+  }
+}
+setInterval(() => { enviarLembreteSiteWhatsapp().catch((err) => console.error("Erro no lembrete do site pelo WhatsApp:", err.message)); }, 10 * 60_000);
+
 // A autorização do cliente na Facta vale por um tempo. Antes de pedir uma nova, confere se a consulta já
 // responde com dados do trabalhador: se sim, o cliente pula a etapa de autorizar de novo.
 async function autorizacaoFactaVigente(cpf) {
@@ -875,11 +912,11 @@ function resolverTokenParametro(texto, nome) {
 // `params` (opcional): lista de textos, 1 por variável {{1}},{{2}}... do template, cada um
 // podendo usar os tokens {{nome}}/{{data}} — sem isso, mantém o padrão antigo (só {{1}}=nome).
 const TEMPLATES_SEM_VARIAVEIS = ["bomdia", "boatarde"];
-async function enviarUmBroadcast(businessId, { phone, name, template, language, bodyPreview, params }) {
+async function enviarUmBroadcast(businessId, { phone, name, template, language, bodyPreview, params, ignorarBloqueio }) {
   const telefoneLimpo = normalizarTelefoneBR(phone);
   const nome = (name || "").trim();
   if (!telefoneLimpo) return { ok: false, error: "telefone inválido" };
-  if (await db.jaRecebeuTemplateRecente(telefoneLimpo, businessId, DIAS_BLOQUEIO_REENVIO_TEMPLATE)) {
+  if (!ignorarBloqueio && await db.jaRecebeuTemplateRecente(telefoneLimpo, businessId, DIAS_BLOQUEIO_REENVIO_TEMPLATE)) {
     return {
       ok: false,
       error: `Bloqueado: esse número já recebeu template desse canal nos últimos ${DIAS_BLOQUEIO_REENVIO_TEMPLATE} dias`,
@@ -5550,8 +5587,8 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
       case "consignado_chat":
         // Já recebeu o link do chat do site: reenvia o botão, mas no máximo 1 vez a cada 30 min (não gasta mensagem
         // repetindo o mesmo link para quem manda várias mensagens seguidas).
-        if (await respondeuHaPouco(de, businessNumberId, 30)) break;
-        await responder("Para continuar a simulação, toque no botão abaixo e continue pelo seu painel no site.", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
+        if (await respondeuHaPouco(de, businessNumberId, 10)) break;
+        await responder("Para continuar a simulação, toque no botão abaixo: você volta exatamente de onde parou no seu painel 😊", null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(de) });
         break;
       default: {
         // consignado_encerrado e consignado_concluido: a pessoa já passou pelo fluxo e escreveu de novo.
@@ -8533,6 +8570,14 @@ const server = http.createServer(async (req, res) => {
 
     // GET /painel/api/facta/ip-saida — mostra os IPs públicos que ESTE servidor usa para sair à internet (vários
     // testes, porque o provedor pode alternar entre alguns). São os que precisam estar liberados no painel da Facta.
+    // GET /painel/api/site/funil?dias=7 — onde os clientes do painel do site (CLT e FGTS) param: quantos chegaram a cada
+    // evento, em que etapa cada conversa está agora (e quantas estão paradas há mais de 30 min) e os motivos de saída.
+    if (req.method === "GET" && path_ === "/painel/api/site/funil") {
+      if (!requireAuth(req, res)) return;
+      const dias = Math.min(90, Math.max(1, Number(new URL(req.url, "http://x").searchParams.get("dias")) || 7));
+      return send(res, 200, { dias, ...(await db.siteChatFunilResumo(Date.now() - dias * 24 * 3600_000)) });
+    }
+
     // GET /painel/api/ambiente/teste — só leitura: quais variáveis de ambiente de cada área estão definidas (nunca mostra valor
     // de segredo; só o valor de chaves não secretas, como FACTA_ENV ou FACTA_PROPOSAL_ENABLED).
     if (req.method === "GET" && path_ === "/painel/api/ambiente/teste") {
