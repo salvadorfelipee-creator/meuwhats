@@ -766,6 +766,19 @@ publicada (version 7.3, com `__example__` em cada campo de `data`, sem `init-val
    `FLUXOS_POR_NUMERO`/a checagem de `CAMPANHA_CLT_NUMBER_ID` em `getFluxo`) ou conectar essa
    automação em outra entrada.
 
+### Atendimento 100% pelo site — painel do cliente (24/10/2026)
+
+O WhatsApp só manda uma mensagem curta com o botão **"Abrir meu painel"** (`linkChatConsignado` → `https://www.felizcred.com.br/minha-simulacao/?novo=CLT|FGTS&wa=...`). Todo o atendimento acontece em `felizcred-site/minha-simulacao/` (index.html, painel.css, painel.js), falando com `/site-chat/conversations/:id/clt/:ação` do `server.js`.
+
+- **CLT**: Facta primeiro (`abrirSimulacaoFactaClt`); se a Facta não libera (ou o cliente toca em "Tentar com outros bancos"), abre o consignado da **Unnotech** (`site-unnotech.js`, mesma conversa, `provider="unnotech"`).
+- **FGTS**: só Unnotech (`fgts-start` → `fgts-requote`). O cliente autoriza os 3 bancos no app do FGTS (J17 e 2 BMP). Sem disponibilidade, o painel oferece o CLT com o mesmo CPF (`switch-clt`).
+- **Regras de oferta** (Facta e Unnotech): nenhuma oferta com seguro (só se não houver outra); ordem por comissão (`COMISSAO_FACTA`, `COMISSAO_UNNO`); maior prazo + 24x.
+- **Horário**: seg–sex 9–18h, sáb 9–12h; fora disso o painel convida a chamar a partir das 9h.
+- **Retomada**: template `felizcred_site_retomada_v2` (marketing, 3 botões) + e-mail Brevo; avisos de proposta usam os templates utility aprovados `felizcred_clt_proposta_em_analise`, `_concluida` e `felizcred_clt_contrato_nao_finalizado`.
+- **Variáveis novas no Render**: `FACTA_DIRECT`, `FACTA_USERNAME/PASSWORD`, `FACTA_LOGIN_CERTIFICADO` (login do certificado, ex. `1234` ou `1234_nome`), `FACTA_PROPOSAL_ENABLED=true`, `UNNOTECH_CLIENT_ID/SECRET` (o `user_uuid` é resolvido sozinho por `/users`; `UNNOTECH_USER_UUID` opcional), `RETOMADA_SITE_WHATSAPP_ATIVA`, `RETOMADA_SITE_TEMPLATE`.
+- **Diagnóstico** (basic auth do painel): `/painel/api/ambiente/teste` (quais variáveis existem, sem valores secretos), `/painel/api/unnotech/teste`, `/versao` (commit publicado).
+- **Testes**: `node tests/site-unnotech.cjs`.
+
 ### Aviso de horário comercial (31/07/2026)
 
 Toda mensagem automática que promete "um especialista vai te chamar" na Cota Certa
