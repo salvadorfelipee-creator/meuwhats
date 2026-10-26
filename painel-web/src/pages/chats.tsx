@@ -1066,8 +1066,8 @@ function ChannelChatsPage() {
           <div className="relative px-3 pt-3 pb-1 shrink-0">
             <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar conversa"
-              className="pl-9"
+              placeholder="Pesquisar conversa"
+              className="pl-9 rounded-lg border-transparent bg-[#f0f2f5] dark:bg-[#202c33] shadow-none"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -1087,7 +1087,7 @@ function ChannelChatsPage() {
                 Nenhuma conversa ainda.
               </p>
             )}
-            <div className="flex flex-col gap-1 p-2">
+            <div className="flex flex-col">
             {itensLista.map((item) => {
               if (item.site) {
                 const c = item.site
@@ -1098,7 +1098,7 @@ function ChannelChatsPage() {
                     setSelected(null)
                     setSiteSel(c.id)
                   }}
-                  className={`w-full p-2.5 rounded-lg text-left flex items-center gap-2.5 ${siteSel === c.id ? "bg-accent" : "hover:bg-accent/50"}`}
+                  className={`w-full px-3 py-3 border-b border-border/50 text-left flex items-center gap-3 ${siteSel === c.id ? "bg-[#f0f2f5] dark:bg-[#2a3942]" : "hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]"}`}
                 >
                   <span className="h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
                     <Globe2 className="h-4 w-4" />
@@ -1140,21 +1140,21 @@ function ChannelChatsPage() {
                   if (todos) setSelectedBiz(c.business_number_id)
                   if (canalId) markConversationSeen(canalId, c.phone)
                 }}
-                className={`w-full p-2.5 rounded-lg cursor-pointer text-left transition-colors relative ${
+                className={`w-full px-3 py-3 border-b border-border/50 cursor-pointer text-left transition-colors relative ${
                   selected === c.phone && (!todos || current?.id === c.business_number_id)
-                    ? "bg-accent"
+                    ? "bg-[#f0f2f5] dark:bg-[#2a3942]"
                     : interessado
                     ? "animate-pulse"
                     : semResposta
                     ? "bg-red-500/10 dark:bg-red-500/15 animate-pulse"
-                    : "hover:bg-accent/50"
-                } ${naoLida ? "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary" : ""}`}
+                    : "hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]"
+                }`}
                 style={interessado && corProduto && !(selected === c.phone && (!todos || current?.id === c.business_number_id)) ? { backgroundColor: `${corProduto}26`, boxShadow: `inset 3px 0 0 ${corProduto}` } : undefined}
                 title={interessado ? "Pediu simulação — ainda não atendida" : semResposta ? "Sem nenhuma resposta (bot ou humano) há mais de 30 minutos" : undefined}
               >
-                <div className="flex flex-row gap-2.5 items-start">
+                <div className="flex flex-row gap-3 items-center">
                   <div className="relative shrink-0">
-                    <Avatar className="size-9">
+                    <Avatar className="size-12">
                       {c.foto_url && <AvatarImage src={mediaUrl(c.foto_url)} alt="" />}
                       <AvatarFallback>{initials(c.name, c.phone)}</AvatarFallback>
                     </Avatar>
@@ -1169,7 +1169,7 @@ function ChannelChatsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`truncate text-[13px] min-w-0 ${naoLida ? "font-semibold" : "font-medium"}`}>
+                        <span className="truncate text-[15px] min-w-0 text-[#111b21] dark:text-[#e9edef]">
                           {c.name || formatarTelefone(c.phone)}
                         </span>
                         {campos["Responsável"] && (
@@ -1187,7 +1187,7 @@ function ChannelChatsPage() {
                             {espera.texto}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(c.last_message_at)}</span>
+                          <span className={`text-xs tabular-nums ${naoLida ? "text-[#25d366] font-medium" : "text-[#667781]"}`}>{formatTime(c.last_message_at)}</span>
                         )}
                       </div>
                     </div>
@@ -1198,7 +1198,7 @@ function ChannelChatsPage() {
                           {rascunhoLista.texto}
                         </p>
                       ) : (
-                      <p className={`truncate min-w-0 flex-1 text-xs ${naoLida ? "font-semibold text-foreground" : "text-muted-foreground"}`}>
+                      <p className={`truncate min-w-0 flex-1 text-[13px] ${naoLida ? "text-[#111b21] dark:text-[#e9edef]" : "text-[#667781]"}`}>
                         {c.last_direction === "out" ? (c.last_origem ? "Você: " : "Automático: ") : ""}
                         {c.last_body || "—"}
                       </p>
@@ -1215,7 +1215,7 @@ function ChannelChatsPage() {
                             />
                           )}
                           <span
-                            className={`relative inline-flex h-2 w-2 rounded-full ${interessado ? "" : urgente ? "bg-red-500" : "bg-primary"}`}
+                            className={`relative inline-flex h-2.5 w-2.5 rounded-full ${interessado ? "" : urgente ? "bg-red-500" : "bg-[#25d366]"}`}
                             style={interessado && corProduto ? { backgroundColor: corProduto } : undefined}
                           />
                         </span>
@@ -1473,7 +1473,7 @@ function ChannelChatsPage() {
             )}
 
             {/* Mensagens */}
-            <div ref={scrollRef} onScroll={handleScrollMensagens} className="flex-1 overflow-y-auto px-4 py-3">
+            <div ref={scrollRef} onScroll={handleScrollMensagens} className="flex-1 overflow-y-auto px-6 py-3 bg-[#efeae2] dark:bg-[#0b141a]">
               {messages.length > 0 && !semMaisAntigas && (
                 <div className="flex justify-center pb-2">
                   <Button
@@ -1497,10 +1497,10 @@ function ChannelChatsPage() {
                     <div
                       key={m.id}
                       id={`msg-${m.id}`}
-                      className={`group relative max-w-[70%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${
+                      className={`group relative max-w-[70%] rounded-lg px-2.5 py-1.5 text-sm shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] whitespace-pre-wrap break-words ${
                         m.direction === "out"
-                          ? "bg-primary text-primary-foreground self-end"
-                          : "bg-secondary text-secondary-foreground self-start"
+                          ? "bg-[#d9fdd3] text-[#111b21] rounded-tr-none self-end dark:bg-[#005c4b] dark:text-[#e9edef]"
+                          : "bg-white text-[#111b21] rounded-tl-none self-start dark:bg-[#202c33] dark:text-[#e9edef]"
                       } ${
                         mensagensEncontradas[buscaIndex] === m.id ? "ring-2 ring-yellow-400 ring-offset-1" : ""
                       }`}
@@ -1520,7 +1520,7 @@ function ChannelChatsPage() {
                       {original && (
                         <div
                           className={`mb-1 rounded-md border-l-2 px-2 py-1 text-xs truncate opacity-80 ${
-                            m.direction === "out" ? "bg-black/10 border-white/50" : "bg-black/5 border-foreground/30"
+                            m.direction === "out" ? "bg-black/5 border-[#06cf9c]" : "bg-black/5 border-[#53bdeb]"
                           }`}
                         >
                           {(original.body || "Mídia").split("\n")[0].slice(0, 80)}
@@ -1615,12 +1615,12 @@ function ChannelChatsPage() {
                           ? destacarTexto(m.body, buscaTexto)
                           : m.body)}
                       {m.status === "failed" && (
-                        <div className="text-[11px] mt-1 text-red-200 flex items-start gap-1">
+                        <div className="text-[11px] mt-1 text-red-600 flex items-start gap-1">
                           <span>⚠️</span>
                           <span>Não entregue{m.error_message ? `: ${m.error_message}` : ""}</span>
                         </div>
                       )}
-                      <div className="text-[10px] opacity-70 mt-1 text-right">
+                      <div className="text-[10px] text-[#667781] dark:text-[#8696a0] mt-0.5 text-right">
                         {formatTime(m.created_at)}
                         {m.direction === "out" && ` · ${m.origem || "Automático"}`}
                         {m.direction === "out" && m.status && ` · ${m.status}`}
