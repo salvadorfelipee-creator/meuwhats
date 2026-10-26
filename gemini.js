@@ -313,18 +313,55 @@ Mensagem: ${String(texto || "").slice(0, 300)}`;
   return Number.isFinite(valor) && valor > 0 ? valor : null;
 }
 
-async function responderConversaCltSite({ mensagem, etapa, provedor }) {
-  // Quando a consulta já foi para a Unnotech (a Facta não liberou), a IA não pode falar em Facta nem pedir CPF/celular de novo:
-  // resposta fixa, sem chamar o modelo.
-  if (provedor === "unnotech") {
-    if (["autorizacao_enviada", "aguardando_autorizacao"].includes(etapa)) {
-      return 'Seus dados já foram enviados, não precisa digitar de novo. Toque no botão de autorização que aparece na tela e, depois de autorizar, volte e toque em "Já autorizei".';
-    }
-    if (["consultando_margem", "simulando"].includes(etapa)) {
-      return "Estamos consultando as condições nos bancos parceiros. Aguarde um instante nesta tela que as opções aparecem aqui.";
-    }
+const RODAPE_AJUDA_CLT = 'Se preferir, toque em "Falar com o Felipe".';
+// Resposta fixa a qualquer mensagem livre quando a simulação CLT/FGTS já começou. Aponta sempre para o passo da tela.
+function respostaFixaCltPorEtapa(etapa, provedor) {
+  const parceiros = provedor === "unnotech";
+  switch (etapa) {
+    case "solicitando_autorizacao":
+      return "Estamos enviando sua autorização. Aguarde um instante nesta tela.";
+    case "autorizacao_enviada":
+    case "aguardando_autorizacao":
+      return parceiros
+        ? 'Seus dados já foram enviados, não precisa digitar de novo. Toque no botão de autorização que aparece na tela e, depois de autorizar, volte e toque em "Já autorizei".'
+        : 'Seus dados já foram enviados, não precisa digitar de novo. Abra o WhatsApp, toque no link da Facta e autorize a consulta. Depois volte e toque em "Já autorizei" na tela.';
+    case "consultando_margem":
+    case "simulando":
+    case "fgts_cotando":
+      return "Estamos consultando as condições. Aguarde um instante nesta tela que as opções aparecem aqui.";
+    case "ofertas_disponiveis":
+    case "oferta_disponivel":
+      return "Suas condições já estão na tela. Escolha a que preferir para seguir.";
+    case "dados_pessoais":
+    case "formalizando":
+      return "Preencha seus dados no formulário da tela para gerar a proposta. Você revê tudo antes de assinar.";
+    case "aguardando_assinatura_facta":
+    case "aguardando_assinatura":
+      return "Sua proposta está pronta. Abra o link de assinatura na tela, revise todas as condições e assine somente se estiver de acordo.";
+    case "proposta_em_analise":
+      return "Sua assinatura foi recebida e o banco está analisando. Você acompanha tudo por aqui.";
+    case "proposta_concluida":
+    case "concluido":
+      return "Seu contrato foi concluído. Se precisar de algo, toque em \"Falar com o Felipe\".";
+    case "erro_autorizacao":
+      return "Confira seus dados no aviso da tela, corrija o que for preciso e envie de novo. Os outros dados continuam salvos.";
+    case "sem_margem":
+    case "nao_elegivel":
+    case "sem_oferta":
+    case "politica_reprovada":
+    case "erro_consulta":
+    case "proposta_cancelada":
+      return `Sua consulta não avançou agora. ${RODAPE_AJUDA_CLT} Nossa equipe vê seu caso e as opções.`;
+    default:
+      return `Siga o passo que aparece na tela. ${RODAPE_AJUDA_CLT}`;
   }
-  const prompt = `Você atende clientes da FelizCred sobre consignado CLT no chat do site. ${provedor === "unnotech" ? "A Facta já recusou este cliente; a consulta segue com outros bancos parceiros. Nunca mencione a Facta nem peça CPF ou celular de novo (já foram enviados)." : "A Facta é o único banco ativo neste fluxo automático."}
+}
+
+async function responderConversaCltSite({ mensagem, etapa, provedor }) {
+  // Simulação já iniciada (existe linha da Facta/Unnotech): o fluxo é determinístico e a tela já guia o cliente. Texto fixo por
+  // etapa, sem chamar o modelo. O Gemini só responde dúvida livre ANTES de a simulação começar.
+  if (provedor) return respostaFixaCltPorEtapa(etapa, provedor);
+  const prompt = `Você atende clientes da FelizCred sobre consignado CLT no chat do site. A Facta é o único banco ativo neste fluxo automático.
 Escreva como Felipe: português brasileiro simples, acolhedor, direto e curto. Use "Perfeito", "Show" e um emoji leve apenas quando combinar. Faça uma pergunta por vez.
 
 REGRAS INVIOLÁVEIS:
