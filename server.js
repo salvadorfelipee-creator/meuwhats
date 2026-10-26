@@ -577,7 +577,7 @@ async function sincronizarSiteChatFacta(row) {
   const response = await facta.consultarTrabalhador(row.cpf);
   if (respostaFactaComErro(response)) {
     const message = mensagemFacta(response);
-    if (/token expirado|necess[aá]rio.*autoriza|n[aã]o autoriz/i.test(message)) {
+    if (/token expirado|necess[aá]rio.*autoriza|n[aã]o autoriz|fila de autoriza/i.test(message)) {
       return db.siteChatCltAtualizar(row.conversation_id, { status_novosaque: "AGUARDANDO_AUTORIZACAO", error_message: null });
     }
     // Lentidão da Facta não é fim da simulação: tenta de novo na próxima verificação (até 10 min desde o pedido).
@@ -702,7 +702,7 @@ async function sincronizarSiteChatClt(row) {
     } catch (err) {
       console.error(`Erro ao sincronizar Facta no site (${row.conversation_id}):`, err.message);
       const retornoFacta = `${err.message} ${JSON.stringify(err.factaResponse || "")}`;
-      if (/token expirado|necess[aá]rio.*autoriza|n[aã]o autoriz|sem autoriza/i.test(retornoFacta)) {
+      if (/token expirado|necess[aá]rio.*autoriza|n[aã]o autoriz|sem autoriza|fila de autoriza/i.test(retornoFacta)) {
         return db.siteChatCltAtualizar(row.conversation_id, {
           status_novosaque: "AGUARDANDO_AUTORIZACAO",
           error_message: "Ainda não vimos sua autorização. Abra a mensagem da Facta no WhatsApp, toque no link para autorizar e depois toque aqui de novo.",
