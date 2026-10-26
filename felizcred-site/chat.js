@@ -154,6 +154,10 @@
     if (status) status.textContent = c?.etapa === "proposta_em_analise" ? "Proposta em análise" : c?.etapa === "proposta_concluida" ? "Proposta concluída" : c ? "Simulação Facta em andamento" : "Assistente online agora";
     if (!c) { cltEl.classList.remove("show"); cltEl.innerHTML = ""; return; }
     cltEl.classList.add("show");
+    if (c && c.provider === "unnotech" && c.etapa === "autorizacao_enviada" && c.consentUrl) {
+      cltEl.innerHTML = `<div class="fc-clt-card fc-clt-status-card"><span class="fc-clt-step">Bancos parceiros</span><h3>Autorize a consulta</h3><p>Toque em “Abrir a autorização”, confirme e volte aqui.</p><div class="fc-clt-actions"><a class="fc-chat-primary" href="${esc(c.consentUrl)}" target="_blank" rel="noopener" style="display:block;text-align:center;text-decoration:none">Abrir a autorização</a><button type="button" class="fc-clt-secondary" data-unno-autorizei>Pronto, já autorizei</button></div></div>`;
+      return;
+    }
     if (c && c.provider === "unnotech") {
       cltEl.innerHTML = `<div class="fc-clt-card fc-clt-status-card"><span class="fc-clt-step">Bancos parceiros</span><h3>Sua simulação continua no painel</h3><p>No painel você autoriza a consulta, vê as condições e acompanha cada etapa pelo celular.</p><div class="fc-clt-actions"><a class="fc-chat-primary" href="/minha-simulacao/" style="display:block;text-align:center;text-decoration:none">Abrir meu painel</a></div></div>`;
       return;
@@ -300,6 +304,19 @@
       cltEl.classList.remove("show");
       cltEl.innerHTML = "";
       composeText.focus();
+      return;
+    }
+    const unnoAutorizei = e.target.closest("[data-unno-autorizei]");
+    if (unnoAutorizei) {
+      unnoAutorizei.disabled = true;
+      unnoAutorizei.textContent = "Conferindo…";
+      await refreshClt();
+      await refresh();
+      if (state.clt?.etapa === "autorizacao_enviada") {
+        unnoAutorizei.disabled = false;
+        unnoAutorizei.textContent = "Pronto, já autorizei";
+        showCltActionError("Ainda não recebemos sua autorização. Toque em “Abrir a autorização”, confirme e volte aqui.");
+      }
       return;
     }
     const confirmAuthorization = e.target.closest("[data-confirm-authorization]");

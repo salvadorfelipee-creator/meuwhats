@@ -164,9 +164,12 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       error_message: null,
     });
     const celularDeOutroCpf = /telefone j[aá] informado para outro cpf/i.test(String(anterior?.error || ""));
-    await falar(row, celularDeOutroCpf
-      ? "Esse celular já está ligado a outro CPF na Facta, mas sem problema: vamos consultar os bancos parceiros com os mesmos dados (você não precisa digitar nada de novo). Falta só você autorizar a consulta pelo botão que aparece na tela."
-      : "A Facta não liberou condições, mas vamos tentar com outros bancos parceiros usando os mesmos dados (você não precisa digitar nada de novo). Falta só você autorizar a consulta pelo botão que aparece na tela.");
+    if (celularDeOutroCpf) {
+      await falar(row, "No Facta não é possível simular, pois este número está vinculado a outro CPF. Provavelmente você já simulou para algum familiar usando o seu número para gerar a autorização no Facta.");
+      await falar(row, "Vamos simular em outro banco com quem trabalhamos, o Unno. Logo abaixo está o link de autorização: é só clicar e autorizar a simulação. Depois de autorizar, toque em “Pronto, já autorizei” aqui na tela ou me avise, por favor.");
+    } else {
+      await falar(row, "A Facta não liberou condições, mas vamos tentar com outros bancos parceiros usando os mesmos dados (você não precisa digitar nada de novo). Falta só você autorizar a consulta pelo botão que aparece na tela.");
+    }
     await avisarLink(row, novo?.terms_link);
     return novo;
   }

@@ -68,7 +68,7 @@ const textos = (a) => (a.messages || []).map((m) => `${m.direction === "visitor"
   check(4, "celular de outro CPF segue sozinho para a Unnotech (não para no erro)", c4?.provider === "unnotech" && c4?.etapa === "autorizacao_enviada", `${c4?.provider}/${c4?.etapa} | ${c4?.error}`);
   check(4, "link de autorização Unnotech existe", !!c4?.consentUrl, c4?.consentUrl);
   at = await a.atendente(); const ms4 = textos(at);
-  check(4, "mensagem explica o celular e não pede para trocar o número", ms4.some((t) => /celular j. est. ligado a outro CPF/.test(t)) && !ms4.some((t) => /Corrigir dados/.test(t)), "");
+  check(4, "mensagem explica o celular e não pede para trocar o número", ms4.some((t) => /vinculado a outro CPF/.test(t)) && !ms4.some((t) => /Corrigir dados/.test(t)), "");
   console.log("   atendente vê:", ms4.join(" | ").slice(0, 600));
 
   console.log("\n[5] Unnotech demora a gerar o link");
