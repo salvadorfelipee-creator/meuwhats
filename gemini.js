@@ -313,8 +313,18 @@ Mensagem: ${String(texto || "").slice(0, 300)}`;
   return Number.isFinite(valor) && valor > 0 ? valor : null;
 }
 
-async function responderConversaCltSite({ mensagem, etapa }) {
-  const prompt = `Você atende clientes da FelizCred sobre consignado CLT no chat do site. A Facta é o único banco ativo neste fluxo automático.
+async function responderConversaCltSite({ mensagem, etapa, provedor }) {
+  // Quando a consulta já foi para a Unnotech (a Facta não liberou), a IA não pode falar em Facta nem pedir CPF/celular de novo:
+  // resposta fixa, sem chamar o modelo.
+  if (provedor === "unnotech") {
+    if (["autorizacao_enviada", "aguardando_autorizacao"].includes(etapa)) {
+      return 'Seus dados já foram enviados, não precisa digitar de novo. Toque no botão de autorização que aparece na tela e, depois de autorizar, volte e toque em "Já autorizei".';
+    }
+    if (["consultando_margem", "simulando"].includes(etapa)) {
+      return "Estamos consultando as condições nos bancos parceiros. Aguarde um instante nesta tela que as opções aparecem aqui.";
+    }
+  }
+  const prompt = `Você atende clientes da FelizCred sobre consignado CLT no chat do site. ${provedor === "unnotech" ? "A Facta já recusou este cliente; a consulta segue com outros bancos parceiros. Nunca mencione a Facta nem peça CPF ou celular de novo (já foram enviados)." : "A Facta é o único banco ativo neste fluxo automático."}
 Escreva como Felipe: português brasileiro simples, acolhedor, direto e curto. Use "Perfeito", "Show" e um emoji leve apenas quando combinar. Faça uma pergunta por vez.
 
 REGRAS INVIOLÁVEIS:

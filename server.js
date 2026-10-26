@@ -6626,7 +6626,7 @@ const server = http.createServer(async (req, res) => {
               .replace(/\b\d{11}\b/g, "[documento ou telefone]")
               .replace(/\b\d{10}\b/g, "[telefone]")
               .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, "[CPF]");
-            const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses" });
+            const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses", provedor: row?.provider });
             if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
             return send(res, 200, { resposta }, corsHeaders);
           }
@@ -7065,7 +7065,7 @@ const server = http.createServer(async (req, res) => {
                 .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, "[CPF]")
                 .replace(/\b\d{11}\b/g, "[documento ou telefone]")
                 .replace(/\b\d{10}\b/g, "[telefone]");
-              const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses" });
+              const resposta = await gemini.responderConversaCltSite({ mensagem: mensagemMascarada, etapa: row?.etapa || "qualificação de 3 meses", provedor: row?.provider });
               if (resposta) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", resposta);
             }
           } catch (err) {
