@@ -5397,6 +5397,16 @@ setTimeout(async () => {
     console.error("Erro ao completar tag de interesse no consignado:", err.message);
   }
 }, 2 * 60 * 1000);
+// Idem para a etapa do pipeline: quem confirmou os dados antes da regra "confirmou → qualificação" ficou em Novo lead.
+setTimeout(async () => {
+  try {
+    for (const c of await db.conversasConsignadoSemEtapa(NUMEROS_CONSIGNADO)) {
+      await db.atualizarPipelineConversa(c.phone, c.business_number_id, "qualificacao", "fluxo_consignado");
+    }
+  } catch (err) {
+    console.error("Erro ao completar etapa do pipeline no consignado:", err.message);
+  }
+}, 3 * 60 * 1000);
 setTimeout(encerrarLidosSemResposta, 60 * 1000);
 setInterval(encerrarLidosSemResposta, 10 * 60 * 1000);
 

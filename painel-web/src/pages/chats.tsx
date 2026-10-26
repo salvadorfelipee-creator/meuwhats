@@ -1676,7 +1676,7 @@ function ChannelChatsPage() {
             {/* Composer */}
             <AnimatePresence mode="wait" initial={false}>
             {gravando ? (
-              <div key="gravando" className="px-2 pb-3 pt-1.5 flex justify-center shrink-0 bg-[#f0f2f5] dark:bg-[#202c33]">
+              <div key="gravando" className="px-2 pb-3 pt-1.5 flex justify-center shrink-0 bg-[#efeae2] dark:bg-[#0b141a]">
                 <GravadorBar segundos={gravacaoSegundos} onCancelar={cancelarGravacao} onEnviar={pararGravacaoEEnviar} />
               </div>
             ) : (
@@ -1686,7 +1686,7 @@ function ChannelChatsPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97 }}
                 transition={{ duration: 0.18 }}
-                className="flex flex-col shrink-0 bg-[#f0f2f5] dark:bg-[#202c33]"
+                className="flex flex-col shrink-0 bg-[#efeae2] dark:bg-[#0b141a]"
               >
                 {/* Atalhos sempre visíveis — os 3 mais usados de verdade (uso_count, já contado
                     em registrarUsoRespostaPronta) ficam à mão sem precisar abrir menu nenhum;

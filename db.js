@@ -1246,6 +1246,21 @@ async function conversasConsignadoSemTag(numeros, nomeTag) {
   return result.rows;
 }
 
+// Quem já confirmou os dados no consignado (fluxo_passo consignado_concluido) e ainda está sem etapa ou em
+// "novo_lead": a regra nova move para qualificação, mas só vale para quem confirma depois dela.
+async function conversasConsignadoSemEtapa(numeros) {
+  await ready;
+  if (!numeros.length) return [];
+  const result = await client.execute({
+    sql: `SELECT phone, business_number_id FROM conversations
+          WHERE business_number_id IN (${numeros.map(() => "?").join(",")})
+            AND fluxo_passo = 'consignado_concluido'
+            AND (pipeline_estagio IS NULL OR pipeline_estagio = 'novo_lead')`,
+    args: numeros,
+  });
+  return result.rows;
+}
+
 const STATUS_VALIDOS = ["novo", "andamento", "resolvido"];
 
 async function atualizarStatusConversa(phone, businessNumberId, status) {
@@ -4425,6 +4440,7 @@ module.exports = {
   siteChatPausarBot,
   templatesLidosSemResposta,
   conversasConsignadoSemTag,
+  conversasConsignadoSemEtapa,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,
