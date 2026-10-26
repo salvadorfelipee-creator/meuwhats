@@ -645,6 +645,15 @@ async function tentarOutrosBancos(row, manual = false) {
   return novo || row;
 }
 
+// Sincroniza a Facta e, se ela devolveu um resultado definitivo sem condição, segue sozinha para os bancos parceiros.
+// Usada em todo caminho que consulta a Facta direto (início com autorização vigente, "Já autorizei", reenvio): antes só
+// a verificação periódica fazia a troca, e o cliente ficava parado numa tela de "sem condições".
+async function sincronizarFactaComOutrosBancos(row) {
+  const atualizada = await sincronizarSiteChatFacta(row);
+  if (atualizada && ETAPAS_FACTA_SEM_CONDICAO.includes(atualizada.etapa) && atualizada.etapa !== row.etapa) return await tentarOutrosBancos(atualizada);
+  return atualizada;
+}
+
 async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
   // Regra do CPF: o cliente que digitou o CPF e ainda não está no Google Contatos é salvo
   // como "FGTS <nome> <CPF>". Não bloqueia o atendimento se o Google falhar.
@@ -680,7 +689,7 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
     await db.siteChatMensagemAtendente(id, "Assistente FelizCred", alreadyAuthorized
       ? "Sua autorização ainda está válida. Já estamos consultando suas condições."
       : "Enviamos a autorização da Facta para seu WhatsApp. Abra o WhatsApp, toque no link da mensagem e autorize a consulta. Depois volte aqui: sua simulação fica salva nesta mesma tela, é só tocar em Já autorizei.");
-    if (alreadyAuthorized) row = await sincronizarSiteChatFacta(row);
+    if (alreadyAuthorized) row = await sincronizarFactaComOutrosBancos(row);
   }
   return row;
 }
@@ -6671,7 +6680,7 @@ const server = http.createServer(async (req, res) => {
           if (action === "confirm-authorization") {
             if (atual.provider !== "facta" || atual.etapa !== "autorizacao_enviada") return send(res, 409, { error: "Esta confirmação não está disponível nesta etapa." }, corsHeaders);
             const unlocked = await db.siteChatCltAtualizar(id, { authorization_checked_at: null, error_message: null });
-            const row = await sincronizarSiteChatFacta(unlocked);
+            const row = await sincronizarFactaComOutrosBancos(unlocked);
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
           if (action === "resend-authorization") {
@@ -6702,7 +6711,7 @@ const server = http.createServer(async (req, res) => {
             });
             if (vigente && !failed) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Sua autorização ainda está válida. Já estamos consultando suas condições.");
-              return send(res, 200, { clt: siteChatCltPublico(await sincronizarSiteChatFacta(row)) }, corsHeaders);
+              return send(res, 200, { clt: siteChatCltPublico(await sincronizarFactaComOutrosBancos(row)) }, corsHeaders);
             }
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
