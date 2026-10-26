@@ -637,6 +637,7 @@ async function sincronizarSiteChatFacta(row) {
 
 // Resultados definitivos da Facta (não adianta tentar de novo): a simulação segue automaticamente nos bancos parceiros.
 const ETAPAS_FACTA_SEM_CONDICAO = ["sem_margem", "nao_elegivel", "sem_oferta", "politica_reprovada"];
+const telefoneDeOutroCpf = (msg) => /telefone j[aá] informado para outro cpf/i.test(String(msg || ""));
 async function tentarOutrosBancos(row, manual = false) {
   if (!row || row.provider !== "facta" || !unnoSite.configurado()) return row;
   const conversa = await db.siteChatObter(row.conversation_id);
@@ -678,7 +679,11 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
   if (respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(authMessage)) {
     await db.siteChatFunilEvento(id, "saida", "erro_autorizacao", "facta", "erro_autorizacao");
     row = await db.siteChatCltAtualizar(id, { etapa: "erro_autorizacao", status_novosaque: "ERRO_AUTORIZACAO", error_message: authMessage });
-    await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(authMessage));
+    // Celular já ligado a outro CPF na Facta: não deixa o cliente parado pedindo outro número, segue direto para os
+    // bancos parceiros (Unnotech) com os mesmos dados. Se não abrir lá, cai no aviso de sempre.
+    const migrada = telefoneDeOutroCpf(authMessage) ? await tentarOutrosBancos(row) : row;
+    if (migrada?.provider === "unnotech") row = migrada;
+    else await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(authMessage));
   } else {
     await db.siteChatFunilEvento(id, "autorizacao_enviada", "autorizacao_enviada", "facta");
     const alreadyAuthorized = /n[aã]o necessita de autoriza/i.test(authMessage);
@@ -5420,6 +5425,14 @@ async function finalizarConversasAntigas() {
     console.error("Erro ao encerrar conversas antigas:", err.message);
   }
 }
+// Uma única vez ao subir: quem parou na Facta por "celular de outro CPF" antes dessa regra segue para os bancos parceiros.
+setTimeout(async () => {
+  try {
+    for (const row of await db.siteChatCltTelefoneOutroCpfParadas()) await tentarOutrosBancos(row);
+  } catch (err) {
+    console.error("Erro ao retomar simulações paradas por celular de outro CPF:", err.message);
+  }
+}, 5 * 60 * 1000);
 setTimeout(finalizarConversasAntigas, 4 * 60 * 1000);
 setInterval(finalizarConversasAntigas, 60 * 60 * 1000);
 setTimeout(encerrarLidosSemResposta, 60 * 1000);
@@ -6737,6 +6750,10 @@ const server = http.createServer(async (req, res) => {
               authorization_requested_at: Date.now(), authorization_checked_at: null,
               error_message: failed ? authMessage : null,
             });
+            if (failed && telefoneDeOutroCpf(authMessage)) {
+              const migrada = await tentarOutrosBancos(row);
+              if (migrada?.provider === "unnotech") return send(res, 200, { clt: siteChatCltPublico(migrada) }, corsHeaders);
+            }
             if (vigente && !failed) {
               await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Sua autorização ainda está válida. Já estamos consultando suas condições.");
               return send(res, 200, { clt: siteChatCltPublico(await sincronizarFactaComOutrosBancos(row)) }, corsHeaders);

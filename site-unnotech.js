@@ -163,7 +163,10 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       authorization_checked_at: null,
       error_message: null,
     });
-    await falar(row, "A Facta não liberou condições, mas vamos tentar com outros bancos parceiros usando os mesmos dados (você não precisa digitar nada de novo). Falta só você autorizar a consulta pelo botão que aparece na tela.");
+    const celularDeOutroCpf = /telefone j[aá] informado para outro cpf/i.test(String(anterior?.error || ""));
+    await falar(row, celularDeOutroCpf
+      ? "Esse celular já está ligado a outro CPF na Facta, mas sem problema: vamos consultar os bancos parceiros com os mesmos dados (você não precisa digitar nada de novo). Falta só você autorizar a consulta pelo botão que aparece na tela."
+      : "A Facta não liberou condições, mas vamos tentar com outros bancos parceiros usando os mesmos dados (você não precisa digitar nada de novo). Falta só você autorizar a consulta pelo botão que aparece na tela.");
     await avisarLink(row, novo?.terms_link);
     return novo;
   }

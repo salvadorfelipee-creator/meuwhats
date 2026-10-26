@@ -3947,6 +3947,13 @@ async function conversasFinalizarAntigas(desde) {
   return Number(r.rowsAffected || 0);
 }
 
+// Simulações do site paradas em "erro_autorizacao" porque o celular já estava ligado a outro CPF na Facta.
+async function siteChatCltTelefoneOutroCpfParadas() {
+  await ready;
+  const r = await client.execute(`SELECT * FROM site_chat_clt WHERE provider = 'facta' AND etapa = 'erro_autorizacao' AND LOWER(error_message) LIKE '%informado para outro cpf%'`);
+  return r.rows;
+}
+
 async function siteChatDefinirNome(id, name) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET name = ? WHERE id = ?`, args: [name, id] });
@@ -4454,6 +4461,7 @@ module.exports = {
   conversasConsignadoSemTag,
   conversasConsignadoSemEtapa,
   conversasFinalizarAntigas,
+  siteChatCltTelefoneOutroCpfParadas,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,
