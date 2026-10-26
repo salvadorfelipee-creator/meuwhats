@@ -126,6 +126,8 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     try { await mensagemAtendente(row.conversation_id, texto); } catch (err) { console.error("Mensagem do assistente (Unnotech) não gravada:", err.message); }
   };
   const atualizar = (row, campos) => db.siteChatCltAtualizar(row.conversation_id, campos);
+  // O link de autorização também vai como mensagem na conversa: o cliente toca nele e o atendente vê e copia no painel.
+  const avisarLink = (row, url) => (url ? falar(row, `Link para autorizar a consulta nos bancos parceiros: ${url}`) : null);
 
   // Abre a solicitação na Unnotech com os dados que o cliente já informou (CPF, celular, e-mail, nome). Devolve a linha
   // atualizada, ou null se não foi possível (sem credencial, dado faltando ou erro da API: a Facta continua como estava).
@@ -161,7 +163,8 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       authorization_checked_at: null,
       error_message: null,
     });
-    await falar(row, "A Facta não liberou condições, mas vamos tentar com outros bancos parceiros usando os mesmos dados. Falta só você autorizar a consulta pelo botão que aparece na tela.");
+    await falar(row, "A Facta não liberou condições, mas vamos tentar com outros bancos parceiros usando os mesmos dados (você não precisa digitar nada de novo). Falta só você autorizar a consulta pelo botão que aparece na tela.");
+    await avisarLink(row, novo?.terms_link);
     return novo;
   }
 
@@ -177,7 +180,7 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     if (!row.terms_link) {
       const completa = await unnotech.consultarSolicitacaoCompletaClt(row.transaction_id).catch(() => null);
       const url = completa?.authorization?.consent_url;
-      if (url) row = await atualizar(row, { terms_link: url });
+      if (url) { row = await atualizar(row, { terms_link: url }); await avisarLink(row, url); }
     }
     if (status.status === "NO_MARGIN") return encerrar(row, "sem_margem", "Nenhum vínculo seu tem margem disponível nos bancos parceiros agora.");
     if (status.authorization_status === "NOT_AVAILABLE") return encerrar(row, "nao_elegivel", "Seu CPF ainda não liberou a consulta no Dataprev (Carteira de Trabalho Digital). Depois que liberar, é só falar com a gente.");
