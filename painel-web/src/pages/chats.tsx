@@ -128,6 +128,24 @@ function formatTime(ts: number | null) {
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
 }
 
+function formatHora(ts: number | null) {
+  if (!ts) return ""
+  return new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+}
+
+// Separador de dia no topo de cada grupo de mensagens, como no WhatsApp.
+function chaveDia(ts: number) {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
+
+function rotuloDia(ts: number) {
+  const hoje = Date.now()
+  if (chaveDia(ts) === chaveDia(hoje)) return "Hoje"
+  if (chaveDia(ts) === chaveDia(hoje - 86400000)) return "Ontem"
+  return new Date(ts).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+}
+
 // "Visto" = a última vez que uma mensagem NOSSA foi marcada como lida pelo WhatsApp
 // (conversations.last_seen_at, ver db.js). NÃO é presença/online — a API do WhatsApp não
 // entrega isso pra nenhuma empresa. Só existe quando já mandamos alguma mensagem e ela foi lida.
@@ -1487,15 +1505,23 @@ function ChannelChatsPage() {
                   </Button>
                 </div>
               )}
-              <div className="flex flex-col gap-2">
-                {messages.map((m) => {
+              <div className="flex flex-col gap-1">
+                {messages.map((m, idx) => {
                   const original = m.context_wa_id
                     ? messages.find((o) => o.wa_message_id === m.context_wa_id)
                     : null
                   const semDadosLabel = TIPO_SEM_DADOS_LABEL[m.type]
+                  const novoDia = idx === 0 || chaveDia(messages[idx - 1].created_at) !== chaveDia(m.created_at)
                   return (
+                    <React.Fragment key={m.id}>
+                    {novoDia && (
+                      <div className="flex justify-center my-2">
+                        <span className="rounded-lg bg-white/90 dark:bg-[#202c33] px-3 py-1 text-xs text-[#54656f] dark:text-[#8696a0] shadow-[0_1px_0.5px_rgba(11,20,26,0.13)]">
+                          {rotuloDia(m.created_at)}
+                        </span>
+                      </div>
+                    )}
                     <div
-                      key={m.id}
                       id={`msg-${m.id}`}
                       className={`group relative max-w-[70%] rounded-lg px-2.5 py-1.5 text-sm shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] whitespace-pre-wrap break-words ${
                         m.direction === "out"
@@ -1620,12 +1646,15 @@ function ChannelChatsPage() {
                           <span>Não entregue{m.error_message ? `: ${m.error_message}` : ""}</span>
                         </div>
                       )}
-                      <div className="text-[10px] text-[#667781] dark:text-[#8696a0] mt-0.5 text-right">
-                        {formatTime(m.created_at)}
-                        {m.direction === "out" && ` · ${m.origem || "Automático"}`}
-                        {m.direction === "out" && m.status && ` · ${m.status}`}
+                      <div className="text-[11px] text-[#667781] dark:text-[#8696a0] mt-0.5 flex items-center justify-end gap-1">
+                        {m.direction === "out" && <span className="opacity-80">{m.origem || "Automático"} ·</span>}
+                        <span>{formatHora(m.created_at)}</span>
+                        {m.direction === "out" && m.status === "read" && <span className="text-[#53bdeb] font-bold tracking-tighter">✓✓</span>}
+                        {m.direction === "out" && m.status === "delivered" && <span className="font-bold tracking-tighter">✓✓</span>}
+                        {m.direction === "out" && m.status === "sent" && <span className="font-bold">✓</span>}
                       </div>
                     </div>
+                    </React.Fragment>
                   )
                 })}
               </div>
@@ -1647,7 +1676,7 @@ function ChannelChatsPage() {
             {/* Composer */}
             <AnimatePresence mode="wait" initial={false}>
             {gravando ? (
-              <div key="gravando" className="px-2 pb-3 pt-1.5 flex justify-center border-t shrink-0">
+              <div key="gravando" className="px-2 pb-3 pt-1.5 flex justify-center shrink-0 bg-[#f0f2f5] dark:bg-[#202c33]">
                 <GravadorBar segundos={gravacaoSegundos} onCancelar={cancelarGravacao} onEnviar={pararGravacaoEEnviar} />
               </div>
             ) : (
@@ -1657,7 +1686,7 @@ function ChannelChatsPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.97 }}
                 transition={{ duration: 0.18 }}
-                className="flex flex-col border-t shrink-0"
+                className="flex flex-col shrink-0 bg-[#f0f2f5] dark:bg-[#202c33]"
               >
                 {/* Atalhos sempre visíveis — os 3 mais usados de verdade (uso_count, já contado
                     em registrarUsoRespostaPronta) ficam à mão sem precisar abrir menu nenhum;
@@ -1744,7 +1773,7 @@ function ChannelChatsPage() {
                 </div>
 
                 <div className="px-2 pb-3 pt-1.5 flex justify-center">
-                <div className="w-full max-w-[640px] flex items-end gap-1 rounded-[20px] border border-indigo-100 dark:border-indigo-900/40 bg-white/85 dark:bg-zinc-900/70 backdrop-blur-md px-2 py-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.10),0_2px_8px_rgba(0,0,0,0.05)] transition-shadow duration-200 focus-within:border-indigo-300 dark:focus-within:border-indigo-700 focus-within:shadow-[0_0_0_3px_rgba(99,102,241,0.22),0_0_26px_rgba(139,92,246,0.22),0_10px_32px_rgba(0,0,0,0.08)]">
+                <div className="w-full max-w-[640px] flex items-end gap-1 rounded-full border-transparent bg-white dark:bg-[#2a3942] px-2 py-1.5 shadow-none">
                   <div className="relative">
                     <Button variant="ghost" size="icon" title="Emoji" className="h-9 w-9 rounded-xl shrink-0" onClick={() => setEmojiOpen((v) => !v)}>
                       <span className="text-base leading-none">😊</span>
