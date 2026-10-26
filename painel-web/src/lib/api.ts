@@ -175,6 +175,7 @@ export type Retorno = {
 export const PIPELINE_ESTAGIOS = [
   { id: "novo_lead", nome: "Novo lead", cor: "#64748b" },
   { id: "qualificacao", nome: "Em qualificação", cor: "#2563eb" },
+  { id: "proposta", nome: "Simulação enviada", cor: "#0891b2" },
   { id: "documentos", nome: "Documentos enviados", cor: "#7c3aed" },
   { id: "analise", nome: "Em análise", cor: "#d97706" },
   { id: "aprovado", nome: "Aprovado", cor: "#16a34a" },

@@ -5407,6 +5407,21 @@ setTimeout(async () => {
     console.error("Erro ao completar etapa do pipeline no consignado:", err.message);
   }
 }, 3 * 60 * 1000);
+// Encerramento automático: conversa sem nenhuma mensagem há 3 dias sai do pipeline e das conversas ativas
+// (continua em "conversas finalizadas" e reabre se o cliente escrever). Vale também para o chat do site.
+const FINALIZAR_APOS_MS = 3 * 24 * 60 * 60 * 1000;
+async function finalizarConversasAntigas() {
+  try {
+    const desde = Date.now() - FINALIZAR_APOS_MS;
+    const whats = await db.conversasFinalizarAntigas(desde);
+    const site = await db.siteChatFinalizarAntigas(desde);
+    if (whats || site) console.log(`Encerramento automático: ${whats} conversas e ${site} chats do site sem atividade há 3 dias`);
+  } catch (err) {
+    console.error("Erro ao encerrar conversas antigas:", err.message);
+  }
+}
+setTimeout(finalizarConversasAntigas, 4 * 60 * 1000);
+setInterval(finalizarConversasAntigas, 60 * 60 * 1000);
 setTimeout(encerrarLidosSemResposta, 60 * 1000);
 setInterval(encerrarLidosSemResposta, 10 * 60 * 1000);
 
@@ -10132,6 +10147,7 @@ setTimeout(() => {
 const NOME_ETAPA_PIPELINE = {
   novo_lead: "Novo lead",
   qualificacao: "Em qualificação",
+  proposta: "Simulação enviada",
   documentos: "Documentos enviados",
   analise: "Em análise",
   aprovado: "Aprovado",

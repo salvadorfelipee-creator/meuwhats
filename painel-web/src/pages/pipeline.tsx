@@ -518,7 +518,7 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
     const canaisDaEmpresa = channels.filter((c) => c.company === current.company && c.kind !== "site")
     setCarregando(true)
     const site = current.company === "felizcred"
-      ? api.siteChatConversas().then((lista) => lista.filter((c) => c.status !== "closed").map((c): Conversation => ({
+      ? api.siteChatConversas().then((lista) => lista.map((c): Conversation => ({
           phone: c.id, business_number_id: "site", name: c.name, email: c.contact,
           status: c.status === "closed" ? "resolvido" : "novo", last_message_at: c.updated_at,
           last_body: c.last_message || null,
@@ -528,8 +528,17 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
           tags_json: c.produto_tag ? JSON.stringify([{ id: -1, nome: c.produto_tag, cor: "#15803D" }]) : null,
         }))).catch(() => [])
       : Promise.resolve([] as Conversation[])
-    Promise.all([...canaisDaEmpresa.map((c) => api.conversations(c.id).catch(() => [])), site])
-      .then((listas) => setConversas(listas.flat()))
+    // Lead do site já encerrado continua no quadro se o mesmo cliente tem conversa aberta no WhatsApp
+    // (começou lá e está recebendo no site): os dois cartões aparecem. Compara os 8 últimos dígitos
+    // (com/sem 55 e com/sem o 9).
+    const fim8 = (v: string | null | undefined) => (v || "").replace(/\D/g, "").slice(-8)
+    Promise.all([Promise.all(canaisDaEmpresa.map((c) => api.conversations(c.id).catch(() => [] as Conversation[]))), site])
+      .then(([listasWhats, siteLista]) => {
+        const whats = listasWhats.flat()
+        const comWhatsAberto = new Set(whats.map((w) => fim8(w.phone)).filter(Boolean))
+        const siteVisivel = siteLista.filter((c) => c.status !== "resolvido" || comWhatsAberto.has(fim8(c.email)))
+        setConversas([...whats, ...siteVisivel])
+      })
       .finally(() => setCarregando(false))
   }, [channels, current])
 

@@ -3935,6 +3935,18 @@ async function siteChatFinalizarAntigas(desde) {
   return Number(r.rowsAffected || 0);
 }
 
+// Finaliza (não apaga) as conversas do WhatsApp/Instagram sem nenhuma mensagem desde `desde` (ms).
+// Se o cliente escrever de novo a conversa reabre sozinha (ver o UPDATE ... status = 'novo' em mensagem recebida).
+async function conversasFinalizarAntigas(desde) {
+  await ready;
+  const r = await client.execute({
+    sql: `UPDATE conversations SET status = 'resolvido', resolvido_em = ?
+          WHERE COALESCE(status, 'novo') != 'resolvido' AND last_message_at IS NOT NULL AND last_message_at < ?`,
+    args: [Date.now(), desde],
+  });
+  return Number(r.rowsAffected || 0);
+}
+
 async function siteChatDefinirNome(id, name) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET name = ? WHERE id = ?`, args: [name, id] });
@@ -4441,6 +4453,7 @@ module.exports = {
   templatesLidosSemResposta,
   conversasConsignadoSemTag,
   conversasConsignadoSemEtapa,
+  conversasFinalizarAntigas,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,
