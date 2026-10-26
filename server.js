@@ -668,7 +668,10 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
   await db.siteChatFunilEvento(id, "provedor_tentado", "solicitando_autorizacao", "facta");
   await db.siteChatDefinirProduto(id, "Empréstimo CLT");
   await db.siteChatDefinirPipeline(id, "qualificacao");
-  const authorization = (await autorizacaoFactaVigente(cpf))
+  const vigente = await autorizacaoFactaVigente(cpf);
+  // Avisa na conversa ANTES de pedir a autorização: o cliente não pode receber o link da Facta sem saber o que é.
+  if (!vigente) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", `Vamos simular no banco Facta. Estamos pedindo a autorização agora: você vai receber no WhatsApp do celular final ${String(phone).slice(-4)} uma mensagem da Facta com um link. Abra, toque no link e autorize a consulta.`);
+  const authorization = vigente
     ? { mensagem: "Cliente não necessita de autorização" }
     : await facta.solicitarAutorizacao({ nome: fullName, cpf, celular: formatarCelularFacta(phone) });
   const authMessage = mensagemFacta(authorization);
@@ -7039,7 +7042,7 @@ const server = http.createServer(async (req, res) => {
               cltStep = "atalho";
             } else if (!row && confirmouTempo) {
               await db.siteChatFunilEvento(id, "qualificado", "mais_de_3_meses", "facta");
-              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Perfeito! Agora digite seu CPF para iniciarmos a simulação.");
+              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Perfeito! Vamos simular no banco Facta. Informe seu CPF: em seguida a Facta envia um link de autorização para o WhatsApp do celular que você cadastrou. É só abrir a mensagem, tocar no link e autorizar. Sem essa autorização não conseguimos consultar suas condições.");
               cltStep = "start";
             } else if (!row && semTempoMinimo) {
               await db.siteChatFunilEvento(id, "saida", "tempo_minimo", "facta", "menos_de_3_meses");

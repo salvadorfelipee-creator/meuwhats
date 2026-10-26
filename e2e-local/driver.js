@@ -80,7 +80,7 @@ const textos = (a) => (a.messages || []).map((m) => `${m.direction === "visitor"
   await a.say("Ainda não tenho 3 meses"); await sleep(1500); at = await a.atendente(); const t6 = textos(at);
   check(6, "responde 'volte quando completar 3 meses'", t6.some((t) => /3 meses no trabalho atual, volte/.test(t)), t6.at(-1));
   a = await cliente("6b", 6); await a.say("Sim, tenho mais de 3 meses"); await sleep(1500); at = await a.atendente();
-  check(6, "pede o CPF depois de confirmar 3 meses", textos(at).some((t) => /digite seu CPF/.test(t)), textos(at).at(-1));
+  check(6, "pede o CPF depois de confirmar 3 meses", textos(at).some((t) => /Informe seu CPF/.test(t)), textos(at).at(-1));
   await a.say(a.cpf); await sleep(2500); at = await a.atendente(); console.log("   atendente vê:", textos(at).join(" | ").slice(0, 700));
 
   console.log("\nRESUMO:", R.filter((x) => x.ok).length + "/" + R.length, "ok");

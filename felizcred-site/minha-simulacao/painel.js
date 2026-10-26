@@ -530,7 +530,12 @@
       return;
     }
     if (acao === "ja-sacou") { state.jaSacou = alvo.dataset.valor; state.erro = ""; render(); return; }
-    if (acao === "tres-meses") { state.tresMeses = alvo.dataset.valor === "sim"; state.erro = ""; render(); return; }
+    if (acao === "tres-meses") {
+      const sim = alvo.dataset.valor === "sim";
+      // A resposta também entra na conversa: o aviso de que a Facta vai mandar o link de autorização aparece no chat, não só no formulário.
+      if (state.tresMeses !== sim) enviarMensagemSimples(sim ? "Sim, tenho mais de 3 meses" : "Ainda não tenho 3 meses").catch(() => {});
+      state.tresMeses = sim; state.erro = ""; render(); return;
+    }
     if (acao === "trocar-clt") { state.fluxo = "clt"; state.erro = ""; render(); window.scrollTo(0, 0); return; }
     if (acao === "trocar-fgts") { state.fluxo = "fgts"; state.erro = ""; render(); window.scrollTo(0, 0); return; }
     if (acao === "para-clt") {
