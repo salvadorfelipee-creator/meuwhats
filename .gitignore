@@ -48,3 +48,5 @@ processo/
 debug.log
 # Capturas de tela de revisão de design (binários, não são o site)
 .impeccable/review/
+e2e-local/e2e.db*
+e2e-local/server.log
