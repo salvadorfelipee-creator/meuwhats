@@ -158,6 +158,7 @@ function siteChatCltPublicoUnnotech(row) {
     contractLink: row.contract_link || null,
     proposalCode: row.codigo_proposta ? String(row.codigo_proposta).slice(0, 8).toUpperCase() : null,
     previous: anterior,
+    parallelFacta: parseJsonSeguro(row.facta_paralelo_json).estado || null,
     error: row.error_message || null,
     trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/minha-simulacao/?t=${encodeURIComponent(row.tracking_token)}` : null,
   };
@@ -210,6 +211,7 @@ function siteChatCltPublico(row) {
       },
       contractLink: row.contract_link || null,
       proposalCode: row.codigo_proposta || null,
+      parallelFacta: parseJsonSeguro(row.facta_paralelo_json).estado || null,
       error: row.error_message || null,
       trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/proposta/?token=${encodeURIComponent(row.tracking_token)}` : null,
     };
