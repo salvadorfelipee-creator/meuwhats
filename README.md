@@ -1947,3 +1947,12 @@ navegador aberta (sem service worker / push em segundo plano).
 Se quiser ir além de HTML/CSS/JS puro no futuro (ex.: migrar para React/Tailwind/shadcn),
 isso é uma mudança de arquitetura grande (build step novo, mudar como `server.js` serve os
 arquivos) — converse com o usuário antes, não assuma.
+
+## Site: Unnotech na frente, Facta em paralelo (27/10/2026)
+
+No chat do site (CLT), o cadastro abre primeiro a **Unnotech** (link de autorização no chat; precisa de e-mail do cliente, senão cai no caminho antigo: Facta primeiro). Quando a Unnotech confirma a autorização, o chat avisa que a análise leva uns minutos e o servidor pede também a autorização da **Facta** por WhatsApp. Depois de 5 segundos, a Facta passa a ser conferida junto com a Unnotech (a cada 15 s, pelo verificador de 1 min ou pela tela do cliente); **quem liberar valores primeiro é mostrado**. Estado da Facta em `site_chat_clt.facta_paralelo_json` (`aguardando`, `descartada`, `facta_venceu`, `facta_assumiu`, `negativa`, `indisponivel`). Se a Unnotech desiste (sem margem, sem oferta) e a Facta ainda não autorizou, a espera passa a ser só pela Facta (6 h). Celular de outro CPF na Facta → segue só com a Unnotech, sem falar da Facta.
+
+- Chats abertos do mesmo cliente (celular ou CPF): ao iniciar um novo, os antigos são encerrados (`siteChatEncerrarDuplicados`) e ficam no histórico.
+- O verificador de 1 min também acompanha Unnotech em andamento (12 h) e Facta aguardando autorização (6 h), sem depender da aba do cliente aberta.
+- Painel: cartão (pipeline e lista de conversas) do cliente que recebeu o link de autorização **pisca em laranja** até autorizar.
+- Teste local: `DRIVER=driver-unno-primeiro.js bash e2e-local/rodar.sh` (21 verificações). O `driver.js` antigo cobre o caminho Facta-primeiro, que agora só vale sem e-mail ou sem Unnotech.

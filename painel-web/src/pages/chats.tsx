@@ -1147,7 +1147,7 @@ function ChannelChatsPage() {
                     setSelected(null)
                     setSiteSel(c.id)
                   }}
-                  className={`w-full px-3 py-3 border-b border-border/50 text-left flex items-center gap-3 ${item.agrupado ? "border-l-[3px] border-l-emerald-500" : ""} ${siteSel === c.id ? "bg-[#f0f2f5] dark:bg-[#2a3942]" : "hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]"}`}
+                  className={`w-full px-3 py-3 border-b border-border/50 text-left flex items-center gap-3 ${["autorizacao_enviada", "aguardando_autorizacao"].includes(c.clt_etapa || "") ? "animate-pulse bg-orange-100 dark:bg-orange-950/40 border-l-[3px] border-l-orange-500" : item.agrupado ? "border-l-[3px] border-l-emerald-500" : ""} ${siteSel === c.id ? "bg-[#f0f2f5] dark:bg-[#2a3942]" : "hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]"}`}
                 >
                   <span className="h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
                     <Globe2 className="h-4 w-4" />

@@ -7,4 +7,4 @@ cd "$RAIZ"; rm -f "$DIR/e2e.db"*
 env -i PATH="$PATH" SYSTEMROOT="$SYSTEMROOT" TEMP="$TEMP" PORT=3000 TURSO_DATABASE_URL="file:$DIR/e2e.db" \
   FACTA_BRIDGE_URL=http://127.0.0.1:4101 FACTA_BRIDGE_SECRET=x UNNOTECH_CLIENT_ID=x UNNOTECH_CLIENT_SECRET=x UNNOTECH_USER_UUID=u1 \
   PAINEL_USER=admin PAINEL_PASS=admin node -r "$DIR/mocks.js" server.js > "$DIR/server.log" 2>&1 &
-PID=$!; sleep 12; node "$DIR/driver.js"; [ -n "$MANTER" ] || kill $PID
+PID=$!; sleep 12; node "$DIR/${DRIVER:-driver.js}"; [ -n "$MANTER" ] || kill $PID

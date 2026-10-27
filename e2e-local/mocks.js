@@ -56,7 +56,7 @@ function unnoReply(method, path) {
     if (p === "not_available") return [200, { status: "AWAITING_AUTHORIZATION", authorization_status: "NOT_AVAILABLE" }];
   }
   if (/\/margin$/.test(m)) return [200, { employments: [{ employment_id: "e1", employer_name: "EMPRESA TESTE", available_margin: 400 }] }];
-  if (/\/simulations$/.test(m)) { S.unno.phase = "offers"; return [202, {}]; }
+  if (/\/simulations$/.test(m)) { if (!S.unno.travarSimulacao) S.unno.phase = "offers"; return [202, {}]; }
   if (/\/clt\/applications\/[^/]+$/.test(m)) return [200, { authorization: S.unno.semLink && S.unno.linkDepois ? { consent_url: "https://termo.mock/tardio" } : {}, offers, quotes: [] }];
   return [404, { error: { code: "mock_sem_rota", path: m } }];
 }

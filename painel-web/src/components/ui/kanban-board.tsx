@@ -93,6 +93,8 @@ export interface KanbanTask {
   unread?: boolean;
   /** Com `unread`, pisca (ping) em vez de ficar sólida — "urgente" pra quem está vendo o quadro. */
   unreadBlink?: boolean;
+  /** Cliente recebeu o link de autorização e ainda não autorizou: cartão pisca em laranja. */
+  authBlink?: boolean;
   channelKind?: "whatsapp" | "instagram" | "site";
 }
 
@@ -771,7 +773,9 @@ function CardShell({ task, floating }: { task: KanbanTask; floating?: boolean })
     <div
       className={cn(
         "rounded-[12px] border p-3",
-        task.stale
+        task.authBlink
+          ? "animate-pulse border-orange-400 bg-orange-100 ring-2 ring-orange-300/70 dark:border-orange-500/70 dark:bg-orange-950/40"
+          : task.stale
           ? "border-amber-300 bg-amber-50/60 dark:border-amber-700/50 dark:bg-amber-950/20"
           : "border-black/[0.06] bg-white dark:border-white/[0.08] dark:bg-neutral-900",
         floating ? "shadow-[0_16px_32px_-12px_rgb(0_0_0/0.28)]" : "shadow-[0_1px_2px_rgb(0_0_0/0.05)]",

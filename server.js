@@ -24,6 +24,7 @@ const siteUnno = require("./site-unnotech");
 const unnoSite = siteUnno.criarAdaptador({
   db, unnotech,
   mensagemAtendente: (id, texto) => db.siteChatMensagemAtendente(id, "Assistente FelizCred", texto),
+  aoAutorizar: (row) => iniciarFactaParalela(row),
   notificar: async (row, etapa) => {
     await notificarEtapaFactaNoWhatsApp(row, etapa, "financeira parceira").catch(() => {});
     await notificarEtapaFactaPorEmail(row, etapa, "banco parceiro").catch((err) => console.error(`E-mail da etapa ${etapa} não enviado (${row.conversation_id}):`, err.message));
@@ -687,6 +688,14 @@ const ETAPAS_FACTA_SEM_CONDICAO = ["sem_margem", "nao_elegivel", "sem_oferta", "
 const telefoneDeOutroCpf = (msg) => /telefone j[aá] informado para outro cpf/i.test(String(msg || ""));
 async function tentarOutrosBancos(row, manual = false) {
   if (!row || row.provider !== "facta" || !unnoSite.configurado()) return row;
+  // A Unnotech já foi tentada primeiro neste atendimento (e esgotou): não abre outra solicitação, só avisa.
+  if (parseJsonSeguro(row.facta_paralelo_json).estado === "facta_assumiu") {
+    if (!manual && ETAPAS_FACTA_SEM_CONDICAO.includes(row.etapa)) {
+      await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Nenhum dos bancos liberou condições agora. Nossa equipe já recebeu a atualização e fala com você pelo chat.").catch(() => {});
+      await db.siteChatConfirmarHumano(row.conversation_id).catch(() => {});
+    }
+    return row;
+  }
   const conversa = await db.siteChatObter(row.conversation_id);
   const anterior = { provider: "facta", etapa: row.etapa, error: row.error_message || null };
   const novo = await unnoSite.iniciar(row, conversa, anterior);
@@ -700,6 +709,136 @@ async function sincronizarFactaComOutrosBancos(row) {
   const atualizada = await sincronizarSiteChatFacta(row);
   if (atualizada && ETAPAS_FACTA_SEM_CONDICAO.includes(atualizada.etapa) && atualizada.etapa !== row.etapa) return await tentarOutrosBancos(atualizada);
   return atualizada;
+}
+
+// ── Unnotech na frente, Facta em paralelo ────────────────────────────────────────────────────────────────────
+// O cliente autoriza primeiro a Unnotech (link no chat). Quando ela confirma a autorização, a Facta também é pedida
+// por WhatsApp e o servidor confere os dois: o primeiro banco que liberar valores é o mostrado. O estado da Facta fica
+// em site_chat_clt.facta_paralelo_json: { estado: aguardando|descartada|negativa|indisponivel|facta_venceu|facta_assumiu, em, ... }.
+const ESPERA_FACTA_PARALELA_MS = 5_000;
+const VALIDADE_FACTA_PARALELA_MS = 6 * 3600 * 1000;
+const ETAPAS_UNNO_SEGUIU = ["ofertas_disponiveis", "dados_pessoais", "aguardando_assinatura_facta", "proposta_em_analise", "proposta_concluida", "proposta_cancelada"];
+const ETAPAS_UNNO_SEM_CONDICAO = ["sem_margem", "sem_oferta", "nao_elegivel", "erro_consulta"];
+
+function parseJsonSeguro(texto) {
+  try { return JSON.parse(texto || "{}") || {}; } catch { return {}; }
+}
+
+async function iniciarFactaParalela(row) {
+  if (!row?.cpf || unnoSite.ehFgts(row) || row.facta_paralelo_json) return;
+  const conversa = await db.siteChatObter(row.conversation_id);
+  const blob = unnoSite.lerBlob(row);
+  const nome = String(blob.nome || blob.anterior?.nome || conversa?.name || "").trim();
+  const phone = String(row.phone || conversa?.contact || "").replace(/\D/g, "");
+  if (nome.split(" ").filter(Boolean).length < 2 || phone.length < 10) {
+    await db.siteChatCltAtualizar(row.conversation_id, { facta_paralelo_json: JSON.stringify({ estado: "indisponivel", em: Date.now() }) });
+    return;
+  }
+  const vigente = await autorizacaoFactaVigente(row.cpf);
+  let authorization;
+  try {
+    authorization = vigente ? { mensagem: "Cliente não necessita de autorização" } : await facta.solicitarAutorizacao({ nome, cpf: row.cpf, celular: formatarCelularFacta(phone) });
+  } catch (err) {
+    console.error(`Facta em paralelo: autorização não enviada (${row.conversation_id}):`, err.message);
+    authorization = { erro: true, mensagem: err.message };
+  }
+  // Celular de outro CPF ou erro da Facta: segue só com a Unnotech, sem falar da Facta para o cliente.
+  if (respostaFactaComErro(authorization) || /telefone j[aá] informado para outro cpf/i.test(mensagemFacta(authorization))) {
+    await db.siteChatCltAtualizar(row.conversation_id, { facta_paralelo_json: JSON.stringify({ estado: "indisponivel", em: Date.now(), motivo: mensagemFacta(authorization) }) });
+    return;
+  }
+  await db.siteChatCltAtualizar(row.conversation_id, { facta_paralelo_json: JSON.stringify({ estado: "aguardando", em: Date.now(), nome, phone, vigente }) });
+  await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", vigente
+    ? "Sua autorização da Facta ainda está válida. Vou verificar qual banco libera os valores primeiro."
+    : "Enviei também a autorização do Facta no seu WhatsApp: se quiser, abra a mensagem, toque no link e libere. Vou verificar qual banco libera os valores primeiro.");
+}
+
+// Consulta a Facta (autorização + condições), sem gravar nada. Devolve { estado: aguardando | negativo | ofertas, ... }.
+async function buscarOfertasFacta(cpf) {
+  const response = await facta.consultarTrabalhador(cpf);
+  if (respostaFactaComErro(response)) {
+    const message = mensagemFacta(response);
+    return /token expirado|necess[aá]rio.*autoriza|n[aã]o autoriz|fila de autoriza|demorou|tempo esgotado|timeout|indispon/i.test(message) ? { estado: "aguardando" } : { estado: "negativo", motivo: message };
+  }
+  const rows = dadosTrabalhadorFacta(response);
+  const elegiveis = rows.filter((item) => simFacta(item.elegivel)).sort((a, b) => numeroFacta(b.valorMargemDisponivel) - numeroFacta(a.valorMargemDisponivel));
+  if (!elegiveis.length || numeroFacta(elegiveis[0].valorMargemDisponivel) <= 0) return { estado: "negativo", motivo: "sem_margem" };
+  for (const candidato of elegiveis.slice(0, 5)) {
+    const parcela = parcelaMaximaFacta(numeroFacta(candidato.valorMargemDisponivel));
+    if (parcela <= 0) continue;
+    const operations = await facta.consultarOperacoes({
+      opcao_valor: 2,
+      valor_parcela: parcela.toFixed(2),
+      cpf,
+      data_nascimento: normalizarDataFacta(candidato.dataNascimento),
+      valor_renda: numeroFacta(candidato.valorTotalVencimentos).toFixed(2),
+      ...(candidato.matricula ? { matricula: candidato.matricula } : {}),
+    });
+    if (respostaFactaComErro(operations)) continue;
+    const offers = ofertasFacta(operations);
+    if (offers.length) return { estado: "ofertas", worker: candidato, margem: parcela, offers };
+  }
+  return { estado: "negativo", motivo: "sem_oferta" };
+}
+
+async function verificarFactaParalela(row) {
+  if (!row || row.provider !== "unnotech") return row;
+  const f = parseJsonSeguro(row.facta_paralelo_json);
+  if (f.estado !== "aguardando") return row;
+  const gravar = (campos, estado, extra = {}) => db.siteChatCltAtualizar(row.conversation_id, { ...campos, facta_paralelo_json: JSON.stringify({ ...f, ...extra, estado }) });
+  // A Unnotech já mostrou valores (ou o cliente já seguiu): a Facta não é mais necessária.
+  if (ETAPAS_UNNO_SEGUIU.includes(row.etapa)) return gravar({}, "descartada");
+  if (Date.now() - Number(f.em || 0) > VALIDADE_FACTA_PARALELA_MS) return gravar({}, "descartada", { motivo: "expirou" });
+  // 5 segundos depois do aviso da Facta: só então ela é consultada (a Unnotech é sempre conferida antes, em sincronizarSiteChatClt).
+  if (Date.now() - Number(f.em || 0) < ESPERA_FACTA_PARALELA_MS) return row;
+  if (f.verificadoEm && Date.now() - Number(f.verificadoEm) < 15_000) return row;
+  f.verificadoEm = Date.now();
+  await db.siteChatCltAtualizar(row.conversation_id, { facta_paralelo_json: JSON.stringify(f) });
+  let r;
+  try { r = await buscarOfertasFacta(row.cpf); } catch (err) { console.error(`Facta em paralelo: consulta falhou (${row.conversation_id}):`, err.message); return row; }
+  if (r.estado === "ofertas") {
+    await db.siteChatFunilEvento(row.conversation_id, "oferta_disponivel", "ofertas_disponiveis", "facta").catch(() => {});
+    await db.siteChatDefinirPipeline(row.conversation_id, "proposta").catch(() => {});
+    await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Autorização da Facta confirmada. Encontramos condições para você escolher. Os valores ainda passam pela política final da Facta.");
+    return gravar({
+      provider: "facta", transaction_id: null, terms_link: null, etapa: "ofertas_disponiveis", status_novosaque: "OFERTAS_DISPONIVEIS",
+      margem_disponivel: r.margem, facta_worker_json: JSON.stringify(r.worker), offers_json: JSON.stringify(r.offers), facta_offer_json: null,
+      authorization_requested_at: Date.now(), authorization_checked_at: null, error_message: null,
+    }, "facta_venceu");
+  }
+  if (r.estado === "negativo") {
+    // A Facta também não liberou: fica só o resultado da Unnotech.
+    return gravar({}, "negativa", { motivo: r.motivo || null });
+  }
+  // Facta ainda sem autorização. Se a Unnotech já desistiu, a espera passa a ser só pela Facta.
+  if (ETAPAS_UNNO_SEM_CONDICAO.includes(row.etapa)) {
+    await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Os bancos parceiros não liberaram valores agora. Continuo aguardando sua autorização da Facta no WhatsApp: é só abrir a mensagem, tocar no link e liberar.");
+    return gravar({
+      provider: "facta", transaction_id: null, terms_link: null, etapa: "autorizacao_enviada", status_novosaque: "AGUARDANDO_AUTORIZACAO",
+      facta_worker_json: JSON.stringify({ preAuthorization: { nome: f.nome } }), offers_json: null, authorization_requested_at: f.em, authorization_checked_at: null, error_message: null,
+    }, "facta_assumiu");
+  }
+  return row;
+}
+
+// Cadastro novo com a Unnotech na frente: abre a solicitação dela e mostra o link de autorização. Sem e-mail, sem credencial
+// ou com erro da API, segue o caminho de sempre (Facta primeiro).
+async function abrirSimulacaoUnnoPrimeiro(id, { cpf, phone, fullName }) {
+  const conversa = await db.siteChatObter(id);
+  if (!unnoSite.configurado() || !String(conversa?.email || "").trim()) return abrirSimulacaoFactaClt(id, { cpf, phone, fullName });
+  nomearContatoPeloSite({ phone, nome: fullName, cpf });
+  await salvarDadosSite(id, { nome: fullName, cpf, celular: phone });
+  let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO", trackingToken: crypto.randomBytes(32).toString("base64url") });
+  row = await db.siteChatCltAtualizar(id, { facta_worker_json: JSON.stringify({ nome: fullName, preAuthorization: { nome: fullName } }), facta_offer_json: null, codigo_proposta: null, contract_link: null, facta_paralelo_json: null });
+  const aberta = await unnoSite.iniciar(row, conversa, { unnoPrimeiro: true, nome: fullName });
+  if (!aberta) return abrirSimulacaoFactaClt(id, { cpf, phone, fullName });
+  await db.siteChatFunilEvento(id, "dados_minimos_enviados", "cpf_consentimento", "unnotech");
+  await db.siteChatFunilEvento(id, "provedor_tentado", "solicitando_autorizacao", "unnotech");
+  await db.siteChatFunilEvento(id, "autorizacao_enviada", "autorizacao_enviada", "unnotech");
+  await db.siteChatDefinirProduto(id, "Empréstimo CLT");
+  await db.siteChatDefinirPipeline(id, "qualificacao");
+  await db.siteChatEncerrarDuplicados(id, phone, cpf).catch((err) => console.error("Chats duplicados não encerrados:", err.message));
+  return aberta;
 }
 
 async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
@@ -720,6 +859,7 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
   await db.siteChatFunilEvento(id, "provedor_tentado", "solicitando_autorizacao", "facta");
   await db.siteChatDefinirProduto(id, "Empréstimo CLT");
   await db.siteChatDefinirPipeline(id, "qualificacao");
+  await db.siteChatEncerrarDuplicados(id, phone, cpf).catch((err) => console.error("Chats duplicados não encerrados:", err.message));
   const vigente = await autorizacaoFactaVigente(cpf);
   const authorization = vigente
     ? { mensagem: "Cliente não necessita de autorização" }
@@ -754,7 +894,8 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
 async function sincronizarSiteChatClt(row) {
   if (row?.provider === "unnotech") {
     try {
-      return await unnoSite.sincronizar(row);
+      const unno = await unnoSite.sincronizar(row);
+      return await verificarFactaParalela(unno);
     } catch (err) {
       console.error(`Erro ao sincronizar Unnotech no site (${row.conversation_id}):`, err.message);
       return row;
@@ -6881,7 +7022,7 @@ const server = http.createServer(async (req, res) => {
             if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
             if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
-            const row = await abrirSimulacaoFactaClt(id, { cpf, phone, fullName });
+            const row = await abrirSimulacaoUnnoPrimeiro(id, { cpf, phone, fullName });
             return send(res, 201, { clt: siteChatCltPublico(row) }, corsHeaders);
           }
           const atual = await db.siteChatCltObter(id);

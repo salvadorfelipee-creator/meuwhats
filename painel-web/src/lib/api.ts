@@ -7,6 +7,7 @@ const AUTH_KEY = "painel_auth"
 export type PhoneNumber = { id: string; label: string }
 
 export type Conversation = {
+  clt_etapa?: string | null
   phone: string
   business_number_id: string
   name: string | null
@@ -93,6 +94,7 @@ export type SiteChatConversation = {
   pipeline_estagio?: string | null
   pipeline_estagio_desde?: number | null
   produto_tag?: string | null
+  clt_etapa?: string | null
   human_intent_stage?: "awaiting_question" | "awaiting_confirmation" | "requested" | "human_active" | null
   human_handoff_requested_at?: number | null
   bot_pausado_ate?: number | null

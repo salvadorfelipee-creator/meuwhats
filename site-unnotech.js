@@ -117,7 +117,7 @@ function ofertaPublicaFgts(o) {
   };
 }
 
-function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () => {} }) {
+function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () => {}, aoAutorizar = async () => {} }) {
   // Mesmas etapas, endpoints diferentes: CLT x FGTS.
   const apiDe = (row) => (ehFgts(row)
     ? { status: unnotech.consultarStatus, completa: unnotech.consultarSolicitacaoCompleta, kyc: unnotech.enviarKyc, payload: unnotech.montarPayloadKyc, aceitar: unnotech.aceitarOferta }
@@ -163,6 +163,11 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       authorization_checked_at: null,
       error_message: null,
     });
+    if (anterior?.unnoPrimeiro) {
+      await falar(row, "Para simular, preciso que você autorize a consulta nos bancos parceiros. Logo abaixo está o link: é só clicar e autorizar. Depois de autorizar, toque em “Pronto, já autorizei” aqui na tela ou me avise, por favor.");
+      await avisarLink(row, novo?.terms_link);
+      return novo;
+    }
     const celularDeOutroCpf = /telefone j[aá] informado para outro cpf/i.test(String(anterior?.error || ""));
     if (celularDeOutroCpf) {
       await falar(row, "No Facta não é possível simular, pois este número está vinculado a outro CPF. Provavelmente você já simulou para algum familiar usando o seu número para gerar a autorização no Facta.");
@@ -182,7 +187,7 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
 
   // Avança a solicitação (autorização → margem → simulação → ofertas). Chamada a cada consulta de status do painel.
   async function avancar(row) {
-    const blob = lerBlob(row);
+    let blob = lerBlob(row);
     const status = await unnotech.consultarStatusClt(row.transaction_id);
     const desde = Number(row.authorization_requested_at || row.created_at || Date.now());
     if (!row.terms_link) {
@@ -195,7 +200,13 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     if (["EXPIRED", "CANCELLED", "FAILED"].includes(status.status)) return encerrar(row, "erro_consulta", "A consulta nos bancos parceiros não foi concluída. Um atendente pode ajudar.");
     if (status.status === "NO_OFFERS") return encerrar(row, "sem_oferta", "Os bancos parceiros não encontraram uma condição agora.");
 
-    if (status.authorization_status === "AUTHORIZED" && row.etapa === "autorizacao_enviada") row = await atualizar(row, { etapa: "consultando_margem", status_novosaque: status.status, authorization_requested_at: Date.now() }); // reinicia o relógio da etapa
+    if (status.authorization_status === "AUTHORIZED" && row.etapa === "autorizacao_enviada") {
+      row = await atualizar(row, { etapa: "consultando_margem", status_novosaque: status.status, authorization_requested_at: Date.now() }); // reinicia o relógio da etapa
+      // Cliente autorizou: avisa que a análise leva uns minutos e abre, em paralelo, a autorização da Facta no WhatsApp
+      // (quem liberar os valores primeiro é mostrado).
+      await falar(row, "Autorização recebida! Agora é só aguardar uns minutos enquanto o banco analisa e libera os valores.");
+      try { await aoAutorizar(row); } catch (err) { console.error(`Facta em paralelo não aberta (${row.conversation_id}):`, err.message); }
+    }
 
     if (status.status === "AWAITING_SIMULATION" && ["consultando_margem", "autorizacao_enviada"].includes(row.etapa)) {
       const margem = await unnotech.consultarMargemClt(row.transaction_id);

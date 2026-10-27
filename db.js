@@ -163,6 +163,7 @@ const ready = (async () => {
     ["authorization_requested_at", "INTEGER"],
     ["authorization_checked_at", "INTEGER"],
     ["tracking_token", "TEXT"],
+    ["facta_paralelo_json", "TEXT"],
   ];
   for (const [nome, tipo] of colunasSiteChatClt) {
     if (!infoSiteChatClt.rows.some((r) => r.name === nome)) await client.execute(`ALTER TABLE site_chat_clt ADD COLUMN ${nome} ${tipo}`);
@@ -3925,7 +3926,8 @@ async function siteChatListar() {
   const result = await client.execute(`
     SELECT c.*,
       (SELECT body FROM site_chat_messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_message,
-      CASE WHEN c.last_visitor_at IS NOT NULL AND c.last_visitor_at > COALESCE(c.last_read_at, 0) THEN 1 ELSE 0 END AS unread
+      CASE WHEN c.last_visitor_at IS NOT NULL AND c.last_visitor_at > COALESCE(c.last_read_at, 0) THEN 1 ELSE 0 END AS unread,
+      (SELECT t.etapa FROM site_chat_clt t WHERE t.conversation_id = c.id) AS clt_etapa
     FROM site_chat_conversations c
     ORDER BY CASE WHEN c.status = 'open' THEN 0 ELSE 1 END, c.updated_at DESC
   `);
@@ -4003,6 +4005,22 @@ async function siteChatCltOfertasAbertasRecentes(desde) {
   await ready;
   const r = await client.execute({ sql: `SELECT * FROM site_chat_clt WHERE provider = 'facta' AND etapa = 'ofertas_disponiveis' AND updated_at >= ?`, args: [desde] });
   return r.rows;
+}
+
+// Mesmo cliente (celular ou CPF) que abre outro chat no site: os chats abertos mais antigos são encerrados e ficam no
+// histórico; vale o mais novo. Evita 3 cartões do mesmo cliente no painel.
+async function siteChatEncerrarDuplicados(idAtual, telefone, cpf) {
+  await ready;
+  const formas = variantesTelefoneBR(telefone);
+  const cpfLimpo = String(cpf || "").replace(/\D/g, "");
+  const marcas = formas.map(() => "?").join(",");
+  const condicoes = [];
+  const args = [idAtual];
+  if (formas.length) { condicoes.push(`contact IN (${marcas})`, `id IN (SELECT conversation_id FROM site_chat_clt WHERE phone IN (${marcas}))`); args.push(...formas, ...formas); }
+  if (cpfLimpo) { condicoes.push(`id IN (SELECT conversation_id FROM site_chat_clt WHERE cpf = ?)`); args.push(cpfLimpo); }
+  if (!condicoes.length) return 0;
+  const r = await client.execute({ sql: `UPDATE site_chat_conversations SET status = 'closed' WHERE id != ? AND status = 'open' AND (${condicoes.join(" OR ")})`, args });
+  return Number(r.rowsAffected || 0);
 }
 
 async function siteChatDefinirNome(id, name) {
@@ -4249,11 +4267,12 @@ async function siteChatFactaListarEmAcompanhamento() {
   await ready;
   const result = await client.execute(`
     SELECT * FROM site_chat_clt
-    WHERE provider = 'facta'
-      AND (
-        (codigo_proposta IS NOT NULL AND etapa IN ('aguardando_assinatura_facta', 'proposta_em_analise'))
+    WHERE (
+        (provider = 'facta' AND codigo_proposta IS NOT NULL AND etapa IN ('aguardando_assinatura_facta', 'proposta_em_analise'))
         -- Autorização pedida nas últimas 6h: o servidor confere sozinho, sem depender do navegador do cliente aberto.
-        OR (etapa IN ('autorizacao_enviada', 'aguardando_autorizacao') AND COALESCE(authorization_requested_at, 0) > ${Date.now() - 6 * 3600 * 1000})
+        OR (provider = 'facta' AND etapa IN ('autorizacao_enviada', 'aguardando_autorizacao') AND COALESCE(authorization_requested_at, 0) > ${Date.now() - 6 * 3600 * 1000})
+        -- Unnotech em andamento (autorização → margem → simulação) e Facta em paralelo aguardando: acompanha sem depender da aba aberta.
+        OR (provider = 'unnotech' AND etapa IN ('autorizacao_enviada', 'consultando_margem', 'simulando') AND COALESCE(authorization_requested_at, 0) > ${Date.now() - 12 * 3600 * 1000})
       )
     ORDER BY updated_at ASC
   `);
@@ -4308,7 +4327,7 @@ async function siteChatFactaCriar(conversationId, dados) {
 
 async function siteChatCltAtualizar(conversationId, campos) {
   await ready;
-  const permitidos = ["transaction_id", "simulation_id", "etapa", "status_novosaque", "terms_link", "contract_link", "offers_json", "phone", "whatsapp_notified_at", "whatsapp_notify_attempt_at", "error_message", "provider", "cpf", "margem_disponivel", "offline_updated_at", "possui_alertas", "facta_worker_json", "facta_offer_json", "codigo_cliente", "codigo_proposta", "authorization_requested_at", "authorization_checked_at", "tracking_token"];
+  const permitidos = ["transaction_id", "simulation_id", "etapa", "status_novosaque", "terms_link", "contract_link", "offers_json", "phone", "whatsapp_notified_at", "whatsapp_notify_attempt_at", "error_message", "provider", "cpf", "margem_disponivel", "offline_updated_at", "possui_alertas", "facta_worker_json", "facta_offer_json", "codigo_cliente", "codigo_proposta", "authorization_requested_at", "authorization_checked_at", "tracking_token", "facta_paralelo_json"];
   const entradas = Object.entries(campos).filter(([k]) => permitidos.includes(k));
   if (!entradas.length) return siteChatCltObter(conversationId);
   const sets = entradas.map(([k]) => `${k} = ?`).join(", ");
@@ -4532,6 +4551,7 @@ module.exports = {
   siteChatCltNaoFinalizadasRecentes,
   siteChatCltComCpfRecentes,
   siteChatCltOfertasAbertasRecentes,
+  siteChatEncerrarDuplicados,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,

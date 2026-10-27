@@ -180,9 +180,13 @@ function conversaParaTask(
     stale: parado,
     unread: notificacao.naoLida,
     unreadBlink: notificacao.urgente,
+    authBlink: ETAPAS_AGUARDANDO_AUTORIZACAO.includes(conversa.clt_etapa || ""),
     channelKind: canal?.kind || "whatsapp",
   }
 }
+
+// Etapas em que o cliente já recebeu o link de autorização (Unnotech ou Facta) e ainda não autorizou.
+const ETAPAS_AGUARDANDO_AUTORIZACAO = ["autorizacao_enviada", "aguardando_autorizacao"]
 
 function construirColunas(
   conversas: Conversation[],
@@ -525,6 +529,7 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
           last_direction: c.last_visitor_at && (!c.last_agent_at || c.last_visitor_at > c.last_agent_at) ? "in" : "out",
           nota: null, fluxo_passo: null, pipeline_estagio: c.pipeline_estagio,
           pipeline_estagio_desde: c.pipeline_estagio_desde, channel: "site", nao_lida: c.unread,
+          clt_etapa: c.status === "closed" ? null : c.clt_etapa,
           tags_json: c.produto_tag ? JSON.stringify([{ id: -1, nome: c.produto_tag, cor: "#15803D" }]) : null,
         }))).catch(() => [])
       : Promise.resolve([] as Conversation[])
