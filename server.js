@@ -93,6 +93,45 @@ function siteChatTokenValido(conversation, token) {
   return recebido.length === esperado.length && crypto.timingSafeEqual(recebido, esperado);
 }
 
+// Dados que o cliente digita no site (formulário de início, reenvio, dados pessoais da proposta): ficam salvos na conversa
+// do site para consulta no painel (cartão do site e cartão do WhatsApp do mesmo celular), mesmo sem concluir a simulação.
+const ROTULOS_DADOS_SITE = {
+  nome: "Nome completo", cpf: "CPF", data_nascimento: "Data de nascimento", celular: "Celular", email: "E-mail",
+  genero: "Gênero", sexo: "Gênero", estado_civil: "Estado civil", escolaridade: "Escolaridade", nome_mae: "Nome da mãe", nome_pai: "Nome do pai",
+  rg: "RG", rg_numero: "RG", rg_orgao: "Órgão emissor do RG", orgao_emissor: "Órgão emissor do RG", rg_uf: "UF do RG", estado_rg: "UF do RG",
+  data_expedicao: "Data de expedição do RG", estado_natural: "UF de nascimento", cidade_natural_nome: "Cidade de nascimento", nacionalidade: "Nacionalidade",
+  renda: "Renda", cep: "CEP", rua: "Endereço", endereco: "Endereço", numero: "Número", bairro: "Bairro", cidade: "Cidade", cidade_nome: "Cidade", uf: "UF", estado: "UF",
+  forma_desembolso: "Forma de recebimento", tipo_conta: "Tipo de conta", banco: "Banco", agencia: "Agência", conta: "Conta", tipo_chave_pix: "Tipo da chave Pix", chave_pix: "Chave Pix",
+};
+const ORDEM_DADOS_SITE = ["Nome completo", "CPF", "Data de nascimento", "Celular", "E-mail"];
+function formatarCpfDado(v) {
+  const d = String(v || "").replace(/\D/g, "");
+  return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : String(v || "");
+}
+function salvarDadosSite(id, bruto) {
+  const campos = {};
+  for (const [chave, valor] of Object.entries(bruto || {})) {
+    const rotulo = ROTULOS_DADOS_SITE[chave];
+    if (!rotulo || valor == null || typeof valor === "object") continue;
+    campos[rotulo] = chave === "cpf" ? formatarCpfDado(valor) : valor;
+  }
+  return db.siteChatSalvarDados(id, campos).catch((err) => console.error(`Dados do site não salvos (${id}):`, err.message));
+}
+// Dados salvos + o que já existia nas tabelas antes dessa função (CPF e celular da consulta, nome, e-mail), na ordem de leitura.
+function dadosDoSite(conversation, clt) {
+  let salvos = {};
+  try { salvos = JSON.parse(conversation?.dados_json || "{}") || {}; } catch {}
+  const base = {
+    "Nome completo": conversation?.name,
+    "CPF": clt?.cpf ? formatarCpfDado(clt.cpf) : null,
+    "Celular": clt?.phone || conversation?.contact,
+    "E-mail": conversation?.email,
+  };
+  const juntos = { ...Object.fromEntries(Object.entries(base).filter(([, v]) => v)), ...salvos };
+  const chaves = [...ORDEM_DADOS_SITE.filter((k) => k in juntos), ...Object.keys(juntos).filter((k) => !ORDEM_DADOS_SITE.includes(k))];
+  return chaves.map((rotulo) => ({ rotulo, valor: String(juntos[rotulo]) }));
+}
+
 function siteChatCltPublicoUnnotech(row) {
   const blob = unnoSite.lerBlob(row);
   let escolhida = null;
@@ -663,6 +702,7 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
     google.garantirContato({ telefone: telefoneGoogle, nomePerfil: nomeContatoComCpf(cpf, fullName) })
       .catch((err) => console.error("Erro ao salvar contato do site com CPF no Google:", err.message));
   }
+  await salvarDadosSite(id, { nome: fullName, cpf, celular: phone });
   let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO", trackingToken: crypto.randomBytes(32).toString("base64url") });
   row = await db.siteChatCltAtualizar(id, { facta_worker_json: JSON.stringify({ preAuthorization: { nome: fullName } }), facta_offer_json: null, codigo_proposta: null, contract_link: null });
   await db.siteChatFunilEvento(id, "dados_minimos_enviados", "cpf_consentimento", "facta");
@@ -6633,6 +6673,7 @@ const server = http.createServer(async (req, res) => {
           whatsappOptInVersion: WHATSAPP_OPT_IN_VERSION,
           whatsappOptInText: WHATSAPP_OPT_IN_TEXT,
         });
+        await salvarDadosSite(id, { nome: name, celular: contact, email });
         enviarInicioChatFelizcred({ nome: name, email }).catch((err) => console.error(`E-mail inicial do chat não enviado (${id}):`, err.message));
         // Salva quem preencheu o formulário do site: lista de contatos do Brevo e Google Contatos
         // (prefixo "SITE" pra distinguir dos outros funis). Em segundo plano, nunca atrasa o chat.
@@ -6687,6 +6728,7 @@ const server = http.createServer(async (req, res) => {
             const contato = String(body.contact || "").replace(/\D/g, "").slice(0, 13);
             if (nome.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{10,13}$/.test(contato)) return send(res, 400, { error: "Confira nome, e-mail e celular com DDD." }, corsHeaders);
             const nova = await db.siteChatAtualizarDados(id, { name: nome, email, contact: contato });
+            await salvarDadosSite(id, { nome, email, celular: contato });
             return send(res, 200, { conversation: { id: nova.id, name: nova.name, contact: nova.contact, email: nova.email } }, corsHeaders);
           }
           if (action === "fgts-start") {
@@ -6695,6 +6737,7 @@ const server = http.createServer(async (req, res) => {
             if (existente && !(existente.provider === "unnotech" && unnoSite.ehFgts(existente) && ["sem_oferta", "erro_consulta", "proposta_cancelada"].includes(existente.etapa))) return send(res, 409, { error: "A simulação já foi iniciada." }, corsHeaders);
             const cpfFgts = String(body.cpf || "").replace(/\D/g, "");
             if (!unnotech.cpfValido(cpfFgts)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
+            await salvarDadosSite(id, { cpf: cpfFgts });
             if (!unnoSite.configurado()) return send(res, 503, { error: "A consulta do FGTS está indisponível agora. Fale com o Felipe." }, corsHeaders);
             const telefoneFgts = String(conversation.contact || "").replace(/\D/g, "");
             let linhaFgts = await db.siteChatFactaCriar(id, { cpf: cpfFgts, phone: telefoneFgts, etapa: "fgts_cotando", status: "QUOTING", trackingToken: existente?.tracking_token || crypto.randomBytes(32).toString("base64url") });
@@ -6735,6 +6778,7 @@ const server = http.createServer(async (req, res) => {
             const cpf = novosaque.cpfValido(cpfNovo) ? cpfNovo : atual.cpf;
             if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
+            await salvarDadosSite(id, { nome: fullName, cpf, celular: phone });
             const vigente = await autorizacaoFactaVigente(cpf);
             const authorization = vigente
               ? { mensagem: "Cliente não necessita de autorização" }
@@ -6824,6 +6868,7 @@ const server = http.createServer(async (req, res) => {
           }
           if (action === "personal-data" && atual.provider === "unnotech") {
             try {
+              await salvarDadosSite(id, body.customer || {});
               const novo = await unnoSite.enviarDados(atual, body.customer || {});
               return send(res, 200, { clt: siteChatCltPublico(novo) }, corsHeaders);
             } catch (err) {
@@ -6889,6 +6934,7 @@ const server = http.createServer(async (req, res) => {
               cnpj_empregador: worker.numeroInscricaoEmpregador || customer.cnpj_empregador,
               data_admissao: worker.dataAdmissao || customer.data_admissao,
             });
+            await salvarDadosSite(id, { ...customer, cpf: atual.cpf });
             const required = ["nome", "sexo", "estado_civil", "data_nascimento", "rg", "estado_rg", "orgao_emissor", "data_expedicao", "estado_natural", "cidade_natural_nome", "nacionalidade", "celular", "renda", "cep", "endereco", "numero", "bairro", "cidade_nome", "estado", "nome_mae", "nome_pai", "valor_patrimonio", "cliente_iletrado_impossibilitado", "tipo_conta", "banco", "agencia", "conta", "matricula", "cnpj_empregador", "data_admissao", "tipo_chave_pix", "chave_pix"];
             if (required.some((field) => !customer[field])) return send(res, 400, { error: "Preencha todos os campos obrigatórios para gerar a proposta." }, corsHeaders);
             if (customer.cliente_iletrado_impossibilitado === "S" && ["nome_a_rogo", "cpf_a_rogo", "nome_a_rogo_testemunha", "cpf_a_rogo_testemunha"].some((field) => !customer[field])) return send(res, 400, { error: "Preencha os dados de assinatura a rogo e da testemunha." }, corsHeaders);
@@ -7152,7 +7198,7 @@ const server = http.createServer(async (req, res) => {
       if (!conversation) return send(res, 404, { error: "Conversa não encontrada" });
       await db.siteChatMarcarLida(conversation.id);
       const clt = await db.siteChatCltObter(conversation.id);
-      return send(res, 200, { conversation, messages: await db.siteChatMensagens(conversation.id), clt: siteChatCltPublico(clt) });
+      return send(res, 200, { conversation, messages: await db.siteChatMensagens(conversation.id), clt: siteChatCltPublico(clt), dados: dadosDoSite(conversation, clt) });
     }
 
     const painelSiteChatReplyMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)\/reply$/i);
@@ -7542,6 +7588,19 @@ const server = http.createServer(async (req, res) => {
       // Também o chat do site do mesmo celular (o painel do cliente): "site" abre a conversa do site, `phone` leva o id dela.
       const doSite = (await db.siteChatPorTelefone(phone)).map((c) => ({ business_number_id: "site", phone: c.id, name: c.name, last_message_at: Number(c.updated_at) || null }));
       return send(res, 200, [...outros, ...doSite]);
+    }
+
+    // GET /painel/api/conversations/:businessId/:phone/dados-site — o que o cliente digitou no chat do site (cartão do WhatsApp).
+    const matchDadosSite = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/([^/]+)\/dados-site$/);
+    if (req.method === "GET" && matchDadosSite) {
+      if (!requireAuth(req, res)) return;
+      const conversasSite = await db.siteChatPorTelefone(decodeURIComponent(matchDadosSite[2]));
+      const saida = [];
+      for (const c of conversasSite) {
+        const completa = await db.siteChatObter(c.id);
+        saida.push({ id: c.id, nome: c.name, dados: dadosDoSite(completa, await db.siteChatCltObter(c.id)) });
+      }
+      return send(res, 200, saida);
     }
 
     // GET /painel/api/site-chat/:id/whatsapp — as conversas de WhatsApp (e Instagram) do mesmo celular do chat do site.

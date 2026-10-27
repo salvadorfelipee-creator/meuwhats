@@ -41,6 +41,7 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
   }, [selecionada?.id])
   const [mensagens, setMensagens] = React.useState<SiteChatMessage[]>([])
   const [clt, setClt] = React.useState<SiteChatClt | null>(null)
+  const [dadosCliente, setDadosCliente] = React.useState<{ rotulo: string; valor: string }[]>([])
   const [busca, setBusca] = React.useState("")
   const [texto, setTexto] = React.useState("")
   const [enviando, setEnviando] = React.useState(false)
@@ -62,6 +63,7 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
       setSelecionada(dados.conversation)
       setMensagens(dados.messages)
       setClt(dados.clt)
+      setDadosCliente(dados.dados || [])
       markConversationSeen("site", id)
       setConversas((prev) => prev.map((c) => c.id === id ? { ...c, ...dados.conversation, unread: false } : c))
     } catch { if (!silencioso) { setSelecionada(null); setClt(null) } }
@@ -221,6 +223,7 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
               <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Produto de interesse</dt><dd>{selecionada.produto_tag || "—"}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Começou em</dt><dd>{new Date(selecionada.created_at).toLocaleString("pt-BR")}</dd></div>
               <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Última mensagem do cliente</dt><dd>{selecionada.last_visitor_at ? new Date(selecionada.last_visitor_at).toLocaleString("pt-BR") : "—"}</dd></div>
+              {dadosCliente.length > 0 && <div className="rounded-md border bg-muted/30 p-2.5"><dt className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Dados informados no site</dt><dd className="space-y-1.5">{dadosCliente.map((d) => <div key={d.rotulo}><p className="text-[10px] uppercase tracking-wide text-muted-foreground">{d.rotulo}</p><p className="select-all break-words text-sm">{d.valor}</p></div>)}</dd></div>}
               {selecionada.page_url && <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Página de origem</dt><dd className="break-all text-xs">{selecionada.page_url}</dd></div>}
               {selecionada.human_intent_stage === "requested" && <div className="rounded-md bg-amber-100 px-2 py-1.5 text-xs font-medium text-amber-800">Pediu atendimento humano</div>}
             </dl>

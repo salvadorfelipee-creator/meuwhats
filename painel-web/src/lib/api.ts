@@ -547,7 +547,7 @@ export const api = {
   factaStatus: () => request<{ ok: boolean; checadoEm: number; erro?: string }>("/painel/api/facta/status"),
   siteChatConversas: () => request<SiteChatConversation[]>("/painel/api/site-chat/conversations"),
   siteChatConversa: (id: string) =>
-    request<{ conversation: SiteChatConversation; messages: SiteChatMessage[]; clt: SiteChatClt | null }>(
+    request<{ conversation: SiteChatConversation; messages: SiteChatMessage[]; clt: SiteChatClt | null; dados?: DadoCliente[] }>(
       `/painel/api/site-chat/conversations/${encodeURIComponent(id)}`,
     ),
   siteChatResponder: (id: string, payload: string | {
@@ -709,6 +709,11 @@ export const api = {
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/midias`,
     ),
 
+  // O que o cliente digitou no chat do site (cartão do WhatsApp do mesmo celular).
+  dadosDoSite: (businessId: string, phone: string) =>
+    request<{ id: string; nome: string; dados: DadoCliente[] }[]>(
+      `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/dados-site`,
+    ),
   siteChatWhatsapp: (id: string) => request<{ business_number_id: string; phone: string; name: string | null; last_message_at: number | null }[]>(`/painel/api/site-chat/${encodeURIComponent(id)}/whatsapp`),
 
   outrosCanais: (businessId: string, phone: string) =>
@@ -1154,3 +1159,5 @@ export const api = {
 }
 
 export { ApiError }
+
+export type DadoCliente = { rotulo: string; valor: string }

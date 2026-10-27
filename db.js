@@ -168,6 +168,11 @@ const ready = (async () => {
     if (!infoSiteChatClt.rows.some((r) => r.name === nome)) await client.execute(`ALTER TABLE site_chat_clt ADD COLUMN ${nome} ${tipo}`);
   }
   const infoSiteChat = await client.execute(`PRAGMA table_info(site_chat_conversations)`);
+  // dados_json: tudo que o cliente digitou no site (nome, CPF, nascimento, endereço...), que fica no cartão do cliente
+  // mesmo depois que a consulta é refeita ou a conversa é encerrada.
+  if (!infoSiteChat.rows.some((r) => r.name === "dados_json")) {
+    await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN dados_json TEXT`);
+  }
   if (!infoSiteChat.rows.some((r) => r.name === "pipeline_estagio")) {
     await client.execute(`ALTER TABLE site_chat_conversations ADD COLUMN pipeline_estagio TEXT`);
   }
@@ -3421,7 +3426,7 @@ async function siteChatPorTelefone(telefone) {
   if (!formas.length) return [];
   const marcas = formas.map(() => "?").join(",");
   const r = await client.execute({
-    sql: `SELECT id, name, updated_at FROM site_chat_conversations
+    sql: `SELECT id, name, updated_at, status, dados_json FROM site_chat_conversations
           WHERE contact IN (${marcas}) OR id IN (SELECT conversation_id FROM site_chat_clt WHERE phone IN (${marcas}))
           ORDER BY updated_at DESC LIMIT 5`,
     args: [...formas, ...formas],
@@ -3927,6 +3932,24 @@ async function siteChatListar() {
   return result.rows;
 }
 
+// Junta `campos` ({ "Rótulo": valor }) aos dados que o cliente digitou no site. Valor vazio nunca apaga o que já estava salvo.
+async function siteChatSalvarDados(id, campos) {
+  await ready;
+  const r = await client.execute({ sql: `SELECT dados_json FROM site_chat_conversations WHERE id = ?`, args: [id] });
+  if (!r.rows[0]) return null;
+  let atuais = {};
+  try { atuais = JSON.parse(r.rows[0].dados_json || "{}") || {}; } catch {}
+  let mudou = false;
+  for (const [rotulo, valor] of Object.entries(campos || {})) {
+    const v = String(valor ?? "").trim().slice(0, 300);
+    if (!v || atuais[rotulo] === v) continue;
+    atuais[rotulo] = v;
+    mudou = true;
+  }
+  if (mudou) await client.execute({ sql: `UPDATE site_chat_conversations SET dados_json = ? WHERE id = ?`, args: [JSON.stringify(atuais), id] });
+  return atuais;
+}
+
 // Finaliza as conversas abertas do chat do site sem atividade desde `desde` (ms) — mesmo corte da limpeza de
 // conversas do WhatsApp. Só fecha (não apaga): se o visitante voltar a escrever, a conversa reabre sozinha.
 async function siteChatFinalizarAntigas(desde) {
@@ -4397,6 +4420,7 @@ module.exports = {
   siteChatMensagemVisitante,
   siteChatMensagemAtendente,
   siteChatListar,
+  siteChatSalvarDados,
   siteChatMarcarLida,
   siteChatDefinirStatus,
   siteChatDefinirPipeline,

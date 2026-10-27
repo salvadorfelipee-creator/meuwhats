@@ -516,7 +516,7 @@ function ChannelChatsPage() {
       if (document.hidden) return
       api
         .siteChatConversas()
-        .then((l) => setSiteAbertas(l.filter((c) => c.status === "open").sort((x, y) => y.updated_at - x.updated_at).slice(0, 15)))
+        .then((l) => setSiteAbertas(l.filter((c) => c.status === "open").sort((x, y) => y.updated_at - x.updated_at)))
         .catch(() => {})
     }
     buscar()
@@ -675,7 +675,7 @@ function ChannelChatsPage() {
   })
 
   // WhatsApp/Instagram e as conversas abertas do site na mesma ordem: a mais recente primeiro.
-  const itensLista: { site?: SiteChatConversation; conv?: Conversation; t: number }[] = [
+  const itensOrdenados: { site?: SiteChatConversation; conv?: Conversation; t: number; agrupado?: boolean }[] = [
     ...(todos && canalSite
       ? siteAbertas
           .filter((c) => `${c.name} ${c.contact || ""}`.toLowerCase().includes(search.toLowerCase()))
@@ -688,6 +688,37 @@ function ChannelChatsPage() {
       return { conv: c, t: rascunho ? 1e14 + rascunho.t : c.last_message_at || 0 }
     }),
   ].sort((x, y) => y.t - x.t)
+
+  // Mesmo cliente no site e no WhatsApp (mesmo DDD + últimos 8 dígitos do celular): os dois cards ficam um em cima do
+  // outro, na posição do mais recente, com uma barra verde na lateral. Cada card continua abrindo a sua conversa.
+  const chaveTelefone = (tel?: string | null) => {
+    let d = String(tel || "").replace(/\D/g, "")
+    if (d.length >= 12 && d.startsWith("55")) d = d.slice(2)
+    return d.length >= 10 ? d.slice(0, 2) + d.slice(-8) : ""
+  }
+  const itensLista = (() => {
+    const porTelefone = new Map<string, typeof itensOrdenados>()
+    for (const it of itensOrdenados) {
+      const k = chaveTelefone(it.site ? it.site.contact : it.conv?.phone)
+      if (k) porTelefone.set(k, [...(porTelefone.get(k) || []), it])
+    }
+    const saida: typeof itensOrdenados = []
+    const jaUsados = new Set<typeof itensOrdenados[number]>()
+    for (const it of itensOrdenados) {
+      if (jaUsados.has(it)) continue
+      const k = chaveTelefone(it.site ? it.site.contact : it.conv?.phone)
+      const grupo = k ? porTelefone.get(k) || [] : []
+      const temSite = grupo.some((g) => g.site)
+      const temZap = grupo.some((g) => g.conv)
+      if (grupo.length > 1 && temSite && temZap) {
+        for (const g of grupo) { jaUsados.add(g); saida.push({ ...g, agrupado: true }) }
+      } else {
+        jaUsados.add(it)
+        saida.push(it)
+      }
+    }
+    return saida
+  })()
 
   async function enviar() {
     if (!current || !selected || !texto.trim()) return
@@ -1116,14 +1147,14 @@ function ChannelChatsPage() {
                     setSelected(null)
                     setSiteSel(c.id)
                   }}
-                  className={`w-full px-3 py-3 border-b border-border/50 text-left flex items-center gap-3 ${siteSel === c.id ? "bg-[#f0f2f5] dark:bg-[#2a3942]" : "hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]"}`}
+                  className={`w-full px-3 py-3 border-b border-border/50 text-left flex items-center gap-3 ${item.agrupado ? "border-l-[3px] border-l-emerald-500" : ""} ${siteSel === c.id ? "bg-[#f0f2f5] dark:bg-[#2a3942]" : "hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]"}`}
                 >
                   <span className="h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
                     <Globe2 className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-medium">{c.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">Site · {c.last_message || "Conversa iniciada"}</span>
+                    <span className="block truncate text-xs text-muted-foreground">Site{item.agrupado ? " (mesmo cliente do WhatsApp)" : ""} · {c.last_message || "Conversa iniciada"}</span>
                   </span>
                   <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(c.updated_at)}</span>
                 </button>
@@ -1158,7 +1189,7 @@ function ChannelChatsPage() {
                   if (todos) setSelectedBiz(c.business_number_id)
                   if (canalId) markConversationSeen(canalId, c.phone)
                 }}
-                className={`w-full px-3 py-3 border-b border-border/50 cursor-pointer text-left transition-colors relative ${
+                className={`w-full px-3 py-3 border-b border-border/50 cursor-pointer text-left transition-colors relative ${item.agrupado ? "border-l-[3px] border-l-emerald-500" : ""} ${
                   selected === c.phone && (!todos || current?.id === c.business_number_id)
                     ? "bg-[#f0f2f5] dark:bg-[#2a3942]"
                     : interessado
@@ -2952,6 +2983,11 @@ function ContactDetails({
 
   // ── Mesmo telefone em outro canal (outro número de WhatsApp, ou Instagram) ────────────────
   const [outrosCanais, setOutrosCanais] = React.useState<OutroCanal[]>([])
+  const [dadosSite, setDadosSite] = React.useState<{ id: string; nome: string; dados: { rotulo: string; valor: string }[] }[]>([])
+  React.useEffect(() => {
+    setDadosSite([])
+    api.dadosDoSite(businessId, conversation.phone).then(setDadosSite).catch(() => {})
+  }, [businessId, conversation.phone])
   React.useEffect(() => {
     api.outrosCanais(businessId, conversation.phone).then(setOutrosCanais).catch(() => {})
   }, [businessId, conversation.phone])
@@ -3067,6 +3103,18 @@ function ContactDetails({
           className="h-6 flex-1 min-w-0 rounded-md border border-transparent hover:border-input focus:border-input bg-transparent px-1.5 text-xs"
         />
       </div>
+
+      {dadosSite.filter((d) => d.dados.length > 0).map((d) => (
+        <div key={d.id} className="rounded-xl border bg-muted/30 p-3 flex flex-col gap-1.5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dados informados no site</p>
+          {d.dados.map((x) => (
+            <div key={x.rotulo}>
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{x.rotulo}</p>
+              <p className="text-sm break-words select-all">{x.valor}</p>
+            </div>
+          ))}
+        </div>
+      ))}
 
       {outrosCanais.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
