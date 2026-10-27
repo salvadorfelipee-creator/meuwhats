@@ -710,8 +710,6 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
   await db.siteChatDefinirProduto(id, "Empréstimo CLT");
   await db.siteChatDefinirPipeline(id, "qualificacao");
   const vigente = await autorizacaoFactaVigente(cpf);
-  // Avisa na conversa ANTES de pedir a autorização: o cliente não pode receber o link da Facta sem saber o que é.
-  if (!vigente) await db.siteChatMensagemAtendente(id, "Assistente FelizCred", `Vamos simular no banco Facta. Estamos pedindo a autorização agora: você vai receber no WhatsApp do celular final ${String(phone).slice(-4)} uma mensagem da Facta com um link. Abra, toque no link e autorize a consulta.`);
   const authorization = vigente
     ? { mensagem: "Cliente não necessita de autorização" }
     : await facta.solicitarAutorizacao({ nome: fullName, cpf, celular: formatarCelularFacta(phone) });
@@ -736,7 +734,7 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
     });
     await db.siteChatMensagemAtendente(id, "Assistente FelizCred", alreadyAuthorized
       ? "Sua autorização ainda está válida. Já estamos consultando suas condições."
-      : "Enviamos a autorização da Facta para seu WhatsApp. Abra o WhatsApp, toque no link da mensagem e autorize a consulta. Depois volte aqui: sua simulação fica salva nesta mesma tela, é só tocar em Já autorizei.");
+      : "Para fazer a simulação no banco Facta, é necessário fazer uma autorização. Enviei uma autorização de simulação para o seu telefone: é só abrir a mensagem, tocar no link e liberar a simulação. Depois, volte aqui, por favor.");
     if (alreadyAuthorized) row = await sincronizarFactaComOutrosBancos(row);
   }
   return row;
@@ -5469,6 +5467,8 @@ async function finalizarConversasAntigas() {
 setTimeout(async () => {
   try {
     for (const row of await db.siteChatCltTelefoneOutroCpfParadas()) await tentarOutrosBancos(row);
+    // Idem para quem a Facta reprovou na política de crédito nos últimos 2 dias e ficou parado sem tentar o Unno.
+    for (const row of await db.siteChatCltPoliticaReprovadaRecentes(Date.now() - 2 * 24 * 60 * 60 * 1000)) await tentarOutrosBancos(row);
   } catch (err) {
     console.error("Erro ao retomar simulações paradas por celular de outro CPF:", err.message);
   }
@@ -6902,7 +6902,9 @@ const server = http.createServer(async (req, res) => {
             if (String(policy?.aprovado) !== "1") {
               await db.siteChatFunilEvento(id, "saida", "politica_reprovada", "facta", "politica_reprovada");
               const row = await db.siteChatCltAtualizar(id, { etapa: "politica_reprovada", status_novosaque: "POLITICA_REPROVADA", error_message: mensagemFacta(policy, "A condição não passou pela política de crédito da Facta.") });
-              return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
+              // Reprovada na política da Facta: segue sozinho para o banco parceiro (Unno), com os mesmos dados.
+              const migrada = await tentarOutrosBancos(row);
+              return send(res, 200, { clt: siteChatCltPublico(migrada || row) }, corsHeaders);
             }
             const loginCertificado = String(process.env.FACTA_LOGIN_CERTIFICADO || "").trim();
             if (!loginCertificado) throw new Error("FACTA_LOGIN_CERTIFICADO não configurado");
@@ -7130,7 +7132,6 @@ const server = http.createServer(async (req, res) => {
               cltStep = "atalho";
             } else if (!row && confirmouTempo) {
               await db.siteChatFunilEvento(id, "qualificado", "mais_de_3_meses", "facta");
-              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Perfeito! Vamos simular no banco Facta. Informe seu CPF: em seguida a Facta envia um link de autorização para o WhatsApp do celular que você cadastrou. É só abrir a mensagem, tocar no link e autorizar. Sem essa autorização não conseguimos consultar suas condições.");
               cltStep = "start";
             } else if (!row && semTempoMinimo) {
               await db.siteChatFunilEvento(id, "saida", "tempo_minimo", "facta", "menos_de_3_meses");

@@ -3977,6 +3977,13 @@ async function siteChatCltTelefoneOutroCpfParadas() {
   return r.rows;
 }
 
+// Simulações da Facta reprovadas na política de crédito (desde `desde`, ms) que ainda não foram para o banco parceiro.
+async function siteChatCltPoliticaReprovadaRecentes(desde) {
+  await ready;
+  const r = await client.execute({ sql: `SELECT * FROM site_chat_clt WHERE provider = 'facta' AND etapa = 'politica_reprovada' AND updated_at >= ?`, args: [desde] });
+  return r.rows;
+}
+
 async function siteChatDefinirNome(id, name) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET name = ? WHERE id = ?`, args: [name, id] });
@@ -4486,6 +4493,7 @@ module.exports = {
   conversasConsignadoSemEtapa,
   conversasFinalizarAntigas,
   siteChatCltTelefoneOutroCpfParadas,
+  siteChatCltPoliticaReprovadaRecentes,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,

@@ -23,6 +23,7 @@ http.createServer(async (req, res) => {
       if (f.modo === "nao_elegivel") return send(res, 200, { ok: true, body: mk("NAO", "0,00") });
       return send(res, 200, { ok: true, body: mk("SIM", "500,00") });
     }
+    if (path === "/consignado-trabalhador/analise-politica-credito") return send(res, 200, { ok: true, body: { erro: false, aprovado: f.modo === "politica" ? "0" : "1" } });
     if (path === "/proposta/operacoes-disponiveis") return send(res, 200, { ok: true, body: { erro: false, tabelas: [
       { codigoTabela: "71064", prazo: 36, parcela: 500, valor_liquido: 9000, contrato: 12000, taxa: 2.1 },
       { codigoTabela: "71056", prazo: 24, parcela: 500, valor_liquido: 7000, contrato: 9000, taxa: 2.0 } ] } });

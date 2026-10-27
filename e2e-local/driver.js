@@ -84,8 +84,21 @@ const textos = (a) => (a.messages || []).map((m) => `${m.direction === "visitor"
   await a.say("Ainda não tenho 3 meses"); await sleep(1500); at = await a.atendente(); const t6 = textos(at);
   check(6, "responde 'volte quando completar 3 meses'", t6.some((t) => /3 meses no trabalho atual, volte/.test(t)), t6.at(-1));
   a = await cliente("6b", 6); await a.say("Sim, tenho mais de 3 meses"); await sleep(1500); at = await a.atendente();
-  check(6, "pede o CPF depois de confirmar 3 meses", textos(at).some((t) => /Informe seu CPF/.test(t)), textos(at).at(-1));
+  check(6, "confirmar 3 meses não manda mais as mensagens antigas da Facta", !textos(at).some((t) => /Informe seu CPF|celular final/.test(t)), textos(at).at(-1));
   await a.say(a.cpf); await sleep(2500); at = await a.atendente(); console.log("   atendente vê:", textos(at).join(" | ").slice(0, 700));
+
+  console.log("\n[7] Facta reprova na política de crédito: segue para a Unnotech");
+  a = await cliente("7", 7); await ctl("facta", { cpf: a.cpf, set: { modo: "fila", autorizado: false } });
+  st = await a.start(); await ctl("facta", { cpf: a.cpf, set: { modo: "politica", autorizado: true } });
+  await a.f("POST", `/site-chat/conversations/${a.id}/clt/confirm-authorization`, {}, a.token);
+  let c7 = await a.clt();
+  check(7, "chega nas ofertas da Facta", c7.etapa === "ofertas_disponiveis" && (c7.offers || []).length > 0, `${c7.provider}/${c7.etapa}`);
+  await a.f("POST", `/site-chat/conversations/${a.id}/clt/select-offer`, { offerId: c7.offers[0].id }, a.token); await sleep(1500);
+  c7 = await a.clt();
+  check(7, "política reprovada vai sozinha para a Unnotech", c7.provider === "unnotech" && c7.etapa === "autorizacao_enviada", `${c7.provider}/${c7.etapa}`);
+  at = await a.atendente(); const ms7 = textos(at);
+  check(7, "mensagem explica a política e manda o link", ms7.some((t) => /política de crédito/.test(t)) && ms7.some((t) => /termo\.mock/.test(t)), ms7.slice(-3).join(" | ").slice(0, 300));
+  check(7, "só a mensagem nova de autorização da Facta (sem as antigas)", ms7.some((t) => /é necessário fazer uma autorização/.test(t)) && !ms7.some((t) => /celular final|Informe seu CPF|Enviamos a autorização da Facta/.test(t)), "");
 
   console.log("\nRESUMO:", R.filter((x) => x.ok).length + "/" + R.length, "ok");
   console.log("FALHAS:\n  " + R.filter((x) => !x.ok).map((x) => `[${x.cen}] ${x.nome}`).join("\n  "));
