@@ -262,6 +262,13 @@ function numeroFacta(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+// A Facta só aceita parcela de até 90% da margem disponível (margem 97,63 → "Valor Máximo Prestação" 87,87 na
+// consulta do portal). Simular com a margem inteira mostrava ao cliente uma parcela que a Facta recusa.
+function parcelaMaximaFacta(margem) {
+  const m = Number(margem) || 0;
+  return m > 0 ? Math.round(m * 0.9 * 100) / 100 : 0;
+}
+
 function simFacta(value) {
   return /^(s|sim|true|1|elegivel|elegível)$/i.test(String(value ?? "").trim());
 }
@@ -638,9 +645,9 @@ async function sincronizarSiteChatFacta(row) {
   const primeiro = elegiveis[0];
   if (numeroFacta(primeiro.valorMargemDisponivel) <= 0) return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_margem", status_novosaque: "SEM_MARGEM", margem_disponivel: 0, facta_worker_json: JSON.stringify(primeiro), error_message: null });
 
-  let worker = primeiro, margem = numeroFacta(primeiro.valorMargemDisponivel), offers = [], erroOperacoes = null;
+  let worker = primeiro, margem = parcelaMaximaFacta(numeroFacta(primeiro.valorMargemDisponivel)), offers = [], erroOperacoes = null;
   for (const candidato of elegiveis.slice(0, 5)) {
-    const margemCandidato = numeroFacta(candidato.valorMargemDisponivel);
+    const margemCandidato = parcelaMaximaFacta(numeroFacta(candidato.valorMargemDisponivel));
     if (margemCandidato <= 0) continue;
     const operations = await facta.consultarOperacoes({
       opcao_valor: 2,
@@ -2091,6 +2098,32 @@ function nomeContatoComCpf(cpf, nome) {
 
 // Nome e CPF que o cliente digitou no site passam a ser o nome do contato no WhatsApp ("FGTS <nome> <CPF>") quando a
 // conversa ainda está "Sem nome" (ou só com o número), e também no Google Contatos se o contato existir sem nome.
+// Ofertas que ainda estavam na tela com a parcela igual à margem inteira (antes da regra dos 90%) são refeitas.
+async function corrigirOfertasFactaParcelaMaxima() {
+  for (const row of await db.siteChatCltOfertasAbertasRecentes(Date.now() - 3 * 24 * 60 * 60 * 1000)) {
+    try {
+      const worker = JSON.parse(row.facta_worker_json || "{}");
+      const cheia = numeroFacta(worker.valorMargemDisponivel);
+      if (!(cheia > 0) || Math.abs(Number(row.margem_disponivel || 0) - cheia) > 0.005) continue;
+      const parcela = parcelaMaximaFacta(cheia);
+      const operacoes = await facta.consultarOperacoes({
+        opcao_valor: 2,
+        valor_parcela: parcela.toFixed(2),
+        cpf: row.cpf,
+        data_nascimento: normalizarDataFacta(worker.dataNascimento),
+        valor_renda: numeroFacta(worker.valorTotalVencimentos).toFixed(2),
+        ...(worker.matricula ? { matricula: worker.matricula } : {}),
+      });
+      const novas = respostaFactaComErro(operacoes) ? [] : ofertasFacta(operacoes);
+      if (!novas.length) continue;
+      await db.siteChatCltAtualizar(row.conversation_id, { offers_json: JSON.stringify(novas), margem_disponivel: parcela });
+      console.log(`Ofertas Facta refeitas com parcela máxima de R$ ${parcela.toFixed(2)} (conversa ${row.conversation_id})`);
+    } catch (err) {
+      console.error("Erro ao refazer ofertas Facta com parcela máxima:", err.message);
+    }
+  }
+}
+
 async function nomearContatoPeloSite({ phone, nome, cpf }) {
   const nomeLimpo = String(nome || "").trim();
   if (!nomeLimpo || !cpf) return;
@@ -5496,6 +5529,7 @@ setTimeout(async () => {
     // Idem para quem a Facta reprovou na política de crédito nos últimos 2 dias e ficou parado sem tentar o Unno.
     // Quem digitou nome e CPF no site nos últimos 3 dias e ainda está "Sem nome" no WhatsApp ganha o nome agora.
     for (const row of await db.siteChatCltComCpfRecentes(Date.now() - 3 * 24 * 60 * 60 * 1000)) await nomearContatoPeloSite({ phone: row.phone, nome: row.name, cpf: row.cpf });
+    await corrigirOfertasFactaParcelaMaxima();
     for (const row of await db.siteChatCltFactaNegativaRecentes(Date.now() - 2 * 24 * 60 * 60 * 1000, ETAPAS_FACTA_SEM_CONDICAO)) await tentarOutrosBancos(row);
   } catch (err) {
     console.error("Erro ao retomar simulações paradas por celular de outro CPF:", err.message);

@@ -3998,6 +3998,13 @@ async function siteChatCltComCpfRecentes(desde) {
   return r.rows;
 }
 
+// Simulações Facta do site com ofertas na tela, mexidas desde `desde` (ms).
+async function siteChatCltOfertasAbertasRecentes(desde) {
+  await ready;
+  const r = await client.execute({ sql: `SELECT * FROM site_chat_clt WHERE provider = 'facta' AND etapa = 'ofertas_disponiveis' AND updated_at >= ?`, args: [desde] });
+  return r.rows;
+}
+
 async function siteChatDefinirNome(id, name) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET name = ? WHERE id = ?`, args: [name, id] });
@@ -4521,6 +4528,7 @@ module.exports = {
   siteChatCltFactaNegativaRecentes,
   siteChatCltNaoFinalizadasRecentes,
   siteChatCltComCpfRecentes,
+  siteChatCltOfertasAbertasRecentes,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,
