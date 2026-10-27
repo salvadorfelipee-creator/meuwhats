@@ -7323,6 +7323,19 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       const status = body.status === "closed" ? "closed" : "open";
       await db.siteChatDefinirStatus(painelSiteChatStatusMatch[1], status);
+      // Site e WhatsApp do mesmo cliente andam juntos: encerrar um finaliza o outro; reabrir um reabre o outro.
+      try {
+        const tel = await db.siteChatTelefoneDe(painelSiteChatStatusMatch[1]);
+        if (tel) {
+          for (const c of await db.conversasPorTelefoneTodosCanais(tel)) {
+            if (c.business_number_id === "instagram") continue;
+            if (status === "closed" && c.status !== "resolvido") await db.atualizarStatusConversa(c.phone, c.business_number_id, "resolvido");
+            if (status === "open" && c.status === "resolvido") await db.atualizarStatusConversa(c.phone, c.business_number_id, "novo");
+          }
+        }
+      } catch (err) {
+        console.error("Status do site não espelhado no WhatsApp:", err.message);
+      }
       return send(res, 200, { ok: true });
     }
 
@@ -7981,7 +7994,19 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       const body = await parseBody(req);
       try {
-        await db.atualizarStatusConversa(decodeURIComponent(matchStatus[2]), decodeURIComponent(matchStatus[1]), body.status);
+        const telStatus = decodeURIComponent(matchStatus[2]);
+        await db.atualizarStatusConversa(telStatus, decodeURIComponent(matchStatus[1]), body.status);
+        // Mesmo cliente no site: finalizar/reabrir o WhatsApp faz o mesmo com o chat do site.
+        if ((body.status === "resolvido" || body.status === "novo") && decodeURIComponent(matchStatus[1]) !== "instagram") {
+          try {
+            for (const sc of await db.siteChatPorTelefone(telStatus)) {
+              if (body.status === "resolvido" && sc.status === "open") await db.siteChatDefinirStatus(sc.id, "closed");
+              if (body.status === "novo" && sc.status === "closed") await db.siteChatDefinirStatus(sc.id, "open");
+            }
+          } catch (err) {
+            console.error("Status do WhatsApp não espelhado no site:", err.message);
+          }
+        }
         return send(res, 200, { ok: true });
       } catch (err) {
         return send(res, 400, { error: err.message });

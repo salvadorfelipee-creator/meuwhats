@@ -3440,7 +3440,7 @@ async function conversasPorTelefoneTodosCanais(telefone) {
   const formas = variantesTelefoneBR(telefone);
   if (!formas.length) return [];
   const r = await client.execute({
-    sql: `SELECT business_number_id, phone, name, last_message_at FROM conversations WHERE phone IN (${formas.map(() => "?").join(",")}) ORDER BY last_message_at DESC`,
+    sql: `SELECT business_number_id, phone, name, last_message_at, status FROM conversations WHERE phone IN (${formas.map(() => "?").join(",")}) ORDER BY last_message_at DESC`,
     args: formas,
   });
   return r.rows.map((x) => ({ ...x }));
@@ -4114,6 +4114,16 @@ async function siteChatDefinirStatus(id, status) {
   await client.execute({ sql: `UPDATE site_chat_conversations SET status = ?, updated_at = ? WHERE id = ?`, args: [status, Date.now(), id] });
 }
 
+// Celular do cliente de uma conversa do site (cadastro ou consulta CLT), pra espelhar o status no WhatsApp.
+async function siteChatTelefoneDe(id) {
+  await ready;
+  const r = await client.execute({
+    sql: `SELECT COALESCE(NULLIF(c.contact, ''), (SELECT phone FROM site_chat_clt WHERE conversation_id = c.id AND phone IS NOT NULL AND phone != '' ORDER BY updated_at DESC LIMIT 1)) AS tel FROM site_chat_conversations c WHERE c.id = ?`,
+    args: [id],
+  });
+  return r.rows[0]?.tel ? String(r.rows[0].tel) : null;
+}
+
 async function siteChatDefinirPipeline(id, estagio) {
   await ready;
   await client.execute({
@@ -4399,6 +4409,7 @@ module.exports = {
   marcarBrevoContatoSync,
   conversasDoTelefoneEmOutrosCanais,
   siteChatPorTelefone,
+  siteChatTelefoneDe,
   conversasPorTelefoneTodosCanais,
   importarContato,
   listMidiasDaConversa,
