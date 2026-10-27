@@ -2096,8 +2096,6 @@ function nomeContatoComCpf(cpf, nome) {
   return ["FGTS", nomeReal, cpf].filter(Boolean).join(" ");
 }
 
-// Nome e CPF que o cliente digitou no site passam a ser o nome do contato no WhatsApp ("FGTS <nome> <CPF>") quando a
-// conversa ainda está "Sem nome" (ou só com o número), e também no Google Contatos se o contato existir sem nome.
 // Ofertas que ainda estavam na tela com a parcela igual à margem inteira (antes da regra dos 90%) são refeitas.
 async function corrigirOfertasFactaParcelaMaxima() {
   for (const row of await db.siteChatCltOfertasAbertasRecentes(Date.now() - 3 * 24 * 60 * 60 * 1000)) {
@@ -2124,6 +2122,9 @@ async function corrigirOfertasFactaParcelaMaxima() {
   }
 }
 
+// Nome e CPF que o cliente digitou no site passam a ser o nome do contato no WhatsApp ("FGTS <nome> <CPF>") quando a
+// conversa ainda está "Sem nome", só com o número ou só "FGTS <CPF>"; no Google Contatos o contato é criado, nomeado
+// (se estava sem nome) ou completado (se estava como "FGTS ...").
 async function nomearContatoPeloSite({ phone, nome, cpf }) {
   const nomeLimpo = String(nome || "").trim();
   if (!nomeLimpo || !cpf) return;
@@ -2132,12 +2133,22 @@ async function nomearContatoPeloSite({ phone, nome, cpf }) {
     for (const c of await db.conversasPorTelefoneTodosCanais(phone)) {
       if (c.business_number_id === "instagram") continue;
       const atual = String(c.name || "").trim();
-      if (atual && !/^\+?[\d\s()-]+$/.test(atual)) continue; // já tem nome de verdade
+      if (atual && !/^(FGTS\s+)?\+?[\d\s()-]+$/i.test(atual)) continue; // já tem nome de verdade
       await db.renomearConversa(c.phone, c.business_number_id, nomeContato);
     }
     if (google.configurado()) {
       const d = String(phone || "").replace(/\D/g, "");
-      await google.nomearContatoSemNome({ telefone: d.startsWith("55") && d.length >= 12 ? d : `55${d}`, nome: nomeContato });
+      const telefone = d.startsWith("55") && d.length >= 12 ? d : `55${d}`;
+      const r = await google.garantirContato({ telefone, nomePerfil: nomeContato });
+      if (r?.existente) {
+        await google.nomearContatoSemNome({ telefone, nome: nomeContato });
+        await google.renomearContatoFgts({ telefone, nome: nomeContato });
+      }
+      if (r?.resourceName) {
+        for (const c of await db.conversasPorTelefoneTodosCanais(phone)) {
+          if (c.business_number_id !== "instagram") await db.salvarGoogleContactResourceName(c.phone, c.business_number_id, r.resourceName).catch(() => {});
+        }
+      }
     }
   } catch (err) {
     console.error("Nome do site não aplicado ao contato:", err.message);
@@ -5528,7 +5539,7 @@ setTimeout(async () => {
     for (const row of await db.siteChatCltTelefoneOutroCpfParadas()) await tentarOutrosBancos(row);
     // Idem para quem a Facta reprovou na política de crédito nos últimos 2 dias e ficou parado sem tentar o Unno.
     // Quem digitou nome e CPF no site nos últimos 3 dias e ainda está "Sem nome" no WhatsApp ganha o nome agora.
-    for (const row of await db.siteChatCltComCpfRecentes(Date.now() - 3 * 24 * 60 * 60 * 1000)) await nomearContatoPeloSite({ phone: row.phone, nome: row.name, cpf: row.cpf });
+    for (const row of await db.siteChatCltComCpfRecentes(Date.now() - 30 * 24 * 60 * 60 * 1000)) await nomearContatoPeloSite({ phone: row.phone, nome: row.name, cpf: row.cpf });
     await corrigirOfertasFactaParcelaMaxima();
     for (const row of await db.siteChatCltFactaNegativaRecentes(Date.now() - 2 * 24 * 60 * 60 * 1000, ETAPAS_FACTA_SEM_CONDICAO)) await tentarOutrosBancos(row);
   } catch (err) {

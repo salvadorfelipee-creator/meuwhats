@@ -375,6 +375,20 @@ async function nomearContatoSemNome({ telefone, nome }) {
   return true;
 }
 
+// Contato do Google salvo como "FGTS <CPF>" (sem o nome) ou com outro nome FGTS antigo: atualiza para o nome completo.
+// Só mexe em contato cujo nome já começa com "FGTS" — nome de gente nunca é sobrescrito.
+async function renomearContatoFgts({ telefone, nome }) {
+  const mapa = await mapaContatos();
+  const achado = mapa.get(chaveTelefone(telefone));
+  if (!achado || !achado.resourceName || !nome || !/^FGTS/i.test(achado.nome || "") || achado.nome === nome) return false;
+  const accessToken = await obterAccessToken();
+  const pessoa = await requestJson("GET", "people.googleapis.com", `/v1/${achado.resourceName}?personFields=names,metadata`, { accessToken });
+  if (!pessoa.etag) return false;
+  await requestJson("PATCH", "people.googleapis.com", `/v1/${achado.resourceName}:updateContact?updatePersonFields=names`, { accessToken, bodyObj: { etag: pessoa.etag, names: [{ givenName: nome }] } });
+  achado.nome = nome;
+  return true;
+}
+
 // Exportação completa (19k+ contatos): todas as páginas, com nome, telefones e e-mails. Usada pela
 // rota GET /painel/api/google/exportar-csv pra gerar o arquivo de backup/limpeza.
 async function listarTodosContatosCompletos() {
@@ -399,6 +413,7 @@ async function listarTodosContatosCompletos() {
 }
 
 module.exports = {
+  renomearContatoFgts,
   listarTodosContatosCompletos,
   configurado,
   chaveTelefone,
