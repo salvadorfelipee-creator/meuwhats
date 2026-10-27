@@ -3977,10 +3977,17 @@ async function siteChatCltTelefoneOutroCpfParadas() {
   return r.rows;
 }
 
-// Simulações da Facta reprovadas na política de crédito (desde `desde`, ms) que ainda não foram para o banco parceiro.
-async function siteChatCltPoliticaReprovadaRecentes(desde) {
+// Simulações da Facta paradas num resultado negativo (`etapas`), atualizadas desde `desde` (ms), que ainda não foram para o banco parceiro.
+async function siteChatCltFactaNegativaRecentes(desde, etapas) {
   await ready;
-  const r = await client.execute({ sql: `SELECT * FROM site_chat_clt WHERE provider = 'facta' AND etapa = 'politica_reprovada' AND updated_at >= ?`, args: [desde] });
+  const r = await client.execute({ sql: `SELECT * FROM site_chat_clt WHERE provider = 'facta' AND etapa IN (${etapas.map(() => "?").join(",")}) AND updated_at >= ?`, args: [...etapas, desde] });
+  return r.rows;
+}
+
+// Simulações do site com celular, ainda sem proposta nem encerramento, paradas entre `desde` e `ate` (ms).
+async function siteChatCltNaoFinalizadasRecentes(desde, ate, etapasEncerradas) {
+  await ready;
+  const r = await client.execute({ sql: `SELECT phone FROM site_chat_clt WHERE phone IS NOT NULL AND phone != '' AND etapa NOT IN (${etapasEncerradas.map(() => "?").join(",")}) AND updated_at BETWEEN ? AND ?`, args: [...etapasEncerradas, desde, ate] });
   return r.rows;
 }
 
@@ -4493,7 +4500,8 @@ module.exports = {
   conversasConsignadoSemEtapa,
   conversasFinalizarAntigas,
   siteChatCltTelefoneOutroCpfParadas,
-  siteChatCltPoliticaReprovadaRecentes,
+  siteChatCltFactaNegativaRecentes,
+  siteChatCltNaoFinalizadasRecentes,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,

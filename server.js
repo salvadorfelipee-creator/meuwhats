@@ -675,7 +675,8 @@ async function sincronizarSiteChatFacta(row) {
 }
 
 // Resultados definitivos da Facta (não adianta tentar de novo): a simulação segue automaticamente nos bancos parceiros.
-const ETAPAS_FACTA_SEM_CONDICAO = ["sem_margem", "nao_elegivel", "sem_oferta", "politica_reprovada"];
+// Qualquer resultado negativo da Facta (sem condição, política reprovada, erro de consulta, de integração ou de autorização) segue para o Unno.
+const ETAPAS_FACTA_SEM_CONDICAO = ["sem_margem", "nao_elegivel", "sem_oferta", "politica_reprovada", "erro_consulta", "erro_integracao", "erro_autorizacao"];
 const telefoneDeOutroCpf = (msg) => /telefone j[aá] informado para outro cpf/i.test(String(msg || ""));
 async function tentarOutrosBancos(row, manual = false) {
   if (!row || row.provider !== "facta" || !unnoSite.configurado()) return row;
@@ -719,7 +720,7 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
     row = await db.siteChatCltAtualizar(id, { etapa: "erro_autorizacao", status_novosaque: "ERRO_AUTORIZACAO", error_message: authMessage });
     // Celular já ligado a outro CPF na Facta: não deixa o cliente parado pedindo outro número, segue direto para os
     // bancos parceiros (Unnotech) com os mesmos dados. Se não abrir lá, cai no aviso de sempre.
-    const migrada = telefoneDeOutroCpf(authMessage) ? await tentarOutrosBancos(row) : row;
+    const migrada = await tentarOutrosBancos(row);
     if (migrada?.provider === "unnotech") row = migrada;
     else await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(authMessage));
   } else {
@@ -5468,7 +5469,7 @@ setTimeout(async () => {
   try {
     for (const row of await db.siteChatCltTelefoneOutroCpfParadas()) await tentarOutrosBancos(row);
     // Idem para quem a Facta reprovou na política de crédito nos últimos 2 dias e ficou parado sem tentar o Unno.
-    for (const row of await db.siteChatCltPoliticaReprovadaRecentes(Date.now() - 2 * 24 * 60 * 60 * 1000)) await tentarOutrosBancos(row);
+    for (const row of await db.siteChatCltFactaNegativaRecentes(Date.now() - 2 * 24 * 60 * 60 * 1000, ETAPAS_FACTA_SEM_CONDICAO)) await tentarOutrosBancos(row);
   } catch (err) {
     console.error("Erro ao retomar simulações paradas por celular de outro CPF:", err.message);
   }
@@ -5507,6 +5508,38 @@ function nascimentoDeTexto(texto) {
 //   consignado_oferta → consignado_iniciar → consignado_nome → consignado_cpf → consignado_nasc → consignado_confirma → consignado_concluido
 //   consignado_oferta → consignado_encerrado ("no momento não")
 // Quem já está em outro funil não entra aqui.
+// Simulação do site que o cliente começou e não terminou (não chegou à proposta nem encerrou por falta de condição).
+const ETAPAS_SIMULACAO_SITE_ENCERRADAS = ["proposta_concluida", "proposta_cancelada", "aguardando_assinatura_facta", "sem_margem", "nao_elegivel", "sem_oferta"];
+const TAG_SIMULACAO_NAO_FINALIZADA = "Simulação não finalizada";
+async function marcarSimulacaoNaoFinalizada(businessNumberId, phone) {
+  try {
+    const tagId = await db.tagEncontrarOuCriar(businessNumberId, TAG_SIMULACAO_NAO_FINALIZADA, "#D97706");
+    await db.adicionarTagConversaSeAusente(businessNumberId, phone, tagId, "automatico");
+  } catch (err) {
+    console.error("Erro ao marcar simulação não finalizada:", err.message);
+  }
+}
+async function simulacaoSiteNaoFinalizada(phone) {
+  for (const site of await db.siteChatPorTelefone(phone)) {
+    const clt = await db.siteChatCltObter(site.id);
+    if (clt && !ETAPAS_SIMULACAO_SITE_ENCERRADAS.includes(clt.etapa)) return { site, clt };
+  }
+  return null;
+}
+// Todo dia/hora: marca nas conversas de WhatsApp quem começou a simulação no site e parou há mais de 1 h (últimos 3 dias).
+async function marcarSimulacoesNaoFinalizadas() {
+  try {
+    const agora = Date.now();
+    for (const clt of await db.siteChatCltNaoFinalizadasRecentes(agora - 3 * 24 * 60 * 60 * 1000, agora - 60 * 60 * 1000, ETAPAS_SIMULACAO_SITE_ENCERRADAS)) {
+      for (const c of await db.conversasPorTelefoneTodosCanais(clt.phone)) await marcarSimulacaoNaoFinalizada(c.business_number_id, c.phone);
+    }
+  } catch (err) {
+    console.error("Erro ao marcar simulações não finalizadas:", err.message);
+  }
+}
+setTimeout(marcarSimulacoesNaoFinalizadas, 6 * 60 * 1000);
+setInterval(marcarSimulacoesNaoFinalizadas, 60 * 60 * 1000);
+
 async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conversaAnterior, base }) {
   if (!NUMEROS_CONSIGNADO.includes(businessNumberId)) return false;
   const texto =
@@ -5579,6 +5612,26 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
 
   try {
     await db.insertMessage({ ...base, type: tipo === "text" ? "text" : "button", body: texto });
+    // Cliente que já começou a simulação no site e parou: não recebe a apresentação e a oferta de novo. Fica marcado
+    // ("Simulação não finalizada") e recebe o botão para continuar de onde parou, no máximo 1 vez a cada 10 min.
+    if ((!ehConsignado || (estado === "consignado_oferta" && !t.includes("no momento"))) && !REGEX_INTENCAO_FGTS.test(texto)) {
+      const pendente = await simulacaoSiteNaoFinalizada(de);
+      if (pendente) {
+        await marcarSimulacaoNaoFinalizada(businessNumberId, de);
+        await marcarInteressadoConsignado(de, businessNumberId);
+        const dia = new Date(Number(pendente.site.updated_at) || Date.now()).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+        const marca = `Simulação do site não finalizada (parou em ${pendente.clt.etapa}, ${dia})`;
+        if (!String(conversaAnterior?.nota || "").includes("Simulação do site não finalizada")) {
+          await db.atualizarNotaConversa(de, businessNumberId, [conversaAnterior?.nota, marca].filter(Boolean).join("\n"));
+        }
+        await irPara("consignado_chat");
+        if (!(await respondeuHaPouco(de, businessNumberId, 10))) {
+          const link = pendente.clt.tracking_token ? `https://www.felizcred.com.br/minha-simulacao/?t=${encodeURIComponent(pendente.clt.tracking_token)}` : linkChatConsignado(de);
+          await responder(`Você começou sua simulação no dia ${dia} e ainda não terminou. Toque no botão abaixo para continuar exatamente de onde parou 😊`, null, { ...CTA_CHAT_CONSIGNADO, url: link });
+        }
+        return true;
+      }
+    }
     if (!ehConsignado) {
       await iniciarOfertaConsignado(de, businessNumberId);
       return true;
@@ -6794,7 +6847,7 @@ const server = http.createServer(async (req, res) => {
               authorization_requested_at: Date.now(), authorization_checked_at: null,
               error_message: failed ? authMessage : null,
             });
-            if (failed && telefoneDeOutroCpf(authMessage)) {
+            if (failed) {
               const migrada = await tentarOutrosBancos(row);
               if (migrada?.provider === "unnotech") return send(res, 200, { clt: siteChatCltPublico(migrada) }, corsHeaders);
             }

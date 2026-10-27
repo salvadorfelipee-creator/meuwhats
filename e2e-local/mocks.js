@@ -13,6 +13,7 @@ http.createServer(async (req, res) => {
     const f = S.facta[cpf] || (S.facta[cpf] = { modo: "fila", autorizado: false });
     S.log.push(`facta ${path} ${cpf.slice(0, 3)}* modo=${f.modo}`);
     if (path === "/solicita-autorizacao-consulta") {
+      if (f.modo === "erro_auth") return send(res, 200, { ok: true, body: { erro: true, mensagem: "Serviço da Facta indisponível" } });
       if (f.modo === "telefone") return send(res, 200, { ok: true, body: { erro: true, mensagem: "Telefone já informado para outro CPF" } });
       return send(res, 200, { ok: true, body: { erro: false, mensagem: "Autorização enviada por WhatsApp" } });
     }

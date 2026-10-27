@@ -6,7 +6,7 @@ const mk = () => { const ip = "10.9.0." + (ipN++); return async (method, path, b
   const j = await r.json().catch(() => ({})); return { s: r.status, j }; }; };
 const ctl = (p, b) => fetch("http://127.0.0.1:4101/ctl/" + p, { method: "POST", body: JSON.stringify(b) }).then((r) => r.json());
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const cpfs = ["52998224725", "11144477735", "39053344705", "16899535009", "12345678909", "98765432100", "71428793860", "45317828791"];
+const cpfs = ["52998224725", "11144477735", "39053344705", "16899535009", "12345678909", "98765432100", "71428793860", "45317828791", "12345678062"];
 const R = [];
 const check = (cen, nome, ok, det = "") => { R.push({ cen, nome, ok }); console.log(`  ${ok ? "OK   " : "FALHA"} ${nome}${det ? " — " + det : ""}`); };
 
@@ -99,6 +99,11 @@ const textos = (a) => (a.messages || []).map((m) => `${m.direction === "visitor"
   at = await a.atendente(); const ms7 = textos(at);
   check(7, "mensagem explica a política e manda o link", ms7.some((t) => /política de crédito/.test(t)) && ms7.some((t) => /termo\.mock/.test(t)), ms7.slice(-3).join(" | ").slice(0, 300));
   check(7, "só a mensagem nova de autorização da Facta (sem as antigas)", ms7.some((t) => /é necessário fazer uma autorização/.test(t)) && !ms7.some((t) => /celular final|Informe seu CPF|Enviamos a autorização da Facta/.test(t)), "");
+
+  console.log("\n[8] Facta recusa a autorização por outro motivo: também segue para a Unnotech");
+  a = await cliente("8", 8); await ctl("facta", { cpf: a.cpf, set: { modo: "erro_auth" } });
+  st = await a.start(); const c8 = st.j.clt;
+  check(8, "erro genérico da Facta segue para a Unnotech", c8?.provider === "unnotech" && c8?.etapa === "autorizacao_enviada", `${c8?.provider}/${c8?.etapa} | ${c8?.error}`);
 
   console.log("\nRESUMO:", R.filter((x) => x.ok).length + "/" + R.length, "ok");
   console.log("FALHAS:\n  " + R.filter((x) => !x.ok).map((x) => `[${x.cen}] ${x.nome}`).join("\n  "));
