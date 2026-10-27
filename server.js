@@ -701,7 +701,10 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
   if (google.configurado()) {
     const telefoneGoogle = phone.startsWith("55") && phone.length >= 12 ? phone : `55${phone}`;
     google.garantirContato({ telefone: telefoneGoogle, nomePerfil: nomeContatoComCpf(cpf, fullName) })
-      .catch((err) => console.error("Erro ao salvar contato do site com CPF no Google:", err.message));
+      .catch((err) => console.error("Erro ao salvar contato do site com CPF no Google:", err.message))
+      .finally(() => nomearContatoPeloSite({ phone, nome: fullName, cpf }));
+  } else {
+    nomearContatoPeloSite({ phone, nome: fullName, cpf });
   }
   await salvarDadosSite(id, { nome: fullName, cpf, celular: phone });
   let row = await db.siteChatFactaCriar(id, { cpf, phone, etapa: "solicitando_autorizacao", status: "SOLICITANDO_AUTORIZACAO", trackingToken: crypto.randomBytes(32).toString("base64url") });
@@ -2084,6 +2087,28 @@ function nomeContatoComCpf(cpf, nome) {
   const nomeLimpo = String(nome || "").trim();
   const nomeReal = nomeLimpo && !/^\+?[\d\s()-]+$/.test(nomeLimpo) ? nomeLimpo : "";
   return ["FGTS", nomeReal, cpf].filter(Boolean).join(" ");
+}
+
+// Nome e CPF que o cliente digitou no site passam a ser o nome do contato no WhatsApp ("FGTS <nome> <CPF>") quando a
+// conversa ainda está "Sem nome" (ou só com o número), e também no Google Contatos se o contato existir sem nome.
+async function nomearContatoPeloSite({ phone, nome, cpf }) {
+  const nomeLimpo = String(nome || "").trim();
+  if (!nomeLimpo || !cpf) return;
+  const nomeContato = nomeContatoComCpf(cpf, nomeLimpo);
+  try {
+    for (const c of await db.conversasPorTelefoneTodosCanais(phone)) {
+      if (c.business_number_id === "instagram") continue;
+      const atual = String(c.name || "").trim();
+      if (atual && !/^\+?[\d\s()-]+$/.test(atual)) continue; // já tem nome de verdade
+      await db.renomearConversa(c.phone, c.business_number_id, nomeContato);
+    }
+    if (google.configurado()) {
+      const d = String(phone || "").replace(/\D/g, "");
+      await google.nomearContatoSemNome({ telefone: d.startsWith("55") && d.length >= 12 ? d : `55${d}`, nome: nomeContato });
+    }
+  } catch (err) {
+    console.error("Nome do site não aplicado ao contato:", err.message);
+  }
 }
 
 async function sincronizarContatoGoogle(telefone, businessNumberId, nomePerfil, nomeNovo) {
@@ -5469,6 +5494,8 @@ setTimeout(async () => {
   try {
     for (const row of await db.siteChatCltTelefoneOutroCpfParadas()) await tentarOutrosBancos(row);
     // Idem para quem a Facta reprovou na política de crédito nos últimos 2 dias e ficou parado sem tentar o Unno.
+    // Quem digitou nome e CPF no site nos últimos 3 dias e ainda está "Sem nome" no WhatsApp ganha o nome agora.
+    for (const row of await db.siteChatCltComCpfRecentes(Date.now() - 3 * 24 * 60 * 60 * 1000)) await nomearContatoPeloSite({ phone: row.phone, nome: row.name, cpf: row.cpf });
     for (const row of await db.siteChatCltFactaNegativaRecentes(Date.now() - 2 * 24 * 60 * 60 * 1000, ETAPAS_FACTA_SEM_CONDICAO)) await tentarOutrosBancos(row);
   } catch (err) {
     console.error("Erro ao retomar simulações paradas por celular de outro CPF:", err.message);
@@ -6832,6 +6859,7 @@ const server = http.createServer(async (req, res) => {
             if (fullName.split(" ").filter(Boolean).length < 2) return send(res, 400, { error: "Digite seu nome completo, como aparece no documento." }, corsHeaders);
             if (phone.length < 10 || phone.length > 13) return send(res, 400, { error: "Digite um celular com DDD." }, corsHeaders);
             await salvarDadosSite(id, { nome: fullName, cpf, celular: phone });
+            nomearContatoPeloSite({ phone, nome: fullName, cpf });
             const vigente = await autorizacaoFactaVigente(cpf);
             const authorization = vigente
               ? { mensagem: "Cliente não necessita de autorização" }

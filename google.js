@@ -361,6 +361,20 @@ async function garantirContato({ telefone, nomePerfil }) {
   }
 }
 
+// Contato que já existe no Google mas está sem nome (salvo só pelo número): põe o nome. Não mexe em quem já tem nome.
+async function nomearContatoSemNome({ telefone, nome }) {
+  const mapa = await mapaContatos();
+  const achado = mapa.get(chaveTelefone(telefone));
+  if (!achado || achado.nome || !achado.resourceName || !nome) return false;
+  const accessToken = await obterAccessToken();
+  const pessoa = await requestJson("GET", "people.googleapis.com", `/v1/${achado.resourceName}?personFields=names,metadata`, { accessToken });
+  const etag = pessoa.etag;
+  if (!etag) return false;
+  await requestJson("PATCH", "people.googleapis.com", `/v1/${achado.resourceName}:updateContact?updatePersonFields=names`, { accessToken, bodyObj: { etag, names: [{ givenName: nome }] } });
+  achado.nome = nome;
+  return true;
+}
+
 // Exportação completa (19k+ contatos): todas as páginas, com nome, telefones e e-mails. Usada pela
 // rota GET /painel/api/google/exportar-csv pra gerar o arquivo de backup/limpeza.
 async function listarTodosContatosCompletos() {
@@ -390,6 +404,7 @@ module.exports = {
   chaveTelefone,
   mapaContatos,
   garantirContato,
+  nomearContatoSemNome,
   urlAutorizacao,
   trocarCodigoPorToken,
   criarContato,

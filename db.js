@@ -3991,6 +3991,13 @@ async function siteChatCltNaoFinalizadasRecentes(desde, ate, etapasEncerradas) {
   return r.rows;
 }
 
+// Simulações do site com CPF mexidas desde `desde` (ms), com o nome digitado na conversa.
+async function siteChatCltComCpfRecentes(desde) {
+  await ready;
+  const r = await client.execute({ sql: `SELECT t.cpf, t.phone, c.name FROM site_chat_clt t JOIN site_chat_conversations c ON c.id = t.conversation_id WHERE t.cpf IS NOT NULL AND t.cpf != '' AND t.phone IS NOT NULL AND t.updated_at >= ?`, args: [desde] });
+  return r.rows;
+}
+
 async function siteChatDefinirNome(id, name) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET name = ? WHERE id = ?`, args: [name, id] });
@@ -4502,6 +4509,7 @@ module.exports = {
   siteChatCltTelefoneOutroCpfParadas,
   siteChatCltFactaNegativaRecentes,
   siteChatCltNaoFinalizadasRecentes,
+  siteChatCltComCpfRecentes,
   getMensagemPorWaId,
   apagarConversa,
   planoLimpezaConversas,
