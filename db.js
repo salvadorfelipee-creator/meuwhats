@@ -4250,8 +4250,11 @@ async function siteChatFactaListarEmAcompanhamento() {
   const result = await client.execute(`
     SELECT * FROM site_chat_clt
     WHERE provider = 'facta'
-      AND codigo_proposta IS NOT NULL
-      AND etapa IN ('aguardando_assinatura_facta', 'proposta_em_analise')
+      AND (
+        (codigo_proposta IS NOT NULL AND etapa IN ('aguardando_assinatura_facta', 'proposta_em_analise'))
+        -- Autorização pedida nas últimas 6h: o servidor confere sozinho, sem depender do navegador do cliente aberto.
+        OR (etapa IN ('autorizacao_enviada', 'aguardando_autorizacao') AND COALESCE(authorization_requested_at, 0) > ${Date.now() - 6 * 3600 * 1000})
+      )
     ORDER BY updated_at ASC
   `);
   return result.rows;
