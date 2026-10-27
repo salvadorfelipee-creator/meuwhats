@@ -52,9 +52,13 @@ function unnoReply(method, path) {
     if (p === "awaiting_auth") return [200, { status: "AWAITING_AUTHORIZATION", authorization_status: "PENDING" }];
     if (p === "authorized") return [200, { status: "AWAITING_SIMULATION", authorization_status: "AUTHORIZED" }];
     if (p === "offers") return [200, { status: "OFFERS_AVAILABLE", authorization_status: "AUTHORIZED", quotes_pending: 0 }];
+    if (p === "signing") return [200, { status: "AWAITING_SIGNATURE", authorization_status: "AUTHORIZED", proposal_uuid: "abcd1234-0000" }];
     if (p === "no_margin") return [200, { status: "NO_MARGIN", authorization_status: "AUTHORIZED" }];
     if (p === "not_available") return [200, { status: "AWAITING_AUTHORIZATION", authorization_status: "NOT_AVAILABLE" }];
   }
+  if (/\/kyc$/.test(m)) return [200, {}];
+  if (/\/accept$/.test(m)) { S.unno.phase = "signing"; return [200, {}]; }
+  if (/\/proposals\//.test(m)) return [200, { signature_link: "https://assinatura.mock/contrato" }];
   if (/\/margin$/.test(m)) return [200, { employments: [{ employment_id: "e1", employer_name: "EMPRESA TESTE", available_margin: 400 }] }];
   if (/\/simulations$/.test(m)) { if (!S.unno.travarSimulacao) S.unno.phase = "offers"; return [202, {}]; }
   if (/\/clt\/applications\/[^/]+$/.test(m)) return [200, { authorization: S.unno.semLink && S.unno.linkDepois ? { consent_url: "https://termo.mock/tardio" } : {}, offers, quotes: [] }];

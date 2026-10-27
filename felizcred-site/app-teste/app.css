@@ -32,6 +32,7 @@ body.trava { overflow: hidden; }
 .oferta .par { font-size: 14px; }
 .oferta .go { margin-top: 8px; font-size: 14px; font-weight: 700; color: var(--verde-escuro); display: flex; align-items: center; gap: 8px; }
 .mini-spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #cfe3d7; border-top-color: var(--verde); animation: gira .8s linear infinite; }
+.pix b { font: inherit; font-weight: 700; }
 .pix { margin: 0 !important; font-size: 13px !important; color: var(--verde-escuro) !important; }
 @keyframes entra { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
 
