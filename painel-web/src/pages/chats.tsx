@@ -1521,6 +1521,14 @@ function ChannelChatsPage() {
               </div>
             )}
 
+            {/* Nota fixada: aviso sempre visível no topo da conversa (editada em Detalhes do contato). */}
+            {conversaAtual.nota?.trim() && (
+              <div className="flex items-start gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200/70 dark:border-amber-900/50 text-sm text-amber-900 dark:text-amber-200 shrink-0">
+                <StickyNote className="h-4 w-4 mt-0.5 shrink-0" />
+                <span className="whitespace-pre-wrap break-words min-w-0">{conversaAtual.nota}</span>
+              </div>
+            )}
+
             {/* Mensagens */}
             <div ref={scrollRef} onScroll={handleScrollMensagens} className="flex-1 overflow-y-auto px-6 py-3 bg-[#efeae2] dark:bg-[#0b141a]">
               {messages.length > 0 && !semMaisAntigas && (
