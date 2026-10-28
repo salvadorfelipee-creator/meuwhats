@@ -797,7 +797,7 @@ async function iniciarFactaParalela(row) {
 
 // Confere na política de crédito da Facta, ANTES de mostrar ao cliente, uma condição de cada prazo (a de maior valor).
 // Prazo reprovado some da tela; se a Facta não responder (erro), mantém tudo: a conferência final continua no select-offer.
-async function filtrarOfertasPelaPolitica(cpf, worker, offers) {
+async function filtrarOfertasPelaPolitica(cpf, worker, offers, detalhes = []) {
   const aprovados = new Map();
   for (const oferta of offers) {
     if (aprovados.has(oferta.prazo)) continue;
@@ -808,7 +808,9 @@ async function filtrarOfertasPelaPolitica(cpf, worker, offers) {
         dataAdmissao: normalizarDataFacta(worker.dataAdmissao),
         prazo: oferta.prazo, valorEmprestimo: Number(oferta.contrato || 0).toFixed(2),
       });
-      aprovados.set(oferta.prazo, respostaFactaComErro(policy) ? true : String(policy?.aprovado) === "1");
+      const ok = respostaFactaComErro(policy) ? true : String(policy?.aprovado) === "1";
+      if (!ok) { const texto = mensagemFacta(policy, "reprovado"); detalhes.push(`${oferta.prazo}x: ${texto}`); console.log(`Política Facta reprovou ${oferta.prazo}x (cpf final ${String(cpf).slice(-4)}): ${texto} | aprovado=${policy?.aprovado}`); }
+      aprovados.set(oferta.prazo, ok);
     } catch (err) {
       console.error("Política Facta não conferida:", err.message);
       aprovados.set(oferta.prazo, true);
@@ -828,6 +830,7 @@ async function buscarOfertasFacta(cpf) {
   const elegiveis = rows.filter((item) => simFacta(item.elegivel)).sort((a, b) => numeroFacta(b.valorMargemDisponivel) - numeroFacta(a.valorMargemDisponivel));
   if (!elegiveis.length || numeroFacta(elegiveis[0].valorMargemDisponivel) <= 0) return { estado: "negativo", motivo: "sem_margem" };
   let bloqueadaPelaPolitica = false;
+  const detalhesPolitica = [];
   for (const candidato of elegiveis.slice(0, 5)) {
     const parcela = parcelaMaximaFacta(numeroFacta(candidato.valorMargemDisponivel));
     if (parcela <= 0) continue;
@@ -841,11 +844,11 @@ async function buscarOfertasFacta(cpf) {
     });
     if (respostaFactaComErro(operations)) continue;
     const todas = ofertasFacta(operations);
-    const offers = todas.length ? await filtrarOfertasPelaPolitica(cpf, candidato, todas) : [];
+    const offers = todas.length ? await filtrarOfertasPelaPolitica(cpf, candidato, todas, detalhesPolitica) : [];
     if (offers.length) return { estado: "ofertas", worker: candidato, margem: parcela, offers };
     if (todas.length) bloqueadaPelaPolitica = true;
   }
-  return { estado: "negativo", motivo: bloqueadaPelaPolitica ? "politica_reprovada" : "sem_oferta" };
+  return { estado: "negativo", motivo: bloqueadaPelaPolitica ? "politica_reprovada" : "sem_oferta", detalhe: detalhesPolitica.join(" | ").slice(0, 300) || null };
 }
 
 async function verificarFactaParalela(row) {
@@ -875,7 +878,7 @@ async function verificarFactaParalela(row) {
   }
   if (r.estado === "negativo") {
     // A Facta também não liberou: fica só o resultado da Unnotech.
-    return gravar({}, "negativa", { motivo: r.motivo || null });
+    return gravar({}, "negativa", { motivo: r.motivo || null, detalhe: r.detalhe || null });
   }
   // Facta ainda sem autorização. Se a Unnotech já desistiu, a espera passa a ser só pela Facta.
   if (ETAPAS_UNNO_SEM_CONDICAO.includes(row.etapa)) {
