@@ -70,7 +70,14 @@
       </div></div>
       <div class="form-section"><b>Documento</b><div class="form-grid"><div class="form-duo"><label>Número do RG<input name="rg_numero" required></label><label>UF do RG<select name="rg_uf" required>${opcoesUf("")}</select></label></div></div></div>
       ${campoEndereco({ rua: "rua", cidade: "cidade", uf: "uf" })}
-      <div class="ap-recebe"><span>${IC.pix}</span><div><b>Você recebe por Pix</b><small>O valor cai na chave Pix do seu CPF. Não precisa informar conta bancária.</small></div></div>
+      <div class="form-section"><b>Como receber o valor</b><div class="form-grid">
+        <label>Forma de recebimento<select name="forma_desembolso" required><option value="PIX">Pix (chave = seu CPF)</option><option value="CONTA">Conta bancária</option></select></label>
+        <div class="conta-banco" hidden>
+          <label>Banco<select name="banco"><option value="">Selecione</option>${["Banco do Brasil", "Santander", "Caixa Econômica Federal", "Bradesco", "Itaú", "Nubank", "Inter", "C6 Bank", "PagBank", "Mercado Pago", "PicPay", "Banco Original", "Sicoob", "Sicredi"].map((b) => `<option>${b}</option>`).join("")}</select></label>
+          <label>Tipo de conta<select name="tipo_conta"><option value="Corrente">Corrente</option><option value="Poupança">Poupança</option><option value="Salário">Salário</option></select></label>
+          <div class="form-duo"><label>Agência<input name="agencia" inputmode="numeric"></label><label>Conta<input name="conta" inputmode="numeric"></label></div>
+          <label>Dígito da conta<input name="digito_conta"></label>
+        </div></div></div>
       ${consentimento}<button class="ap-btn principal grande">Gerar proposta</button></form>`;
   }
 
@@ -97,7 +104,10 @@
         <label>Tipo de conta<select name="tipo_conta" required><option value="C">Conta corrente</option><option value="P">Conta poupança</option></select></label>
         <div class="form-duo"><label>Agência<input name="agencia" required inputmode="numeric"></label><label>Conta com dígito<input name="conta" required></label></div>
       </div></div>
-      <div class="ap-recebe"><span>${IC.pix}</span><div><b>Você recebe por Pix</b><small>A chave Pix é o seu CPF. A conta acima é a que o banco cadastra no contrato.</small></div></div>
+      <div class="form-section"><b>Chave Pix para receber</b><div class="form-grid">
+        <label>Tipo de chave<select name="tipo_chave_pix" required><option value="1">CPF (o seu)</option><option value="2">Telefone</option><option value="3">E-mail</option><option value="4">Chave aleatória</option></select></label>
+        <label class="chave-pix" hidden>Chave Pix<input name="chave_pix"></label>
+      </div></div>
       ${consentimento}<button class="ap-btn principal grande">Gerar proposta</button></form>`;
   }
 
@@ -307,15 +317,15 @@
     const form = c.provider === "unnotech" ? formDadosParceiros(c.customerDefaults || {}, c.selectedOffer || {}) : formDados(c.customerDefaults || {}, c.selectedOffer || {});
     sheet.innerHTML = `<div class="fundo" data-acao="fechar-sheet"></div><div class="folha" role="dialog" aria-modal="true" aria-label="Dados da proposta">
       <div class="puxador"></div>
-      <div class="pix-faixa"><span>${IC.pix}</span><div><b>O pagamento é feito via Pix</b><small>O valor cai por Pix. Você revê o contrato inteiro antes de assinar.</small></div></div>
+      <div class="pix-faixa"><span>${IC.pix}</span><div><b>O pagamento é feito via Pix</b><small>O pagamento é por Pix (ou na conta que você escolher). Você revê o contrato inteiro antes de assinar.</small></div></div>
       ${demo ? notaDemo(c) : ""}<div class="erro-sheet"></div>${form}
       <button class="ap-btn suave" type="button" data-acao="fechar-sheet" style="margin:10px 20px 0;width:calc(100% - 40px)">Voltar</button></div>`;
     sheet.classList.add("aberta"); document.body.classList.add("trava");
   }
   function notaDemo(c) {
     const auto = c.provider === "unnotech"
-      ? ["Forma de recebimento: Pix na chave CPF", "Escolaridade: ensino médio", "Órgão emissor do RG: SSP", "CPF, valores e prazo da condição"]
-      : ["Sexo, nascimento, renda, matrícula, empresa e admissão (vêm da consulta)", "Chave Pix: o CPF", "Faixa de patrimônio: até R$ 10 mil", "Órgão emissor do RG: SSP", "Nacionalidade: brasileira", "Assinatura a rogo: não", "Nome do pai: não declarado"];
+      ? ["Escolaridade: ensino médio", "Órgão emissor do RG: SSP", "CPF, valores e prazo da condição"]
+      : ["Sexo, nascimento, renda, matrícula, empresa e admissão (vêm da consulta)", "Chave Pix: o CPF (se o cliente não escolher outra)", "Faixa de patrimônio: até R$ 10 mil", "Órgão emissor do RG: SSP", "Nacionalidade: brasileira", "Assinatura a rogo: não", "Nome do pai: não declarado"];
     return `<div class="ap-demo-nota"><b>Prévia · o cliente NÃO vê estes campos</b><ul>${auto.map((x) => `<li>${x}</li>`).join("")}</ul></div>`;
   }
   function fecharSheet() { sheet.classList.remove("aberta"); document.body.classList.remove("trava"); sheet.innerHTML = ""; }
@@ -392,7 +402,14 @@
     }
   });
   document.addEventListener("change", (e) => {
-    if (e.target.name === "forma_desembolso") { const conta = sheet.querySelector(".conta-banco"); if (conta) conta.hidden = e.target.value !== "CONTA"; }
+    if (e.target.name === "forma_desembolso") {
+      const conta = sheet.querySelector(".conta-banco");
+      if (conta) { conta.hidden = e.target.value !== "CONTA"; conta.querySelectorAll("input, select").forEach((el) => { el.required = e.target.value === "CONTA" && el.name !== "complemento"; }); }
+    }
+    if (e.target.name === "tipo_chave_pix") {
+      const campo = sheet.querySelector(".chave-pix");
+      if (campo) { campo.hidden = e.target.value === "1"; const i = campo.querySelector("input"); i.required = e.target.value !== "1"; if (e.target.value === "1") i.value = ""; }
+    }
     if (e.target.name === "cliente_iletrado_impossibilitado") { const rogo = sheet.querySelector(".rogo"); if (rogo) rogo.hidden = e.target.value !== "S"; }
   });
   document.addEventListener("click", async (e) => {
