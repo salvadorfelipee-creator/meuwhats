@@ -5,7 +5,7 @@
   const CHAT_KEY = "felizcred_site_chat_v1";
   const DIAS_30 = 30 * 24 * 3600 * 1000;
   const app = document.getElementById("app");
-  const state = { fluxo: "", jaSacou: "", tresMeses: null, pedirNome: false, session: null, clt: null, messages: [], aba: "inicio", folha: false, erro: "", carregando: false, outroNumero: false, aviso: "", valorFolha: "", assinatura: "" };
+  const state = { fluxo: "", jaSacou: "", tresMeses: null, pedirNome: false, session: null, clt: null, messages: [], aba: "inicio", digitando: false, folha: false, erro: "", carregando: false, outroNumero: false, aviso: "", valorFolha: "", assinatura: "" };
   let sondagem = null;
 
   const money = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -154,7 +154,7 @@
 
   function viewFgtsCotando() {
     return `${topo()}<div class="cabeca"><h1>Consultando seu FGTS</h1><p class="sub">Estamos pedindo as condições aos bancos. Isso leva alguns instantes.</p></div>
-      <div class="espera" style="margin-top:18px"><span class="ponto"><i></i><i></i></span><div><b>Consultando seu saldo</b><p>Atualizamos aqui sozinhos, sem apertar nada.</p></div></div>
+      <div class="espera" style="margin-top:18px"><span class="ponto"><i></i><i></i><i></i></span><div><b>Consultando seu saldo</b><p>Atualizamos aqui sozinhos, sem apertar nada.</p></div></div>
       <p class="rotulo">Seu andamento</p>${andamento()}`;
   }
   function viewFgtsAutorizar() {
@@ -186,7 +186,7 @@
     const processando = c.etapa === "consultando_margem" || c.etapa === "simulando";
     if (processando) {
       return `${topo()}<div class="cabeca"><h1>Consultando os bancos</h1><p class="sub">Sua autorização foi confirmada. Estamos pedindo as condições para os bancos parceiros. Isso leva alguns instantes.</p></div>
-        <div class="espera" style="margin-top:18px"><span class="ponto"><i></i><i></i></span><div><b>${c.etapa === "simulando" ? "Comparando as condições" : "Consultando sua margem"}</b><p>Atualizamos aqui sozinhos, sem apertar nada.</p></div></div>
+        <div class="espera" style="margin-top:18px"><span class="ponto"><i></i><i></i><i></i></span><div><b>${c.etapa === "simulando" ? "Comparando as condições" : "Consultando sua margem"}</b><p>Atualizamos aqui sozinhos, sem apertar nada.</p></div></div>
         <p class="rotulo">Bancos consultados</p>${blocoBancos(c)}`;
     }
     return `${topo()}<div class="cabeca"><h1>${c.previous ? "Vamos tentar outros bancos" : "Falta só um passo"}</h1><p class="sub">${c.previous ? "A Facta não liberou desta vez, mas usamos seus dados salvos para consultar bancos parceiros. " : ""}Falta só autorizar a consulta. Leva menos de um minuto.</p></div>
@@ -196,7 +196,7 @@
         <div class="passo"><span class="n">3</span><p><b>Volte para cá.</b> Seguimos sozinhos, sem apertar nada.</p></div>
       </div>
       <div style="margin:18px 20px 0">${c.consentUrl ? `<a class="btn primario grande" href="${esc(c.consentUrl)}" target="_blank" rel="noopener">Abrir a autorização</a>` : `<button class="btn primario grande" type="button" disabled>Preparando o link…</button>`}</div>
-      <div class="espera"><span class="ponto"><i></i><i></i></span><div><b>Esperando sua autorização</b><p>Conferimos sozinhos a cada poucos segundos.</p></div></div>
+      <div class="espera"><span class="ponto"><i></i><i></i><i></i></span><div><b>Esperando sua autorização</b><p>Conferimos sozinhos a cada poucos segundos.</p></div></div>
       <p class="rotulo">Bancos consultados</p>${blocoBancos(c)}
       <p class="rotulo">Precisa de ajuda?</p>
       <div class="lista-opcoes"><button class="opcao" type="button" data-acao="conversa"><span><b>Falar com o Felipe</b></span><span class="seta">${ICONE.seta}</span></button></div>`;
@@ -212,7 +212,7 @@
         <div class="passo"><span class="n">3</span><p><b>Volte para cá.</b> Suas condições aparecem sozinhas, sem apertar nada.</p></div>
       </div>
       <div style="margin:18px 20px 0"><a class="btn primario grande" href="https://wa.me/" target="_blank" rel="noopener">${ICONE.zap} Abrir o WhatsApp</a></div>
-      <div class="espera"><span class="ponto"><i></i><i></i></span><div><b>Esperando sua autorização</b><p>Conferimos sozinhos a cada poucos segundos.</p></div></div>
+      <div class="espera"><span class="ponto"><i></i><i></i><i></i></span><div><b>Esperando sua autorização</b><p>Conferimos sozinhos a cada poucos segundos.</p></div></div>
       ${avisoBox()}${erroBox()}
       <p class="rotulo">Não chegou?</p>
       <div class="lista-opcoes">
@@ -398,6 +398,15 @@
       <div class="mensagens" id="mensagens"></div>
       <form class="compor" data-form="mensagem"><input name="texto" type="text" aria-label="Escreva uma mensagem" placeholder="Escreva uma mensagem" autocomplete="off"><button type="submit" aria-label="Enviar">${ICONE.envia}</button></form></div>`;
   }
+  // Cliente aguardando: acabou de mandar mensagem (até a resposta chegar, no máximo 40 s) ou os bancos estão analisando.
+  const ETAPAS_PROCESSANDO = ["solicitando_autorizacao", "consultando_margem", "simulando"];
+  let timerDigitando = null;
+  const esperandoResposta = () => state.digitando || ETAPAS_PROCESSANDO.includes(state.clt && state.clt.etapa);
+  function comecarDigitando() {
+    state.digitando = true;
+    clearTimeout(timerDigitando);
+    timerDigitando = setTimeout(() => { state.digitando = false; if (state.aba === "conversa") desenharMensagens(); }, 40000);
+  }
   function desenharMensagens() {
     const alvo = document.getElementById("mensagens");
     if (!alvo) return;
@@ -406,7 +415,7 @@
       const eu = m.direction === "visitor";
       const texto = m.type && m.type !== "text" && !m.body ? "[arquivo]" : m.body;
       return `<div class="bolha ${eu ? "eu" : ""}">${esc(texto)}<small>${eu ? "" : esc(m.sender_name || "FelizCred") + " · "}${hora(m.created_at)}</small></div>`;
-    }).join("") : '<p class="sub centro">Escreva aqui. O Felipe responde em minutos.</p>';
+    }).join("") + (esperandoResposta() ? '<div class="digitando" role="status" aria-label="O Felipe está digitando"><i></i><i></i><i></i></div>' : "") : '<p class="sub centro">Escreva aqui. O Felipe responde em minutos.</p>';
     if (perto) window.scrollTo(0, document.body.scrollHeight);
   }
 
@@ -479,9 +488,12 @@
   async function atualizarMensagens() {
     try {
       const dados = await api(`/conversations/${state.session.id}`);
+      const estavaEsperando = esperandoResposta();
       const mudou = dados.messages.length !== state.messages.length;
       state.messages = dados.messages;
-      if (mudou) { if (state.aba === "conversa") { desenharMensagens(); marcarVistas(); } else render(); }
+      const ultima = state.messages[state.messages.length - 1];
+      if (state.digitando && ultima && ultima.direction !== "visitor") { state.digitando = false; clearTimeout(timerDigitando); }
+      if (mudou || estavaEsperando !== esperandoResposta()) { if (state.aba === "conversa") { desenharMensagens(); marcarVistas(); } else render(); }
     } catch {}
   }
 
@@ -571,7 +583,7 @@
       const texto = String(dados.get("texto") || "").trim();
       if (!texto) return;
       form.reset();
-      state.messages = [...state.messages, { direction: "visitor", body: texto, created_at: Date.now() }]; desenharMensagens();
+      state.messages = [...state.messages, { direction: "visitor", body: texto, created_at: Date.now() }]; comecarDigitando(); desenharMensagens();
       try { await enviarMensagemSimples(texto); } catch (err) { state.erro = err.message; }
       return;
     }
