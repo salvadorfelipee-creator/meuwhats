@@ -1,7 +1,6 @@
 // Abre a simulação (/app/) ao lado da página no computador e em tela cheia no celular.
 (() => {
   "use strict";
-  const DESKTOP = 900;
   let gaveta = null;
   const css = document.createElement("style");
   css.textContent = `
@@ -22,7 +21,6 @@
   }
   function abrir(produto) {
     const p = produto === "fgts" || produto === "clt" ? produto : "";
-    if (window.innerWidth < DESKTOP) { location.href = "/app/" + (p ? "?p=" + p : ""); return; }
     if (!gaveta) {
       gaveta = document.createElement("div");
       gaveta.className = "fc-app-gaveta";
@@ -38,7 +36,7 @@
   window.fcAbrirApp = abrir;
   // Link direto (WhatsApp, e-mail) aberto no computador: o site abre já com a gaveta e repassa os dados do link.
   const q = new URLSearchParams(location.search);
-  if (q.get("abrirapp") === "1" && window.innerWidth >= DESKTOP) {
+  if (q.get("abrirapp") === "1") {
     q.delete("abrirapp");
     const resto = q.toString();
     try { history.replaceState(null, "", "/"); } catch {}

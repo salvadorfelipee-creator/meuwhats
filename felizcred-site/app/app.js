@@ -10,8 +10,11 @@
   const TRES_DIAS = 3 * 24 * 3600 * 1000, TRINTA_DIAS = 30 * 24 * 3600 * 1000;
   const PARAMS = new URLSearchParams(location.search);
   const EMBED = PARAMS.get("embed") === "1";
-  // No computador a simulação abre ao lado do site (gaveta), não numa página estreita solta: quem chega direto em /app/ vai para o site.
-  if (!EMBED && !PARAMS.get("demo") && !PARAMS.get("sozinho") && window.innerWidth >= 900 && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+  // Espelho: o painel da FelizCred mostra aqui, só para leitura, a mesma tela que o cliente viu.
+  const ESPELHO = PARAMS.get("espelho") === "1";
+  if (ESPELHO) document.body.classList.add("espelho");
+  // A simulação nunca abre sozinha: é sempre a lateral do site (computador) ou a tela por cima do site (celular, dá para minimizar). Quem chega direto em /app/ vai para o site.
+  if (!EMBED && !ESPELHO && !PARAMS.get("demo") && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
     location.replace("/?abrirapp=1" + (location.search ? "&" + location.search.slice(1) : ""));
   }
   if (EMBED) document.body.classList.add("embed");
@@ -702,7 +705,19 @@
     el.innerHTML = '<b>Prévia</b>' + lista.map((k) => `<a href="?demo=${k}" class="${k === demo ? "on" : ""}">${k}</a>`).join("") + '<a href="?demo=entrada" class="' + (demo === "entrada" ? "on" : "") + '">entrada</a>';
     document.body.prepend(el);
   }
-  if (demo) {
+  if (ESPELHO) {
+    const ORIGENS_ESPELHO = ["https://meuwhats.onrender.com", "http://localhost:3000", "http://localhost:5173"];
+    app.innerHTML = '<div class="splash"><span class="spinner" aria-hidden="true"></span><p>Carregando…</p></div>';
+    window.addEventListener("message", (e) => {
+      if (!ORIGENS_ESPELHO.includes(e.origin) || !e.data || !e.data.fcEspelho) return;
+      const { clt, nome } = e.data.fcEspelho;
+      state.session = { id: "espelho", token: "espelho", name: nome || "Cliente", contact: "", email: "" };
+      state.clt = clt; state.assinatura = assinaturaClt(clt);
+      state.produto = clt && clt.produto === "FGTS" ? "fgts" : "clt";
+      telaApp();
+    });
+    try { parent.postMessage({ fcEspelhoPronto: true }, "*"); } catch {}
+  } else if (demo) {
     barraDemo();
     state.session = { id: "demo", token: "demo", name: "Salvador Felipe", contact: "47999999999", email: "demo@teste.com" };
     if (demo === "entrada") telaEntrada(); else { state.clt = demoClt(demo); state.assinatura = assinaturaClt(state.clt); telaApp(); if (/^dados-/.test(demo)) abrirSheet(); }

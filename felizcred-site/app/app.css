@@ -234,3 +234,7 @@ body.trava .ap-fab { display: none; }
 .ap-outro b { font: 700 15px "Sora", sans-serif; }
 .ap-outro small { font-size: 13px; color: var(--suave); }
 .ap-atalhos .destaque { background: var(--verde); border-color: var(--verde); color: #fff; }
+
+/* espelho (painel): só leitura */
+body.espelho #app, body.espelho #sheet { pointer-events: none; }
+body.espelho .ap-fab { display: none !important; }

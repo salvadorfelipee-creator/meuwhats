@@ -1947,6 +1947,7 @@ async function marcarNaoAprovadoSite(row) {
     if (!tel) return;
     for (const c of await db.conversasPorTelefoneTodosCanais(tel)) {
       if (c.business_number_id === "instagram") continue;
+      if (row.provider === "unnotech" && unnoSite.ehFgts(row) && row.etapa === "sem_oferta") await marcarFgtsConsultado(c.phone, c.business_number_id);
       const tagId = await db.tagEncontrarOuCriar(c.business_number_id, TAG_NAO_APROVADO, "#dc2626");
       if (await db.adicionarTagConversaSeAusente(c.business_number_id, c.phone, tagId, "automatico")) {
         const interessado = await db.tagEncontrarOuCriar(c.business_number_id, "Interessado", "#16a34a");
@@ -1958,6 +1959,20 @@ async function marcarNaoAprovadoSite(row) {
   }
 }
 db.definirAoAtualizarClt(marcarNaoAprovadoSite);
+
+// Cliente que já consultou o FGTS e não teve condição não simula de novo: vale a tag do WhatsApp (12 meses) ou uma consulta anterior do site.
+async function fgtsJaSemSaldo(cpf, telefone) {
+  try {
+    if (cpf && await db.siteChatFgtsSemOfertaPorCpf(cpf)) return true;
+    if (telefone) {
+      for (const c of await db.conversasPorTelefoneTodosCanais(telefone)) {
+        if (c.business_number_id === "instagram") continue;
+        if (await fgtsJaConsultado(c.phone, c.business_number_id)) return true;
+      }
+    }
+  } catch (err) { console.error("Erro ao conferir FGTS já consultado:", err.message); }
+  return false;
+}
 
 async function fgtsJaConsultado(de, businessNumberId) {
   try {
@@ -7159,6 +7174,10 @@ const server = http.createServer(async (req, res) => {
             if (existente && !(existente.provider === "unnotech" && unnoSite.ehFgts(existente) && ["sem_oferta", "erro_consulta", "proposta_cancelada"].includes(existente.etapa))) return send(res, 409, { error: "A simulação já foi iniciada." }, corsHeaders);
             const cpfFgts = String(body.cpf || "").replace(/\D/g, "");
             if (!unnotech.cpfValido(cpfFgts)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
+            if (await fgtsJaSemSaldo(cpfFgts, conversation.contact)) {
+              await db.siteChatDefinirStatus(id, "closed").catch(() => {});
+              return send(res, 422, { codigo: "fgts_ja_consultado", error: "Seu FGTS já foi consultado e não há valor para antecipar neste ano (a Caixa permite uma antecipação por ano). Você pode simular o Consignado CLT: escolha essa opção acima." }, corsHeaders);
+            }
             await salvarDadosSite(id, { cpf: cpfFgts });
             if (!unnoSite.configurado()) return send(res, 503, { error: "A consulta do FGTS está indisponível agora. Fale com o Felipe." }, corsHeaders);
             const telefoneFgts = String(conversation.contact || "").replace(/\D/g, "");

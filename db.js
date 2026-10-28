@@ -4167,6 +4167,16 @@ async function siteChatDefinirStatus(id, status) {
 }
 
 // Celular do cliente de uma conversa do site (cadastro ou consulta CLT), pra espelhar o status no WhatsApp.
+// FGTS do CPF que já terminou sem condição (sem saldo / bancos não liberaram) nos últimos 12 meses: a Caixa só permite uma antecipação por ano.
+async function siteChatFgtsSemOfertaPorCpf(cpf) {
+  await ready;
+  const r = await client.execute({
+    sql: `SELECT 1 FROM site_chat_clt WHERE cpf = ? AND etapa = 'sem_oferta' AND facta_worker_json LIKE '%"produto":"FGTS"%' AND updated_at > ? LIMIT 1`,
+    args: [cpf, Date.now() - 365 * 24 * 3600 * 1000],
+  });
+  return !!r.rows[0];
+}
+
 async function siteChatTelefoneDe(id) {
   await ready;
   const r = await client.execute({
@@ -4472,6 +4482,7 @@ module.exports = {
   conversasDoTelefoneEmOutrosCanais,
   siteChatPorTelefone,
   siteChatTelefoneDe,
+  siteChatFgtsSemOfertaPorCpf,
   definirAoAtualizarClt,
   conversasPorTelefoneTodosCanais,
   importarContato,
