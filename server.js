@@ -23,7 +23,7 @@ const unnotech = require("./unnotech");
 const siteUnno = require("./site-unnotech");
 const unnoSite = siteUnno.criarAdaptador({
   db, unnotech,
-  mensagemAtendente: (id, texto) => db.siteChatMensagemAtendente(id, "Assistente FelizCred", texto),
+  mensagemAtendente: (id, texto) => mensagemFluxo(id, texto),
   aoAutorizar: (row) => iniciarFactaParalela(row),
   notificar: async (row, etapa) => {
     await notificarEtapaFactaNoWhatsApp(row, etapa, "financeira parceira").catch(() => {});
@@ -138,7 +138,7 @@ function siteChatCltPublicoUnnotech(row) {
   let escolhida = null;
   try { escolhida = JSON.parse(row.facta_offer_json || "null"); } catch {}
   let anterior = null;
-  if (blob.anterior) anterior = { banco: "Facta", etapa: blob.anterior.etapa || null, error: blob.anterior.error || null };
+  if (blob.anterior && !blob.anterior.unnoPrimeiro) anterior = { banco: "Facta", etapa: blob.anterior.etapa || null, error: blob.anterior.error || null };
   return {
     provider: "unnotech",
     etapa: row.etapa,
@@ -605,15 +605,15 @@ async function sincronizarSiteChatFacta(row) {
       if (updated.etapa === "proposta_em_analise") {
         await db.siteChatFunilEvento(row.conversation_id, "assinatura_concluida", "proposta_em_analise", "facta");
         await db.siteChatDefinirPipeline(row.conversation_id, "analise");
-        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Sua assinatura foi recebida. A proposta agora está em análise na Facta; você pode acompanhar o andamento por aqui sem preencher os dados novamente.");
+        await mensagemFluxo(row.conversation_id, "Sua assinatura foi recebida. A proposta agora está em análise na Facta; você pode acompanhar o andamento por aqui sem preencher os dados novamente.");
       } else if (updated.etapa === "proposta_concluida") {
         await db.siteChatFunilEvento(row.conversation_id, "proposta_concluida", "proposta_concluida", "facta");
-        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", `A Facta confirmou o pagamento da proposta ${updated.codigo_proposta || ""}. Confira a conta informada na contratação e fale com a gente se precisar de ajuda.`);
+        await mensagemFluxo(row.conversation_id, `A Facta confirmou o pagamento da proposta ${updated.codigo_proposta || ""}. Confira a conta informada na contratação e fale com a gente se precisar de ajuda.`);
       } else if (updated.etapa === "proposta_cancelada") {
         await db.siteChatFunilEvento(row.conversation_id, "saida", "proposta_cancelada", "facta", "proposta_cancelada");
         await db.siteChatDefinirPipeline(row.conversation_id, "perdido");
         await db.siteChatConfirmarHumano(row.conversation_id);
-        await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Seu contrato não foi finalizado. Nossa equipe já recebeu a atualização; aguarde o atendimento para mais detalhes.");
+        await mensagemFluxo(row.conversation_id, "Seu contrato não foi finalizado. Nossa equipe já recebeu a atualização; aguarde o atendimento para mais detalhes.");
       }
       notificarEtapaFactaNoWhatsApp(updated, updated.etapa).catch(() => {});
       notificarEtapaFactaPorEmail(updated, updated.etapa).catch((err) => console.error(`E-mail da etapa ${updated.etapa} não enviado (${row.conversation_id}):`, err.message));
@@ -673,7 +673,7 @@ async function sincronizarSiteChatFacta(row) {
   if (jaRegistrada?.etapa === "ofertas_disponiveis") return jaRegistrada;
   await db.siteChatFunilEvento(row.conversation_id, "oferta_disponivel", "ofertas_disponiveis", "facta");
   await db.siteChatDefinirPipeline(row.conversation_id, "proposta");
-  await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Autorização confirmada. Encontramos condições para você escolher. Os valores ainda passam pela política final da Facta.");
+  await mensagemFluxo(row.conversation_id, "Autorização confirmada. Encontramos condições para você escolher. Os valores ainda passam pela política final da Facta.");
   return db.siteChatCltAtualizar(row.conversation_id, {
     etapa: "ofertas_disponiveis",
     status_novosaque: "OFERTAS_DISPONIVEIS",
@@ -693,7 +693,7 @@ async function tentarOutrosBancos(row, manual = false) {
   // A Unnotech já foi tentada primeiro neste atendimento (e esgotou): não abre outra solicitação, só avisa.
   if (parseJsonSeguro(row.facta_paralelo_json).estado === "facta_assumiu") {
     if (!manual && ETAPAS_FACTA_SEM_CONDICAO.includes(row.etapa)) {
-      await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Nenhum dos bancos liberou condições agora. Nossa equipe já recebeu a atualização e fala com você pelo chat.").catch(() => {});
+      await mensagemFluxo(row.conversation_id, "Nenhum dos bancos liberou condições agora. Nossa equipe já recebeu a atualização e fala com você pelo chat.").catch(() => {});
       await db.siteChatConfirmarHumano(row.conversation_id).catch(() => {});
     }
     return row;
@@ -721,6 +721,15 @@ const ESPERA_FACTA_PARALELA_MS = 5_000;
 const VALIDADE_FACTA_PARALELA_MS = 6 * 3600 * 1000;
 const ETAPAS_UNNO_SEGUIU = ["ofertas_disponiveis", "dados_pessoais", "aguardando_assinatura_facta", "proposta_em_analise", "proposta_concluida", "proposta_cancelada"];
 const ETAPAS_UNNO_SEM_CONDICAO = ["sem_margem", "sem_oferta", "nao_elegivel", "erro_consulta"];
+
+// Conversas abertas pelo app (página /app-teste/) não recebem as mensagens automáticas de cada etapa: o app mostra o andamento
+// na tela e o chat fica só para o cliente pedir ajuda.
+const ehConversaApp = (c) => /\/app(-teste)?\//.test(String(c?.page_url || ""));
+async function mensagemFluxo(id, texto) {
+  const conversa = await db.siteChatObter(id).catch(() => null);
+  if (ehConversaApp(conversa)) return null;
+  return db.siteChatMensagemAtendente(id, "Assistente FelizCred", texto);
+}
 
 function parseJsonSeguro(texto) {
   try { return JSON.parse(texto || "{}") || {}; } catch { return {}; }
@@ -750,7 +759,7 @@ async function iniciarFactaParalela(row) {
     return;
   }
   await db.siteChatCltAtualizar(row.conversation_id, { facta_paralelo_json: JSON.stringify({ estado: "aguardando", em: Date.now(), nome, phone, vigente }) });
-  await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", vigente
+  await mensagemFluxo(row.conversation_id, vigente
     ? "Sua autorização da Facta ainda está válida. Vou verificar qual banco libera os valores primeiro."
     : "Enviei também a autorização do Facta no seu WhatsApp: se quiser, abra a mensagem, toque no link e libere. Vou verificar qual banco libera os valores primeiro.");
 }
@@ -801,7 +810,7 @@ async function verificarFactaParalela(row) {
   if (r.estado === "ofertas") {
     await db.siteChatFunilEvento(row.conversation_id, "oferta_disponivel", "ofertas_disponiveis", "facta").catch(() => {});
     await db.siteChatDefinirPipeline(row.conversation_id, "proposta").catch(() => {});
-    await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Autorização da Facta confirmada. Encontramos condições para você escolher. Os valores ainda passam pela política final da Facta.");
+    await mensagemFluxo(row.conversation_id, "Autorização da Facta confirmada. Encontramos condições para você escolher. Os valores ainda passam pela política final da Facta.");
     return gravar({
       provider: "facta", transaction_id: null, terms_link: null, etapa: "ofertas_disponiveis", status_novosaque: "OFERTAS_DISPONIVEIS",
       margem_disponivel: r.margem, facta_worker_json: JSON.stringify(r.worker), offers_json: JSON.stringify(r.offers), facta_offer_json: null,
@@ -814,7 +823,7 @@ async function verificarFactaParalela(row) {
   }
   // Facta ainda sem autorização. Se a Unnotech já desistiu, a espera passa a ser só pela Facta.
   if (ETAPAS_UNNO_SEM_CONDICAO.includes(row.etapa)) {
-    await db.siteChatMensagemAtendente(row.conversation_id, "Assistente FelizCred", "Os bancos parceiros não liberaram valores agora. Continuo aguardando sua autorização da Facta no WhatsApp: é só abrir a mensagem, tocar no link e liberar.");
+    await mensagemFluxo(row.conversation_id, "Os bancos parceiros não liberaram valores agora. Continuo aguardando sua autorização da Facta no WhatsApp: é só abrir a mensagem, tocar no link e liberar.");
     return gravar({
       provider: "facta", transaction_id: null, terms_link: null, etapa: "autorizacao_enviada", status_novosaque: "AGUARDANDO_AUTORIZACAO",
       facta_worker_json: JSON.stringify({ preAuthorization: { nome: f.nome } }), offers_json: null, authorization_requested_at: f.em, authorization_checked_at: null, error_message: null,
@@ -874,7 +883,7 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
     // bancos parceiros (Unnotech) com os mesmos dados. Se não abrir lá, cai no aviso de sempre.
     const migrada = await tentarOutrosBancos(row);
     if (migrada?.provider === "unnotech") row = migrada;
-    else await db.siteChatMensagemAtendente(id, "Assistente FelizCred", siteChatRules.mensagemErroAutorizacao(authMessage));
+    else await mensagemFluxo(id, siteChatRules.mensagemErroAutorizacao(authMessage));
   } else {
     await db.siteChatFunilEvento(id, "autorizacao_enviada", "autorizacao_enviada", "facta");
     const alreadyAuthorized = /n[aã]o necessita de autoriza/i.test(authMessage);
@@ -885,7 +894,7 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
       authorization_checked_at: null,
       error_message: null,
     });
-    await db.siteChatMensagemAtendente(id, "Assistente FelizCred", alreadyAuthorized
+    await mensagemFluxo(id, alreadyAuthorized
       ? "Sua autorização ainda está válida. Já estamos consultando suas condições."
       : "Para fazer a simulação no banco Facta, é necessário fazer uma autorização. Enviei uma autorização de simulação para o seu telefone: é só abrir a mensagem, tocar no link e liberar a simulação. Depois, volte aqui, por favor.");
     if (alreadyAuthorized) row = await sincronizarFactaComOutrosBancos(row);
@@ -896,7 +905,16 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
 async function sincronizarSiteChatClt(row) {
   if (row?.provider === "unnotech") {
     try {
-      const unno = await unnoSite.sincronizar(row);
+      let unno = await unnoSite.sincronizar(row);
+      // A Unnotech (primeiro banco) não liberou nada sem nunca ter passado pela autorização (ex.: o cliente já tinha autorizado
+      // antes): a Facta é pedida agora, senão o cliente ficaria sem nenhuma opção.
+      if (ETAPAS_UNNO_SEM_CONDICAO.includes(unno?.etapa) && !unno.facta_paralelo_json && !unnoSite.ehFgts(unno)) {
+        const anterior = unnoSite.lerBlob(unno).anterior;
+        if (!anterior || anterior.unnoPrimeiro) {
+          await iniciarFactaParalela(unno);
+          unno = await db.siteChatCltObter(unno.conversation_id);
+        }
+      }
       return await verificarFactaParalela(unno);
     } catch (err) {
       console.error(`Erro ao sincronizar Unnotech no site (${row.conversation_id}):`, err.message);
@@ -6956,7 +6974,7 @@ const server = http.createServer(async (req, res) => {
         }
         if (produtoTag === "Empréstimo CLT") {
           await db.siteChatFunilEvento(id, "entrada", "inicio", "facta");
-          await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
+          await mensagemFluxo(id, "Para fazer a simulação do consignado CLT, você precisa ter mais de 3 meses de registro no trabalho atual. Você já completou esse período?");
         }
         return send(res, 201, { conversation, token, messages: await db.siteChatMensagens(id) }, corsHeaders);
       }
@@ -7068,7 +7086,7 @@ const server = http.createServer(async (req, res) => {
               if (migrada?.provider === "unnotech") return send(res, 200, { clt: siteChatCltPublico(migrada) }, corsHeaders);
             }
             if (vigente && !failed) {
-              await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Sua autorização ainda está válida. Já estamos consultando suas condições.");
+              await mensagemFluxo(id, "Sua autorização ainda está válida. Já estamos consultando suas condições.");
               return send(res, 200, { clt: siteChatCltPublico(await sincronizarFactaComOutrosBancos(row)) }, corsHeaders);
             }
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
@@ -7235,7 +7253,7 @@ const server = http.createServer(async (req, res) => {
             const contractLink = /^https?:\/\//i.test(String(proposal.url_formalizacao)) ? proposal.url_formalizacao : `https://${proposal.url_formalizacao}`;
             await facta.enviarLinkAssinatura(proposal.codigo, "whatsapp").catch((linkError) => console.error(`Link Facta não enviado por WhatsApp (${id}):`, linkError.message));
             await db.siteChatDefinirPipeline(id, "documentos");
-            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", "Proposta gerada. Revise todas as condições e assine somente se estiver de acordo.");
+            await mensagemFluxo(id, "Proposta gerada. Revise todas as condições e assine somente se estiver de acordo.");
             const row = await db.siteChatCltAtualizar(id, { codigo_cliente: String(stage2.codigo_cliente), codigo_proposta: String(proposal.codigo), contract_link: contractLink, etapa: "aguardando_assinatura_facta", status_novosaque: "PROPOSTA_CRIADA", authorization_checked_at: null, error_message: null });
             await db.siteChatFunilEvento(id, "proposta_criada", "aguardando_assinatura_facta", "facta");
             notificarEtapaFactaPorEmail(row, "aguardando_assinatura_facta").catch((err) => console.error(`E-mail de assinatura não enviado (${id}):`, err.message));
