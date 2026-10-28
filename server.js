@@ -5707,6 +5707,47 @@ setTimeout(async () => {
     console.error("Erro ao retomar simulações paradas por celular de outro CPF:", err.message);
   }
 }, 5 * 60 * 1000);
+// Janela de 24h fechada (o cliente não escreve há mais de 24h): aplica as tags que faltam e encerra a conversa.
+// Fica de fora quem está em etapa avançada do pipeline (documentos, análise, aprovado, proposta) ou tem retorno agendado.
+const ETAPAS_PIPELINE_AVANCADAS = ["proposta", "documentos", "analise", "aprovado"];
+const NOTA_JANELA_FECHADA = "Janela de 24h fechada: conversa encerrada automaticamente";
+let fechandoJanelas = false;
+async function encerrarConversasJanelaFechada() {
+  if (fechandoJanelas) return;
+  fechandoJanelas = true;
+  try {
+    let n = 0;
+    for (const c of await db.conversasJanelaFechadaAbertas(NUMEROS_CONSIGNADO, ETAPAS_PIPELINE_AVANCADAS)) {
+      try {
+        const passo = String(c.fluxo_passo || "");
+        // Tags: a de produto vale para a Campanha CLT e para quem entrou no fluxo do consignado.
+        if (c.business_number_id === CAMPANHA_CLT_NUMBER_ID || passo.startsWith("consignado_")) {
+          const tagId = await db.tagEncontrarOuCriar(c.business_number_id, "Consignado CLT", "#15803D");
+          await db.adicionarTagConversaSeAusente(c.business_number_id, c.phone, tagId, "automatico");
+        }
+        if (/^consignado_(chat|concluido)/.test(passo)) await marcarInteressadoConsignado(c.phone, c.business_number_id);
+        const pendente = await simulacaoSiteNaoFinalizada(c.phone);
+        if (pendente) {
+          await marcarSimulacaoNaoFinalizada(c.business_number_id, c.phone);
+          await marcarInteressadoConsignado(c.phone, c.business_number_id);
+        }
+        const nota = String(c.nota || "");
+        if (!nota.includes(NOTA_JANELA_FECHADA)) await db.atualizarNotaConversa(c.phone, c.business_number_id, [nota, NOTA_JANELA_FECHADA].filter(Boolean).join("\n"));
+        await db.atualizarStatusConversa(c.phone, c.business_number_id, "resolvido");
+        n++;
+      } catch (err) {
+        console.error(`Erro ao encerrar conversa de janela fechada ${c.phone}:`, err.message);
+      }
+    }
+    if (n) console.log(`Janela de 24h fechada: ${n} conversas encerradas com as tags corretas`);
+  } catch (err) {
+    console.error("Erro ao encerrar conversas de janela fechada:", err.message);
+  } finally {
+    fechandoJanelas = false;
+  }
+}
+setTimeout(encerrarConversasJanelaFechada, 5 * 60 * 1000);
+setInterval(encerrarConversasJanelaFechada, 30 * 60 * 1000);
 setTimeout(finalizarConversasAntigas, 4 * 60 * 1000);
 setInterval(finalizarConversasAntigas, 60 * 60 * 1000);
 setTimeout(encerrarLidosSemResposta, 60 * 1000);
@@ -6943,6 +6984,7 @@ const server = http.createServer(async (req, res) => {
         const id = crypto.randomUUID();
         const token = crypto.randomBytes(32).toString("hex");
         const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        const jaTinhaEmail = await db.siteChatExisteEmail(email, id);
         let produtoTag = null;
         try { produtoTag = await gemini.classificarProdutoSite(message); }
         catch { produtoTag = /fgts/i.test(message) ? "FGTS" : /clt/i.test(message) ? "Empréstimo CLT" : /carro/i.test(message) ? "Carro em garantia" : null; }
@@ -6960,7 +7002,9 @@ const server = http.createServer(async (req, res) => {
           whatsappOptInText: WHATSAPP_OPT_IN_TEXT,
         });
         await salvarDadosSite(id, { nome: name, celular: contact, email });
-        enviarInicioChatFelizcred({ nome: name, email }).catch((err) => console.error(`E-mail inicial do chat não enviado (${id}):`, err.message));
+        // Mesmo cliente voltando (outro navegador/dia): só a conversa mais nova fica aberta e o e-mail de boas-vindas não se repete.
+        await db.siteChatEncerrarDuplicados(id, contact, null).catch((err) => console.error(`Chats duplicados não encerrados (${id}):`, err.message));
+        if (!jaTinhaEmail) enviarInicioChatFelizcred({ nome: name, email }).catch((err) => console.error(`E-mail inicial do chat não enviado (${id}):`, err.message));
         // Salva quem preencheu o formulário do site: lista de contatos do Brevo e Google Contatos
         // (prefixo "SITE" pra distinguir dos outros funis). Em segundo plano, nunca atrasa o chat.
         garantirListaBrevo()
@@ -6969,7 +7013,7 @@ const server = http.createServer(async (req, res) => {
         if (google.configurado()) {
           const digitosContato = contact.replace(/\D/g, "");
           google
-            .criarContato({ nome: `SITE - ${name}`, telefone: digitosContato.startsWith("55") ? digitosContato : `55${digitosContato}`, email })
+            .garantirContato({ nomePerfil: `SITE - ${name}`, telefone: digitosContato.startsWith("55") ? digitosContato : `55${digitosContato}` })
             .catch((err) => console.error(`Contato do site não salvo no Google (${id}):`, err.message));
         }
         if (produtoTag === "Empréstimo CLT") {
@@ -7887,7 +7931,8 @@ const server = http.createServer(async (req, res) => {
       const phone = decodeURIComponent(matchOutrosCanais[2]);
       const outros = await db.conversasDoTelefoneEmOutrosCanais(phone, businessId);
       // Também o chat do site do mesmo celular (o painel do cliente): "site" abre a conversa do site, `phone` leva o id dela.
-      const doSite = (await db.siteChatPorTelefone(phone)).map((c) => ({ business_number_id: "site", phone: c.id, name: c.name, last_message_at: Number(c.updated_at) || null }));
+      // Só o chat do site mais recente (siteChatPorTelefone já vem do mais novo para o mais antigo): sem botões repetidos.
+      const doSite = (await db.siteChatPorTelefone(phone)).slice(0, 1).map((c) => ({ business_number_id: "site", phone: c.id, name: c.name, last_message_at: Number(c.updated_at) || null }));
       return send(res, 200, [...outros, ...doSite]);
     }
 

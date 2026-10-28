@@ -675,9 +675,22 @@ function ChannelChatsPage() {
   })
 
   // WhatsApp/Instagram e as conversas abertas do site na mesma ordem: a mais recente primeiro.
+  // Chat do site: um único card por celular (o mais recente) — o cliente que abre o chat de novo não vira card repetido.
+  const siteSemRepetidos = (() => {
+    const vistos = new Set<string>()
+    return [...siteAbertas]
+      .sort((a, b) => b.updated_at - a.updated_at)
+      .filter((c) => {
+        const d = String(c.contact || "").replace(/\D/g, "")
+        const k = d.length >= 8 ? d.slice(-8) : c.id
+        if (vistos.has(k)) return false
+        vistos.add(k)
+        return true
+      })
+  })()
   const itensOrdenados: { site?: SiteChatConversation; conv?: Conversation; t: number; agrupado?: boolean }[] = [
     ...(todos && canalSite
-      ? siteAbertas
+      ? siteSemRepetidos
           .filter((c) => `${c.name} ${c.contact || ""}`.toLowerCase().includes(search.toLowerCase()))
           .map((c) => ({ site: c, t: c.updated_at }))
       : []),

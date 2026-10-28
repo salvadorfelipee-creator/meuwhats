@@ -4023,6 +4023,32 @@ async function siteChatEncerrarDuplicados(idAtual, telefone, cpf) {
   return Number(r.rowsAffected || 0);
 }
 
+// Já existe conversa do site com esse e-mail? (evita mandar de novo o e-mail de boas-vindas a quem volta a abrir o chat)
+async function siteChatExisteEmail(email, exceptoId) {
+  await ready;
+  const r = await client.execute({ sql: `SELECT 1 FROM site_chat_conversations WHERE LOWER(email) = ? AND id != ? LIMIT 1`, args: [String(email || "").toLowerCase(), exceptoId || ""] });
+  return r.rows.length > 0;
+}
+
+// Conversas de WhatsApp com a janela de 24h já fechada (nenhuma mensagem do cliente há mais de 24h; quem nunca
+// respondeu conta pela última mensagem) que seguem abertas. Fora quem está em etapa avançada ou com retorno agendado.
+async function conversasJanelaFechadaAbertas(numeros, etapasAvancadas) {
+  await ready;
+  if (!numeros.length) return [];
+  const limite = Date.now() - 24 * 60 * 60 * 1000;
+  const r = await client.execute({
+    sql: `SELECT c.phone, c.business_number_id, c.fluxo_passo, c.nota FROM conversations c
+          WHERE c.business_number_id IN (${numeros.map(() => "?").join(",")})
+            AND COALESCE(c.status, 'novo') != 'resolvido'
+            AND COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.phone = c.phone AND m.business_number_id = c.business_number_id AND m.direction = 'in'), 0) < ?
+            AND COALESCE(c.last_message_at, 0) < ?
+            AND COALESCE(c.pipeline_estagio, '') NOT IN (${etapasAvancadas.map(() => "?").join(",")})
+            AND NOT EXISTS (SELECT 1 FROM retornos r WHERE r.business_id = c.business_number_id AND r.phone = c.phone AND r.status = 'pending')`,
+    args: [...numeros, limite, limite, ...etapasAvancadas],
+  });
+  return r.rows.map((x) => ({ ...x }));
+}
+
 async function siteChatDefinirNome(id, name) {
   await ready;
   await client.execute({ sql: `UPDATE site_chat_conversations SET name = ? WHERE id = ?`, args: [name, id] });
@@ -4547,6 +4573,8 @@ module.exports = {
   conversasConsignadoSemEtapa,
   conversasFinalizarAntigas,
   siteChatCltTelefoneOutroCpfParadas,
+  siteChatExisteEmail,
+  conversasJanelaFechadaAbertas,
   siteChatCltFactaNegativaRecentes,
   siteChatCltNaoFinalizadasRecentes,
   siteChatCltComCpfRecentes,

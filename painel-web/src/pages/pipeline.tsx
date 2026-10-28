@@ -537,7 +537,18 @@ export function PipelinePage({ onAbrirConversa }: { onAbrirConversa: (channelId:
       .then(([listasWhats, siteLista]) => {
         const whats = listasWhats.flat()
         // Site e WhatsApp do mesmo cliente se encerram juntos: lead do site encerrado sai do quadro.
-        const siteVisivel = siteLista.filter((c) => c.status !== "resolvido")
+        // Um cartão do site por celular (o mais recente): quem abriu o chat várias vezes não repete no quadro.
+        const fimTel = (v: string | null | undefined) => (v || "").replace(/\D/g, "").slice(-8)
+        const vistos = new Set<string>()
+        const siteVisivel = [...siteLista]
+          .sort((a, b) => (b.last_message_at ?? 0) - (a.last_message_at ?? 0))
+          .filter((c) => c.status !== "resolvido")
+          .filter((c) => {
+            const k = fimTel(c.email) || c.phone
+            if (vistos.has(k)) return false
+            vistos.add(k)
+            return true
+          })
         setConversas([...whats, ...siteVisivel])
       })
       .finally(() => setCarregando(false))
