@@ -5954,7 +5954,8 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
         } else {
           // Texto livre sem escolher botão: lembra das opções uma vez só (não é chat, não repete a cada mensagem).
           const ultimoCorpo = String((await db.getUltimoCorpoEnviado(de, businessNumberId)) || "");
-          if (!ultimoCorpo.startsWith("Quer saber as condições?")) {
+          // Cliente que manda duas mensagens seguidas ("Oii", "Bom dia") recebe a oferta uma vez só: sem lembrete se acabamos de responder.
+          if (!ultimoCorpo.startsWith("Quer saber as condições?") && !(await respondeuHaPouco(de, businessNumberId, 3))) {
             await responder("Quer saber as condições? Toque em uma das opções abaixo.", BOTOES_OFERTA_CONSIGNADO);
           }
         }
@@ -6105,6 +6106,18 @@ async function dispararInicioFluxo(fluxo, de, businessNumberId) {
   await db.setFluxoPasso(de, businessNumberId, menu.foraDeHorario || menu.encaminhaSite ? null : "menu_inicial");
 }
 
+// ─── SPAM ────────────────────────────────────────────────────────────────────
+// Mensagem de número desconhecido (nunca falamos com ele) que traz link de fora e linguagem de golpe/propaganda
+// ("auxílio", "consulta liberada", "receberam hoje", saque via PIX...). Não responde, não aciona fluxo e já fica finalizada.
+const REGEX_LINK_EXTERNO = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|ru|xyz|top|info|site|online|link|app|club|click|bet)\b)/i;
+const REGEX_LINK_PROPRIO = /(felizcred\.com\.br|cotacertaseguros\.com\.br|ciahot)/i;
+const REGEX_LINGUAGEM_SPAM = /(aux[ií]lio|benef[ií]cio liberado|consulta liberada|consulte agora|receberam hoje|pessoas receberam|saque (de forma )?imediat|via pix|clique (no )?(link|aqui)|ganhe|ganhar dinheiro|renda extra|sorteio|pr[eê]mio|b[oô]nus|cadastre[- ]se|promo[cç][aã]o imperd|oferta imperd|bitcoin|cripto|aposta|cassino|tigrinho)/i;
+function pareceSpam(texto) {
+  const t = String(texto || "");
+  if (t.length < 40 || !REGEX_LINK_EXTERNO.test(t) || REGEX_LINK_PROPRIO.test(t)) return false;
+  return REGEX_LINGUAGEM_SPAM.test(t);
+}
+
 // ─── PROCESSAR MENSAGENS RECEBIDAS ───────────────────────────────────────────
 async function processarEntry(entry) {
   for (const e of entry) {
@@ -6127,6 +6140,22 @@ async function processarEntry(entry) {
         );
 
         const conversaAnterior = await db.getConversation(de, businessNumberId);
+        // Spam de número desconhecido: guarda a mensagem, marca como "Spam" e finaliza, sem responder nem acionar nenhum fluxo.
+        if (tipo === "text" && pareceSpam(msg.text?.body) && !(await db.ultimasMensagens(de, businessNumberId, 30)).some((m) => m.direction === "out")) {
+          try {
+            await db.upsertConversation(de, businessNumberId, nome, quando);
+            await db.insertMessage({ phone: de, business_number_id: businessNumberId, direction: "in", wa_message_id: msg.id, created_at: quando, status: "received", type: "text", body: msg.text?.body });
+            const tagId = await db.tagEncontrarOuCriar(businessNumberId, "Spam", "#6B7280");
+            await db.adicionarTagConversaSeAusente(businessNumberId, de, tagId, "automatico");
+            await db.atualizarNotaConversa(de, businessNumberId, "Spam: mensagem de propaganda/golpe, não respondida");
+            await db.atualizarStatusConversa(de, businessNumberId, "resolvido");
+            await db.marcarConversaLida(de, businessNumberId);
+            console.log(`🚫 Spam ignorado de ${de} (${businessNumberId})`);
+          } catch (err) {
+            console.error("Erro ao tratar spam:", err.message);
+          }
+          continue;
+        }
         // Por telefone, não por número de negócio, porque a Campanha CLT hoje divide o
         // contato entre 2 variantes (teste 1 x 2), e o número principal pode ter o contato
         // "preso" num fluxo de anúncio (fluxo_passo) — ver getFluxo.
