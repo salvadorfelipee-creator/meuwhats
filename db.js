@@ -15,7 +15,7 @@ const originacaoPossivelmenteAberta = { fgts: true, clt: true, novosaque: true }
 const executarOriginal = client.execute.bind(client);
 client.execute = (stmt, ...resto) => {
   const sql = typeof stmt === "string" ? stmt : stmt?.sql;
-  const m = /^\s*(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE)\s+(fgts|clt|novosaque)_origination/i.exec(sql || "");
+  const m = /^\s*(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE)\s+(fgts|clt|novosaque)_originationb/i.exec(sql || "");
   if (m) originacaoPossivelmenteAberta[m[1].toLowerCase()] = true;
   return executarOriginal(stmt, ...resto);
 };
