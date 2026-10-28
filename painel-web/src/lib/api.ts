@@ -854,6 +854,10 @@ export const api = {
       `/painel/api/conversations/${encodeURIComponent(businessId)}/buscar?q=${encodeURIComponent(termo)}`,
     ),
 
+  // Telefones (só dígitos) dos clientes que batem com QUALQUER dado: CPF, e-mail, nome, celular, dados do site.
+  buscarClientes: (termo: string) =>
+    request<string[]>(`/painel/api/clientes/buscar?q=${encodeURIComponent(termo)}`),
+
   respostasProntas: () => request<RespostaPronta[]>("/painel/api/respostas-prontas"),
 
   criarRespostaPronta: (atalho: string, texto: string) =>

@@ -1704,6 +1704,45 @@ async function buscarMensagens(businessNumberId, termo) {
   return Array.from(porTelefone.values());
 }
 
+// Busca por QUALQUER dado do cliente (CPF, e-mail, nome, celular, campos personalizados, dados
+// digitados no site, simulações CLT/FGTS). Devolve só os telefones (só dígitos) que batem; o
+// painel cruza com a lista de conversas pelo DDD + últimos 8 dígitos.
+async function buscarClientesPorDado(termo) {
+  await ready;
+  const bruto = String(termo || "").trim();
+  if (bruto.length < 3) return [];
+  const digitos = bruto.replace(/\D/g, "");
+  const textoLike = `%${bruto}%`;
+  const digitosLike = digitos.length >= 3 ? `%${digitos}%` : null;
+  // CPF/celular podem estar salvos com ou sem pontuação: compara sobre o valor sem pontuação.
+  const semPontuacao = (col) => `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(${col}, '.', ''), '-', ''), ' ', ''), '(', ''), ')', '')`;
+  const consultas = [
+    { sql: `SELECT phone AS tel FROM conversations WHERE name LIKE ? OR email LIKE ? OR phone LIKE ?`, args: [textoLike, textoLike, textoLike] },
+    { sql: `SELECT phone AS tel FROM conversation_campos_valores WHERE valor LIKE ?`, args: [textoLike] },
+    { sql: `SELECT contact AS tel FROM site_chat_conversations WHERE name LIKE ? OR contact LIKE ? OR email LIKE ? OR dados_json LIKE ?`, args: [textoLike, textoLike, textoLike, textoLike] },
+    { sql: `SELECT whatsapp AS tel FROM cotacerta_leads WHERE nome LIKE ? OR email LIKE ? OR whatsapp LIKE ? OR cpf LIKE ?`, args: [textoLike, textoLike, textoLike, textoLike] },
+  ];
+  if (digitosLike) {
+    consultas.push(
+      { sql: `SELECT phone AS tel FROM fgts_origination WHERE ${semPontuacao("cpf")} LIKE ?`, args: [digitosLike] },
+      { sql: `SELECT phone AS tel FROM clt_origination WHERE ${semPontuacao("cpf")} LIKE ?`, args: [digitosLike] },
+      { sql: `SELECT phone AS tel FROM novosaque_origination WHERE ${semPontuacao("cpf")} LIKE ?`, args: [digitosLike] },
+      { sql: `SELECT COALESCE(c.phone, s.contact) AS tel FROM site_chat_clt c JOIN site_chat_conversations s ON s.id = c.conversation_id WHERE ${semPontuacao("c.cpf")} LIKE ?`, args: [digitosLike] },
+      { sql: `SELECT contact AS tel FROM site_chat_conversations WHERE ${semPontuacao("dados_json")} LIKE ?`, args: [digitosLike] },
+    );
+  }
+  const telefones = new Set();
+  const resultados = await Promise.allSettled(consultas.map((q) => client.execute(q)));
+  for (const r of resultados) {
+    if (r.status !== "fulfilled") { console.error("Busca de clientes: consulta falhou:", r.reason?.message); continue; }
+    for (const row of r.value.rows) {
+      const d = String(row.tel || "").replace(/\D/g, "");
+      if (d.length >= 8) telefones.add(d);
+    }
+  }
+  return [...telefones].slice(0, 500);
+}
+
 async function respostasProntasListar() {
   await ready;
   const result = await client.execute(`SELECT * FROM respostas_prontas ORDER BY atalho ASC`);
@@ -4710,6 +4749,7 @@ module.exports = {
   whatsappFalhasRecentes,
   atualizarNotaConversa,
   buscarMensagens,
+  buscarClientesPorDado,
   respostasProntasListar,
   respostaProntaCriar,
   respostaProntaExcluir,

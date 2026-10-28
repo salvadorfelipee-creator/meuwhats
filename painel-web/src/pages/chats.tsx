@@ -344,6 +344,8 @@ function ChannelChatsPage() {
   const [siteSel, setSiteSel] = React.useState<string | null>(null)
   const [messages, setMessages] = React.useState<Message[]>([])
   const [search, setSearch] = React.useState("")
+  // Telefones (DDD + 8 últimos dígitos) dos clientes que batem com a busca por QUALQUER dado (CPF, e-mail...).
+  const [chavesBuscaDados, setChavesBuscaDados] = React.useState<Set<string>>(new Set())
   const [texto, setTexto] = React.useState("")
   const [enviando, setEnviando] = React.useState(false)
   const [respostas, setRespostas] = React.useState<RespostaPronta[]>([])
@@ -669,9 +671,45 @@ function ChannelChatsPage() {
     })
   }, [texto])
 
+  const chaveBusca = (tel?: string | null) => {
+    let d = String(tel || "").replace(/\D/g, "")
+    if (d.length >= 12 && d.startsWith("55")) d = d.slice(2)
+    return d.length >= 10 ? d.slice(0, 2) + d.slice(-8) : ""
+  }
+
+  // Busca no servidor por qualquer dado do cliente (CPF, e-mail, dados do site, simulações), com um respiro
+  // de 350 ms pra não consultar a cada tecla.
+  React.useEffect(() => {
+    const termo = search.trim()
+    if (termo.length < 3) {
+      setChavesBuscaDados((atual) => (atual.size ? new Set() : atual))
+      return
+    }
+    let cancelado = false
+    const id = setTimeout(() => {
+      api
+        .buscarClientes(termo)
+        .then((tels) => {
+          if (!cancelado) setChavesBuscaDados(new Set(tels.map(chaveBusca).filter(Boolean)))
+        })
+        .catch(() => {
+          if (!cancelado) setChavesBuscaDados(new Set())
+        })
+    }, 350)
+    return () => {
+      cancelado = true
+      clearTimeout(id)
+    }
+  }, [search])
+
+  const batePorDados = (tel?: string | null) => {
+    const k = chaveBusca(tel)
+    return !!k && chavesBuscaDados.has(k)
+  }
+
   const listaFiltrada = conversations.filter((c) => {
     const alvo = `${c.name || ""} ${c.phone}`.toLowerCase()
-    return alvo.includes(search.toLowerCase())
+    return alvo.includes(search.toLowerCase()) || batePorDados(c.phone)
   })
 
   // WhatsApp/Instagram e as conversas abertas do site na mesma ordem: a mais recente primeiro.
@@ -691,7 +729,7 @@ function ChannelChatsPage() {
   const itensOrdenados: { site?: SiteChatConversation; conv?: Conversation; t: number; agrupado?: boolean }[] = [
     ...(todos && canalSite
       ? siteSemRepetidos
-          .filter((c) => `${c.name} ${c.contact || ""}`.toLowerCase().includes(search.toLowerCase()))
+          .filter((c) => `${c.name} ${c.contact || ""}`.toLowerCase().includes(search.toLowerCase()) || batePorDados(c.contact))
           .map((c) => ({ site: c, t: c.updated_at }))
       : []),
     // Conversa com rascunho (que não é a aberta agora) sobe pro topo, igual ao WhatsApp.

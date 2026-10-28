@@ -8713,6 +8713,12 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ...mesclarAnalytics(porCanalLista), dias, desde, ate });
     }
 
+    // GET /painel/api/clientes/buscar?q=... — telefones dos clientes que batem com QUALQUER dado (CPF, e-mail, nome...)
+    if (req.method === "GET" && path_ === "/painel/api/clientes/buscar") {
+      if (!requireAuth(req, res)) return;
+      return send(res, 200, await db.buscarClientesPorDado(url.searchParams.get("q") || ""));
+    }
+
     // GET /painel/api/conversations/:businessId/buscar?q=... — busca texto dentro das mensagens
     const matchBuscarMsg = path_.match(/^\/painel\/api\/conversations\/([^/]+)\/buscar$/);
     if (req.method === "GET" && matchBuscarMsg) {
