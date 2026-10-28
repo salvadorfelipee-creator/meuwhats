@@ -224,7 +224,9 @@
   function cartaoBanco(banco, e, c) {
     const nome = banco === "unno" ? "Unno" : "Facta";
     const rotulos = { espera: ["Na fila", "cinza"], autorizar: ["Falta você", "laranja"], whats: ["Aguardando você", "laranja"], analisando: ["Analisando", "amarelo"], ofertas: ["Liberou", "verde"], escolhida: ["Escolhida", "verde"], proposta: ["Proposta", "verde"], sem: ["Sem condições", "cinza"], dispensado: ["Não precisou", "cinza"] };
-    const [rot, cor] = rotulos[e.k] || ["", "cinza"];
+    let [rot, cor] = rotulos[e.k] || ["", "cinza"];
+    // "Falta você" só quando o botão já existe; enquanto o banco gera o link, o selo diz que somos nós trabalhando.
+    if (banco === "unno" && e.k === "autorizar" && !c.consentUrl) { rot = "Preparando"; cor = "amarelo"; }
     const vivo = ["autorizar", "whats", "analisando"].includes(e.k);
     return `<section class="ap-banco ${["sem", "dispensado"].includes(e.k) ? "apagado" : ""} ${vivo ? "vivo" : ""}">
       <header><span class="ap-logo ${banco}">${nome[0]}</span><div><b>${nome}</b><small>${banco === "unno" ? "Banco parceiro · autorização por link" : "Banco parceiro · autorização por WhatsApp"}</small></div><span class="ap-tag ${cor}">${vivo ? '<i class="ap-pulso"></i>' : ""}${rot}</span></header>
