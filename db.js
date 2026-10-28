@@ -4019,7 +4019,8 @@ async function siteChatEncerrarDuplicados(idAtual, telefone, cpf) {
   if (formas.length) { condicoes.push(`contact IN (${marcas})`, `id IN (SELECT conversation_id FROM site_chat_clt WHERE phone IN (${marcas}))`); args.push(...formas, ...formas); }
   if (cpfLimpo) { condicoes.push(`id IN (SELECT conversation_id FROM site_chat_clt WHERE cpf = ?)`); args.push(cpfLimpo); }
   if (!condicoes.length) return 0;
-  const r = await client.execute({ sql: `UPDATE site_chat_conversations SET status = 'closed' WHERE id != ? AND status = 'open' AND (${condicoes.join(" OR ")})`, args });
+  const r = await client.execute({ sql: `UPDATE site_chat_conversations SET status = 'closed' WHERE id != ? AND status = 'open' AND (${condicoes.join(" OR ")})
+    AND id NOT IN (SELECT conversation_id FROM site_chat_clt WHERE etapa IN ('aguardando_assinatura_facta', 'proposta_em_analise', 'proposta_concluida'))`, args });
   return Number(r.rowsAffected || 0);
 }
 

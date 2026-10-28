@@ -14,7 +14,8 @@
   const app = document.getElementById("app");
   const sheet = document.getElementById("sheet");
   const demo = new URLSearchParams(location.search).get("demo");
-  const state = { aviso: "", outrosDados: false, produto: /^fgts$/i.test(new URLSearchParams(location.search).get("p") || new URLSearchParams(location.search).get("novo") || "") ? "fgts" : "clt", fgtsLoading: false, session: null, clt: null, erro: "", escolhendo: "", assinatura: "", prazo: null, parcela: null, atualizando: false, chat: { aberto: false, msgs: [], enviando: false } };
+  const TITULO = document.title;
+  const state = { abriuLink: false, aviso: "", outrosDados: false, produto: /^fgts$/i.test(new URLSearchParams(location.search).get("p") || new URLSearchParams(location.search).get("novo") || "") ? "fgts" : "clt", fgtsLoading: false, session: null, clt: null, erro: "", escolhendo: "", assinatura: "", prazo: null, parcela: null, atualizando: false, chat: { aberto: false, msgs: [], enviando: false } };
   let sondagem = null, sondagemChat = null;
 
   const money = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -202,8 +203,8 @@
   }
   function acaoBanco(banco, e, c) {
     if (e.k === "autorizar" && !c.consentUrl) return `<div class="ap-preparando" role="status"><span class="ap-pontos" aria-hidden="true"><i></i><i></i><i></i></span><div><b>Preparando o link de autorização</b><small>O banco está gerando o seu link. Pode levar alguns minutos: deixe esta tela aberta, ele aparece aqui sozinho.</small></div></div>`;
-    if (e.k === "autorizar") return `<div class="ap-acoes"><a class="ap-btn principal" href="${esc(c.consentUrl)}" target="_blank" rel="noopener">${IC.cadeado} Autorizar agora</a>
-        <button class="ap-btn suave" type="button" data-acao="atualizar">Já autorizei</button></div>
+    if (e.k === "autorizar") return `${state.abriuLink ? '<div class="ap-preparando" role="status" style="margin-bottom:12px"><span class="ap-pontos" aria-hidden="true"><i></i><i></i><i></i></span><div><b>Aguardando você autorizar</b><small>Na página que abrimos, confirme a autorização e depois feche aquela aba para voltar aqui. Esta tela segue sozinha.</small></div></div>' : ""}<div class="ap-acoes"><a class="ap-btn ${state.abriuLink ? "suave" : "principal"}" data-acao="abriu-link" href="${esc(c.consentUrl)}" target="_blank" rel="noopener">${IC.cadeado} ${state.abriuLink ? "Abrir a autorização de novo" : "Autorizar agora"}</a>
+        <button class="ap-btn ${state.abriuLink ? "principal" : "suave"}" type="button" data-acao="atualizar">Já autorizei</button></div>
         <p class="ap-dica">É uma página segura do banco parceiro. Depois de autorizar, volte para cá: seguimos sozinhos.</p>`;
     if (e.k === "whats") return `<div class="ap-acoes"><a class="ap-btn zap" href="https://wa.me/" target="_blank" rel="noopener">${IC.zap} Abrir o WhatsApp</a></div>
         <p class="ap-dica">Enviamos uma mensagem do <b>Facta</b> para o seu celular. Toque no link dela e libere a consulta. Conferimos sozinhos a cada poucos segundos.</p>`;
@@ -376,6 +377,7 @@
     else if (n === 2) { titulo = "Autorize os bancos no app do FGTS"; sub = "Para consultar seu saldo, o FGTS precisa da sua autorização. Você faz direto no aplicativo, em menos de um minuto."; }
     else { titulo = "Consultando seu FGTS"; sub = "Estamos pedindo as condições aos bancos. Isso leva alguns instantes."; }
     app.innerHTML = `${barraTopo(`<span class="ap-ola">Olá, ${esc(nome)}</span><button class="ap-avatar" type="button" data-acao="menu" title="Menu">${esc(nome.slice(0, 1).toUpperCase() || "F")}</button>`)}
+      ${seletorProduto(c)}
       ${stepper(n, NOMES_FGTS)}
       <section class="ap-hero ${sem ? "erro" : ""}"><h1>${titulo}</h1><p>${esc(sub)}</p>${n === 1 && !sem ? '<div class="ap-barra"><i></i></div>' : ""}</section>
       ${state.aviso ? `<div class="ap-aviso">${esc(state.aviso)}</div>` : ""}${state.erro ? `<div class="ap-erro">${esc(state.erro)}</div>` : ""}
@@ -387,7 +389,26 @@
       ${temProposta ? "" : (n === 2 ? "" : `<p class="ap-secao">Andamento</p><div class="ap-bancos">${cartaoFgtsAndamento(c)}</div>`)}
       ${n <= 2 || sem ? REQUISITOS_FGTS : ""}
       ${sem ? `<div class="ap-acoes pad"><button class="ap-btn principal grande" type="button" data-acao="chat">Falar com a FelizCred</button></div>` : ""}
+      ${sem || temProposta ? cartaoOutroProduto(c) : ""}
       <div class="ap-selopix">${IC.pix}<span>Pagamento sempre via <b>Pix</b></span></div>`;
+  }
+
+  function seletorProduto(c) {
+    const fgts = c?.produto === "FGTS";
+    return `<div class="ap-produtos" role="tablist" aria-label="Produto"><button type="button" class="${fgts ? "" : "on"}" ${fgts ? 'data-acao="iniciar" data-p="clt"' : 'aria-current="true"'}>Consignado CLT</button><button type="button" class="${fgts ? "on" : ""}" ${fgts ? 'aria-current="true"' : 'data-acao="iniciar" data-p="fgts"'}>Antecipar FGTS</button></div>`;
+  }
+  function cartaoOutroProduto(c) {
+    const fgts = c?.produto === "FGTS";
+    return `<section class="ap-outro"><b>${fgts ? "Quer simular o consignado CLT também?" : "Quer simular a antecipação do FGTS também?"}</b><small>${fgts ? "Para quem tem carteira assinada há mais de 3 meses." : "Para quem está no saque-aniversário do FGTS."}</small><button class="ap-btn suave" type="button" data-acao="iniciar" data-p="${fgts ? "clt" : "fgts"}">${fgts ? "Simular CLT agora" : "Simular FGTS agora"}</button></section>`;
+  }
+  function confirmarTroca(p) {
+    const fgts = p === "fgts";
+    sheet.innerHTML = `<div class="fundo" data-acao="fechar-sheet"></div><div class="folha ap-menu" role="dialog" aria-modal="true"><div class="puxador"></div>
+      <p class="ap-menu-ola">Começar a simulação de ${fgts ? "FGTS" : "CLT"}?</p>
+      <p class="ap-dica" style="margin:0 20px 10px">A sua simulação atual continua salva e o atendimento enxerga as duas.</p>
+      <button class="ap-btn principal" style="margin:8px 20px 0;width:calc(100% - 40px)" type="button" data-acao="iniciar" data-p="${p}" data-ok="1">Sim, simular ${fgts ? "FGTS" : "CLT"}</button>
+      <button class="ap-btn suave" style="margin:10px 20px 0;width:calc(100% - 40px)" type="button" data-acao="fechar-sheet">Continuar a atual</button></div>`;
+    sheet.classList.add("aberta"); document.body.classList.add("trava");
   }
 
   function telaApp() {
@@ -402,6 +423,7 @@
     const bancoOfertas = u.k === "ofertas" ? "unno" : f.k === "ofertas" ? "facta" : null;
     const mostrarOfertas = !!bancoOfertas && !temProposta && c.etapa !== "dados_pessoais";
     app.innerHTML = `${barraTopo(`<span class="ap-ola">Olá, ${esc(nome)}</span><button class="ap-avatar" type="button" data-acao="menu" title="Menu">${esc(nome.slice(0, 1).toUpperCase() || "F")}</button>`)}
+      ${seletorProduto(c)}
       ${stepper(n)}
       <section class="ap-hero ${semTudo ? "erro" : ""}"><h1>${titulo}</h1><p>${sub}</p>${!semTudo && !temProposta && n === 2 ? '<div class="ap-barra"><i></i></div>' : ""}</section>
       ${state.aviso ? `<div class="ap-aviso">${esc(state.aviso)}</div>` : ""}${state.erro ? `<div class="ap-erro">${esc(state.erro)}</div>` : ""}
@@ -410,6 +432,7 @@
       ${mostrarOfertas ? cartaoSimulador(c, bancoOfertas) : ""}
       ${temProposta ? "" : `<p class="ap-secao">Bancos consultados</p><div class="ap-bancos">${cartaoBanco("unno", u, c)}${cartaoBanco("facta", f, c)}</div>`}
       ${semTudo ? `<div class="ap-acoes pad"><button class="ap-btn principal grande" type="button" data-acao="chat">Falar com a FelizCred</button></div>` : ""}
+      ${semTudo || temProposta ? cartaoOutroProduto(c) : ""}
       <div class="ap-selopix">${IC.pix}<span>Pagamento sempre via <b>Pix</b></span></div>`;
   }
 
@@ -462,11 +485,15 @@
     const msgs = state.chat.msgs.filter((m) => !/^Tenho interesse em:/.test(String(m.body || "")));
     const corpo = msgs.length ? msgs.map((m) => `<div class="ap-msg ${m.direction === "visitor" ? "eu" : "eles"}">${esc(m.body)}</div>`).join("") : '<p class="ap-vazio">Oi! Se tiver qualquer dúvida sobre a simulação, escreva aqui ou toque em um atalho. Respondemos no horário de atendimento.</p>';
     const st = statusAtual();
+    const fgtsAgora = state.clt?.produto === "FGTS";
+    const ultima = String([...msgs].reverse().find((m) => m.direction === "visitor")?.body || "");
+    const querOutro = fgtsAgora ? /\bclt\b|consignado|empr[eé]stimo|carteira assinada/i.test(ultima) : /\bfgts\b|saque.?anivers|antecipa/i.test(ultima);
+    const chipTroca = `<button type="button" class="${querOutro ? "destaque" : ""}" data-acao="iniciar" data-p="${fgtsAgora ? "clt" : "fgts"}">${fgtsAgora ? "Simular CLT agora" : "Simular FGTS agora"}</button>`;
     sheet.innerHTML = `<div class="fundo" data-acao="fechar-chat"></div><div class="folha ap-chat" role="dialog" aria-modal="true" aria-label="Ajuda">
       <div class="puxador"></div><div class="ap-chat-topo"><b>Fale com a FelizCred</b><button class="ap-icone claro" type="button" data-acao="fechar-chat" aria-label="Fechar">${IC.x}</button></div>
       <div class="ap-status"><span>Você está em</span><b>${esc(st.linha)}</b></div>
       <div class="ap-msgs" id="ap-msgs">${corpo}</div>
-      <div class="ap-atalhos">${st.atalhos.map((t) => `<button type="button" data-acao="atalho" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      <div class="ap-atalhos">${querOutro ? chipTroca : ""}${st.atalhos.map((t) => `<button type="button" data-acao="atalho" data-t="${esc(t)}">${esc(t)}</button>`).join("")}${querOutro ? "" : chipTroca}</div>
       <form class="ap-chat-form" data-form="chat"><input name="msg" placeholder="Escreva sua dúvida" autocomplete="off" required><button class="ap-btn principal" ${state.chat.enviando ? "disabled" : ""}>Enviar</button></form></div>`;
     sheet.classList.add("aberta"); document.body.classList.add("trava");
     const m = document.getElementById("ap-msgs"); if (m) m.scrollTop = m.scrollHeight;
@@ -490,7 +517,10 @@
   const assinaturaClt = (c) => JSON.stringify([c?.produto, c?.provider, c?.etapa, c?.status, c?.parallelFacta, c?.error, (c?.offers || []).map((o) => o.id + o.installmentValue).join(), c?.consentUrl, c?.contractLink, c?.proposalCode, c?.motivoRecusa]);
   function aplicar(clt) {
     const mudou = assinaturaClt(clt) !== state.assinatura;
+    const antes = state.clt;
     state.clt = clt; state.assinatura = assinaturaClt(clt);
+    if (mudou && clt.etapa !== "autorizacao_enviada") state.abriuLink = false;
+    if (mudou && antes && document.hidden && antes.etapa !== clt.etapa) document.title = "✅ Atualizado — volte para a sua simulação";
     if (mudou) { state.atualizando = false; state.parcela = null; state.prazo = null; if (!state.chat.aberto) telaApp(); }
   }
   async function atualizar() {
@@ -581,10 +611,14 @@
     const alvo = e.target.closest("[data-acao]");
     if (!alvo) return;
     const acao = alvo.dataset.acao;
+    if (acao === "abriu-link") { state.abriuLink = true; setTimeout(() => { if (!sheet.classList.contains("aberta")) telaApp(); }, 500); return; }
     if (acao === "sair") return sair();
     if (acao === "menu") return abrirMenu();
     if (acao === "fechar-embed") { try { parent.postMessage({ fcApp: "close" }, "*"); } catch {} return; }
     if (acao === "iniciar") {
+      const emAndamento = state.clt && ["ofertas_disponiveis", "dados_pessoais", "aguardando_assinatura_facta", "proposta_em_analise", "proposta_concluida"].includes(state.clt.etapa);
+      if (emAndamento && !alvo.dataset.ok && (state.clt.produto === "FGTS") !== (alvo.dataset.p === "fgts")) { state.chat.aberto = false; clearInterval(sondagemChat); return confirmarTroca(alvo.dataset.p); }
+      state.chat.aberto = false; clearInterval(sondagemChat);
       const login = lerLogin(); fecharSheet();
       if (!login) { state.produto = alvo.dataset.p === "fgts" ? "fgts" : "clt"; limparSessao(); state.outrosDados = true; return telaEntrada(); }
       limparSessao(); return abrir({ ...login, produto: alvo.dataset.p });
@@ -648,7 +682,7 @@
       } catch (erro) { if (botao) { botao.disabled = false; botao.textContent = "Gerar proposta para revisão"; } faixa.innerHTML = `<div class="erro" style="margin:10px 20px 0">${esc(erro.message)}</div>`; sheet.querySelector(".folha").scrollTo({ top: 0, behavior: "smooth" }); }
     }
   });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session) atualizar(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = TITULO; if (!document.hidden && state.session) atualizar(); });
   window.addEventListener("focus", () => { if (state.session) atualizar(); });
 
   // Botão de ajuda fixo no canto de baixo (celular, computador e gaveta).

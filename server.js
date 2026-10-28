@@ -7139,6 +7139,7 @@ const server = http.createServer(async (req, res) => {
             await db.siteChatDefinirProduto(id, "FGTS");
             await db.siteChatDefinirPipeline(id, "qualificacao");
             await db.siteChatFunilEvento(id, "dados_minimos_enviados", "fgts_cotando", "unnotech");
+            await db.siteChatEncerrarDuplicados(id, telefoneFgts, cpfFgts).catch((err) => console.error("Chats duplicados não encerrados:", err.message));
             return send(res, 200, { clt: siteChatCltPublico(aberta) }, corsHeaders);
           }
           if (action === "start") {
@@ -7414,7 +7415,16 @@ const server = http.createServer(async (req, res) => {
           const row = await db.siteChatCltObter(id).catch(() => null);
           const recentes = await db.siteChatMensagens(id).catch(() => []);
           const ultimaAuto = [...recentes].reverse().find((m) => m.direction === "agent" && m.sender_name === "Assistente FelizCred");
-          if (!ultimaAuto || Date.now() - Number(ultimaAuto.created_at || 0) > 3 * 60_000) {
+          // Cliente fala de outro produto (estava no CLT e escreveu FGTS, ou o contrário): marca o produto certo para o atendimento
+          // e aponta o botão de simular o outro produto, em vez de repetir a dica da etapa.
+          const querFgts = /\bfgts\b|saque.?anivers|antecipa(r|[çc][ãa]o)/i.test(message);
+          const querClt = /\bclt\b|consignado|empr[eé]stimo|carteira assinada/i.test(message);
+          const atualFgts = row ? unnoSite.ehFgts(row) : /fgts/i.test(String(conversation.produto_tag || ""));
+          if ((querFgts && !atualFgts) || (querClt && !querFgts && atualFgts)) {
+            const novo = querFgts ? "FGTS" : "Empréstimo CLT";
+            await db.siteChatDefinirProduto(id, novo).catch(() => {});
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", `Entendi que você quer falar de ${querFgts ? "antecipação do FGTS" : "empréstimo CLT"}. Toque em “Simular ${querFgts ? "FGTS" : "CLT"} agora” aqui no chat para fazer essa simulação na hora. O atendimento de ${querFgts ? "FGTS" : "CLT"} também já foi avisado e responde por aqui.`);
+          } else if (!ultimaAuto || Date.now() - Number(ultimaAuto.created_at || 0) > 3 * 60_000) {
             await db.siteChatMensagemAtendente(id, "Assistente FelizCred", `Recebi sua mensagem e um atendente responde em breve. Enquanto isso: ${dicaEtapaApp(row)}`);
           }
           await db.siteChatConfirmarHumano(id).catch(() => {});

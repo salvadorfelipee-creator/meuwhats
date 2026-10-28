@@ -225,3 +225,12 @@ body.embed .app { max-width: 100%; }
 @media (min-width: 900px) { body:not(.embed) .ap-fab { right: max(16px, calc(50% - 214px)); } }
 body.trava .ap-fab { display: none; }
 .app { padding-bottom: 92px; }
+
+/* troca de produto e venda cruzada */
+.ap-produtos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 20px 0; padding: 4px; border-radius: 14px; background: #e4ece7; }
+.ap-produtos button { min-height: 38px; border: 0; border-radius: 10px; background: transparent; font: 700 13px "DM Sans", sans-serif; color: var(--suave); }
+.ap-produtos button.on { background: #fff; color: var(--verde-escuro); box-shadow: 0 2px 8px rgba(7, 26, 47, .12); }
+.ap-outro { margin: 18px 20px 0; padding: 16px; border-radius: 20px; background: #fff; border: 1.5px solid #cfe7d9; display: grid; gap: 8px; }
+.ap-outro b { font: 700 15px "Sora", sans-serif; }
+.ap-outro small { font-size: 13px; color: var(--suave); }
+.ap-atalhos .destaque { background: var(--verde); border-color: var(--verde); color: #fff; }
