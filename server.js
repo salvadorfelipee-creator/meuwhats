@@ -731,6 +731,19 @@ async function mensagemFluxo(id, texto) {
   return db.siteChatMensagemAtendente(id, "Assistente FelizCred", texto);
 }
 
+// Campos que o cliente não digita: o app preenche com o padrão do dono (o formulário antigo do painel continua enviando os seus).
+function padroesProposta(customer, provider, cpf) {
+  const c = { ...(customer || {}) };
+  const def = (k, v) => { if (!String(c[k] ?? "").trim()) c[k] = v; };
+  if (provider === "unnotech") {
+    def("escolaridade", "Ensino Médio"); def("rg_orgao", "SSP"); def("forma_desembolso", "PIX");
+  } else {
+    def("valor_patrimonio", "1"); def("orgao_emissor", "SSP"); def("nacionalidade", "1"); def("cliente_iletrado_impossibilitado", "N");
+    def("nome_pai", "NÃO DECLARADO"); def("tipo_chave_pix", "1"); def("chave_pix", cpf);
+  }
+  return c;
+}
+
 function parseJsonSeguro(texto) {
   try { return JSON.parse(texto || "{}") || {}; } catch { return {}; }
 }
@@ -7228,8 +7241,9 @@ const server = http.createServer(async (req, res) => {
           }
           if (action === "personal-data" && atual.provider === "unnotech") {
             try {
-              await salvarDadosSite(id, body.customer || {});
-              const novo = await unnoSite.enviarDados(atual, body.customer || {});
+              const clienteUnno = padroesProposta(body.customer, "unnotech", atual.cpf);
+              await salvarDadosSite(id, clienteUnno);
+              const novo = await unnoSite.enviarDados(atual, clienteUnno);
               return send(res, 200, { clt: siteChatCltPublico(novo) }, corsHeaders);
             } catch (err) {
               return send(res, 400, { error: String(err.message || "Não foi possível gerar a proposta agora.").slice(0, 300) }, corsHeaders);
@@ -7282,7 +7296,7 @@ const server = http.createServer(async (req, res) => {
           if (action === "personal-data") {
             if (atual.provider !== "facta" || atual.etapa !== "dados_pessoais" || !atual.transaction_id) return send(res, 409, { error: "Selecione uma condição antes de enviar seus dados." }, corsHeaders);
             if (process.env.FACTA_PROPOSAL_ENABLED !== "true") throw new Error("FACTA_PROPOSAL_ENABLED não configurado");
-            const customer = somenteCamposFacta(body.customer, ["nome", "sexo", "estado_civil", "data_nascimento", "rg", "estado_rg", "orgao_emissor", "data_expedicao", "estado_natural", "cidade_natural_nome", "nacionalidade", "celular", "renda", "cep", "endereco", "numero", "complemento", "bairro", "cidade_nome", "estado", "nome_mae", "nome_pai", "valor_patrimonio", "cliente_iletrado_impossibilitado", "tipo_conta", "banco", "agencia", "conta", "email", "matricula", "cnpj_empregador", "data_admissao", "tipo_chave_pix", "chave_pix", "nome_a_rogo", "cpf_a_rogo", "nome_a_rogo_testemunha", "cpf_a_rogo_testemunha"]);
+            const customer = somenteCamposFacta(padroesProposta(body.customer, "facta", atual.cpf), ["nome", "sexo", "estado_civil", "data_nascimento", "rg", "estado_rg", "orgao_emissor", "data_expedicao", "estado_natural", "cidade_natural_nome", "nacionalidade", "celular", "renda", "cep", "endereco", "numero", "complemento", "bairro", "cidade_nome", "estado", "nome_mae", "nome_pai", "valor_patrimonio", "cliente_iletrado_impossibilitado", "tipo_conta", "banco", "agencia", "conta", "email", "matricula", "cnpj_empregador", "data_admissao", "tipo_chave_pix", "chave_pix", "nome_a_rogo", "cpf_a_rogo", "nome_a_rogo_testemunha", "cpf_a_rogo_testemunha"]);
             let worker = {};
             try { worker = JSON.parse(atual.facta_worker_json || "{}"); } catch {}
             Object.assign(customer, {

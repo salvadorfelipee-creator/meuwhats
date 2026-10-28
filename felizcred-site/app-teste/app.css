@@ -150,3 +150,17 @@ body.trava { overflow: hidden; }
 .ap-chat-form .ap-btn { width: auto; min-height: 48px; }
 @keyframes sobe { from { transform: translate(-50%, 40px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
 @keyframes surge { from { opacity: 0; } to { opacity: 1; } }
+
+/* formulário do popup */
+.form-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form label em { font-style: normal; font-weight: 400; color: var(--suave); }
+.ap-cond { display: grid; gap: 2px; padding: 14px 16px; border-radius: 16px; background: #f1f8f4; border: 1.5px solid #cfe7d9; }
+.ap-cond span { font-size: 12px; color: var(--suave); font-weight: 700; }
+.ap-cond b { font: 700 26px "Sora", sans-serif; }
+.ap-cond small { font-size: 13px; color: var(--verde-escuro); }
+.ap-recebe { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--verde-claro); }
+.ap-recebe > span { color: var(--verde); }
+.ap-recebe b { display: block; font-size: 14px; color: var(--verde-escuro); }
+.ap-recebe small { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: #27533c; }
+.ap-demo-nota { margin: 0 20px 10px; padding: 12px 14px; border-radius: 14px; background: #fff7e6; border: 1.5px dashed #f0b95a; font-size: 12px; color: #6a4400; }
+.ap-demo-nota ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; }

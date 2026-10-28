@@ -25,7 +25,7 @@
     chat: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/></svg>',
     zap: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2a9.7 9.7 0 0 0-8.4 14.55L2.2 21.8l5.37-1.4A9.8 9.8 0 1 0 12 2Zm4.28 11.96c-.23-.12-1.39-.69-1.6-.76-.22-.08-.38-.12-.54.12-.16.23-.61.76-.75.92-.14.15-.28.17-.52.05a6.4 6.4 0 0 1-3.2-2.8c-.24-.42.24-.39.7-1.3.08-.16.04-.29-.02-.4-.06-.12-.54-1.3-.74-1.78-.2-.46-.4-.4-.54-.4h-.46c-.16 0-.41.06-.63.3-.22.23-.83.81-.83 1.98s.85 2.3.97 2.46c.12.15 1.67 2.55 4.05 3.58.57.24 1.01.39 1.35.5.57.18 1.08.15 1.49.09.45-.07 1.39-.57 1.59-1.12.2-.55.2-1.02.14-1.12-.06-.1-.22-.16-.45-.28Z"/></svg>',
     cadeado: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
-    pix: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M12 2.5l9.5 9.5-9.5 9.5L2.5 12z"/><path d="M8.5 12l3.5-3.5 3.5 3.5-3.5 3.5z" fill="currentColor"/></svg>',
+    pix: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2.8l3.6 3.6a2 2 0 0 0 2.8 0l1.1-1.1.9.9-1.1 1.1a2 2 0 0 0 0 2.8L22 13.7l-3.6 3.6a2 2 0 0 1-2.8 0L14.5 16.2a2 2 0 0 0-2.8 0l-1.1 1.1a2 2 0 0 1-2.8 0L4.2 13.7 7.8 10a2 2 0 0 0 0-2.8L6.7 6.1l.9-.9 1.1 1.1a2 2 0 0 0 2.8 0z" transform="scale(.9) translate(1.3 1.3)"/></svg>',
   };
 
   async function api(path, opts = {}) {
@@ -41,61 +41,87 @@
   const lerSessao = () => { try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); return s && s.id && s.token && s.expiresAt > Date.now() ? s : null; } catch { return null; } };
 
   // ── formulários da proposta (copiados do painel "Minha simulação") ──────────────────────────────────────────
-    function formDados(d, offer) {
-    return `<form class="form" data-form="dados"><p>Condição selecionada: você recebe aproximadamente <b>${money(offer.disbursedAmount)}</b> e paga ${offer.installments || "—"} parcelas de ${money(offer.installmentValue)}.</p><div class="form-section"><b>Dados pessoais</b><div class="form-grid"><label>Nome completo<input name="nome" value="${esc(d.nome)}" required autocomplete="name"></label><label>Sexo<select name="sexo" required><option value="">Selecione</option><option value="M" ${d.sexo === "M" ? "selected" : ""}>Masculino</option><option value="F" ${d.sexo === "F" ? "selected" : ""}>Feminino</option></select></label><label>Estado civil<select name="estado_civil" required><option value="">Selecione</option><option value="4">Solteiro(a)</option><option value="3">Casado(a)</option><option value="2">Divorciado(a)</option><option value="5">Viúvo(a)</option><option value="9">União estável</option><option value="6">Outro</option></select></label><label>Data de nascimento<input name="data_nascimento" type="date" value="${esc(inputDate(d.data_nascimento))}" required></label><label>RG<input name="rg" required inputmode="numeric"></label><label>UF do RG<input name="estado_rg" maxlength="2" required placeholder="SC"></label><label>Órgão emissor<input name="orgao_emissor" required placeholder="SSP"></label><label>Data de expedição<input name="data_expedicao" type="date" required></label><label>UF de nascimento<input name="estado_natural" maxlength="2" required placeholder="SC"></label><label>Cidade de nascimento<input name="cidade_natural_nome" required></label><label>Nacionalidade<select name="nacionalidade" required><option value="1">Brasileiro(a)</option><option value="2">Estrangeiro(a)</option></select></label><label>Celular<input name="celular" required inputmode="tel" value="${esc(d.celular)}"></label><label>E-mail<input name="email" type="email" autocomplete="email"></label><label>Nome da mãe<input name="nome_mae" value="${esc(d.nome_mae)}" required></label><label>Nome do pai<input name="nome_pai" required placeholder="Ou NÃO DECLARADO"></label><label>Faixa de patrimônio<select name="valor_patrimonio" required><option value="1">Até R$ 10 mil</option><option value="2">De R$ 10 mil a R$ 100 mil</option><option value="3">De R$ 100 mil a R$ 500 mil</option><option value="4">De R$ 500 mil a R$ 1 milhão</option><option value="5">Acima de R$ 1 milhão</option></select></label></div></div><div class="form-section"><b>Endereço</b><div class="form-grid"><label>CEP<input name="cep" required inputmode="numeric" maxlength="9"></label><label>Endereço<input name="endereco" required></label><label>Número<input name="numero" required inputmode="numeric"></label><label>Complemento<input name="complemento"></label><label>Bairro<input name="bairro" required></label><label>Cidade<input name="cidade_nome" required></label><label>UF<input name="estado" required maxlength="2" placeholder="SC"></label></div></div><div class="form-section"><b>Conta para recebimento</b><div class="form-grid"><label>Banco<select name="banco" required><option value="">Selecione</option><option value="001">Banco do Brasil</option><option value="033">Santander</option><option value="104">Caixa</option><option value="237">Bradesco</option><option value="341">Itaú</option><option value="260">Nubank</option><option value="077">Inter</option><option value="336">C6 Bank</option></select></label><label>Tipo de conta<select name="tipo_conta" required><option value="C">Conta corrente</option><option value="P">Conta poupança</option></select></label><label>Agência<input name="agencia" required inputmode="numeric"></label><label>Conta com dígito<input name="conta" required></label><label>Tipo de chave Pix<select name="tipo_chave_pix" required><option value="1">CPF</option><option value="2">Telefone</option><option value="3">E-mail</option><option value="4">Chave aleatória</option></select></label><label>Chave Pix<input name="chave_pix" required></label></div></div><input type="hidden" name="renda" value="${esc(d.renda)}"><input type="hidden" name="matricula" value="${esc(d.matricula)}"><input type="hidden" name="cnpj_empregador" value="${esc(d.cnpj_empregador)}"><input type="hidden" name="data_admissao" value="${esc(inputDate(d.data_admissao))}"><label>Precisa de assinatura a rogo?<select name="cliente_iletrado_impossibilitado" required><option value="N">Não</option><option value="S">Sim</option></select></label><div class="rogo" hidden><div class="form-grid"><label>Nome de quem assina a rogo<input name="nome_a_rogo"></label><label>CPF de quem assina<input name="cpf_a_rogo" inputmode="numeric"></label><label>Nome da testemunha<input name="nome_a_rogo_testemunha"></label><label>CPF da testemunha<input name="cpf_a_rogo_testemunha" inputmode="numeric"></label></div></div><label class="consent"><input type="checkbox" required> Confirmo que os dados estão corretos e autorizo a geração de uma proposta real na Facta. Poderei revisar o contrato antes de assinar.</label><button class="btn primario grande">Gerar proposta para revisão</button></form>`;
-  }
+  // ── formulários da proposta ──────────────────────────────────────────────────────────────────────────────────
+  // O cliente só digita o que os bancos não sabem. O resto o servidor preenche sozinho (Pix na chave CPF, patrimônio até
+  // R$ 10 mil, escolaridade ensino médio, órgão emissor SSP, nacionalidade brasileira, sem assinatura a rogo, pai "não declarado").
   const UFS = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
   const opcoesUf = (sel) => `<option value="">Selecione</option>${UFS.map((u) => `<option value="${u}"${u === sel ? " selected" : ""}>${u}</option>`).join("")}`;
+  const BANCOS = [["001", "Banco do Brasil"], ["033", "Santander"], ["104", "Caixa"], ["237", "Bradesco"], ["341", "Itaú"], ["260", "Nubank"], ["077", "Inter"], ["336", "C6 Bank"]];
+  const resumoCondicao = (offer) => `<div class="ap-cond"><span>Condição escolhida</span><b>${money(offer.disbursedAmount)}</b><small>${offer.installments || "—"}x de ${money(offer.installmentValue)} · você recebe por Pix</small></div>`;
+  const campoEndereco = (n) => `<div class="form-section"><b>Endereço</b><div class="form-grid">
+        <label>CEP<input name="cep" required inputmode="numeric" maxlength="9" autocomplete="postal-code" placeholder="00000-000"></label>
+        <label>Rua<input name="${n.rua}" required autocomplete="address-line1"></label>
+        <div class="form-duo"><label>Número<input name="numero" required inputmode="numeric"></label><label>Complemento <em>(opcional)</em><input name="complemento"></label></div>
+        <label>Bairro<input name="bairro" required></label>
+        <div class="form-duo"><label>Cidade<input name="${n.cidade}" required></label><label>UF<select name="${n.uf}" required>${opcoesUf("")}</select></label></div>
+      </div></div>`;
+  const consentimento = '<label class="consent"><input type="checkbox" required> Confirmo que os dados estão corretos e autorizo a geração de uma proposta real. Poderei revisar o contrato antes de assinar.</label>';
+
   function formDadosParceiros(d, offer) {
-    const c0 = state.clt || {};
-    return `<form class="form" data-form="dados"><p>Condição escolhida: você recebe aproximadamente <b>${money(offer.disbursedAmount)}</b> e paga ${offer.installments || "—"} parcelas de ${money(offer.installmentValue)}.</p>
+    return `<form class="form" data-form="dados">${resumoCondicao(offer)}
       <div class="form-section"><b>Dados pessoais</b><div class="form-grid">
         <label>Nome completo<input name="nome" value="${esc(state.session?.name || d.nome)}" required autocomplete="name"></label>
-        <label>Data de nascimento<input name="data_nascimento" type="date" required></label>
-        <label>Gênero<select name="genero" required><option value="">Selecione</option><option value="FEMALE">Feminino</option><option value="MALE">Masculino</option><option value="OTHER">Outro</option></select></label>
+        <div class="form-duo"><label>Nascimento<input name="data_nascimento" type="date" required></label>
+          <label>Gênero<select name="genero" required><option value="">Selecione</option><option value="FEMALE">Feminino</option><option value="MALE">Masculino</option><option value="OTHER">Outro</option></select></label></div>
         <label>Estado civil<select name="estado_civil" required><option value="">Selecione</option><option value="SINGLE">Solteiro(a)</option><option value="MARRIED">Casado(a)</option><option value="DIVORCED">Divorciado(a)</option><option value="WIDOWED">Viúvo(a)</option><option value="SEPARATED">Separado(a)</option><option value="OTHER">Outro</option></select></label>
-        <label>Escolaridade<select name="escolaridade" required><option value="">Selecione</option><option value="Fundamental">Ensino Fundamental</option><option value="Ensino Médio">Ensino Médio</option><option value="Superior">Ensino Superior</option><option value="Pós-graduação">Pós-graduação</option></select></label>
         <label>Nome completo da mãe<input name="nome_mae" required></label>
-        <label>Celular<input name="celular" required inputmode="tel" value="${esc(d.celular)}"></label>
-        <label>E-mail<input name="email" type="email" value="${esc(state.session?.email)}" autocomplete="email"></label>
+        <label>Celular<input name="celular" required inputmode="tel" value="${esc(maskTel(d.celular || state.session?.contact))}" autocomplete="tel"></label>
+        <label>E-mail<input name="email" type="email" required value="${esc(state.session?.email || "")}" autocomplete="email"></label>
       </div></div>
-      <div class="form-section"><b>Documento (RG)</b><div class="form-grid">
-        <label>Número do RG<input name="rg_numero" required inputmode="numeric"></label>
-        <label>Órgão emissor<select name="rg_orgao" required><option value="SSP">SSP</option><option value="DETRAN">DETRAN</option><option value="PC">Polícia Civil</option><option value="IFP">IFP</option></select></label>
-        <label>UF do RG<select name="rg_uf" required>${opcoesUf("")}</select></label>
-      </div></div>
-      <div class="form-section"><b>Endereço</b><div class="form-grid">
-        <label>CEP<input name="cep" required inputmode="numeric" maxlength="9"></label>
-        <label>Rua<input name="rua" required></label>
-        <label>Número<input name="numero" required></label>
-        <label>Complemento (opcional)<input name="complemento"></label>
-        <label>Bairro<input name="bairro" required></label>
-        <label>Cidade<input name="cidade" required></label>
-        <label>UF<select name="uf" required>${opcoesUf("")}</select></label>
-      </div></div>
-      <div class="form-section"><b>Como receber o valor</b><div class="form-grid">
-        <label>Forma de recebimento<select name="forma_desembolso" required><option value="PIX">PIX (chave = seu CPF)</option><option value="CONTA">Conta bancária</option></select></label>
-      </div>
-      <div class="form-grid conta-banco" hidden>
-        <label>Banco<select name="banco"><option value="">Selecione</option>${["Banco do Brasil","Santander","Caixa Econômica Federal","Bradesco","Itaú","Nubank","Inter","C6 Bank","PagBank","Mercado Pago","PicPay","Banco Original","Sicoob","Sicredi"].map((b) => `<option>${b}</option>`).join("")}</select></label>
-        <label>Tipo de conta<select name="tipo_conta"><option value="Corrente">Corrente</option><option value="Poupança">Poupança</option><option value="Salário">Salário</option></select></label>
-        <label>Agência<input name="agencia" inputmode="numeric"></label>
-        <label>Número da conta<input name="conta" inputmode="numeric"></label>
-        <label>Dígito da conta<input name="digito_conta"></label>
-      </div></div>
-      ${c0.produto === "FGTS" ? "" : `<div class="form-section"><b>Seu RH (opcional)</b><div class="form-grid">
-        <label>E-mail do RH<input name="email_rh" type="email"></label>
-        <label>Telefone do RH<input name="telefone_rh" inputmode="tel"></label>
-      </div></div>`}
-      <label class="consent"><input type="checkbox" required> Confirmo que os dados estão corretos e autorizo a geração de uma proposta real. Poderei revisar o contrato antes de assinar.</label>
-      <button class="btn primario grande">Gerar proposta para revisão</button></form>`;
+      <div class="form-section"><b>Documento</b><div class="form-grid"><div class="form-duo"><label>Número do RG<input name="rg_numero" required></label><label>UF do RG<select name="rg_uf" required>${opcoesUf("")}</select></label></div></div></div>
+      ${campoEndereco({ rua: "rua", cidade: "cidade", uf: "uf" })}
+      <div class="ap-recebe"><span>${IC.pix}</span><div><b>Você recebe por Pix</b><small>O valor cai na chave Pix do seu CPF. Não precisa informar conta bancária.</small></div></div>
+      ${consentimento}<button class="ap-btn principal grande">Gerar proposta</button></form>`;
   }
+
+  function formDados(d, offer) {
+    const tem = (v) => String(v || "").trim() !== "";
+    return `<form class="form" data-form="dados">${resumoCondicao(offer)}
+      <div class="form-section"><b>Dados pessoais</b><div class="form-grid">
+        <label>Nome completo<input name="nome" value="${esc(state.session?.name || d.nome)}" required autocomplete="name"></label>
+        ${tem(d.data_nascimento) ? "" : '<label>Data de nascimento<input name="data_nascimento" type="date" required></label>'}
+        ${tem(d.sexo) ? "" : '<label>Sexo<select name="sexo" required><option value="">Selecione</option><option value="M">Masculino</option><option value="F">Feminino</option></select></label>'}
+        <label>Estado civil<select name="estado_civil" required><option value="">Selecione</option><option value="4">Solteiro(a)</option><option value="3">Casado(a)</option><option value="2">Divorciado(a)</option><option value="5">Viúvo(a)</option><option value="9">União estável</option><option value="6">Outro</option></select></label>
+        ${tem(d.nome_mae) ? "" : '<label>Nome completo da mãe<input name="nome_mae" required></label>'}
+        <label>Celular<input name="celular" required inputmode="tel" value="${esc(maskTel(d.celular || state.session?.contact))}" autocomplete="tel"></label>
+        <label>E-mail<input name="email" type="email" required value="${esc(state.session?.email || "")}" autocomplete="email"></label>
+      </div></div>
+      <div class="form-section"><b>Documento e naturalidade</b><div class="form-grid">
+        <div class="form-duo"><label>Número do RG<input name="rg" required></label><label>UF do RG<select name="estado_rg" required>${opcoesUf("")}</select></label></div>
+        <label>Data de expedição do RG<input name="data_expedicao" type="date" required></label>
+        <div class="form-duo"><label>Cidade onde nasceu<input name="cidade_natural_nome" required></label><label>UF<select name="estado_natural" required>${opcoesUf("")}</select></label></div>
+      </div></div>
+      ${campoEndereco({ rua: "endereco", cidade: "cidade_nome", uf: "estado" })}
+      <div class="form-section"><b>Conta para receber</b><div class="form-grid">
+        <label>Banco<select name="banco" required><option value="">Selecione</option>${BANCOS.map(([v, n]) => `<option value="${v}">${n}</option>`).join("")}</select></label>
+        <label>Tipo de conta<select name="tipo_conta" required><option value="C">Conta corrente</option><option value="P">Conta poupança</option></select></label>
+        <div class="form-duo"><label>Agência<input name="agencia" required inputmode="numeric"></label><label>Conta com dígito<input name="conta" required></label></div>
+      </div></div>
+      <div class="ap-recebe"><span>${IC.pix}</span><div><b>Você recebe por Pix</b><small>A chave Pix é o seu CPF. A conta acima é a que o banco cadastra no contrato.</small></div></div>
+      ${consentimento}<button class="ap-btn principal grande">Gerar proposta</button></form>`;
+  }
+
+  // CEP → rua, bairro, cidade e UF (ViaCEP). Se falhar, o cliente digita.
+  async function preencherCep(input) {
+    const cep = soDigitos(input.value);
+    if (cep.length !== 8) return;
+    const form = input.closest("form");
+    try {
+      const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`); const j = await r.json();
+      if (j.erro) return;
+      const set = (nomes, v) => { for (const n of nomes) { const el = form.querySelector(`[name="${n}"]`); if (el && v && !el.value) el.value = v; } };
+      set(["rua", "endereco"], j.logradouro); set(["bairro"], j.bairro); set(["cidade", "cidade_nome"], j.localidade); set(["uf", "estado"], j.uf);
+    } catch {}
+  }
+
 
   // ── prévia (?demo=) ──────────────────────────────────────────────────────────────────────────────────────────
   const DEMO_OFERTAS = [24, 36, 48, 60].map((n, i) => ({ id: "d" + n, installments: n, installmentValue: 480, disbursedAmount: [9120, 11740, 13380, 14610][i] }));
   function demoClt(tipo) {
     const base = { provider: "unnotech", consentUrl: "https://termo.exemplo/autorizar", maxInstallment: 480, offers: [], parallelFacta: null, customerDefaults: { nome: "Salvador Felipe", celular: "47999999999" }, selectedOffer: null };
     switch (tipo) {
+      case "dados-unno": return { ...base, etapa: "dados_pessoais", parallelFacta: "descartada", selectedOffer: DEMO_OFERTAS[1] };
+      case "dados-facta": return { ...base, provider: "facta", etapa: "dados_pessoais", parallelFacta: "facta_venceu", selectedOffer: DEMO_OFERTAS[1], customerDefaults: { nome: "Salvador Felipe", celular: "47999999999", sexo: "3", data_nascimento: "16/09/1975", nome_mae: "" } };
       case "autorizar": return { ...base, etapa: "autorizacao_enviada" };
       case "analisando": return { ...base, etapa: "simulando", parallelFacta: "aguardando" };
       case "whatsapp": return { ...base, provider: "facta", etapa: "autorizacao_enviada", parallelFacta: "facta_assumiu" };
@@ -281,10 +307,16 @@
     const form = c.provider === "unnotech" ? formDadosParceiros(c.customerDefaults || {}, c.selectedOffer || {}) : formDados(c.customerDefaults || {}, c.selectedOffer || {});
     sheet.innerHTML = `<div class="fundo" data-acao="fechar-sheet"></div><div class="folha" role="dialog" aria-modal="true" aria-label="Dados da proposta">
       <div class="puxador"></div>
-      <div class="pix-faixa"><span>${IC.pix}</span><div><b>O pagamento é feito via Pix</b><small>O valor cai na conta que você informar abaixo. Você revê o contrato antes de assinar.</small></div></div>
-      <div class="erro-sheet"></div>${form}
+      <div class="pix-faixa"><span>${IC.pix}</span><div><b>O pagamento é feito via Pix</b><small>O valor cai por Pix. Você revê o contrato inteiro antes de assinar.</small></div></div>
+      ${demo ? notaDemo(c) : ""}<div class="erro-sheet"></div>${form}
       <button class="ap-btn suave" type="button" data-acao="fechar-sheet" style="margin:10px 20px 0;width:calc(100% - 40px)">Voltar</button></div>`;
     sheet.classList.add("aberta"); document.body.classList.add("trava");
+  }
+  function notaDemo(c) {
+    const auto = c.provider === "unnotech"
+      ? ["Forma de recebimento: Pix na chave CPF", "Escolaridade: ensino médio", "Órgão emissor do RG: SSP", "CPF, valores e prazo da condição"]
+      : ["Sexo, nascimento, renda, matrícula, empresa e admissão (vêm da consulta)", "Chave Pix: o CPF", "Faixa de patrimônio: até R$ 10 mil", "Órgão emissor do RG: SSP", "Nacionalidade: brasileira", "Assinatura a rogo: não", "Nome do pai: não declarado"];
+    return `<div class="ap-demo-nota"><b>Prévia · o cliente NÃO vê estes campos</b><ul>${auto.map((x) => `<li>${x}</li>`).join("")}</ul></div>`;
   }
   function fecharSheet() { sheet.classList.remove("aberta"); document.body.classList.remove("trava"); sheet.innerHTML = ""; }
 
@@ -346,6 +378,7 @@
   document.addEventListener("input", (e) => {
     if (e.target.name === "cpf" && e.target.closest(".ap-form")) e.target.value = maskCpf(e.target.value);
     if (e.target.name === "phone" && e.target.closest(".ap-form")) e.target.value = maskTel(e.target.value);
+    if (e.target.name === "cep" && e.target.closest("form[data-form=dados]")) { const d = soDigitos(e.target.value).slice(0, 8); e.target.value = d.length > 5 ? d.slice(0, 5) + "-" + d.slice(5) : d; preencherCep(e.target); }
     if (e.target.id === "ap-range") {
       const o = ofertaAtual(state.clt); if (!o) return;
       state.parcela = Number(e.target.value);
@@ -417,7 +450,7 @@
 
   // ── início ───────────────────────────────────────────────────────────────────────────────────────────────────
   function barraDemo() {
-    const lista = ["autorizar", "analisando", "whatsapp", "ofertas", "proposta", "sem"];
+    const lista = ["autorizar", "analisando", "whatsapp", "ofertas", "dados-unno", "dados-facta", "proposta", "sem"];
     const el = document.createElement("div"); el.className = "ap-demo";
     el.innerHTML = '<b>Prévia</b>' + lista.map((k) => `<a href="?demo=${k}" class="${k === demo ? "on" : ""}">${k}</a>`).join("") + '<a href="?demo=entrada" class="' + (demo === "entrada" ? "on" : "") + '">entrada</a>';
     document.body.prepend(el);
@@ -425,7 +458,7 @@
   if (demo) {
     barraDemo();
     state.session = { id: "demo", token: "demo", name: "Salvador Felipe", contact: "47999999999", email: "demo@teste.com" };
-    if (demo === "entrada") telaEntrada(); else { state.clt = demoClt(demo); state.assinatura = assinaturaClt(state.clt); telaApp(); }
+    if (demo === "entrada") telaEntrada(); else { state.clt = demoClt(demo); state.assinatura = assinaturaClt(state.clt); telaApp(); if (/^dados-/.test(demo)) abrirSheet(); }
   } else {
     const s = lerSessao();
     if (!s) telaEntrada();
