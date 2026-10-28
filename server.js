@@ -160,6 +160,8 @@ function siteChatCltPublicoUnnotech(row) {
     previous: anterior,
     parallelFacta: parseJsonSeguro(row.facta_paralelo_json).estado || null,
     motivoRecusa: blob.motivo_recusa || null,
+    categoriaRecusa: blob.categoria || null,
+    reconsultas: Number(blob.reconsultas || 0),
     error: row.error_message || null,
     trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/app/?t=${encodeURIComponent(row.tracking_token)}` : null,
   };
@@ -1947,7 +1949,7 @@ async function marcarNaoAprovadoSite(row) {
     if (!tel) return;
     for (const c of await db.conversasPorTelefoneTodosCanais(tel)) {
       if (c.business_number_id === "instagram") continue;
-      if (row.provider === "unnotech" && unnoSite.ehFgts(row) && row.etapa === "sem_oferta") await marcarFgtsConsultado(c.phone, c.business_number_id);
+      if (row.provider === "unnotech" && unnoSite.ehFgts(row) && row.etapa === "sem_oferta" && unnoSite.lerBlob(row).categoria === "sem_saldo") await marcarFgtsConsultado(c.phone, c.business_number_id);
       const tagId = await db.tagEncontrarOuCriar(c.business_number_id, TAG_NAO_APROVADO, "#dc2626");
       if (await db.adicionarTagConversaSeAusente(c.business_number_id, c.phone, tagId, "automatico")) {
         const interessado = await db.tagEncontrarOuCriar(c.business_number_id, "Interessado", "#16a34a");

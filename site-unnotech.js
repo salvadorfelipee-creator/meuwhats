@@ -378,7 +378,7 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       if (categoria === "autorizacao") return atualizar(row, { etapa: "fgts_autorizar", status_novosaque: status.status, error_message: null });
       // O motivo cru do banco fica guardado: sem ele não dá para saber por que a consulta não liberou nada.
       console.log(`FGTS sem oferta (${row.conversation_id}): categoria=${categoria} motivo="${String(motivoTexto).slice(0, 200)}"`);
-      await atualizar(row, { facta_worker_json: JSON.stringify({ ...blob, motivo_recusa: String(motivoTexto || "").slice(0, 300) }) });
+      await atualizar(row, { facta_worker_json: JSON.stringify({ ...blob, motivo_recusa: String(motivoTexto || "").slice(0, 300), categoria }) });
       const texto = categoria === "sem_saldo"
         ? "Não há saldo do FGTS disponível para antecipar agora. Isso pode mudar, por exemplo depois do mês do seu aniversário."
         : "Os bancos não liberaram uma condição para o seu FGTS agora. Um atendente pode conferir o motivo com você.";
@@ -397,7 +397,9 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       if (/RATE_LIMIT/.test(err.message || "")) throw new Error("Muitas consultas seguidas para o seu CPF. Aguarde alguns minutos e tente de novo.");
       throw err;
     }
-    return atualizar(row, { etapa: "fgts_cotando", authorization_requested_at: Date.now(), authorization_checked_at: null, error_message: null });
+    // reconsultas: quantas vezes o cliente disse "já autorizei" e o banco ainda pediu autorização (a tela reforça salvar e confirmar no app do FGTS).
+    const blobAtual = lerBlob(row);
+    return atualizar(row, { etapa: "fgts_cotando", authorization_requested_at: Date.now(), authorization_checked_at: null, error_message: null, facta_worker_json: JSON.stringify({ ...blobAtual, reconsultas: Number(blobAtual.reconsultas || 0) + (row.etapa === "fgts_autorizar" ? 1 : 0) }) });
   }
 
   return { configurado, iniciar, sincronizar, escolherOferta, enviarDados, resimular, selecionarOfertas, ofertaPublica, ofertaPublicaFgts, lerBlob, lerOfertas, ehFgts, iniciarFgts, requotarFgts };

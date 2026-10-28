@@ -4171,7 +4171,7 @@ async function siteChatDefinirStatus(id, status) {
 async function siteChatFgtsSemOfertaPorCpf(cpf) {
   await ready;
   const r = await client.execute({
-    sql: `SELECT 1 FROM site_chat_clt WHERE cpf = ? AND etapa = 'sem_oferta' AND facta_worker_json LIKE '%"produto":"FGTS"%' AND updated_at > ? LIMIT 1`,
+    sql: `SELECT 1 FROM site_chat_clt WHERE cpf = ? AND etapa = 'sem_oferta' AND facta_worker_json LIKE '%"produto":"FGTS"%' AND facta_worker_json LIKE '%"categoria":"sem_saldo"%' AND updated_at > ? LIMIT 1`,
     args: [cpf, Date.now() - 365 * 24 * 3600 * 1000],
   });
   return !!r.rows[0];

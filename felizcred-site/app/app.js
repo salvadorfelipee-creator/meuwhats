@@ -351,16 +351,16 @@
       <span class="ap-tag ${sem ? "cinza" : vivo ? "laranja" : "verde"}">${vivo ? '<i class="ap-pulso"></i>' : ""}${sem ? "Sem condições" : vivo ? "Em andamento" : "Liberou"}</span></header>
       <ul class="ap-lista">${nomes.map((n, i) => `<li class="ap-li ${t[i]}"><span class="ap-bolinha">${t[i] === "ok" ? IC.ok : t[i] === "falha" ? IC.x : ""}</span><span>${n}</span></li>`).join("")}</ul></section>`;
   }
-  function cartaoAutorizarFgts(retentar = false, c = {}) {
+  function cartaoAutorizarFgts(retentar = false, c = {}, esperar = false) {
     return `<section class="ap-banco vivo"><header><span class="ap-logo fgts">F</span><div><b>${retentar ? "Já autorizou os bancos no app do FGTS?" : "Autorize no app do FGTS"}</b><small>${retentar ? "Se ainda não, faça agora e consulte de novo" : "Leva menos de um minuto"}</small></div><span class="ap-tag laranja"><i class="ap-pulso"></i>${retentar ? "Confira" : "Falta você"}</span></header>
       ${retentar && c.motivoRecusa ? `<p class="ap-dica" style="margin-top:12px"><b>Motivo informado pelo banco:</b> ${esc(c.motivoRecusa)}</p>` : ""}
       <ol class="ap-passos">
         <li><span>1</span><p><b>Abra o aplicativo FGTS</b> (ou entre em fgts.caixa.gov.br) e faça login.</p></li>
         <li><span>2</span><p>Vá em <b>Meu FGTS › Autorizações</b>.</p></li>
-        <li><span>3</span><p><b>Autorize estes 3 bancos:</b><br><em>J17 Sociedade de Crédito Direto S/A · BMP Sociedade de Crédito Direto S.A. · BMP Sociedade de Crédito ao Microempreendedor e à Empresa de Pequeno Porte Ltda</em></p></li>
+        <li><span>3</span><p><b>Autorize estes 3 bancos.</b> Ao digitar o nome de cada banco, toque em <b>Salvar</b> e depois em <b>Confirmar</b>: só digitar o nome não vale.<br><em>J17 Sociedade de Crédito Direto S/A · BMP Sociedade de Crédito Direto S.A. · BMP Sociedade de Crédito ao Microempreendedor e à Empresa de Pequeno Porte Ltda</em></p></li>
         <li><span>4</span><p><b>Volte aqui</b> e toque em “Já autorizei”. A autorização vale por 90 dias.</p></li></ol>
       <div class="ap-acoes"><a class="ap-btn suave" href="https://fgts.caixa.gov.br" target="_blank" rel="noopener">Abrir o site do FGTS</a>
-        <button class="ap-btn principal" type="button" data-acao="fgts-requote" ${state.fgtsLoading ? "disabled" : ""}>${state.fgtsLoading ? '<i class="ap-spin"></i> Consultando de novo…' : "Já autorizei, consultar de novo"}</button></div></section>`;
+        ${esperar ? "" : `<button class="ap-btn principal" type="button" data-acao="fgts-requote" ${state.fgtsLoading ? "disabled" : ""}>${state.fgtsLoading ? '<i class="ap-spin"></i> Consultando de novo…' : "Já autorizei, consultar de novo"}</button>`}</div></section>`;
   }
   function cartaoOfertaFgts(c) {
     const o = (c.offers || [])[0];
@@ -377,7 +377,7 @@
     const nome = String(state.session?.name || "").trim().split(/\s+/)[0] || "";
     const n = passoFgts(c), temProposta = ETAPAS_PROPOSTA.includes(c.etapa), sem = ETAPAS_SEM_FGTS.includes(c.etapa);
     let titulo, sub;
-    if (sem) { titulo = "Não há antecipação disponível agora"; sub = c.error || "Os bancos não encontraram uma condição para o seu FGTS neste momento."; }
+    if (sem) { titulo = "Não há antecipação disponível agora"; sub = c.categoriaRecusa === "sem_saldo" ? "Seu FGTS não tem saldo disponível para antecipar agora. A Caixa permite uma antecipação por ano; você pode simular o Consignado CLT." : c.error || "Os bancos não encontraram uma condição para o seu FGTS neste momento."; }
     else if (temProposta) { titulo = "Falta só assinar"; sub = "Sua proposta foi gerada. Revise e assine no ambiente seguro do banco."; }
     else if (n === 4) { titulo = "Quase lá"; sub = "Complete seus dados para gerar a proposta."; }
     else if (n === 3) { titulo = "Sua antecipação está liberada"; sub = "Confira o valor e contrate. Você recebe por Pix."; }
@@ -391,8 +391,10 @@
       ${temProposta ? cartaoProposta(c) : ""}
       ${c.etapa === "dados_pessoais" ? '<section class="ap-sim"><p class="ap-sub">Condição escolhida. Falta completar seus dados.</p><button class="ap-btn principal grande" type="button" data-acao="abrir-dados">Completar dados</button></section>' : ""}
       ${n === 3 ? cartaoOfertaFgts(c) : ""}
+      ${n === 2 && c.reconsultas > 0 ? '<div class="ap-erro">Ainda não consta a autorização. Confira no app do FGTS se, em cada um dos 3 bancos, você tocou em Salvar e Confirmar. Depois toque em “Já autorizei”.</div>' : ""}
       ${n === 2 ? cartaoAutorizarFgts() : ""}
-      ${sem && ["sem_oferta", "erro_consulta"].includes(c.etapa) ? cartaoAutorizarFgts(true, c) : ""}
+      ${n === 1 && !sem ? cartaoAutorizarFgts(false, c, true) : ""}
+      ${sem && ["sem_oferta", "erro_consulta"].includes(c.etapa) && c.categoriaRecusa !== "sem_saldo" ? cartaoAutorizarFgts(true, c) : ""}
       ${temProposta ? "" : (n === 2 ? "" : `<p class="ap-secao">Andamento</p><div class="ap-bancos">${cartaoFgtsAndamento(c)}</div>`)}
       ${n <= 2 || sem ? REQUISITOS_FGTS : ""}
       ${sem ? `<div class="ap-acoes pad"><button class="ap-btn principal grande" type="button" data-acao="chat">Falar com a FelizCred</button></div>` : ""}
