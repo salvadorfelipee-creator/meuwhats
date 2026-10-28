@@ -46,6 +46,20 @@ function unnoReply(method, path) {
   const m = path.replace("/public", "");
   S.log.push(`unno ${method} ${m} phase=${S.unno.phase}`);
   if (m === "/api/v1/auth/token") return [200, { access_token: "t", expires_in: 3600 }];
+  if (/\/fgts\//.test(m)) {
+    if (/\/applications$/.test(m) && method === "POST") { S.unno.apps++; S.unno.phase = S.unno.fixoFgts || "fgts_quoting"; return [201, { application_id: "fg-" + S.unno.apps, status: "QUOTING" }]; }
+    if (/\/status$/.test(m)) {
+      const p = S.unno.phase;
+      if (p === "fgts_auth") return [200, { status: "NO_OFFERS", quotes_pending: 0 }];
+      if (p === "fgts_offers") return [200, { status: "OFFERS_AVAILABLE", quotes_pending: 0 }];
+      if (p === "signing") return [200, { status: "AWAITING_SIGNATURE", proposal_uuid: "fg-prop-1" }];
+      return [200, { status: "QUOTING", quotes_pending: 1 }];
+    }
+    if (/\/requote$/.test(m)) { S.unno.phase = S.unno.aposRequote || "fgts_offers"; return [202, {}]; }
+    if (/\/kyc$/.test(m)) return [200, {}];
+    if (/\/accept$/.test(m)) { S.unno.phase = "signing"; return [200, {}]; }
+    if (/\/applications\/[^/]+$/.test(m)) return [200, { offers: S.unno.phase === "fgts_offers" ? [{ source: "J17", status: "AVAILABLE", offer_id: "f1", net_amount: 1900, gross_amount: 2200, installments: [{ amount: 500 }, { amount: 500 }, { amount: 500 }, { amount: 500 }] }] : [], quotes: [{ source: "J17", reason: S.unno.phase === "fgts_auth" ? "Banco não autorizado pelo trabalhador" : "" }] }];
+  }
   if (m === "/api/v1/clt/applications" && method === "POST") { S.unno.apps++; S.unno.phase = S.unno.fixo || "awaiting_auth"; return [201, { application_id: "app-" + S.unno.apps, status: "AWAITING_AUTHORIZATION", authorization: S.unno.semLink ? {} : { consent_url: "https://termo.mock/app-" + S.unno.apps } }]; }
   if (/\/status$/.test(m)) {
     const p = S.unno.phase;

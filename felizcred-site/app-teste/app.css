@@ -164,3 +164,17 @@ body.trava { overflow: hidden; }
 .ap-recebe small { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: #27533c; }
 .ap-demo-nota { margin: 0 20px 10px; padding: 12px 14px; border-radius: 14px; background: #fff7e6; border: 1.5px dashed #f0b95a; font-size: 12px; color: #6a4400; }
 .ap-demo-nota ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; }
+
+/* escolha de produto e FGTS */
+.ap-escolha { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 12px 20px 0; padding: 5px; border-radius: 16px; background: #e4ece7; }
+.ap-escolha button { min-height: 44px; border: 0; border-radius: 12px; background: transparent; font: 700 14px "DM Sans", sans-serif; color: var(--suave); transition: all .15s; }
+.ap-escolha button.on { background: #fff; color: var(--verde-escuro); box-shadow: 0 3px 10px rgba(7, 26, 47, .12); }
+.ap-logo.fgts { background: linear-gradient(135deg, #0a6bb5, #064a7d); }
+.ap-passos { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.ap-passos li { display: flex; gap: 12px; align-items: flex-start; }
+.ap-passos li > span { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--verde-claro); color: var(--verde-escuro); font: 700 13px "Sora", sans-serif; }
+.ap-passos p { margin: 0; font-size: 14px; line-height: 1.45; }
+.ap-passos em { font-style: normal; font-size: 12px; color: var(--suave); }
+.ap-req { margin: 14px 20px 0; padding: 16px; border-radius: 20px; background: #fff; border: 1px solid #e1ebe5; font-size: 13px; color: #33475b; }
+.ap-req > b { font: 700 15px "Sora", sans-serif; color: var(--texto); }
+.ap-req ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.55; }

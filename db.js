@@ -4298,7 +4298,7 @@ async function siteChatFactaListarEmAcompanhamento() {
         -- Autorização pedida nas últimas 6h: o servidor confere sozinho, sem depender do navegador do cliente aberto.
         OR (provider = 'facta' AND etapa IN ('autorizacao_enviada', 'aguardando_autorizacao') AND COALESCE(authorization_requested_at, 0) > ${Date.now() - 6 * 3600 * 1000})
         -- Unnotech em andamento (autorização → margem → simulação) e Facta em paralelo aguardando: acompanha sem depender da aba aberta.
-        OR (provider = 'unnotech' AND etapa IN ('autorizacao_enviada', 'consultando_margem', 'simulando') AND COALESCE(authorization_requested_at, 0) > ${Date.now() - 12 * 3600 * 1000})
+        OR (provider = 'unnotech' AND etapa IN ('autorizacao_enviada', 'consultando_margem', 'simulando', 'fgts_cotando') AND COALESCE(authorization_requested_at, 0) > ${Date.now() - 12 * 3600 * 1000})
       )
     ORDER BY updated_at ASC
   `);
