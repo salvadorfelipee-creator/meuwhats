@@ -1,3 +1,5 @@
+// Varredura do chat CLT: cenarios validos nos dois caminhos (Facta negativa -> Unnotech, chat antes do formulario, recusa da Facta).
+// O fluxo atual (Unnotech na frente, Facta em paralelo) e coberto por driver-unno-primeiro.js; os cenarios antigos "Facta primeiro" sairam daqui.
 const API = "http://localhost:3000", ORIGIN = "http://localhost:8000";
 const AUTH = "Basic " + Buffer.from("admin:admin").toString("base64");
 let ipN = 10;
@@ -24,16 +26,6 @@ async function cliente(cen, i) {
 const textos = (a) => (a.messages || []).map((m) => `${m.direction === "visitor" ? "CLIENTE" : "ASSIST."}: ${String(m.body).slice(0, 140)}`);
 
 (async () => {
-  console.log("\n[1] Facta: espera autorização e depois libera ofertas");
-  let a = await cliente("1", 0); await ctl("facta", { cpf: a.cpf, set: { modo: "fila", autorizado: false } });
-  let st = await a.start(); check(1, "start devolve 201 e etapa autorizacao_enviada", st.s === 201 && st.j.clt.etapa === "autorizacao_enviada", `${st.s} ${st.j.clt?.etapa}`);
-  let c1 = await a.clt(); check(1, "'CPF está na fila de autorização' NÃO vira erro (continua aguardando)", c1.etapa === "autorizacao_enviada" && c1.provider === "facta", `${c1.provider}/${c1.etapa} erro=${c1.error}`);
-  await sleep(13000); c1 = await a.clt(); check(1, "continua aguardando após nova verificação", c1.etapa === "autorizacao_enviada", c1.etapa);
-  await ctl("facta", { cpf: a.cpf, set: { modo: "aprovado", autorizado: true } });
-  await a.f("POST", `/site-chat/conversations/${a.id}/clt/confirm-authorization`, {}, a.token);
-  c1 = await a.clt(); check(1, "após autorizar: ofertas_disponiveis com ofertas", c1.etapa === "ofertas_disponiveis" && (c1.offers || []).length > 0, `${c1.etapa} ofertas=${(c1.offers || []).length}`);
-  let at = await a.atendente(); console.log("   atendente vê:", textos(at).join(" | ").slice(0, 600));
-
   console.log("\n[2] Facta sem margem: segue sozinho para a Unnotech");
   await ctl("unno", { phase: "awaiting_auth", semLink: false });
   a = await cliente("2", 1); await ctl("facta", { cpf: a.cpf, set: { modo: "sem_margem", autorizado: true } });
@@ -62,23 +54,6 @@ const textos = (a) => (a.messages || []).map((m) => `${m.direction === "visitor"
   check(3, "termina em sem_margem com mensagem ao cliente", c3.etapa === "sem_margem" && !!c3.error, `${c3.etapa} | ${c3.error}`);
   at = await a.atendente(); console.log("   atendente vê:", textos(at).join(" | ").slice(0, 700));
 
-  console.log("\n[4] Facta recusa o telefone");
-  a = await cliente("4", 3); await ctl("facta", { cpf: a.cpf, set: { modo: "telefone" } });
-  st = await a.start(); const c4 = st.j.clt;
-  check(4, "celular de outro CPF segue sozinho para a Unnotech (não para no erro)", c4?.provider === "unnotech" && c4?.etapa === "autorizacao_enviada", `${c4?.provider}/${c4?.etapa} | ${c4?.error}`);
-  check(4, "link de autorização Unnotech existe", !!c4?.consentUrl, c4?.consentUrl);
-  at = await a.atendente(); const ms4 = textos(at);
-  check(4, "mensagem explica o celular e não pede para trocar o número", ms4.some((t) => /vinculado a outro CPF/.test(t)) && !ms4.some((t) => /Corrigir dados/.test(t)), "");
-  console.log("   atendente vê:", ms4.join(" | ").slice(0, 600));
-
-  console.log("\n[5] Unnotech demora a gerar o link");
-  await ctl("unno", { phase: "awaiting_auth", semLink: true, linkDepois: true });
-  a = await cliente("5", 4); await ctl("facta", { cpf: a.cpf, set: { modo: "sem_margem", autorizado: true } });
-  await a.start(); let c5 = await a.clt(); check(5, "tela mostra 'preparando' (sem link ainda) sem quebrar", c5.provider === "unnotech" && !c5.consentUrl, `${c5.etapa}`);
-  await sleep(300); c5 = await a.clt(); check(5, "link aparece depois", !!c5.consentUrl, c5.consentUrl);
-  at = await a.atendente(); check(5, "atendente vê o link na conversa", textos(at).some((t) => /tardio/.test(t)), ""); console.log("   atendente vê:", textos(at).join(" | ").slice(0, 600));
-  await ctl("unno", { semLink: false, linkDepois: false });
-
   console.log("\n[6] Chat: antes do formulário");
   a = await cliente("6", 5); await sleep(300);
   await a.say("Ainda não tenho 3 meses"); await sleep(1500); at = await a.atendente(); const t6 = textos(at);
@@ -86,19 +61,6 @@ const textos = (a) => (a.messages || []).map((m) => `${m.direction === "visitor"
   a = await cliente("6b", 6); await a.say("Sim, tenho mais de 3 meses"); await sleep(1500); at = await a.atendente();
   check(6, "confirmar 3 meses não manda mais as mensagens antigas da Facta", !textos(at).some((t) => /Informe seu CPF|celular final/.test(t)), textos(at).at(-1));
   await a.say(a.cpf); await sleep(2500); at = await a.atendente(); console.log("   atendente vê:", textos(at).join(" | ").slice(0, 700));
-
-  console.log("\n[7] Facta reprova na política de crédito: segue para a Unnotech");
-  a = await cliente("7", 7); await ctl("facta", { cpf: a.cpf, set: { modo: "fila", autorizado: false } });
-  st = await a.start(); await ctl("facta", { cpf: a.cpf, set: { modo: "politica", autorizado: true } });
-  await a.f("POST", `/site-chat/conversations/${a.id}/clt/confirm-authorization`, {}, a.token);
-  let c7 = await a.clt();
-  check(7, "chega nas ofertas da Facta", c7.etapa === "ofertas_disponiveis" && (c7.offers || []).length > 0, `${c7.provider}/${c7.etapa}`);
-  await a.f("POST", `/site-chat/conversations/${a.id}/clt/select-offer`, { offerId: c7.offers[0].id }, a.token); await sleep(1500);
-  c7 = await a.clt();
-  check(7, "política reprovada vai sozinha para a Unnotech", c7.provider === "unnotech" && c7.etapa === "autorizacao_enviada", `${c7.provider}/${c7.etapa}`);
-  at = await a.atendente(); const ms7 = textos(at);
-  check(7, "mensagem explica a política e manda o link", ms7.some((t) => /política de crédito/.test(t)) && ms7.some((t) => /termo\.mock/.test(t)), ms7.slice(-3).join(" | ").slice(0, 300));
-  check(7, "só a mensagem nova de autorização da Facta (sem as antigas)", ms7.some((t) => /é necessário fazer uma autorização/.test(t)) && !ms7.some((t) => /celular final|Informe seu CPF|Enviamos a autorização da Facta/.test(t)), "");
 
   console.log("\n[8] Facta recusa a autorização por outro motivo: também segue para a Unnotech");
   a = await cliente("8", 8); await ctl("facta", { cpf: a.cpf, set: { modo: "erro_auth" } });

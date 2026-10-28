@@ -1955,4 +1955,4 @@ No chat do site (CLT), o cadastro abre primeiro a **Unnotech** (link de autoriza
 - Chats abertos do mesmo cliente (celular ou CPF): ao iniciar um novo, os antigos são encerrados (`siteChatEncerrarDuplicados`) e ficam no histórico.
 - O verificador de 1 min também acompanha Unnotech em andamento (12 h) e Facta aguardando autorização (6 h), sem depender da aba do cliente aberta.
 - Painel: cartão (pipeline e lista de conversas) do cliente que recebeu o link de autorização **pisca em laranja** até autorizar.
-- Teste local: `DRIVER=driver-unno-primeiro.js bash e2e-local/rodar.sh` (21 verificações). O `driver.js` antigo cobre o caminho Facta-primeiro, que agora só vale sem e-mail ou sem Unnotech.
+- Teste local: `bash e2e-local/rodar.sh` roda os dois testes em sequência, cada um com servidor e banco novos: `driver-unno-primeiro.js` (fluxo atual, 21 verificações) e `driver.js` (cenários válidos nos dois caminhos, 12 verificações). `DRIVER=<arquivo>` roda só um.
