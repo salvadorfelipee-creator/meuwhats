@@ -7489,7 +7489,17 @@ const server = http.createServer(async (req, res) => {
               prazo: offer.prazo, valor_operacao: offer.contrato, valor_parcela: offer.parcela,
               coeficiente: offer.coeficiente,
             });
-            if (respostaFactaComErro(simulation) || !simulation?.id_simulador) throw new Error(mensagemFacta(simulation, "A Facta não criou a simulação selecionada."));
+            if (respostaFactaComErro(simulation) || !simulation?.id_simulador) {
+              // A Facta recusou a condição na hora de contratar (ex.: tabela indisponível para esse cliente). Antes isso virava um
+              // erro genérico ("A Facta não concluiu esta etapa") e o cliente ficava sem saída (caso 28/10/2026); agora segue
+              // sozinho para o Unno, como na recusa de política. O texto exato da Facta fica no log e no registro da conversa.
+              const textoFacta = mensagemFacta(simulation, "A Facta não criou a simulação selecionada.");
+              console.log(`Facta recusou a simulação ao contratar (${id}, ${offer.prazo}x, cpf final ${String(atual.cpf).slice(-4)}): ${textoFacta}`);
+              await db.siteChatFunilEvento(id, "saida", "politica_reprovada", "facta", "politica_reprovada");
+              const row = await db.siteChatCltAtualizar(id, { etapa: "politica_reprovada", status_novosaque: "POLITICA_REPROVADA", error_message: textoFacta.slice(0, 300) });
+              const migrada = await tentarOutrosBancos(row);
+              return send(res, 200, { clt: siteChatCltPublico(migrada || row) }, corsHeaders);
+            }
             const row = await db.siteChatCltAtualizar(id, { transaction_id: String(simulation.id_simulador), facta_offer_json: JSON.stringify(offer), etapa: "dados_pessoais", status_novosaque: "SIMULACAO_CRIADA", error_message: null });
             await db.siteChatFunilEvento(id, "oferta_selecionada", "dados_pessoais", "facta");
             return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
