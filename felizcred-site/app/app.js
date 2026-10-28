@@ -10,6 +10,10 @@
   const TRES_DIAS = 3 * 24 * 3600 * 1000, TRINTA_DIAS = 30 * 24 * 3600 * 1000;
   const PARAMS = new URLSearchParams(location.search);
   const EMBED = PARAMS.get("embed") === "1";
+  // No computador a simulação abre ao lado do site (gaveta), não numa página estreita solta: quem chega direto em /app/ vai para o site.
+  if (!EMBED && !PARAMS.get("demo") && !PARAMS.get("sozinho") && window.innerWidth >= 900 && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+    location.replace("/?abrirapp=1" + (location.search ? "&" + location.search.slice(1) : ""));
+  }
   if (EMBED) document.body.classList.add("embed");
   const app = document.getElementById("app");
   const sheet = document.getElementById("sheet");

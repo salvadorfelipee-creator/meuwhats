@@ -36,6 +36,20 @@
     document.body.classList.add("fc-app-aberto");
   }
   window.fcAbrirApp = abrir;
+  // Link direto (WhatsApp, e-mail) aberto no computador: o site abre já com a gaveta e repassa os dados do link.
+  const q = new URLSearchParams(location.search);
+  if (q.get("abrirapp") === "1" && window.innerWidth >= DESKTOP) {
+    q.delete("abrirapp");
+    const resto = q.toString();
+    try { history.replaceState(null, "", "/"); } catch {}
+    gaveta = document.createElement("div");
+    gaveta.className = "fc-app-gaveta";
+    gaveta.innerHTML = `<div class="fc-app-fundo"></div><aside class="fc-app-painel" role="dialog" aria-label="Minha simulação"><iframe title="Minha simulação" src="/app/?embed=1${resto ? "&" + resto : ""}"></iframe></aside>`;
+    document.body.appendChild(gaveta);
+    gaveta.querySelector(".fc-app-fundo").addEventListener("click", fechar);
+    gaveta.classList.add("on");
+    document.body.classList.add("fc-app-aberto");
+  }
   // O botão do chat (foto do Felipe) também leva para a simulação: o cliente escolhe CLT ou FGTS, informa os dados e segue na tela.
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".fc-chat-launcher")) return;
