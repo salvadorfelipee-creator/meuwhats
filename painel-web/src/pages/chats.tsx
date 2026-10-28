@@ -3118,17 +3118,36 @@ function ContactDetails({
         />
       </div>
 
-      {dadosSite.filter((d) => d.dados.length > 0).map((d) => (
-        <div key={d.id} className="rounded-xl border bg-muted/30 p-3 flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Dados informados no site</p>
-          {d.dados.map((x) => (
-            <div key={x.rotulo}>
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{x.rotulo}</p>
-              <p className="text-sm break-words select-all">{x.valor}</p>
-            </div>
-          ))}
-        </div>
-      ))}
+      {/* O mesmo cliente pode abrir o chat do site várias vezes (cada visita em outro navegador/dia cria uma conversa
+          nova): junta tudo num bloco só, mostrando cada valor distinto uma vez. */}
+      {(() => {
+        const comDados = dadosSite.filter((d) => d.dados.length > 0)
+        if (!comDados.length) return null
+        const campos = new Map<string, string[]>()
+        for (const d of comDados) {
+          for (const x of d.dados) {
+            const lista = campos.get(x.rotulo) ?? []
+            const chave = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ")
+            if (!lista.some((v) => chave(v) === chave(x.valor))) lista.push(x.valor)
+            campos.set(x.rotulo, lista)
+          }
+        }
+        return (
+          <div className="rounded-xl border bg-muted/30 p-3 flex flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Dados informados no site{comDados.length > 1 ? ` · ${comDados.length} visitas` : ""}
+            </p>
+            {[...campos.entries()].map(([rotulo, valores]) => (
+              <div key={rotulo}>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{rotulo}</p>
+                {valores.map((v) => (
+                  <p key={v} className="text-sm break-words select-all">{v}</p>
+                ))}
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {outrosCanais.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
