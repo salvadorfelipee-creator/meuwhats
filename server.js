@@ -944,6 +944,11 @@ async function sincronizarSiteChatClt(row) {
           unno = await db.siteChatCltObter(unno.conversation_id);
         }
       }
+      // O link da Unnotech pode levar minutos para sair: passados 20 s sem link, a Facta já é pedida por WhatsApp para o cliente não ficar parado.
+      if (unno?.etapa === "autorizacao_enviada" && !unno.terms_link && !unno.facta_paralelo_json && !unnoSite.ehFgts(unno) && Date.now() - Number(unno.authorization_requested_at || 0) > 20_000) {
+        await iniciarFactaParalela(unno);
+        unno = await db.siteChatCltObter(unno.conversation_id);
+      }
       return await verificarFactaParalela(unno);
     } catch (err) {
       console.error(`Erro ao sincronizar Unnotech no site (${row.conversation_id}):`, err.message);

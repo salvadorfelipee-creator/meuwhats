@@ -281,7 +281,9 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     const emAndamento = ETAPAS_EM_ANDAMENTO.includes(row.etapa);
     const acompanhando = ETAPAS_ACOMPANHAMENTO.includes(row.etapa);
     if (!emAndamento && !acompanhando) return row;
-    if (row.authorization_checked_at && Date.now() - Number(row.authorization_checked_at) < 8_000) return row;
+    // Enquanto o link de autorização ainda não saiu da Unnotech, confere mais seguido (2 s) para ele aparecer logo para o cliente.
+    const intervalo = row.etapa === "autorizacao_enviada" && !row.terms_link && !ehFgts(row) ? 2_000 : 8_000;
+    if (row.authorization_checked_at && Date.now() - Number(row.authorization_checked_at) < intervalo) return row;
     await atualizar(row, { authorization_checked_at: Date.now() });
     if (emAndamento) return ehFgts(row) ? avancarFgts(row) : avancar(row);
     return acompanhar(row);

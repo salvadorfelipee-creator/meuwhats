@@ -180,8 +180,8 @@
       return { k: "sem" };
     }
     const p = c.parallelFacta;
-    if (c.etapa === "autorizacao_enviada" || !p) return { k: "espera" };
     if (p === "aguardando") return { k: "whats" };
+    if (c.etapa === "autorizacao_enviada" || !p) return { k: "espera" };
     if (p === "descartada") return { k: "dispensado" };
     return { k: "sem" };
   }
@@ -201,7 +201,8 @@
     return nomes.map((n, i) => `<li class="ap-li ${t[i]}"><span class="ap-bolinha">${t[i] === "ok" ? IC.ok : t[i] === "falha" ? IC.x : ""}</span><span>${n}</span></li>`).join("");
   }
   function acaoBanco(banco, e, c) {
-    if (e.k === "autorizar") return `<div class="ap-acoes">${c.consentUrl ? `<a class="ap-btn principal" href="${esc(c.consentUrl)}" target="_blank" rel="noopener">${IC.cadeado} Autorizar agora</a>` : '<button class="ap-btn principal" disabled>Preparando o link…</button>'}
+    if (e.k === "autorizar" && !c.consentUrl) return `<div class="ap-preparando" role="status"><span class="ap-pontos" aria-hidden="true"><i></i><i></i><i></i></span><div><b>Preparando o link de autorização</b><small>O banco está gerando o seu link. Pode levar alguns minutos: deixe esta tela aberta, ele aparece aqui sozinho.</small></div></div>`;
+    if (e.k === "autorizar") return `<div class="ap-acoes"><a class="ap-btn principal" href="${esc(c.consentUrl)}" target="_blank" rel="noopener">${IC.cadeado} Autorizar agora</a>
         <button class="ap-btn suave" type="button" data-acao="atualizar">Já autorizei</button></div>
         <p class="ap-dica">É uma página segura do banco parceiro. Depois de autorizar, volte para cá: seguimos sozinhos.</p>`;
     if (e.k === "whats") return `<div class="ap-acoes"><a class="ap-btn zap" href="https://wa.me/" target="_blank" rel="noopener">${IC.zap} Abrir o WhatsApp</a></div>
@@ -267,7 +268,7 @@
   }
 
   // ── telas ────────────────────────────────────────────────────────────────────────────────────────────────────
-  const barraTopo = (extra = "") => `<div class="ap-topo"><span class="ap-marca">FelizCred</span><div class="ap-topo-dir">${extra}<button class="ap-icone" type="button" data-acao="chat" aria-label="Falar com a FelizCred">${IC.chat}</button>${EMBED ? `<button class="ap-icone" type="button" data-acao="fechar-embed" aria-label="Fechar">${IC.x}</button>` : ""}</div></div>`;
+  const barraTopo = (extra = "") => `<div class="ap-topo"><span class="ap-marca">FelizCred</span><div class="ap-topo-dir">${extra}${EMBED ? `<button class="ap-icone" type="button" data-acao="fechar-embed" aria-label="Fechar">${IC.x}</button>` : ""}</div></div>`;
 
   function telaEntrada(erro = "", v = {}) {
     clearInterval(sondagem);
@@ -313,6 +314,7 @@
     if (n === 4 && ETAPAS_PROPOSTA.includes(c.etapa)) return ["Falta só assinar", "Sua proposta foi gerada. Revise e assine no ambiente seguro do banco."];
     if (n === 4) return ["Quase lá", "Complete seus dados para gerar a proposta."];
     if (n === 3) return ["Suas condições chegaram", "Ajuste a parcela e o prazo do jeito que couber no seu bolso e contrate."];
+    if (n === 1 && !c.consentUrl) return f.k === "whats" ? ["Autorize pelo WhatsApp", "O link do primeiro banco está sendo preparado. Enquanto isso, abra a mensagem do Facta no seu WhatsApp e toque no link."] : ["Preparando sua consulta", "Estamos gerando o link de autorização. Deixe esta tela aberta: ele aparece aqui sozinho."];
     if (n === 1) return ["Autorize a consulta", "Toque em “Autorizar agora” no primeiro banco. Leva menos de um minuto."];
     if (f.k === "whats" && u.k !== "analisando") return ["Falta autorizar no WhatsApp", "Abra a mensagem do Facta no seu WhatsApp e toque no link."];
     return ["Analisando seu perfil", "Os dois bancos estão trabalhando. O primeiro que liberar aparece aqui."];
@@ -449,6 +451,7 @@
     if (ETAPAS_PROPOSTA.includes(c.etapa)) return { linha: "Proposta gerada: falta assinar", atalhos: ["Não consigo assinar", falar] };
     if (c.etapa === "dados_pessoais") return { linha: "Preenchendo os dados da proposta", atalhos: ["Tenho dúvida em um campo", falar] };
     if (u.k === "ofertas" || f.k === "ofertas") return { linha: "Condições liberadas: falta contratar", atalhos: ["Tenho dúvida sobre os valores", falar] };
+    if (u.k === "autorizar" && !c.consentUrl && f.k !== "whats") return { linha: "Preparando o link do 1º banco (Unno)", atalhos: ["O link está demorando", falar] };
     if (u.k === "autorizar") return { linha: "Falta autorizar no 1º banco (Unno)", atalhos: ["Não consigo abrir o link", "Já autorizei e não avançou", falar] };
     if (f.k === "whats") return { linha: "Falta autorizar no WhatsApp (Facta)", atalhos: ["Não recebi a mensagem do Facta", "Já autorizei e não avançou", falar] };
     if (u.k === "analisando") return { linha: "Bancos analisando seu perfil", atalhos: ["Está demorando", falar] };
@@ -647,6 +650,12 @@
   });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session) atualizar(); });
   window.addEventListener("focus", () => { if (state.session) atualizar(); });
+
+  // Botão de ajuda fixo no canto de baixo (celular, computador e gaveta).
+  const fab = document.createElement("button");
+  fab.type = "button"; fab.className = "ap-fab"; fab.dataset.acao = "chat"; fab.setAttribute("aria-label", "Falar com a FelizCred");
+  fab.innerHTML = `${IC.chat}<span>Ajuda</span>`;
+  document.body.appendChild(fab);
 
   // ── início ───────────────────────────────────────────────────────────────────────────────────────────────────
   function barraDemo() {

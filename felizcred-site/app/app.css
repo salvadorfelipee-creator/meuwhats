@@ -209,3 +209,19 @@ body.embed .app { max-width: 100%; }
   body:not(.embed) .app { max-width: 460px; margin-top: 24px; border-radius: 28px; box-shadow: 0 24px 60px rgba(7, 26, 47, .14); min-height: calc(100dvh - 48px); }
   body:not(.embed) { background: #e4ede8; }
 }
+
+/* preparando o link + botão de ajuda embaixo */
+.ap-preparando { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 14px 16px; border-radius: 16px; background: #f1f8f4; border: 1.5px dashed #9bd4b5; animation: respira 1.8s ease-in-out infinite; }
+.ap-preparando b { display: block; font-size: 15px; }
+.ap-preparando small { display: block; margin-top: 3px; font-size: 12px; line-height: 1.4; color: var(--suave); }
+.ap-pontos { flex: none; display: inline-flex; gap: 6px; align-items: center; }
+.ap-pontos i { width: 10px; height: 10px; border-radius: 50%; background: var(--verde); animation: ponto 1.2s ease-in-out infinite; }
+.ap-pontos i:nth-child(2) { animation-delay: .2s; }
+.ap-pontos i:nth-child(3) { animation-delay: .4s; }
+@keyframes ponto { 0%, 80%, 100% { transform: scale(.55); opacity: .35; } 40% { transform: scale(1); opacity: 1; } }
+@keyframes respira { 50% { background: #e3f6ec; } }
+.ap-fab { position: fixed; z-index: 20; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 18px 0 14px; border: 0; border-radius: 999px; background: var(--navy); color: #fff; font: 700 15px "DM Sans", sans-serif; box-shadow: 0 10px 26px rgba(7, 26, 47, .35); }
+.ap-fab:active { transform: scale(.97); }
+@media (min-width: 900px) { body:not(.embed) .ap-fab { right: max(16px, calc(50% - 214px)); } }
+body.trava .ap-fab { display: none; }
+.app { padding-bottom: 92px; }
