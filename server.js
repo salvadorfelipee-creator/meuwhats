@@ -91,7 +91,57 @@ function siteChatTokenValido(conversation, token) {
   if (!conversation || !token) return false;
   const recebido = crypto.createHash("sha256").update(token).digest();
   const esperado = Buffer.from(String(conversation.visitor_token_hash), "hex");
-  return recebido.length === esperado.length && crypto.timingSafeEqual(recebido, esperado);
+  const valido = recebido.length === esperado.length && crypto.timingSafeEqual(recebido, esperado);
+  if (valido) presencaSiteTocar(conversation.id);
+  return valido;
+}
+
+// Presença do cliente no site (só memória, sem banco): o site avisa "entrou" ao abrir e "saiu" ao fechar/sair da aba — dois
+// avisos por visita, sem sinal periódico, então quase não gasta banda. Se o "saiu" se perder (celular travou, internet caiu),
+// o cliente deixa de contar como online depois de PRESENCA_TTL_MS sem nenhuma atividade dele no site.
+const PRESENCA_TTL_MS = 15 * 60_000;
+const presencaSite = new Map(); // id da conversa -> { online, desde, saiuEm, pagina, visto }
+const presencaRate = new Map();
+const presencaTokens = new Map(); // id da conversa -> { id, visitor_token_hash }
+
+function presencaRateLimit(req) {
+  const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+  const now = Date.now();
+  const recent = (presencaRate.get(ip) || []).filter((time) => now - time < 60_000);
+  if (recent.length >= 30) return false;
+  recent.push(now);
+  presencaRate.set(ip, recent);
+  return true;
+}
+
+function presencaSiteRegistrar(id, online, pagina) {
+  const agora = Date.now();
+  const atual = presencaSite.get(id);
+  if (online) {
+    presencaSite.set(id, { online: true, desde: atual?.online ? atual.desde : agora, saiuEm: null, pagina, visto: agora });
+  } else {
+    presencaSite.set(id, { online: false, desde: null, saiuEm: agora, pagina: pagina || atual?.pagina || "", visto: agora });
+  }
+  if (presencaSite.size > 5000) {
+    for (const [chave, p] of presencaSite) if (agora - p.visto > 24 * 3600_000) { presencaSite.delete(chave); presencaTokens.delete(chave); }
+  }
+}
+
+// Qualquer chamada autenticada do cliente (mensagem, status da simulação) prova que ele ainda está lá.
+function presencaSiteTocar(id) {
+  const p = presencaSite.get(id);
+  if (p?.online) p.visto = Date.now();
+}
+
+function presencaSitePublica(id) {
+  const p = presencaSite.get(id);
+  if (!p) return null;
+  if (p.online && Date.now() - p.visto > PRESENCA_TTL_MS) {
+    p.online = false;
+    p.desde = null;
+    p.saiuEm = p.visto;
+  }
+  return { online: p.online, desde: p.desde, saiu_em: p.saiuEm, pagina: p.pagina };
 }
 
 // Dados que o cliente digita no site (formulário de início, reenvio, dados pessoais da proposta): ficam salvos na conversa
@@ -7082,6 +7132,25 @@ const server = http.createServer(async (req, res) => {
       }
       if (!corsHeaders["Access-Control-Allow-Origin"]) return send(res, 403, { error: "Origem não permitida" });
 
+      // Aviso de presença ("entrou"/"saiu"). Vem por sendBeacon (corpo text/plain, sem cabeçalho X-Chat-Token), então o token
+      // segue no corpo. Responde 204 vazio para gastar o mínimo de banda.
+      if (req.method === "POST" && path_ === "/site-chat/presence") {
+        if (!presencaRateLimit(req)) { res.writeHead(429, corsHeaders); return res.end(); }
+        const body = await parseBody(req);
+        const id = String(body.id || "");
+        if (/^[a-f0-9-]{36}$/.test(id)) {
+          // O hash do token fica em memória depois da primeira conferência: evita uma leitura no Turso a cada aviso.
+          let conversation = presencaTokens.get(id);
+          if (!conversation) {
+            const row = await db.siteChatObter(id);
+            if (row) { conversation = { id, visitor_token_hash: row.visitor_token_hash }; presencaTokens.set(id, conversation); }
+          }
+          if (siteChatTokenValido(conversation, String(body.token || ""))) presencaSiteRegistrar(id, body.online === true, String(body.pagina || "").slice(0, 120));
+        }
+        res.writeHead(204, corsHeaders);
+        return res.end();
+      }
+
       const trackingMatch = path_.match(/^\/site-chat\/proposal\/([A-Za-z0-9_-]{40,})$/);
       if (req.method === "GET" && trackingMatch) {
         if (!siteChatRateLimit(req)) return send(res, 429, { error: "Muitas consultas. Aguarde um instante." }, corsHeaders);
@@ -7716,7 +7785,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && path_ === "/painel/api/site-chat/conversations") {
       if (!requireAuth(req, res)) return;
-      return send(res, 200, await db.siteChatListar());
+      return send(res, 200, (await db.siteChatListar()).map((c) => ({ ...c, presenca: presencaSitePublica(c.id) })));
     }
 
     const painelSiteChatMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)$/i);
@@ -7726,7 +7795,7 @@ const server = http.createServer(async (req, res) => {
       if (!conversation) return send(res, 404, { error: "Conversa não encontrada" });
       await db.siteChatMarcarLida(conversation.id);
       const clt = await db.siteChatCltObter(conversation.id);
-      return send(res, 200, { conversation, messages: await db.siteChatMensagens(conversation.id), clt: siteChatCltPublico(clt), dados: dadosDoSite(conversation, clt) });
+      return send(res, 200, { conversation, messages: await db.siteChatMensagens(conversation.id), clt: siteChatCltPublico(clt), dados: dadosDoSite(conversation, clt), presenca: presencaSitePublica(conversation.id) });
     }
 
     const painelSiteChatReplyMatch = path_.match(/^\/painel\/api\/site-chat\/conversations\/([a-f0-9-]+)\/reply$/i);

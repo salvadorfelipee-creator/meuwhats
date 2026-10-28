@@ -752,3 +752,29 @@
     } catch (erro) { reiniciarSozinho(); }
   }
 })();
+
+// Presença: avisa o painel que o cliente (já identificado) entrou ou saiu da página. Só dois avisos por visita, sem sinal periódico.
+(() => {
+  if (/[?&]espelho=/.test(location.search)) return;
+  const URL_PRESENCA = "https://meuwhats.onrender.com/site-chat/presence";
+  let ultimo = "";
+  const sessao = () => {
+    for (const k of ["felizcred_app_v1", "felizcred_site_chat_v1"]) {
+      try { const s = JSON.parse(localStorage.getItem(k) || "null"); if (s && s.id && s.token && !["demo", "espelho"].includes(s.id) && (!s.expiresAt || s.expiresAt > Date.now())) return s; } catch {}
+    }
+    return null;
+  };
+  function avisar(online) {
+    const s = sessao(); if (!s) return;
+    const marca = s.id + (online ? ":1" : ":0"); if (marca === ultimo) return;
+    ultimo = marca;
+    try { navigator.sendBeacon(URL_PRESENCA, new Blob([JSON.stringify({ id: s.id, token: s.token, online, pagina: location.pathname })], { type: "text/plain" })); } catch {}
+  }
+  const estado = () => avisar(document.visibilityState === "visible");
+  document.addEventListener("visibilitychange", estado);
+  window.addEventListener("pagehide", () => avisar(false));
+  window.addEventListener("pageshow", estado);
+  estado();
+  // Cliente que se identifica com a página já aberta: só lê o armazenamento local (sem rede) até achar a sessão.
+  const espera = setInterval(() => { if (sessao()) { clearInterval(espera); estado(); } }, 5000);
+})();

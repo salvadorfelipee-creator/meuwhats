@@ -1200,12 +1200,13 @@ function ChannelChatsPage() {
                   }}
                   className={`w-full px-3 py-3 border-b border-border/50 text-left flex items-center gap-3 ${["autorizacao_enviada", "aguardando_autorizacao"].includes(c.clt_etapa || "") ? "animate-pulse bg-orange-100 dark:bg-orange-950/40 border-l-[3px] border-l-orange-500" : item.agrupado ? "border-l-[3px] border-l-emerald-500" : ""} ${siteSel === c.id ? "bg-[#f0f2f5] dark:bg-[#2a3942]" : "hover:bg-[#f5f6f6] dark:hover:bg-[#202c33]"}`}
                 >
-                  <span className="h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
+                  <span className="relative h-9 w-9 shrink-0 rounded-full bg-emerald-500/10 text-emerald-700 flex items-center justify-center">
                     <Globe2 className="h-4 w-4" />
+                    {c.presenca?.online && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" title="Online no site agora" />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-medium">{c.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">Site{item.agrupado ? " (mesmo cliente do WhatsApp)" : ""} · {c.last_message || "Conversa iniciada"}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{c.presenca?.online ? <span className="font-medium text-emerald-600">Online no site · </span> : null}Site{item.agrupado ? " (mesmo cliente do WhatsApp)" : ""} · {c.last_message || "Conversa iniciada"}</span>
                   </span>
                   <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(c.updated_at)}</span>
                 </button>

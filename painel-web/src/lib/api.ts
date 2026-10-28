@@ -77,7 +77,10 @@ export type MinhaConversa = {
   pipeline_estagio: string | null
 }
 
+export type PresencaSite = { online: boolean; desde: number | null; saiu_em: number | null; pagina: string }
+
 export type SiteChatConversation = {
+  presenca?: PresencaSite | null
   id: string
   name: string
   contact: string | null
@@ -552,7 +555,7 @@ export const api = {
   factaStatus: () => request<{ ok: boolean; checadoEm: number; erro?: string }>("/painel/api/facta/status"),
   siteChatConversas: () => request<SiteChatConversation[]>("/painel/api/site-chat/conversations"),
   siteChatConversa: (id: string) =>
-    request<{ conversation: SiteChatConversation; messages: SiteChatMessage[]; clt: SiteChatClt | null; dados?: DadoCliente[] }>(
+    request<{ conversation: SiteChatConversation; messages: SiteChatMessage[]; clt: SiteChatClt | null; dados?: DadoCliente[]; presenca?: PresencaSite | null }>(
       `/painel/api/site-chat/conversations/${encodeURIComponent(id)}`,
     ),
   siteChatResponder: (id: string, payload: string | {

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 import { SidebarTrigger } from "@/components/blocks/sidebar"
+import { PresencaSiteTag } from "@/components/presenca-site"
 import { useUnread } from "@/lib/unread-context"
 import { COMPANY_LABELS, useChannel } from "@/lib/channel-context"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -73,12 +74,12 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
   const carregarConversa = React.useCallback(async (id: string, silencioso = false) => {
     try {
       const dados = await api.siteChatConversa(id)
-      setSelecionada(dados.conversation)
+      setSelecionada({ ...dados.conversation, presenca: dados.presenca ?? null })
       setMensagens(dados.messages)
       setClt(dados.clt)
       setDadosCliente(dados.dados || [])
       markConversationSeen("site", id)
-      setConversas((prev) => prev.map((c) => c.id === id ? { ...c, ...dados.conversation, unread: false } : c))
+      setConversas((prev) => prev.map((c) => c.id === id ? { ...c, ...dados.conversation, presenca: dados.presenca ?? null, unread: false } : c))
     } catch { if (!silencioso) { setSelecionada(null); setClt(null) } }
   }, [markConversationSeen])
 
@@ -196,7 +197,7 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
       </aside>}
       <main className={cn("min-w-0 flex-1 flex-col", selecionada || soConversaId ? "flex" : "hidden md:flex")}>
         {!selecionada ? <div className="flex flex-1 items-center justify-center text-center"><div><MessageCircle className="mx-auto h-8 w-8 text-muted-foreground/50" /><p className="mt-3 text-sm">Selecione uma conversa</p></div></div> : <>
-          <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4"><Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelecionada(null)}><ArrowLeft className="h-4 w-4" /></Button><div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><UserRound className="h-4 w-4" /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{selecionada.name}</p>{selecionada.human_intent_stage === "requested" && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Aguardando você</span>}</div><p className="truncate text-xs text-muted-foreground">{[selecionada.contact, selecionada.email, selecionada.produto_tag].filter(Boolean).join(" · ")}</p></div>{Number(selecionada.bot_pausado_ate || 0) > Date.now() ? <Button variant="outline" size="sm" className="gap-1.5" title="O assistente automático está calado porque você respondeu. Clique para ele voltar a responder o cliente." onClick={() => alternarBot(false)}><Bot className="h-3.5 w-3.5" />Devolver ao bot</Button> : null}<Button variant="outline" size="sm" className="gap-1.5" onClick={alterarStatus}>{selecionada.status === "open" ? <Check className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}{selecionada.status === "open" ? "Encerrar" : "Reabrir"}</Button></header>
+          <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4"><Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelecionada(null)}><ArrowLeft className="h-4 w-4" /></Button><div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><UserRound className="h-4 w-4" /></div><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-sm font-semibold">{selecionada.name}</p><PresencaSiteTag presenca={selecionada.presenca} />{selecionada.human_intent_stage === "requested" && <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Aguardando você</span>}</div><p className="truncate text-xs text-muted-foreground">{[selecionada.contact, selecionada.email, selecionada.produto_tag].filter(Boolean).join(" · ")}</p></div>{Number(selecionada.bot_pausado_ate || 0) > Date.now() ? <Button variant="outline" size="sm" className="gap-1.5" title="O assistente automático está calado porque você respondeu. Clique para ele voltar a responder o cliente." onClick={() => alternarBot(false)}><Bot className="h-3.5 w-3.5" />Devolver ao bot</Button> : null}<Button variant="outline" size="sm" className="gap-1.5" onClick={alterarStatus}>{selecionada.status === "open" ? <Check className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}{selecionada.status === "open" ? "Encerrar" : "Reabrir"}</Button></header>
           <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20 px-4 py-5"><div className="mx-auto flex max-w-3xl flex-col gap-3">
             <div className="mb-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground"><Globe2 className="h-3.5 w-3.5" /> Conversa iniciada em {new Date(selecionada.created_at).toLocaleString("pt-BR")}</div>
             {clt && <section className="mb-2 rounded-2xl border bg-background p-4 shadow-sm" aria-label="Andamento da simulação">
@@ -227,7 +228,7 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
           <div className="space-y-5 p-4">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700"><UserRound className="h-4 w-4" /></span>
-              <div className="min-w-0"><p className="truncate text-sm font-semibold">{selecionada.name}</p><p className="text-xs text-muted-foreground">Chat do site</p></div>
+              <div className="min-w-0"><p className="truncate text-sm font-semibold">{selecionada.name}</p><p className="text-xs text-muted-foreground">Chat do site</p><PresencaSiteTag presenca={selecionada.presenca} /></div>
             </div>
             <dl className="space-y-3 text-sm">
               <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">WhatsApp do cliente</dt><dd className="flex flex-wrap gap-1.5">{doWhatsapp.length ? doWhatsapp.map((w) => (<button key={`${w.business_number_id}|${w.phone}`} className="inline-flex items-center gap-1 rounded-full border border-emerald-600/40 px-2 py-0.5 text-xs text-emerald-700 hover:bg-emerald-50" onClick={() => abrirConversa(w.business_number_id, w.phone)}><MessageCircle className="h-3 w-3" />{(w.name || w.phone) + " · abrir conversa"}</button>)) : <span className="text-xs text-muted-foreground">Ainda não chamou pelo WhatsApp</span>}</dd></div>
