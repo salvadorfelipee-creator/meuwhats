@@ -961,6 +961,36 @@ async function abrirSimulacaoFactaClt(id, { cpf, phone, fullName }) {
   return row;
 }
 
+// Última vez que a tela do cliente consultou o andamento (memória do servidor: serve só para saber se ele está olhando agora).
+const visitasSiteChat = new Map();
+const CLIENTE_ONLINE_MS = 20_000;
+const linksEmAviso = new Set();
+
+// O link da Unno sai depois de minutos: se o cliente não está com a tela aberta (voltou ao WhatsApp, fechou o navegador),
+// recebe UMA mensagem no WhatsApp com o botão que volta direto para a tela. Só dentro da janela de 24h (texto livre, sem modelo).
+// Cliente online no momento: não envia, e não envia depois também (marca como tratado).
+async function avisarLinkProntoNoWhatsApp(row) {
+  if (!row || row.provider !== "unnotech" || unnoSite.ehFgts(row) || row.etapa !== "autorizacao_enviada" || !row.terms_link) return;
+  const blob = unnoSite.lerBlob(row);
+  if (blob.link_avisado || linksEmAviso.has(row.conversation_id)) return;
+  linksEmAviso.add(row.conversation_id);
+  const conversa = await db.siteChatObter(row.conversation_id);
+  if (!ehConversaApp(conversa) || conversa.status === "closed") return;
+  await db.siteChatCltAtualizar(row.conversation_id, { facta_worker_json: JSON.stringify({ ...blob, link_avisado: Date.now() }) });
+  if (Date.now() - (visitasSiteChat.get(row.conversation_id) || 0) < CLIENTE_ONLINE_MS) return;
+  const comToken = await garantirTrackingToken(row);
+  const tel = await db.siteChatTelefoneDe(row.conversation_id);
+  if (!tel || !comToken?.tracking_token) return;
+  const url = `https://www.felizcred.com.br/app/?t=${encodeURIComponent(comToken.tracking_token)}`;
+  for (const c of await db.conversasPorTelefoneTodosCanais(tel)) {
+    if (c.business_number_id === "instagram") continue;
+    const ultima = await db.ultimaMensagemEntrada(c.phone, c.business_number_id);
+    if (!ultima || Date.now() - ultima > 23 * 3600 * 1000) continue;
+    await enviarRespostaAutomatica(c.business_number_id, c.phone, "Seu link de autorização já está pronto ✅ Toque no botão para voltar à sua simulação e autorizar.", null, null, { buttonText: "Autorizar agora", url });
+    return;
+  }
+}
+
 async function sincronizarSiteChatClt(row) {
   if (row?.provider === "unnotech") {
     try {
@@ -979,6 +1009,7 @@ async function sincronizarSiteChatClt(row) {
         await iniciarFactaParalela(unno);
         unno = await db.siteChatCltObter(unno.conversation_id);
       }
+      avisarLinkProntoNoWhatsApp(unno).catch((err) => console.error("Aviso do link pelo WhatsApp falhou:", err.message));
       return await verificarFactaParalela(unno);
     } catch (err) {
       console.error(`Erro ao sincronizar Unnotech no site (${row.conversation_id}):`, err.message);
@@ -7168,6 +7199,7 @@ const server = http.createServer(async (req, res) => {
         const token = String(req.headers["x-chat-token"] || "");
         if (!siteChatTokenValido(conversation, token)) return send(res, 404, { error: "Conversa não encontrada" }, corsHeaders);
         if (action === "status" && req.method === "GET") {
+          visitasSiteChat.set(id, Date.now());
           const row = await garantirTrackingToken(await sincronizarSiteChatClt(await db.siteChatCltObter(id)));
           return send(res, 200, { clt: siteChatCltPublico(row) }, corsHeaders);
         }

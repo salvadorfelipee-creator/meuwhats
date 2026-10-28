@@ -4177,6 +4177,13 @@ async function siteChatFgtsSemOfertaPorCpf(cpf) {
   return !!r.rows[0];
 }
 
+// Última mensagem RECEBIDA do cliente nesse número (ms), para saber se a janela de 24h do WhatsApp está aberta.
+async function ultimaMensagemEntrada(phone, businessNumberId) {
+  await ready;
+  const r = await client.execute({ sql: `SELECT MAX(created_at) t FROM messages WHERE phone = ? AND business_number_id = ? AND direction = 'in'`, args: [phone, businessNumberId] });
+  return r.rows[0]?.t ? Number(r.rows[0].t) : 0;
+}
+
 async function siteChatTelefoneDe(id) {
   await ready;
   const r = await client.execute({
@@ -4482,6 +4489,7 @@ module.exports = {
   conversasDoTelefoneEmOutrosCanais,
   siteChatPorTelefone,
   siteChatTelefoneDe,
+  ultimaMensagemEntrada,
   siteChatFgtsSemOfertaPorCpf,
   definirAoAtualizarClt,
   conversasPorTelefoneTodosCanais,
