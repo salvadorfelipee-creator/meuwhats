@@ -795,6 +795,28 @@ async function iniciarFactaParalela(row) {
     : "Enviei também a autorização do Facta no seu WhatsApp: se quiser, abra a mensagem, toque no link e libere. Vou verificar qual banco libera os valores primeiro.");
 }
 
+// Confere na política de crédito da Facta, ANTES de mostrar ao cliente, uma condição de cada prazo (a de maior valor).
+// Prazo reprovado some da tela; se a Facta não responder (erro), mantém tudo: a conferência final continua no select-offer.
+async function filtrarOfertasPelaPolitica(cpf, worker, offers) {
+  const aprovados = new Map();
+  for (const oferta of offers) {
+    if (aprovados.has(oferta.prazo)) continue;
+    try {
+      const policy = await facta.analisarPolitica({
+        cpf, matricula: worker.matricula,
+        dataNascimento: normalizarDataFacta(worker.dataNascimento),
+        dataAdmissao: normalizarDataFacta(worker.dataAdmissao),
+        prazo: oferta.prazo, valorEmprestimo: Number(oferta.contrato || 0).toFixed(2),
+      });
+      aprovados.set(oferta.prazo, respostaFactaComErro(policy) ? true : String(policy?.aprovado) === "1");
+    } catch (err) {
+      console.error("Política Facta não conferida:", err.message);
+      aprovados.set(oferta.prazo, true);
+    }
+  }
+  return offers.filter((o) => aprovados.get(o.prazo));
+}
+
 // Consulta a Facta (autorização + condições), sem gravar nada. Devolve { estado: aguardando | negativo | ofertas, ... }.
 async function buscarOfertasFacta(cpf) {
   const response = await facta.consultarTrabalhador(cpf);
@@ -805,6 +827,7 @@ async function buscarOfertasFacta(cpf) {
   const rows = dadosTrabalhadorFacta(response);
   const elegiveis = rows.filter((item) => simFacta(item.elegivel)).sort((a, b) => numeroFacta(b.valorMargemDisponivel) - numeroFacta(a.valorMargemDisponivel));
   if (!elegiveis.length || numeroFacta(elegiveis[0].valorMargemDisponivel) <= 0) return { estado: "negativo", motivo: "sem_margem" };
+  let bloqueadaPelaPolitica = false;
   for (const candidato of elegiveis.slice(0, 5)) {
     const parcela = parcelaMaximaFacta(numeroFacta(candidato.valorMargemDisponivel));
     if (parcela <= 0) continue;
@@ -817,10 +840,12 @@ async function buscarOfertasFacta(cpf) {
       ...(candidato.matricula ? { matricula: candidato.matricula } : {}),
     });
     if (respostaFactaComErro(operations)) continue;
-    const offers = ofertasFacta(operations);
+    const todas = ofertasFacta(operations);
+    const offers = todas.length ? await filtrarOfertasPelaPolitica(cpf, candidato, todas) : [];
     if (offers.length) return { estado: "ofertas", worker: candidato, margem: parcela, offers };
+    if (todas.length) bloqueadaPelaPolitica = true;
   }
-  return { estado: "negativo", motivo: "sem_oferta" };
+  return { estado: "negativo", motivo: bloqueadaPelaPolitica ? "politica_reprovada" : "sem_oferta" };
 }
 
 async function verificarFactaParalela(row) {
