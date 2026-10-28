@@ -10,14 +10,25 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const [, , entrada, saida] = process.argv;
 
 (async () => {
-  const cpfs = fs.readFileSync(entrada, "utf8").split(/\s+/).map((v) => v.replace(/\D/g, "").padStart(11, "0")).filter((v) => v.length === 11);
-  const resultado = {};
+  const cpfs = fs.readFileSync(entrada, "utf8").split(/\s+/).map((v) => v.replace(/\D/g, "")).filter(Boolean).map((v) => v.padStart(11, "0")).filter((v) => v.length === 11);
+  const resultado = fs.existsSync(saida) ? JSON.parse(fs.readFileSync(saida, "utf8")) : {};
   for (let i = 0; i < cpfs.length; i++) {
     const cpf = cpfs[i];
+    if ([403, 429].includes(resultado[cpf]?.status)) {
+      throw new Error(`Consulta bloqueada anteriormente: HTTP ${resultado[cpf].status} no CPF ${i + 1}/${cpfs.length}`);
+    }
+    if (resultado[cpf]?.ok) {
+      process.stdout.write(`PROGRESSO ${i + 1}/${cpfs.length} (já consultado)\n`);
+      continue;
+    }
     try {
       resultado[cpf] = { ok: true, resposta: await facta.consultarBaseOffline(cpf) };
     } catch (error) {
       resultado[cpf] = { ok: false, status: error.httpStatus || null, mensagem: error.message };
+      fs.writeFileSync(saida, JSON.stringify(resultado, null, 2));
+      if ([403, 429].includes(error.httpStatus)) {
+        throw new Error(`Consulta interrompida: HTTP ${error.httpStatus} no CPF ${i + 1}/${cpfs.length}`);
+      }
     }
     fs.writeFileSync(saida, JSON.stringify(resultado, null, 2));
     process.stdout.write(`PROGRESSO ${i + 1}/${cpfs.length}\n`);
