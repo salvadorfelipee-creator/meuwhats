@@ -4362,8 +4362,14 @@ async function siteChatCltAtualizar(conversationId, campos) {
     sql: `UPDATE site_chat_clt SET ${sets}, updated_at = ? WHERE conversation_id = ?`,
     args: [...entradas.map(([, v]) => v), Date.now(), conversationId],
   });
-  return siteChatCltObter(conversationId);
+  const atual = await siteChatCltObter(conversationId);
+  if (aoAtualizarClt && (campos.etapa || campos.facta_paralelo_json)) Promise.resolve(aoAtualizarClt(atual)).catch(() => {});
+  return atual;
 }
+
+// Gancho do servidor: avisado quando a etapa/disputa de uma simulação muda (usado para as tags automáticas).
+let aoAtualizarClt = null;
+function definirAoAtualizarClt(fn) { aoAtualizarClt = fn; }
 
 // Limpeza das conversas do WhatsApp (painel). Só lê no plano: quem tem CPF válido em alguma mensagem
 // recebida vira "comCpf" (para salvar no Google Contatos antes de apagar). Não apaga nada aqui.
@@ -4466,6 +4472,7 @@ module.exports = {
   conversasDoTelefoneEmOutrosCanais,
   siteChatPorTelefone,
   siteChatTelefoneDe,
+  definirAoAtualizarClt,
   conversasPorTelefoneTodosCanais,
   importarContato,
   listMidiasDaConversa,

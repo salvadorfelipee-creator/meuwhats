@@ -1930,6 +1930,35 @@ async function marcarFgtsConsultado(de, businessNumberId) {
   }
 }
 
+// ─── TAG AUTOMÁTICA: NÃO APROVADO ───────────────────────────────────────────────
+// Simulação do site/app que terminou sem margem, sem oferta ou reprovada. Na Unno (CLT) só vale depois que a Facta
+// também foi tentada e negou; no FGTS a recusa da Unno já é final. Troca "Interessado" por "Não aprovado".
+const TAG_NAO_APROVADO = "Não aprovado";
+const ETAPAS_NAO_APROVADO = ["sem_margem", "sem_oferta", "nao_elegivel", "politica_reprovada"];
+
+async function marcarNaoAprovadoSite(row) {
+  try {
+    if (!row || !ETAPAS_NAO_APROVADO.includes(row.etapa)) return;
+    if (row.provider === "unnotech" && !unnoSite.ehFgts(row)) {
+      const par = parseJsonSeguro(row.facta_paralelo_json);
+      if (!["negativa", "indisponivel"].includes(par.estado)) return;
+    }
+    const tel = await db.siteChatTelefoneDe(row.conversation_id);
+    if (!tel) return;
+    for (const c of await db.conversasPorTelefoneTodosCanais(tel)) {
+      if (c.business_number_id === "instagram") continue;
+      const tagId = await db.tagEncontrarOuCriar(c.business_number_id, TAG_NAO_APROVADO, "#dc2626");
+      if (await db.adicionarTagConversaSeAusente(c.business_number_id, c.phone, tagId, "automatico")) {
+        const interessado = await db.tagEncontrarOuCriar(c.business_number_id, "Interessado", "#16a34a");
+        await db.removerTagConversa(c.business_number_id, c.phone, interessado).catch(() => {});
+      }
+    }
+  } catch (err) {
+    console.error("Erro ao marcar Não aprovado:", err.message);
+  }
+}
+db.definirAoAtualizarClt(marcarNaoAprovadoSite);
+
 async function fgtsJaConsultado(de, businessNumberId) {
   try {
     const desde = await db.tagDaConversaDesde(businessNumberId, de, TAG_FGTS_CONSULTADO);
