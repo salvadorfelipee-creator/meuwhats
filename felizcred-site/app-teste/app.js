@@ -133,7 +133,7 @@
       case "fgts-consulta": return { ...base, produto: "FGTS", etapa: "fgts_cotando" };
       case "fgts-autorizar": return { ...base, produto: "FGTS", etapa: "fgts_autorizar", consentUrl: null };
       case "fgts-oferta": return { ...base, produto: "FGTS", etapa: "ofertas_disponiveis", offers: [{ id: "f1", installments: 5, installmentValue: 480, disbursedAmount: 1920 }] };
-      case "fgts-sem": return { ...base, produto: "FGTS", etapa: "sem_oferta", error: "Não há saldo do FGTS disponível para antecipar agora. Isso pode mudar, por exemplo depois do mês do seu aniversário." };
+      case "fgts-sem": return { ...base, produto: "FGTS", etapa: "sem_oferta", motivoRecusa: "Trabalhador sem adesão ao saque-aniversário", error: "Não há saldo do FGTS disponível para antecipar agora. Isso pode mudar, por exemplo depois do mês do seu aniversário." };
       case "dados-unno": return { ...base, etapa: "dados_pessoais", parallelFacta: "descartada", selectedOffer: DEMO_OFERTAS[1] };
       case "dados-facta": return { ...base, provider: "facta", etapa: "dados_pessoais", parallelFacta: "facta_venceu", selectedOffer: DEMO_OFERTAS[1], customerDefaults: { nome: "Salvador Felipe", celular: "47999999999", sexo: "3", data_nascimento: "16/09/1975", nome_mae: "" } };
       case "autorizar": return { ...base, etapa: "autorizacao_enviada" };
@@ -316,8 +316,9 @@
       <span class="ap-tag ${sem ? "cinza" : vivo ? "laranja" : "verde"}">${vivo ? '<i class="ap-pulso"></i>' : ""}${sem ? "Sem condições" : vivo ? "Em andamento" : "Liberou"}</span></header>
       <ul class="ap-lista">${nomes.map((n, i) => `<li class="ap-li ${t[i]}"><span class="ap-bolinha">${t[i] === "ok" ? IC.ok : t[i] === "falha" ? IC.x : ""}</span><span>${n}</span></li>`).join("")}</ul></section>`;
   }
-  function cartaoAutorizarFgts() {
-    return `<section class="ap-banco vivo"><header><span class="ap-logo fgts">F</span><div><b>Autorize no app do FGTS</b><small>Leva menos de um minuto</small></div><span class="ap-tag laranja"><i class="ap-pulso"></i>Falta você</span></header>
+  function cartaoAutorizarFgts(retentar = false, c = {}) {
+    return `<section class="ap-banco vivo"><header><span class="ap-logo fgts">F</span><div><b>${retentar ? "Já autorizou os bancos no app do FGTS?" : "Autorize no app do FGTS"}</b><small>${retentar ? "Se ainda não, faça agora e consulte de novo" : "Leva menos de um minuto"}</small></div><span class="ap-tag laranja"><i class="ap-pulso"></i>${retentar ? "Confira" : "Falta você"}</span></header>
+      ${retentar && c.motivoRecusa ? `<p class="ap-dica" style="margin-top:12px"><b>Motivo informado pelo banco:</b> ${esc(c.motivoRecusa)}</p>` : ""}
       <ol class="ap-passos">
         <li><span>1</span><p><b>Abra o aplicativo FGTS</b> (ou entre em fgts.caixa.gov.br) e faça login.</p></li>
         <li><span>2</span><p>Vá em <b>Meu FGTS › Autorizações</b>.</p></li>
@@ -355,6 +356,7 @@
       ${c.etapa === "dados_pessoais" ? '<section class="ap-sim"><p class="ap-sub">Condição escolhida. Falta completar seus dados.</p><button class="ap-btn principal grande" type="button" data-acao="abrir-dados">Completar dados</button></section>' : ""}
       ${n === 3 ? cartaoOfertaFgts(c) : ""}
       ${n === 2 ? cartaoAutorizarFgts() : ""}
+      ${sem && ["sem_oferta", "erro_consulta"].includes(c.etapa) ? cartaoAutorizarFgts(true, c) : ""}
       ${temProposta ? "" : (n === 2 ? "" : `<p class="ap-secao">Andamento</p><div class="ap-bancos">${cartaoFgtsAndamento(c)}</div>`)}
       ${n <= 2 || sem ? REQUISITOS_FGTS : ""}
       ${sem ? `<div class="ap-acoes pad"><button class="ap-btn principal grande" type="button" data-acao="chat">Falar com a FelizCred</button></div>` : ""}
@@ -427,7 +429,7 @@
   function fecharChat() { state.chat.aberto = false; clearInterval(sondagemChat); fecharSheet(); }
 
   // ── dados do servidor ────────────────────────────────────────────────────────────────────────────────────────
-  const assinaturaClt = (c) => JSON.stringify([c?.produto, c?.provider, c?.etapa, c?.status, c?.parallelFacta, c?.error, (c?.offers || []).map((o) => o.id + o.installmentValue).join(), c?.consentUrl, c?.contractLink, c?.proposalCode]);
+  const assinaturaClt = (c) => JSON.stringify([c?.produto, c?.provider, c?.etapa, c?.status, c?.parallelFacta, c?.error, (c?.offers || []).map((o) => o.id + o.installmentValue).join(), c?.consentUrl, c?.contractLink, c?.proposalCode, c?.motivoRecusa]);
   function aplicar(clt) {
     const mudou = assinaturaClt(clt) !== state.assinatura;
     state.clt = clt; state.assinatura = assinaturaClt(clt);

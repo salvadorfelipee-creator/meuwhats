@@ -159,6 +159,7 @@ function siteChatCltPublicoUnnotech(row) {
     proposalCode: row.codigo_proposta ? String(row.codigo_proposta).slice(0, 8).toUpperCase() : null,
     previous: anterior,
     parallelFacta: parseJsonSeguro(row.facta_paralelo_json).estado || null,
+    motivoRecusa: blob.motivo_recusa || null,
     error: row.error_message || null,
     trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/minha-simulacao/?t=${encodeURIComponent(row.tracking_token)}` : null,
   };

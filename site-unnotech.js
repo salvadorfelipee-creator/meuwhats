@@ -371,8 +371,12 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     }
     if (["NO_OFFERS", "EXPIRED", "OFFERS_AVAILABLE"].includes(status.status)) {
       const completa = await ler();
-      const categoria = unnotech.classificarRecusa(motivo(completa));
+      const motivoTexto = motivo(completa);
+      const categoria = unnotech.classificarRecusa(motivoTexto);
       if (categoria === "autorizacao") return atualizar(row, { etapa: "fgts_autorizar", status_novosaque: status.status, error_message: null });
+      // O motivo cru do banco fica guardado: sem ele não dá para saber por que a consulta não liberou nada.
+      console.log(`FGTS sem oferta (${row.conversation_id}): categoria=${categoria} motivo="${String(motivoTexto).slice(0, 200)}"`);
+      await atualizar(row, { facta_worker_json: JSON.stringify({ ...blob, motivo_recusa: String(motivoTexto || "").slice(0, 300) }) });
       const texto = categoria === "sem_saldo"
         ? "Não há saldo do FGTS disponível para antecipar agora. Isso pode mudar, por exemplo depois do mês do seu aniversário."
         : "Os bancos não liberaram uma condição para o seu FGTS agora. Um atendente pode conferir o motivo com você.";
