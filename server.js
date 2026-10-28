@@ -10136,6 +10136,7 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       const body = await parseBody(req);
       await reels.configSet("pausado", body.pausado ? "1" : "0");
+      reelsPausadoCache = !!body.pausado;
       return send(res, 200, { ok: true });
     }
 
@@ -10346,7 +10347,7 @@ setInterval(async () => {
 }, 60 * 1000);
 
 // ─── VERIFICADOR DE JANELA DE 24H (KEEP-ALIVE) ──────────────────────────────
-// A cada minuto: quem está com um fluxo em aberto e mais de 20h sem responder
+// A cada 30 min (era 1 min — a janela de aviso tem 4h, não precisa de precisão de minuto): quem está com um fluxo em aberto e mais de 20h sem responder
 // (mas ainda dentro da janela de 24h pra mensagem livre) recebe UM aviso pra
 // tentar trazer a pessoa de volta antes que a janela feche e vire template.
 setInterval(async () => {
@@ -10375,7 +10376,7 @@ setInterval(async () => {
   } catch (err) {
     console.error("Erro no verificador de janela de 24h:", err.message);
   }
-}, 60 * 1000);
+}, 30 * 60 * 1000);
 
 // ─── LEMBRETE DE INSTAGRAM (10H DE SILÊNCIO) ────────────────────────────────
 // Felizcred e Cota Certa, só — pedido do usuário em 26/09/2026. Diferente do lembrete de fluxo
@@ -10686,9 +10687,13 @@ setInterval(async () => {
   }
 }, 30 * 1000);
 
+// Guardado em memória: com os Reels pausados (o normal fora de campanha), o tick de 1 min não consulta o Turso.
+// O botão do painel (/painel/api/reels/pausar) atualiza essa variável na hora.
+let reelsPausadoCache = null;
 setInterval(async () => {
   try {
-    if ((await reels.configGet("pausado")) !== "0") return; // padrão: pausado até ligar no painel
+    if (reelsPausadoCache === null) reelsPausadoCache = (await reels.configGet("pausado")) !== "0"; // padrão: pausado até ligar no painel
+    if (reelsPausadoCache) return;
 
     // 1) Vídeo com horário EXATO marcado, checado a cada minuto — tem prioridade sobre o
     // piloto automático, pra sair perto do horário pedido em vez de esperar o próximo

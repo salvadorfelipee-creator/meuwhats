@@ -7,6 +7,19 @@ const client = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+// Os verificadores de originação (FGTS/CLT/Novo Saque) rodam a cada 30s, e cada rodada era uma leitura no Turso
+// mesmo sem nenhum cliente em andamento (gastava banda do Render e leituras do Turso à toa). Agora só consultam
+// o banco quando existe solicitação aberta: a marca liga em qualquer INSERT/UPDATE nessas tabelas (um cliente
+// começou ou avançou) e desliga quando uma consulta volta vazia. Começa ligada pra a 1ª rodada após o boot conferir.
+const originacaoPossivelmenteAberta = { fgts: true, clt: true, novosaque: true };
+const executarOriginal = client.execute.bind(client);
+client.execute = (stmt, ...resto) => {
+  const sql = typeof stmt === "string" ? stmt : stmt?.sql;
+  const m = /^\s*(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE)\s+(fgts|clt|novosaque)_origination/i.exec(sql || "");
+  if (m) originacaoPossivelmenteAberta[m[1].toLowerCase()] = true;
+  return executarOriginal(stmt, ...resto);
+};
+
 // Item travado em 'processing' por mais tempo que isso é considerado órfão (servidor caiu ou
 // foi redeployado no meio da publicação) e pode ser reclamado de novo pelo agendador — senão
 // ficaria pendurado pra sempre sem nunca sair nem aparecer como erro pra dar "Tentar de novo".
@@ -2660,12 +2673,14 @@ async function fgtsOriginationAtualizar(id, campos) {
 
 async function fgtsOriginationListarAbertas() {
   await ready;
+  if (!originacaoPossivelmenteAberta.fgts) return [];
   const result = await client.execute({
     sql: `SELECT * FROM fgts_origination
           WHERE etapa NOT IN (${FGTS_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
           ORDER BY updated_at ASC`,
     args: FGTS_ORIGINATION_ETAPAS_TERMINAIS,
   });
+  originacaoPossivelmenteAberta.fgts = result.rows.length > 0;
   return result.rows;
 }
 
@@ -2745,12 +2760,14 @@ async function cltOriginationAtualizar(id, campos) {
 
 async function cltOriginationListarAbertas() {
   await ready;
+  if (!originacaoPossivelmenteAberta.clt) return [];
   const result = await client.execute({
     sql: `SELECT * FROM clt_origination
           WHERE etapa NOT IN (${CLT_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
           ORDER BY updated_at ASC`,
     args: CLT_ORIGINATION_ETAPAS_TERMINAIS,
   });
+  originacaoPossivelmenteAberta.clt = result.rows.length > 0;
   return result.rows;
 }
 
@@ -2841,12 +2858,14 @@ async function novosaqueOriginationAtualizar(id, campos) {
 
 async function novosaqueOriginationListarAbertas() {
   await ready;
+  if (!originacaoPossivelmenteAberta.novosaque) return [];
   const result = await client.execute({
     sql: `SELECT * FROM novosaque_origination
           WHERE etapa NOT IN (${NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS.map(() => "?").join(",")})
           ORDER BY updated_at ASC`,
     args: NOVOSAQUE_ORIGINATION_ETAPAS_TERMINAIS,
   });
+  originacaoPossivelmenteAberta.novosaque = result.rows.length > 0;
   return result.rows;
 }
 
