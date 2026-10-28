@@ -911,9 +911,9 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     <li><a href="#calculadoras">Calculadoras</a></li>
     <li><a href="#faq">Dúvidas</a></li>
     <li><a href="/blog/">Blog</a></li>
-    <li><a href="#simular" class="nav-cta" data-open-chat>Simular no chat</a></li>
+    <li><a href="#simular" class="nav-cta" data-open-chat>Simular agora</a></li>
   </ul>
-  <a href="#simular" class="btn-primary" style="display:none" id="mob-cta" data-open-chat>Simular no chat</a>
+  <a href="#simular" class="btn-primary" style="display:none" id="mob-cta" data-open-chat>Simular agora</a>
 </nav>
 
 <!-- HERO -->
@@ -921,7 +921,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   <div class="hero-grid">
     <div>
       <div class="badge">Atendimento online e contratação acompanhada</div>
-      <h1>Simule seu empréstimo <em>sem sair do chat</em></h1>
+      <h1>Simule seu empréstimo <em>sem sair de casa</em></h1>
       <p class="hero-sub">Você responde o mínimo necessário, consulta as condições disponíveis e recebe orientação em cada etapa. Se algo não der certo, explicamos o retorno e mostramos o próximo caminho.</p>
       <div class="hero-btns">
         <a href="#simular" class="btn-primary" data-open-chat>Fazer minha simulação</a>
@@ -1009,7 +1009,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         <li>Até 48x para pagar</li>
         <li>Aprovação em minutos</li>
       </ul>
-      <span class="product-btn">Simular no chat →</span>
+      <span class="product-btn">Simular agora →</span>
     </a>
     <a href="#simular" class="product-card fgts" data-open-chat>
       <div class="product-tag">FGTS</div>
@@ -1021,7 +1021,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
         <li>PIX em até 40 minutos</li>
         <li>Mesmo com restrições no nome</li>
       </ul>
-      <span class="product-btn">Conversar pelo chat →</span>
+      <span class="product-btn">Simular agora →</span>
     </a>
   </div>
 </div>
@@ -1083,7 +1083,7 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
       <div class="contact-cta">
         <strong>Faça a consulta com nossa equipe</strong>
         <p>Você começa pelo chat do site e recebe orientação sem abandonar a página.</p>
-        <a href="#simular" class="btn-primary" data-open-chat>Conversar sobre FGTS no chat</a>
+        <a href="#simular" class="btn-primary" data-open-chat>Simular meu FGTS</a>
       </div>
     </div>
   </div>
@@ -1510,9 +1510,13 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
     const trigger = event.target.closest('[data-open-chat]');
     if (!trigger) return;
     event.preventDefault();
-    const launcher = document.querySelector('.fc-chat-launcher');
-    if (launcher) launcher.click();
-    else window.setTimeout(() => document.querySelector('.fc-chat-launcher')?.click(), 250);
+    const produto = trigger.closest('.fgts') ? 'fgts' : trigger.closest('.clt') ? 'clt' : /fgts/i.test(trigger.textContent) ? 'fgts' : '';
+    if (window.fcAbrirApp) { window.fcAbrirApp(produto); }
+    else {
+      const launcher = document.querySelector('.fc-chat-launcher');
+      if (launcher) launcher.click();
+      else window.setTimeout(() => document.querySelector('.fc-chat-launcher')?.click(), 250);
+    }
     window.dataLayer?.push({ event: 'site_chat_cta_click', cta_text: trigger.textContent.trim() });
   });
 
@@ -1678,5 +1682,6 @@ src="https://www.facebook.com/tr?id=1450172669925818&ev=PageView&noscript=1"
   })();
 </script>
 <script src="./chat.js?v=20261023-1" defer></script>
+  <script src="/app-drawer.js?v=2" defer></script>
 </body>
 </html>

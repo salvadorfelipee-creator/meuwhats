@@ -114,6 +114,9 @@ export type SiteChatMessage = {
 }
 
 export type SiteChatClt = {
+  produto?: string
+  parallelFacta?: string | null
+  motivoRecusa?: string | null
   provider: string
   etapa: string
   status: string | null

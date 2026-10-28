@@ -3,6 +3,11 @@
   "cleanUrls": true,
   "redirects": [
     {
+      "source": "/app-teste/",
+      "destination": "/app/",
+      "permanent": false
+    },
+    {
       "source": "/cotacerta/",
       "destination": "https://www.cotacertaseguros.com.br/",
       "permanent": true

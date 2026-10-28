@@ -5,11 +5,16 @@
   "use strict";
   const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
   const API = LOCAL ? "http://localhost:3000/site-chat" : "https://meuwhats.onrender.com/site-chat";
-  const KEY = "felizcred_app_teste_v1";
+  const KEY = "felizcred_app_v1";
+  const LOGIN_KEY = "felizcred_app_login_v1";
+  const TRES_DIAS = 3 * 24 * 3600 * 1000, TRINTA_DIAS = 30 * 24 * 3600 * 1000;
+  const PARAMS = new URLSearchParams(location.search);
+  const EMBED = PARAMS.get("embed") === "1";
+  if (EMBED) document.body.classList.add("embed");
   const app = document.getElementById("app");
   const sheet = document.getElementById("sheet");
   const demo = new URLSearchParams(location.search).get("demo");
-  const state = { produto: new URLSearchParams(location.search).get("p") === "fgts" ? "fgts" : "clt", fgtsLoading: false, session: null, clt: null, erro: "", escolhendo: "", assinatura: "", prazo: null, parcela: null, atualizando: false, chat: { aberto: false, msgs: [], enviando: false } };
+  const state = { aviso: "", outrosDados: false, produto: /^fgts$/i.test(new URLSearchParams(location.search).get("p") || new URLSearchParams(location.search).get("novo") || "") ? "fgts" : "clt", fgtsLoading: false, session: null, clt: null, erro: "", escolhendo: "", assinatura: "", prazo: null, parcela: null, atualizando: false, chat: { aberto: false, msgs: [], enviando: false } };
   let sondagem = null, sondagemChat = null;
 
   const money = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -20,6 +25,7 @@
   const maskCpf = (v) => soDigitos(v).slice(0, 11).replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
   const maskTel = (v) => { const d = soDigitos(v).slice(0, 11); return d.length > 6 ? `(${d.slice(0, 2)}) ${d.slice(2, d.length - 4)}-${d.slice(-4)}` : d.length > 2 ? `(${d.slice(0, 2)}) ${d.slice(2)}` : d; };
   const IC = {
+    seta: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>',
     ok: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     x: '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     chat: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a3 3 0 0 1-3 3H9l-5 3V6a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3z"/></svg>',
@@ -37,8 +43,12 @@
     if (!resposta.ok) { const erro = new Error(dados.error || "Não foi possível concluir agora. Tente de novo em instantes."); erro.status = resposta.status; throw erro; }
     return dados;
   }
-  const guardar = (s) => { state.session = s; try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} };
+  const guardar = (s) => { state.session = { ...s, lastSeen: Date.now() }; try { localStorage.setItem(KEY, JSON.stringify(state.session)); } catch {} };
   const lerSessao = () => { try { const s = JSON.parse(localStorage.getItem(KEY) || "null"); return s && s.id && s.token && s.expiresAt > Date.now() ? s : null; } catch { return null; } };
+  // "Login": os dados digitados ficam neste aparelho para reabrir ou reiniciar a simulação com um toque.
+  const lerLogin = () => { try { const l = JSON.parse(localStorage.getItem(LOGIN_KEY) || "null"); return l && l.name && l.cpf ? l : null; } catch { return null; } };
+  const guardarLogin = (l) => { try { localStorage.setItem(LOGIN_KEY, JSON.stringify(l)); } catch {} };
+  const primeiroNome = (n) => String(n || "").trim().split(/\s+/)[0] || "";
 
   // ── formulários da proposta (copiados do painel "Minha simulação") ──────────────────────────────────────────
   // ── formulários da proposta ──────────────────────────────────────────────────────────────────────────────────
@@ -257,26 +267,41 @@
   }
 
   // ── telas ────────────────────────────────────────────────────────────────────────────────────────────────────
-  const barraTopo = (extra = "") => `<div class="ap-topo"><span class="ap-marca">FelizCred</span><div class="ap-topo-dir">${extra}<button class="ap-icone" type="button" data-acao="chat" aria-label="Falar com a FelizCred">${IC.chat}</button></div></div>`;
+  const barraTopo = (extra = "") => `<div class="ap-topo"><span class="ap-marca">FelizCred</span><div class="ap-topo-dir">${extra}<button class="ap-icone" type="button" data-acao="chat" aria-label="Falar com a FelizCred">${IC.chat}</button>${EMBED ? `<button class="ap-icone" type="button" data-acao="fechar-embed" aria-label="Fechar">${IC.x}</button>` : ""}</div></div>`;
 
   function telaEntrada(erro = "", v = {}) {
     clearInterval(sondagem);
+    const login = lerLogin();
+    if (login && !state.outrosDados && !erro && !demo) return telaBemVindo(login);
     const fgts = state.produto === "fgts";
+    let wa = soDigitos(PARAMS.get("wa")); if (/^55\d{10,11}$/.test(wa)) wa = wa.slice(2);
+    const base = { name: v.name ?? "", cpf: v.cpf ?? "", phone: v.phone ?? (wa.length >= 10 ? maskTel(wa) : ""), email: v.email ?? "" };
     app.innerHTML = `${barraTopo()}
       <div class="ap-escolha" role="tablist"><button type="button" class="${fgts ? "" : "on"}" data-acao="produto" data-p="clt">Consignado CLT</button><button type="button" class="${fgts ? "on" : ""}" data-acao="produto" data-p="fgts">Antecipar FGTS</button></div>
       <div class="ap-capa"><span class="ap-tag verde">${fgts ? "Antecipação do FGTS" : "Consignado CLT"} · simulação grátis</span><h1>${fgts ? "Receba seu FGTS antes, sem sair do celular" : "Seu crédito em poucos minutos, sem sair do celular"}</h1>
         <ul class="ap-ponto"><li>${IC.ok}<span>${fgts ? "Consultamos seu saldo nos <b>bancos parceiros</b>" : "Consultamos <b>dois bancos ao mesmo tempo</b>"}</span></li><li>${IC.ok}<span>Você recebe por <b>Pix</b> na sua conta</span></li><li>${IC.ok}<span>Revê o contrato antes de assinar</span></li></ul></div>
       ${erro ? `<div class="ap-erro">${esc(erro)}</div>` : ""}
       <form class="form ap-form" data-form="entrada" autocomplete="on">
-        <label>Nome completo<input name="name" value="${esc(v.name || "")}" required autocomplete="name"></label>
-        <label>CPF<input name="cpf" value="${esc(v.cpf || "")}" inputmode="numeric" required placeholder="000.000.000-00"></label>
-        <label>Celular com DDD<input name="phone" value="${esc(v.phone || "")}" inputmode="tel" required placeholder="(00) 00000-0000" autocomplete="tel"></label>
-        <label>E-mail<input name="email" type="email" value="${esc(v.email || "")}" required autocomplete="email"></label>
+        <label>Nome completo<input name="name" value="${esc(base.name)}" required autocomplete="name" enterkeyhint="next"></label>
+        <label>CPF<input name="cpf" value="${esc(base.cpf)}" inputmode="numeric" required placeholder="000.000.000-00" enterkeyhint="next"></label>
+        <label>Celular com DDD<input name="phone" value="${esc(base.phone)}" inputmode="tel" required placeholder="(00) 00000-0000" autocomplete="tel" enterkeyhint="next"></label>
+        <label>E-mail<input name="email" type="email" value="${esc(base.email)}" required autocomplete="email" enterkeyhint="go"></label>
         ${fgts ? "" : '<label class="consent"><input type="checkbox" name="tres_meses" required> Tenho mais de 3 meses de registro no trabalho atual (CLT).</label>'}
         <label class="consent"><input type="checkbox" name="whatsapp" checked> Pode me avisar por WhatsApp quando as condições chegarem.</label>
         <button class="ap-btn principal grande" id="seguir">Simular agora</button>
       </form>
-      <p class="ap-rodape">${IC.cadeado} Seus dados são usados só para consultar as condições. Simulação sem compromisso.</p>`;
+      <p class="ap-rodape">${IC.cadeado} Seus dados ficam salvos neste aparelho para você voltar com um toque. Simulação sem compromisso.</p>`;
+  }
+  function telaBemVindo(login) {
+    const nome = esc(primeiroNome(login.name));
+    app.innerHTML = `${barraTopo()}
+      <div class="ap-capa"><span class="ap-tag verde">Bem-vindo de volta</span><h1>Olá, ${nome}!</h1><p class="ap-capa-sub">O que você quer simular agora?</p></div>
+      <div class="ap-tiles">
+        <button class="ap-tile" type="button" data-acao="iniciar" data-p="clt"><span class="ap-tile-ic">C</span><span><b>Consignado CLT</b><small>Para quem tem mais de 3 meses de registro</small></span><i>${IC.seta}</i></button>
+        <button class="ap-tile" type="button" data-acao="iniciar" data-p="fgts"><span class="ap-tile-ic fgts">F</span><span><b>Antecipar FGTS</b><small>Saque-aniversário</small></span><i>${IC.seta}</i></button>
+      </div>
+      <button class="ap-link" type="button" data-acao="outros-dados">Não sou ${nome} · usar outros dados</button>
+      <p class="ap-rodape">${IC.cadeado} Usamos os dados que você já informou. Simulação sem compromisso.</p>`;
   }
 
   function stepper(n, nomes = ["Autorização", "Análise", "Condições", "Contratação"]) {
@@ -348,10 +373,10 @@
     else if (n === 3) { titulo = "Sua antecipação está liberada"; sub = "Confira o valor e contrate. Você recebe por Pix."; }
     else if (n === 2) { titulo = "Autorize os bancos no app do FGTS"; sub = "Para consultar seu saldo, o FGTS precisa da sua autorização. Você faz direto no aplicativo, em menos de um minuto."; }
     else { titulo = "Consultando seu FGTS"; sub = "Estamos pedindo as condições aos bancos. Isso leva alguns instantes."; }
-    app.innerHTML = `${barraTopo(`<span class="ap-ola">Olá, ${esc(nome)}</span><button class="ap-avatar" type="button" data-acao="sair" title="Sair">${esc(nome.slice(0, 1).toUpperCase() || "F")}</button>`)}
+    app.innerHTML = `${barraTopo(`<span class="ap-ola">Olá, ${esc(nome)}</span><button class="ap-avatar" type="button" data-acao="menu" title="Menu">${esc(nome.slice(0, 1).toUpperCase() || "F")}</button>`)}
       ${stepper(n, NOMES_FGTS)}
       <section class="ap-hero ${sem ? "erro" : ""}"><h1>${titulo}</h1><p>${esc(sub)}</p>${n === 1 && !sem ? '<div class="ap-barra"><i></i></div>' : ""}</section>
-      ${state.erro ? `<div class="ap-erro">${esc(state.erro)}</div>` : ""}
+      ${state.aviso ? `<div class="ap-aviso">${esc(state.aviso)}</div>` : ""}${state.erro ? `<div class="ap-erro">${esc(state.erro)}</div>` : ""}
       ${temProposta ? cartaoProposta(c) : ""}
       ${c.etapa === "dados_pessoais" ? '<section class="ap-sim"><p class="ap-sub">Condição escolhida. Falta completar seus dados.</p><button class="ap-btn principal grande" type="button" data-acao="abrir-dados">Completar dados</button></section>' : ""}
       ${n === 3 ? cartaoOfertaFgts(c) : ""}
@@ -374,10 +399,10 @@
     const semTudo = u.k === "sem" && f.k === "sem";
     const bancoOfertas = u.k === "ofertas" ? "unno" : f.k === "ofertas" ? "facta" : null;
     const mostrarOfertas = !!bancoOfertas && !temProposta && c.etapa !== "dados_pessoais";
-    app.innerHTML = `${barraTopo(`<span class="ap-ola">Olá, ${esc(nome)}</span><button class="ap-avatar" type="button" data-acao="sair" title="Sair">${esc(nome.slice(0, 1).toUpperCase() || "F")}</button>`)}
+    app.innerHTML = `${barraTopo(`<span class="ap-ola">Olá, ${esc(nome)}</span><button class="ap-avatar" type="button" data-acao="menu" title="Menu">${esc(nome.slice(0, 1).toUpperCase() || "F")}</button>`)}
       ${stepper(n)}
       <section class="ap-hero ${semTudo ? "erro" : ""}"><h1>${titulo}</h1><p>${sub}</p>${!semTudo && !temProposta && n === 2 ? '<div class="ap-barra"><i></i></div>' : ""}</section>
-      ${state.erro ? `<div class="ap-erro">${esc(state.erro)}</div>` : ""}
+      ${state.aviso ? `<div class="ap-aviso">${esc(state.aviso)}</div>` : ""}${state.erro ? `<div class="ap-erro">${esc(state.erro)}</div>` : ""}
       ${temProposta ? cartaoProposta(c) : ""}
       ${c.etapa === "dados_pessoais" ? '<section class="ap-sim"><p class="ap-sub">Condição escolhida. Falta completar seus dados.</p><button class="ap-btn principal grande" type="button" data-acao="abrir-dados">Completar dados</button></section>' : ""}
       ${mostrarOfertas ? cartaoSimulador(c, bancoOfertas) : ""}
@@ -407,20 +432,50 @@
   function fecharSheet() { sheet.classList.remove("aberta"); document.body.classList.remove("trava"); sheet.innerHTML = ""; }
 
   // ── ajuda (chat) ─────────────────────────────────────────────────────────────────────────────────────────────
+  // O chat sabe em que etapa o cliente está: mostra a etapa e atalhos com as dúvidas mais comuns daquela etapa.
+  function statusAtual() {
+    const c = state.clt;
+    if (!c) return { linha: "Preenchendo seus dados", atalhos: ["Preciso de ajuda para começar"] };
+    const falar = "Quero falar com um atendente";
+    if (c.produto === "FGTS") {
+      if (c.etapa === "fgts_cotando") return { linha: "Consultando seu FGTS", atalhos: ["Está demorando para consultar", falar] };
+      if (c.etapa === "fgts_autorizar") return { linha: "Falta autorizar os bancos no app do FGTS", atalhos: ["Não sei autorizar no app do FGTS", "Já autorizei e não avançou", falar] };
+      if (c.etapa === "ofertas_disponiveis") return { linha: "Antecipação liberada: falta contratar", atalhos: ["Tenho dúvida sobre o valor", falar] };
+      if (c.etapa === "dados_pessoais") return { linha: "Preenchendo os dados da proposta", atalhos: ["Tenho dúvida em um campo", falar] };
+      if (ETAPAS_PROPOSTA.includes(c.etapa)) return { linha: "Proposta gerada: falta assinar", atalhos: ["Não consigo assinar", falar] };
+      return { linha: "Sem condições agora", atalhos: [falar] };
+    }
+    const u = estadoUnno(c), f = estadoFacta(c);
+    if (ETAPAS_PROPOSTA.includes(c.etapa)) return { linha: "Proposta gerada: falta assinar", atalhos: ["Não consigo assinar", falar] };
+    if (c.etapa === "dados_pessoais") return { linha: "Preenchendo os dados da proposta", atalhos: ["Tenho dúvida em um campo", falar] };
+    if (u.k === "ofertas" || f.k === "ofertas") return { linha: "Condições liberadas: falta contratar", atalhos: ["Tenho dúvida sobre os valores", falar] };
+    if (u.k === "autorizar") return { linha: "Falta autorizar no 1º banco (Unno)", atalhos: ["Não consigo abrir o link", "Já autorizei e não avançou", falar] };
+    if (f.k === "whats") return { linha: "Falta autorizar no WhatsApp (Facta)", atalhos: ["Não recebi a mensagem do Facta", "Já autorizei e não avançou", falar] };
+    if (u.k === "analisando") return { linha: "Bancos analisando seu perfil", atalhos: ["Está demorando", falar] };
+    return { linha: "Sem condições agora", atalhos: [falar] };
+  }
   function desenharChat() {
     if (!state.chat.aberto) return;
     const msgs = state.chat.msgs.filter((m) => !/^Tenho interesse em:/.test(String(m.body || "")));
-    const corpo = msgs.length ? msgs.map((m) => `<div class="ap-msg ${m.direction === "visitor" ? "eu" : "eles"}">${esc(m.body)}</div>`).join("") : '<p class="ap-vazio">Oi! Se tiver qualquer dúvida sobre a simulação, escreva aqui. Respondemos no horário de atendimento.</p>';
+    const corpo = msgs.length ? msgs.map((m) => `<div class="ap-msg ${m.direction === "visitor" ? "eu" : "eles"}">${esc(m.body)}</div>`).join("") : '<p class="ap-vazio">Oi! Se tiver qualquer dúvida sobre a simulação, escreva aqui ou toque em um atalho. Respondemos no horário de atendimento.</p>';
+    const st = statusAtual();
     sheet.innerHTML = `<div class="fundo" data-acao="fechar-chat"></div><div class="folha ap-chat" role="dialog" aria-modal="true" aria-label="Ajuda">
       <div class="puxador"></div><div class="ap-chat-topo"><b>Fale com a FelizCred</b><button class="ap-icone claro" type="button" data-acao="fechar-chat" aria-label="Fechar">${IC.x}</button></div>
+      <div class="ap-status"><span>Você está em</span><b>${esc(st.linha)}</b></div>
       <div class="ap-msgs" id="ap-msgs">${corpo}</div>
+      <div class="ap-atalhos">${st.atalhos.map((t) => `<button type="button" data-acao="atalho" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
       <form class="ap-chat-form" data-form="chat"><input name="msg" placeholder="Escreva sua dúvida" autocomplete="off" required><button class="ap-btn principal" ${state.chat.enviando ? "disabled" : ""}>Enviar</button></form></div>`;
     sheet.classList.add("aberta"); document.body.classList.add("trava");
     const m = document.getElementById("ap-msgs"); if (m) m.scrollTop = m.scrollHeight;
   }
+  async function enviarMensagem(texto) {
+    const t = String(texto || "").trim(); if (!t || demo) return;
+    state.chat.msgs.push({ direction: "visitor", body: t }); desenharChat();
+    try { await api(`/conversations/${state.session.id}`, { method: "POST", body: JSON.stringify({ message: t }) }); await carregarChat(); } catch (erro) { state.chat.msgs.push({ direction: "agent", body: erro.message }); desenharChat(); }
+  }
   async function carregarChat() {
     if (!state.session || demo) return;
-    try { const d = await api(`/conversations/${state.session.id}`); state.chat.msgs = d.messages || []; if (state.chat.aberto && !document.activeElement?.closest?.(".ap-chat-form")) desenharChat(); } catch {}
+    try { const d = await api(`/conversations/${state.session.id}`); const novas = d.messages || []; const mudou = novas.length !== state.chat.msgs.length; state.chat.msgs = novas; if (mudou && state.chat.aberto && !document.activeElement?.closest?.(".ap-chat-form")) desenharChat(); } catch {}
   }
   function abrirChat() {
     if (!state.session) { telaEntrada("Preencha seus dados para falar com a gente."); return; }
@@ -437,11 +492,38 @@
   }
   async function atualizar() {
     if (!state.session || demo) return;
-    try { const d = await api(`/conversations/${state.session.id}/clt/status`); if (d.clt) aplicar(d.clt); } catch (erro) { if (erro.status === 401 || erro.status === 404) sair(); }
+    try { const d = await api(`/conversations/${state.session.id}/clt/status`); state.session.lastSeen = Date.now(); if (d.clt) aplicar(d.clt); } catch (erro) { if (erro.status === 401 || erro.status === 404) reiniciarSozinho(); }
   }
-  function iniciarSondagem() { clearInterval(sondagem); if (demo) return; sondagem = setInterval(() => { if (!document.hidden && !sheet.classList.contains("aberta")) atualizar(); }, 4000); }
-  function sair() { try { localStorage.removeItem(KEY); } catch {} clearInterval(sondagem); clearInterval(sondagemChat); state.session = null; state.clt = null; state.assinatura = ""; state.chat = { aberto: false, msgs: [], enviando: false }; fecharSheet(); telaEntrada(); }
+  function iniciarSondagem() { clearInterval(sondagem); if (demo) return; sondagem = setInterval(() => { if (!document.hidden && !sheet.classList.contains("aberta")) atualizar(); }, 3000); }
+  // Sessão vencida (3 dias sem uso, ou o servidor não reconhece mais): recomeça sozinho com os dados salvos.
+  function reiniciarSozinho() {
+    const login = lerLogin(); limparSessao(); try { localStorage.removeItem(KEY); } catch {}
+    if (!login) { state.outrosDados = true; return telaEntrada(); }
+    state.aviso = "Sua simulação anterior venceu, então começamos uma nova com os seus dados.";
+    abrir(login);
+  }
+  function limparSessao() { clearInterval(sondagem); clearInterval(sondagemChat); state.session = null; state.clt = null; state.assinatura = ""; state.chat = { aberto: false, msgs: [], enviando: false }; state.erro = ""; state.aviso = ""; fecharSheet(); }
+  function sair() { try { localStorage.removeItem(KEY); localStorage.removeItem(LOGIN_KEY); } catch {} limparSessao(); state.outrosDados = true; telaEntrada(); }
 
+  // Cria a conversa e já inicia a simulação do produto escolhido (CLT: Unno na frente + Facta em paralelo; FGTS: bancos parceiros).
+  async function abrir(d) {
+    const produto = d.produto === "fgts" ? "fgts" : "clt";
+    state.produto = produto; state.outrosDados = false;
+    clearInterval(sondagem);
+    app.innerHTML = '<div class="splash"><span class="spinner" aria-hidden="true"></span><p>Abrindo sua simulação…</p></div>';
+    try {
+      const r = await fetch(`${API}/conversations`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: d.name, contact: d.phone, email: d.email, whatsappOptIn: d.whatsapp !== false, message: produto === "fgts" ? "Tenho interesse em: FGTS" : "Tenho interesse em: Empréstimo CLT", pageUrl: location.origin + "/app/" }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || "Não foi possível começar agora.");
+      state.clt = null; state.assinatura = "";
+      guardar({ id: j.conversation.id, token: j.token, name: d.name, contact: d.phone, email: d.email, produto, startedAt: Date.now(), expiresAt: Date.now() + TRINTA_DIAS });
+      guardarLogin({ name: d.name, cpf: d.cpf, phone: d.phone, email: d.email, whatsapp: d.whatsapp !== false, produto });
+      const s = produto === "fgts"
+        ? await api(`/conversations/${state.session.id}/clt/fgts-start`, { method: "POST", body: JSON.stringify({ cpf: d.cpf }) })
+        : await api(`/conversations/${state.session.id}/clt/start`, { method: "POST", body: JSON.stringify({ name: d.name, cpf: d.cpf, phone: d.phone }) });
+      aplicar(s.clt); iniciarSondagem();
+    } catch (erro) { limparSessao(); state.outrosDados = true; telaEntrada(erro.message, { name: d.name, cpf: maskCpf(d.cpf), phone: maskTel(d.phone), email: d.email }); }
+  }
   async function seguir(form) {
     const d = new FormData(form);
     const name = String(d.get("name") || "").trim().replace(/\s+/g, " ");
@@ -451,16 +533,18 @@
     if (cpf.length !== 11) return telaEntrada("Digite um CPF válido.", v);
     if (phone.length < 10) return telaEntrada("Digite um celular com DDD.", v);
     const botao = form.querySelector("#seguir"); botao.disabled = true; botao.textContent = "Abrindo…";
-    try {
-      const r = await fetch(`${API}/conversations`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, contact: phone, email, whatsappOptIn: d.has("whatsapp"), message: state.produto === "fgts" ? "Tenho interesse em: FGTS" : "Tenho interesse em: Empréstimo CLT", pageUrl: location.origin + "/app-teste/" }) });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || "Não foi possível começar agora.");
-      guardar({ id: j.conversation.id, token: j.token, name, contact: phone, email, expiresAt: Date.now() + 6 * 3600 * 1000 });
-      const s = state.produto === "fgts"
-        ? await api(`/conversations/${state.session.id}/clt/fgts-start`, { method: "POST", body: JSON.stringify({ cpf }) })
-        : await api(`/conversations/${state.session.id}/clt/start`, { method: "POST", body: JSON.stringify({ name, cpf, phone }) });
-      aplicar(s.clt); iniciarSondagem();
-    } catch (erro) { state.session = null; telaEntrada(erro.message, v); }
+    await abrir({ name, cpf, phone, email, whatsapp: d.has("whatsapp"), produto: state.produto });
+  }
+  function abrirMenu() {
+    const login = lerLogin();
+    sheet.innerHTML = `<div class="fundo" data-acao="fechar-sheet"></div><div class="folha ap-menu" role="dialog" aria-modal="true" aria-label="Menu"><div class="puxador"></div>
+      ${login ? `<p class="ap-menu-ola">${esc(login.name)}</p>` : ""}
+      ${login ? `<button class="ap-menu-item" type="button" data-acao="iniciar" data-p="clt"><b>Nova simulação de CLT</b><small>Recomeça com os seus dados</small></button>
+      <button class="ap-menu-item" type="button" data-acao="iniciar" data-p="fgts"><b>Nova simulação de FGTS</b><small>Recomeça com os seus dados</small></button>` : ""}
+      <button class="ap-menu-item" type="button" data-acao="chat"><b>Falar com a FelizCred</b><small>Tire dúvidas sobre a sua simulação</small></button>
+      <button class="ap-menu-item" type="button" data-acao="outros-dados"><b>Trocar meus dados</b><small>Usar outro nome, CPF ou celular</small></button>
+      <button class="ap-menu-item sair" type="button" data-acao="sair"><b>Sair deste aparelho</b><small>Apaga os dados salvos aqui</small></button></div>`;
+    sheet.classList.add("aberta"); document.body.classList.add("trava");
   }
 
   document.addEventListener("input", (e) => {
@@ -495,6 +579,15 @@
     if (!alvo) return;
     const acao = alvo.dataset.acao;
     if (acao === "sair") return sair();
+    if (acao === "menu") return abrirMenu();
+    if (acao === "fechar-embed") { try { parent.postMessage({ fcApp: "close" }, "*"); } catch {} return; }
+    if (acao === "iniciar") {
+      const login = lerLogin(); fecharSheet();
+      if (!login) { state.produto = alvo.dataset.p === "fgts" ? "fgts" : "clt"; limparSessao(); state.outrosDados = true; return telaEntrada(); }
+      limparSessao(); return abrir({ ...login, produto: alvo.dataset.p });
+    }
+    if (acao === "outros-dados") { limparSessao(); fecharSheet(); state.outrosDados = true; return telaEntrada(); }
+    if (acao === "atalho") { await enviarMensagem(alvo.dataset.t); return; }
     if (acao === "produto") {
       const f = document.querySelector("form[data-form=entrada]"); const d = f ? new FormData(f) : new FormData();
       state.produto = alvo.dataset.p === "fgts" ? "fgts" : "clt";
@@ -538,9 +631,8 @@
     const tipo = form.dataset.form;
     if (tipo === "entrada") return seguir(form);
     if (tipo === "chat") {
-      const campo = form.querySelector("input[name=msg]"); const texto = campo.value.trim(); if (!texto || demo) { campo.value = ""; return; }
-      campo.value = ""; state.chat.msgs.push({ direction: "visitor", body: texto }); desenharChat();
-      try { await api(`/conversations/${state.session.id}`, { method: "POST", body: JSON.stringify({ message: texto }) }); await carregarChat(); } catch (erro) { state.chat.msgs.push({ direction: "agent", body: erro.message }); desenharChat(); }
+      const campo = form.querySelector("input[name=msg]"); const texto = campo.value.trim(); campo.value = "";
+      if (texto) await enviarMensagem(texto);
       return;
     }
     if (tipo === "dados") {
@@ -554,6 +646,7 @@
     }
   });
   document.addEventListener("visibilitychange", () => { if (!document.hidden && state.session) atualizar(); });
+  window.addEventListener("focus", () => { if (state.session) atualizar(); });
 
   // ── início ───────────────────────────────────────────────────────────────────────────────────────────────────
   function barraDemo() {
@@ -567,8 +660,29 @@
     state.session = { id: "demo", token: "demo", name: "Salvador Felipe", contact: "47999999999", email: "demo@teste.com" };
     if (demo === "entrada") telaEntrada(); else { state.clt = demoClt(demo); state.assinatura = assinaturaClt(state.clt); telaApp(); if (/^dados-/.test(demo)) abrirSheet(); }
   } else {
-    const s = lerSessao();
-    if (!s) telaEntrada();
-    else { state.session = s; api(`/conversations/${s.id}/clt/status`).then((d) => { if (!d.clt) return telaEntrada(); aplicar(d.clt); iniciarSondagem(); }).catch(() => sair()); }
+    boot();
+  }
+  async function boot() {
+    const t = PARAMS.get("t");
+    if (t) {
+      try {
+        const r = await fetch(`${API}/access`, { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: t }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "Esse link expirou.");
+        guardar({ id: d.conversation.id, token: d.token, name: d.conversation.name, contact: d.conversation.contact || "", email: d.conversation.email || "", produto: /fgts/i.test(String(d.conversation.product || "")) ? "fgts" : "clt", startedAt: Date.now(), expiresAt: Date.now() + TRINTA_DIAS });
+        history.replaceState(null, "", location.pathname + (EMBED ? "?embed=1" : ""));
+      } catch (erro) { state.aviso = erro.message + " Entre com seus dados para continuar."; }
+    }
+    const s = state.session || lerSessao();
+    if (!s) return telaEntrada();
+    state.session = s;
+    const velha = Date.now() - Number(s.lastSeen || s.startedAt || 0) > TRES_DIAS;
+    try {
+      const d = await api(`/conversations/${s.id}/clt/status`);
+      // Passou o prazo: recomeça sozinho, EXCETO se já existe proposta gerada (o cliente não pode perder o link de assinatura).
+      if (velha && !(d.clt && ETAPAS_PROPOSTA.includes(d.clt.etapa))) return reiniciarSozinho();
+      if (!d.clt) { limparSessao(); return telaEntrada(); }
+      guardar(s); aplicar(d.clt); iniciarSondagem();
+    } catch (erro) { reiniciarSozinho(); }
   }
 })();

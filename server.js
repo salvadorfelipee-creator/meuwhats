@@ -161,7 +161,7 @@ function siteChatCltPublicoUnnotech(row) {
     parallelFacta: parseJsonSeguro(row.facta_paralelo_json).estado || null,
     motivoRecusa: blob.motivo_recusa || null,
     error: row.error_message || null,
-    trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/minha-simulacao/?t=${encodeURIComponent(row.tracking_token)}` : null,
+    trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/app/?t=${encodeURIComponent(row.tracking_token)}` : null,
   };
 }
 
@@ -743,6 +743,21 @@ function padroesProposta(customer, provider, cpf) {
     def("nome_pai", "NÃO DECLARADO"); def("tipo_chave_pix", "1"); def("chave_pix", cpf);
   }
   return c;
+}
+
+// Texto curto do que o cliente deve fazer em cada etapa do app (usado na resposta do chat de ajuda).
+function dicaEtapaApp(row) {
+  const e = row?.etapa || "";
+  if (!row) return "Preencha seus dados na tela e toque em “Simular agora”.";
+  if (e === "fgts_autorizar") return "Para consultar o seu FGTS, autorize os 3 bancos no aplicativo do FGTS (Meu FGTS › Autorizações) e toque em “Já autorizei, consultar de novo”.";
+  if (e === "fgts_cotando") return "Estamos consultando o seu FGTS. A tela atualiza sozinha em alguns instantes.";
+  if (e === "autorizacao_enviada" && row.provider === "unnotech") return "Falta autorizar no primeiro banco: toque em “Autorizar agora” no cartão do Unno, confirme e volte para esta tela.";
+  if (["autorizacao_enviada", "aguardando_autorizacao"].includes(e)) return "Falta autorizar no Facta: abra o WhatsApp, procure a mensagem do Facta e toque no link. A tela atualiza sozinha.";
+  if (["consultando_margem", "simulando"].includes(e)) return "Os bancos estão analisando. Costuma levar alguns minutos e a tela atualiza sozinha.";
+  if (e === "ofertas_disponiveis") return "Suas condições já estão na tela: escolha o prazo e toque em “Contratar esta condição”.";
+  if (e === "dados_pessoais") return "Complete os dados no formulário e toque em “Gerar proposta”.";
+  if (["aguardando_assinatura_facta", "proposta_em_analise", "proposta_concluida"].includes(e)) return "Sua proposta está gerada: toque em “Revisar e assinar” e confira o contrato inteiro antes de assinar.";
+  return "Estamos analisando o seu caso.";
 }
 
 function parseJsonSeguro(texto) {
@@ -5583,7 +5598,7 @@ const CTA_CHAT_CONSIGNADO = { buttonText: "Abrir meu painel" };
 
 function linkChatConsignado(phone, produto = "clt") {
   const digitos = String(phone || "").replace(/\D/g, "").replace(/^55/, "");
-  return `https://www.felizcred.com.br/minha-simulacao/?novo=${produto}&wa=${digitos}&utm_source=whatsapp&utm_medium=${produto === "fgts" ? "fgts" : "consignado"}`;
+  return `https://www.felizcred.com.br/app/?novo=${produto}&wa=${digitos}&utm_source=whatsapp&utm_medium=${produto === "fgts" ? "fgts" : "consignado"}`;
 }
 
 const BOTOES_CONFIRMA_CONSIGNADO = [
@@ -5914,7 +5929,7 @@ async function tratarRespostaConsignado({ de, businessNumberId, tipo, msg, conve
         }
         await irPara("consignado_chat");
         if (!(await respondeuHaPouco(de, businessNumberId, 10))) {
-          const link = pendente.clt.tracking_token ? `https://www.felizcred.com.br/minha-simulacao/?t=${encodeURIComponent(pendente.clt.tracking_token)}` : linkChatConsignado(de);
+          const link = pendente.clt.tracking_token ? `https://www.felizcred.com.br/app/?t=${encodeURIComponent(pendente.clt.tracking_token)}` : linkChatConsignado(de);
           await responder(`Você começou sua simulação no dia ${dia} e ainda não terminou. Toque no botão abaixo para continuar exatamente de onde parou 😊`, null, { ...CTA_CHAT_CONSIGNADO, url: link });
         }
         return true;
@@ -7184,7 +7199,7 @@ const server = http.createServer(async (req, res) => {
             if (!emailCliente) return send(res, 400, { error: "Não temos um e-mail para enviar o acesso." }, corsHeaders);
             if (!atual) return send(res, 400, { error: "A simulação ainda não começou." }, corsHeaders);
             const comToken = await garantirTrackingToken(atual);
-            const link = `https://www.felizcred.com.br/minha-simulacao/?t=${encodeURIComponent(comToken.tracking_token)}&utm_source=email&utm_medium=acesso`;
+            const link = `https://www.felizcred.com.br/app/?t=${encodeURIComponent(comToken.tracking_token)}&utm_source=email&utm_medium=acesso`;
             await enviarAcessoSimulacaoFelizcred({ nome: conversation.name, email: emailCliente, link });
             const [usuario, dominio] = emailCliente.split("@");
             return send(res, 200, { sent: true, email: `${usuario.slice(0, 2)}${"*".repeat(Math.max(usuario.length - 2, 1))}@${dominio}` }, corsHeaders);
@@ -7387,6 +7402,18 @@ const server = http.createServer(async (req, res) => {
         // Atendente respondeu há pouco pelo painel (ou ainda está na conversa): o assistente automático fica calado.
         if (Number(conversation.bot_pausado_ate || 0) > Date.now()) {
           return send(res, 201, { ok: true, clt: conversation.produto_tag === "Empréstimo CLT", handoff: true, botPausado: true }, corsHeaders);
+        }
+        // Conversa aberta pelo app: sem robô. Resposta curta com a dica da etapa atual (no máximo uma a cada 3 min) e o pedido
+        // fica marcado para o atendimento humano, que vê a etapa e os valores no painel.
+        if (ehConversaApp(conversation)) {
+          const row = await db.siteChatCltObter(id).catch(() => null);
+          const recentes = await db.siteChatMensagens(id).catch(() => []);
+          const ultimaAuto = [...recentes].reverse().find((m) => m.direction === "agent" && m.sender_name === "Assistente FelizCred");
+          if (!ultimaAuto || Date.now() - Number(ultimaAuto.created_at || 0) > 3 * 60_000) {
+            await db.siteChatMensagemAtendente(id, "Assistente FelizCred", `Recebi sua mensagem e um atendente responde em breve. Enquanto isso: ${dicaEtapaApp(row)}`);
+          }
+          await db.siteChatConfirmarHumano(id).catch(() => {});
+          return send(res, 201, { ok: true, handoff: true }, corsHeaders);
         }
         const normalizadaHumano = message.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
         const pediuHumano = /\b(falar|conversar|chamar).{0,18}\b(humano|pessoa|atendente|atendimento)\b|\bquero (?:um |uma )?(?:humano|atendente)\b/i.test(message);
