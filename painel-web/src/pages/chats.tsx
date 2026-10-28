@@ -2791,6 +2791,7 @@ function ContactDetails({
   const estagios = pipelineEstagiosPara(current?.label)
 
   const [nota, setNota] = React.useState(conversation.nota || "")
+  const [notaSalva, setNotaSalva] = React.useState(false)
   const [salvando, setSalvando] = React.useState(false)
   const [reabrindo, setReabrindo] = React.useState(false)
   const [reabrirMsg, setReabrirMsg] = React.useState<string | null>(null)
@@ -2886,8 +2887,13 @@ function ContactDetails({
   async function salvar() {
     setSalvando(true)
     try {
-      await api.setNota(businessId, conversation.phone, nota)
+      // Canal da própria conversa (em "Todos os canais" o canal atual pode estar desatualizado e o UPDATE não acharia a linha).
+      await api.setNota(conversation.business_number_id || businessId, conversation.phone, nota)
       onSaved()
+      setNotaSalva(true)
+      window.setTimeout(() => setNotaSalva(false), 2500)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao salvar a nota")
     } finally {
       setSalvando(false)
     }
@@ -3151,8 +3157,9 @@ function ContactDetails({
           className="text-sm bg-background"
         />
         <Button size="sm" className="w-fit" onClick={salvar} disabled={salvando}>
-          {salvando ? "Salvando..." : "Salvar nota"}
+          {salvando ? "Salvando..." : notaSalva ? "Salvo ✓" : "Salvar nota"}
         </Button>
+        <p className="text-[11px] text-muted-foreground">Fica fixa aqui no topo. Para guardar anotações com data, use o "Histórico de notas" mais abaixo.</p>
       </div>
 
       {/* Copiloto de vendas (IA) — rascunho de resposta + leitura estratégica da conversa,
