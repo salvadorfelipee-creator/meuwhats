@@ -361,8 +361,16 @@
         <li><span>2</span><p>Vá em <b>Meu FGTS › Autorizações</b>.</p></li>
         <li><span>3</span><p><b>Autorize os bancos J17, BMP e BMS.</b><br>Depois de autorizar, é preciso <b>Salvar</b> e então <b>Confirmar</b> para dar certo.</p></li>
         <li><span>4</span><p><b>Volte aqui</b> e toque em “Já autorizei”. A autorização vale por 90 dias.</p></li></ol>
-      <div class="ap-acoes"><a class="ap-btn suave" href="https://fgts.caixa.gov.br" target="_blank" rel="noopener">Abrir o site do FGTS</a>
+      <div class="ap-acoes"><a class="ap-btn suave" href="${linkAppFgts()}" target="_blank" rel="noopener">Abrir o app do FGTS</a>
         ${esperar ? "" : `<button class="ap-btn principal" type="button" data-acao="fgts-requote" ${state.fgtsLoading ? "disabled" : ""}>${state.fgtsLoading ? '<i class="ap-spin"></i> Consultando de novo…' : "Já autorizei, consultar de novo"}</button>`}</div></section>`;
+  }
+  // Abre o app FGTS conforme o aparelho: Android tenta o app (e cai na Play Store), iPhone vai à App Store
+  // (o iOS não tem esquema público do app), e computador abre o site.
+  function linkAppFgts() {
+    const ua = navigator.userAgent || "";
+    if (/android/i.test(ua)) return "intent://#Intent;package=br.gov.caixa.fgts.trabalhador;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dbr.gov.caixa.fgts.trabalhador;end";
+    if (/iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1)) return "https://apps.apple.com/br/app/fgts/id1038716031";
+    return "https://fgts.caixa.gov.br";
   }
   function cartaoOfertaFgts(c) {
     const o = (c.offers || [])[0];
