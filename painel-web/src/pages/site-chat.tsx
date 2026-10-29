@@ -241,6 +241,17 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
               {selecionada.page_url && <div><dt className="text-[11px] uppercase tracking-wide text-muted-foreground">Página de origem</dt><dd className="break-all text-xs">{selecionada.page_url}</dd></div>}
               {selecionada.human_intent_stage === "requested" && <div className="rounded-md bg-amber-100 px-2 py-1.5 text-xs font-medium text-amber-800">Pediu atendimento humano</div>}
             </dl>
+            {clt?.provider === "unnotech" && clt.consentUrl && ["autorizacao_enviada", "fgts_autorizar"].includes(clt.etapa) && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-2.5">
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-800">Link de autorização do Unno</p>
+                <p className="select-all break-all text-xs">{clt.consentUrl}</p>
+                <div className="mt-2 flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => navigator.clipboard?.writeText(clt.consentUrl || "").catch(() => {})}>Copiar</Button>
+                  <Button size="sm" variant="outline" asChild><a href={clt.consentUrl} target="_blank" rel="noreferrer">Abrir</a></Button>
+                </div>
+                <p className="mt-1.5 text-[10px] text-amber-800">Some sozinho quando o cliente autoriza.</p>
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Etapa do pipeline</label>
               <select

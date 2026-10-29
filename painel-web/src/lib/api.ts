@@ -125,6 +125,7 @@ export type SiteChatClt = {
   status: string | null
   proposalCode?: string | null
   contractLink?: string | null
+  consentUrl?: string | null
   selectedOffer?: {
     installments: number
     installmentValue: number
