@@ -254,3 +254,13 @@ body.espelho .ap-fab { display: none !important; }
 @media (min-width: 900px) { body:not(.embed) .ap-aviso-facta { right: max(16px, calc(50% - 214px)); } }
 @media (prefers-reduced-motion: reduce) { .ap-aviso-facta { animation: none; } }
 body.trava .ap-aviso-facta, body.espelho .ap-aviso-facta { display: none; }
+
+/* "Role para ver mais": indicador fixo no rodapé enquanto há conteúdo abaixo */
+.ap-mais { position: fixed; z-index: 18; left: 16px; bottom: calc(24px + env(safe-area-inset-bottom)); display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; border: 1px solid #cfdcd5; border-radius: 999px; background: rgba(255, 255, 255, .95); color: var(--verde-escuro); font: 700 13px "DM Sans", sans-serif; box-shadow: 0 6px 16px rgba(7, 26, 47, .14); }
+.ap-mais[hidden] { display: none; }
+.ap-mais i { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); animation: ap-mais-pula 1.4s ease-in-out infinite; }
+@keyframes ap-mais-pula { 0%, 100% { translate: 0 0; } 50% { translate: 0 4px; } }
+@media (min-width: 900px) { body:not(.embed) .ap-mais { left: max(16px, calc(50% - 214px)); } }
+@media (prefers-reduced-motion: reduce) { .ap-mais i { animation: none; } }
+body.trava .ap-mais, body.espelho .ap-mais { display: none; }
+.ap-banco[data-banco] { scroll-margin-top: 14px; }

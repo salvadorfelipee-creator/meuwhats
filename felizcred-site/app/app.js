@@ -229,7 +229,7 @@
     // "Falta você" só quando o botão já existe; enquanto o banco gera o link, o selo diz que somos nós trabalhando.
     if (banco === "unno" && e.k === "autorizar" && !c.consentUrl) { rot = "Preparando"; cor = "amarelo"; }
     const vivo = ["autorizar", "whats", "analisando"].includes(e.k);
-    return `<section class="ap-banco ${["sem", "dispensado"].includes(e.k) ? "apagado" : ""} ${vivo ? "vivo" : ""}">
+    return `<section data-banco="${banco}" class="ap-banco ${["sem", "dispensado"].includes(e.k) ? "apagado" : ""} ${vivo ? "vivo" : ""}">
       <header><span class="ap-logo ${banco}">${nome[0]}</span><div><b>${nome}</b><small>${banco === "unno" ? "Banco parceiro · autorização por link" : "Banco parceiro · autorização por WhatsApp"}</small></div><span class="ap-tag ${cor}">${vivo ? '<i class="ap-pulso"></i>' : ""}${rot}</span></header>
       <ul class="ap-lista">${linhasBanco(banco, e)}</ul>${acaoBanco(banco, e, c)}</section>`;
   }
@@ -724,7 +724,26 @@
     el.className = "ap-aviso-facta"; el.setAttribute("role", "status");
     el.innerHTML = "<b>Enquanto o link do Unno é preparado,</b> autorize o Facta: enviamos uma mensagem no seu WhatsApp. É só tocar no link que já libera e aparece aqui.";
     document.body.appendChild(el);
+    // Leva a tela até o cartão do Facta (depois do desenho da tela); a pessoa pode rolar de volta quando quiser.
+    setTimeout(() => document.querySelector('[data-banco="facta"]')?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
     setTimeout(() => { el.classList.add("saindo"); setTimeout(() => el.remove(), 400); }, AVISO_FACTA_MS);
+  }
+
+  // Indicador de "tem mais embaixo": aparece enquanto falta rolar e some perto do fim da página.
+  if (!ESPELHO) {
+    const mais = document.createElement("button");
+    mais.type = "button"; mais.className = "ap-mais"; mais.hidden = true; mais.setAttribute("aria-label", "Ver mais, role a tela para baixo");
+    mais.innerHTML = "<span>Role para ver mais</span><i aria-hidden=\"true\"></i>";
+    document.body.appendChild(mais);
+    const atualizarMais = () => {
+      const falta = document.documentElement.scrollHeight - window.scrollY - window.innerHeight;
+      mais.hidden = falta < 90;
+    };
+    mais.addEventListener("click", () => window.scrollBy({ top: Math.round(window.innerHeight * 0.7), behavior: "smooth" }));
+    window.addEventListener("scroll", atualizarMais, { passive: true });
+    window.addEventListener("resize", atualizarMais);
+    if (window.ResizeObserver) new ResizeObserver(atualizarMais).observe(document.body);
+    atualizarMais();
   }
 
   // ── início ───────────────────────────────────────────────────────────────────────────────────────────────────
