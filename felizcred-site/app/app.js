@@ -359,7 +359,7 @@
       <ol class="ap-passos">
         <li><span>1</span><p><b>Abra o aplicativo FGTS</b> (ou entre em fgts.caixa.gov.br) e faça login.</p></li>
         <li><span>2</span><p>Vá em <b>Meu FGTS › Autorizações</b>.</p></li>
-        <li><span>3</span><p><b>Autorize estes 3 bancos.</b> Ao digitar o nome de cada banco, toque em <b>Salvar</b> e depois em <b>Confirmar</b>: só digitar o nome não vale.<br><em>J17 Sociedade de Crédito Direto S/A · BMP Sociedade de Crédito Direto S.A. · BMP Sociedade de Crédito ao Microempreendedor e à Empresa de Pequeno Porte Ltda</em></p></li>
+        <li><span>3</span><p><b>Autorize os bancos J17, BMP e BMS.</b><br>Depois de autorizar, é preciso <b>Salvar</b> e então <b>Confirmar</b> para dar certo.</p></li>
         <li><span>4</span><p><b>Volte aqui</b> e toque em “Já autorizei”. A autorização vale por 90 dias.</p></li></ol>
       <div class="ap-acoes"><a class="ap-btn suave" href="https://fgts.caixa.gov.br" target="_blank" rel="noopener">Abrir o site do FGTS</a>
         ${esperar ? "" : `<button class="ap-btn principal" type="button" data-acao="fgts-requote" ${state.fgtsLoading ? "disabled" : ""}>${state.fgtsLoading ? '<i class="ap-spin"></i> Consultando de novo…' : "Já autorizei, consultar de novo"}</button>`}</div></section>`;
