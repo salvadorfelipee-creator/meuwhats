@@ -15,7 +15,7 @@ const crypto = require("crypto");
 
 const PRAZO_AUTORIZACAO_MS = 72 * 3600_000;
 const PRAZO_ETAPA_MS = 45 * 60_000;
-const ESPERA_COTACOES_MS = Number(process.env.UNNO_ESPERA_COTACOES_MS) || 60_000; // depois de 1 min simulando, mostra as ofertas que já chegaram
+ // depois de 1 min simulando, mostra as ofertas que já chegaram
 const ETAPAS_EM_ANDAMENTO = ["autorizacao_enviada", "aguardando_autorizacao", "consultando_margem", "simulando", "fgts_cotando"];
 const ETAPAS_ACOMPANHAMENTO = ["aguardando_assinatura_facta", "proposta_em_analise"];
 
@@ -224,11 +224,9 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       });
     }
 
-    // Quando ainda há financeira cotando (quotes_pending > 0), espera até ESPERA_COTACOES_MS pelas outras; depois mostra o que já
-    // chegou. Antes esperava todas responderem, e uma financeira lenta deixava o cliente preso em "analisando" com oferta pronta.
+    // Mostra as ofertas assim que a primeira financeira liberar valor, mesmo com outras ainda cotando: o cliente não espera na tela.
     const cotacoesPendentes = Number(status.quotes_pending || 0);
-    const jaEsperouCotacoes = Date.now() - desde > ESPERA_COTACOES_MS;
-    if (status.status === "OFFERS_AVAILABLE" && (cotacoesPendentes === 0 || jaEsperouCotacoes) && ["simulando", "consultando_margem", "autorizacao_enviada"].includes(row.etapa)) {
+    if (status.status === "OFFERS_AVAILABLE" && ["simulando", "consultando_margem", "autorizacao_enviada"].includes(row.etapa)) {
       const completa = await unnotech.consultarSolicitacaoCompletaClt(row.transaction_id);
       if (!ofertasValidas(completa.offers).length) {
         if (cotacoesPendentes > 0) return atualizar(row, { status_novosaque: status.status }); // ainda sem oferta válida: continua esperando as cotações
