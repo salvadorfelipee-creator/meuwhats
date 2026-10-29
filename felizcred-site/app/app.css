@@ -245,3 +245,12 @@ body.espelho .ap-fab { display: none !important; }
 @keyframes pulsa { 0%, 100% { transform: scale(1); box-shadow: 0 8px 18px rgba(8,122,71,.28), 0 0 0 0 rgba(8,122,71,.55); } 50% { transform: scale(1.03); box-shadow: 0 10px 22px rgba(8,122,71,.38), 0 0 0 12px rgba(8,122,71,0); } }
 @keyframes brilho { 0% { transform: translateX(-140%) skewX(-18deg); } 55%, 100% { transform: translateX(380%) skewX(-18deg); } }
 @media (prefers-reduced-motion: reduce) { .ap-btn.pulsa, .ap-btn.pulsa::after { animation: none; } }
+
+/* Aviso do Facta ao lado do botão de ajuda (some sozinho depois de 6 s) */
+.ap-aviso-facta { position: fixed; z-index: 19; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); width: min(260px, calc(100vw - 32px)); margin: 0; padding: 10px 12px; border: 1px solid #dbe7e0; border-radius: 14px; background: rgba(255, 255, 255, .94); box-shadow: 0 6px 18px rgba(7, 26, 47, .12); font-size: 13px; line-height: 1.38; color: #0e2230; animation: ap-aviso-entra .5s ease both; transition: opacity .4s; }
+.ap-aviso-facta b { color: var(--verde-escuro); }
+.ap-aviso-facta.saindo { opacity: 0; }
+@keyframes ap-aviso-entra { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (min-width: 900px) { body:not(.embed) .ap-aviso-facta { right: max(16px, calc(50% - 214px)); } }
+@media (prefers-reduced-motion: reduce) { .ap-aviso-facta { animation: none; } }
+body.trava .ap-aviso-facta, body.espelho .ap-aviso-facta { display: none; }

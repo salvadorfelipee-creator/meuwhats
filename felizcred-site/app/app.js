@@ -155,6 +155,7 @@
       case "dados-unno": return { ...base, etapa: "dados_pessoais", parallelFacta: "descartada", selectedOffer: DEMO_OFERTAS[1] };
       case "dados-facta": return { ...base, provider: "facta", etapa: "dados_pessoais", parallelFacta: "facta_venceu", selectedOffer: DEMO_OFERTAS[1], customerDefaults: { nome: "Salvador Felipe", celular: "47999999999", sexo: "3", data_nascimento: "16/09/1975", nome_mae: "" } };
       case "autorizar": return { ...base, etapa: "autorizacao_enviada" };
+      case "preparando": return { ...base, etapa: "autorizacao_enviada", consentUrl: null, parallelFacta: "aguardando" };
       case "analisando": return { ...base, etapa: "simulando", parallelFacta: "aguardando" };
       case "whatsapp": return { ...base, provider: "facta", etapa: "autorizacao_enviada", parallelFacta: "facta_assumiu" };
       case "ofertas": return { ...base, etapa: "ofertas_disponiveis", parallelFacta: "descartada", offers: DEMO_OFERTAS };
@@ -435,6 +436,7 @@
     const c = state.clt;
     const nome = String(state.session?.name || "").trim().split(/\s+/)[0] || "";
     const u = estadoUnno(c), f = estadoFacta(c);
+    avisoFacta(c, f);
     const n = passo(c, u, f);
     const [titulo, sub] = heroTexto(c, u, f, n);
     const temProposta = ETAPAS_PROPOSTA.includes(c.etapa);
@@ -710,9 +712,24 @@
   fab.innerHTML = `${IC.chat}<span>Ajuda</span>`;
   document.body.appendChild(fab);
 
+  // Aviso curto ao lado do botão de ajuda: o Facta já foi enviado por WhatsApp e o link do Unno ainda está sendo gerado.
+  // Fica 6 segundos e fecha sozinho para não ocupar a tela; aparece uma vez por conversa.
+  const AVISO_FACTA_MS = 6000;
+  function avisoFacta(c, f) {
+    if (ESPELHO || !f || f.k !== "whats" || c.provider !== "unnotech" || c.etapa !== "autorizacao_enviada" || c.consentUrl) return;
+    if (document.querySelector(".ap-aviso-facta")) return;
+    const chave = `fc_aviso_facta_${state.session?.id || ""}`;
+    if (!demo) { try { if (localStorage.getItem(chave)) return; localStorage.setItem(chave, "1"); } catch {} }
+    const el = document.createElement("p");
+    el.className = "ap-aviso-facta"; el.setAttribute("role", "status");
+    el.innerHTML = "<b>Enquanto o link do Unno é preparado,</b> autorize o Facta: enviamos uma mensagem no seu WhatsApp. É só tocar no link que já libera e aparece aqui.";
+    document.body.appendChild(el);
+    setTimeout(() => { el.classList.add("saindo"); setTimeout(() => el.remove(), 400); }, AVISO_FACTA_MS);
+  }
+
   // ── início ───────────────────────────────────────────────────────────────────────────────────────────────────
   function barraDemo() {
-    const lista = ["autorizar", "analisando", "whatsapp", "ofertas", "dados-unno", "dados-facta", "proposta", "sem", "fgts-consulta", "fgts-autorizar", "fgts-oferta", "fgts-sem"];
+    const lista = ["autorizar", "preparando", "analisando", "whatsapp", "ofertas", "dados-unno", "dados-facta", "proposta", "sem", "fgts-consulta", "fgts-autorizar", "fgts-oferta", "fgts-sem"];
     const el = document.createElement("div"); el.className = "ap-demo";
     el.innerHTML = '<b>Prévia</b>' + lista.map((k) => `<a href="?demo=${k}" class="${k === demo ? "on" : ""}">${k}</a>`).join("") + '<a href="?demo=entrada" class="' + (demo === "entrada" ? "on" : "") + '">entrada</a>';
     document.body.prepend(el);
