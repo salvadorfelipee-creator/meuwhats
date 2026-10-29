@@ -99,6 +99,15 @@ async function cliente(cen, i, telefone) {
   const r2 = await db.execute({ sql: "SELECT status FROM site_chat_conversations WHERE id=?", args: [novo.id] });
   check("F", "chat novo continua aberto", r2.rows[0]?.status === "open", r2.rows[0]?.status);
 
+  console.log("\n[G] Oferta pronta, mas uma financeira ainda cotando (quotes_pending > 0): mostra depois da espera, sem prender o cliente");
+  await ctl("unno", { phase: "awaiting_auth", travarSimulacao: false, aposSimulacao: "offers_pending" });
+  const g = await cliente("G", 5); await ctl("facta", { cpf: g.cpf, set: { modo: "fila", autorizado: false } });
+  await g.start(); await ctl("unno", { phase: "authorized" }); await g.clt(); await sleep(3000); let cg = await g.clt();
+  check("G", "com cotação pendente, logo no começo ainda espera", cg.etapa === "simulando", cg.etapa);
+  await sleep(6000); cg = await g.clt();
+  check("G", "passada a espera, mostra as ofertas que já chegaram", cg.provider === "unnotech" && cg.etapa === "ofertas_disponiveis" && (cg.offers || []).length > 0, `${cg.provider}/${cg.etapa}`);
+  await ctl("unno", { aposSimulacao: null });
+
   console.log("\nRESUMO:", R.filter((x) => x.ok).length + "/" + R.length, "ok");
   console.log("FALHAS:\n  " + R.filter((x) => !x.ok).map((x) => `[${x.cen}] ${x.nome}`).join("\n  "));
 })().catch((e) => console.error("ERRO NO DRIVER", e));

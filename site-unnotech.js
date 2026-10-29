@@ -15,6 +15,7 @@ const crypto = require("crypto");
 
 const PRAZO_AUTORIZACAO_MS = 72 * 3600_000;
 const PRAZO_ETAPA_MS = 45 * 60_000;
+const ESPERA_COTACOES_MS = Number(process.env.UNNO_ESPERA_COTACOES_MS) || 60_000; // depois de 1 min simulando, mostra as ofertas que já chegaram
 const ETAPAS_EM_ANDAMENTO = ["autorizacao_enviada", "aguardando_autorizacao", "consultando_margem", "simulando", "fgts_cotando"];
 const ETAPAS_ACOMPANHAMENTO = ["aguardando_assinatura_facta", "proposta_em_analise"];
 
@@ -223,9 +224,16 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       });
     }
 
-    if (status.status === "OFFERS_AVAILABLE" && Number(status.quotes_pending || 0) === 0 && ["simulando", "consultando_margem", "autorizacao_enviada"].includes(row.etapa)) {
+    // Quando ainda há financeira cotando (quotes_pending > 0), espera até ESPERA_COTACOES_MS pelas outras; depois mostra o que já
+    // chegou. Antes esperava todas responderem, e uma financeira lenta deixava o cliente preso em "analisando" com oferta pronta.
+    const cotacoesPendentes = Number(status.quotes_pending || 0);
+    const jaEsperouCotacoes = Date.now() - desde > ESPERA_COTACOES_MS;
+    if (status.status === "OFFERS_AVAILABLE" && (cotacoesPendentes === 0 || jaEsperouCotacoes) && ["simulando", "consultando_margem", "autorizacao_enviada"].includes(row.etapa)) {
       const completa = await unnotech.consultarSolicitacaoCompletaClt(row.transaction_id);
-      if (!ofertasValidas(completa.offers).length) return encerrar(row, "sem_oferta", "Os bancos parceiros não aprovaram uma condição agora.");
+      if (!ofertasValidas(completa.offers).length) {
+        if (cotacoesPendentes > 0) return atualizar(row, { status_novosaque: status.status }); // ainda sem oferta válida: continua esperando as cotações
+        return encerrar(row, "sem_oferta", "Os bancos parceiros não aprovaram uma condição agora.");
+      }
       await db.siteChatFunilEvento(row.conversation_id, "oferta_disponivel", "ofertas_disponiveis", "unnotech").catch(() => {});
       await db.siteChatDefinirPipeline(row.conversation_id, "proposta").catch(() => {});
       await falar(row, "Encontramos condições com bancos parceiros. Os valores ainda passam pela análise final do banco.");
