@@ -764,10 +764,10 @@ export const api = {
       { method: "POST", body: JSON.stringify({ text, ...midia, replyToWaId: replyToWaId || undefined }) },
     ),
 
-  reabrirFluxo: (businessId: string, phone: string) =>
+  reabrirFluxo: (businessId: string, phone: string, etapa?: "inicio" | "link_simulacao") =>
     request<{ ok: true }>(
       `/painel/api/conversations/${encodeURIComponent(businessId)}/${encodeURIComponent(phone)}/reabrir-fluxo`,
-      { method: "POST" },
+      { method: "POST", body: JSON.stringify({ etapa: etapa || "inicio" }) },
     ),
 
   setStatus: (businessId: string, phone: string, status: "novo" | "andamento" | "resolvido") =>

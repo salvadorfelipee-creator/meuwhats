@@ -2961,12 +2961,12 @@ function ContactDetails({
 
   // Mesmo efeito de o cliente mandar "menu" — pra quando o fluxo automático falhou/travou e
   // não dá pra depender de pedir pro cliente digitar algo.
-  async function reabrirFluxo() {
+  async function reabrirFluxo(etapa: "inicio" | "link_simulacao" = "inicio") {
     setReabrindo(true)
     setReabrirMsg(null)
     try {
-      await api.reabrirFluxo(businessId, conversation.phone)
-      setReabrirMsg("Fluxo reaberto! ✅")
+      await api.reabrirFluxo(businessId, conversation.phone, etapa)
+      setReabrirMsg(etapa === "link_simulacao" ? "Link da simulação enviado! ✅" : "Fluxo reaberto! ✅")
     } catch (err) {
       setReabrirMsg(err instanceof Error ? err.message : "Erro ao reabrir")
     } finally {
@@ -3472,12 +3472,15 @@ function ContactDetails({
         <div className="flex flex-col gap-2 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
             <ExportarConversaBotao businessId={businessId} phone={conversation.phone} />
-            <Button size="sm" variant="outline" onClick={reabrirFluxo} disabled={reabrindo}>
-              {reabrindo ? "Reabrindo..." : "Reabrir fluxo automático"}
+            <Button size="sm" variant="outline" onClick={() => reabrirFluxo("inicio")} disabled={reabrindo}>
+              {reabrindo ? "Enviando..." : "Reabrir fluxo (do início)"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => reabrirFluxo("link_simulacao")} disabled={reabrindo}>
+              Enviar link da simulação
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            "Reabrir fluxo" tem o mesmo efeito de o cliente mandar "menu" — use se a automação travou.
+            "Do início" é como o cliente mandar "menu". "Enviar link da simulação" é a resposta de quem tocou em "Desejo simular" (só no CLT).
           </p>
           {reabrirMsg && <p className="text-xs">{reabrirMsg}</p>}
         </div>

@@ -8504,7 +8504,16 @@ const server = http.createServer(async (req, res) => {
       const phone = decodeURIComponent(matchReabrirFluxo[2]);
       if (businessId === "instagram") return send(res, 400, { error: "Instagram não tem fluxo automático pra reabrir" });
       try {
+        const body = await parseBody(req).catch(() => ({}));
         await db.pausarBot(phone, businessId, null);
+        if (body?.etapa === "link_simulacao") {
+          // Mesmo efeito de o cliente tocar em "Desejo simular": manda o botão do painel do site, sem reiniciar o fluxo.
+          if (!NUMEROS_CONSIGNADO.includes(businessId)) return send(res, 400, { error: "Essa etapa só existe no fluxo do consignado CLT" });
+          await marcarInteressadoConsignado(phone, businessId);
+          await enviarRespostaAutomatica(businessId, phone, TEXTO_IR_PARA_CHAT_CONSIGNADO, null, null, { ...CTA_CHAT_CONSIGNADO, url: linkChatConsignado(phone) });
+          await db.setFluxoPasso(phone, businessId, "consignado_chat");
+          return send(res, 200, { ok: true });
+        }
         await dispararInicioFluxo(await getFluxo(businessId, phone), phone, businessId);
         return send(res, 200, { ok: true });
       } catch (err) {
