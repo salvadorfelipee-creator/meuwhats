@@ -17,8 +17,99 @@ client.execute = (stmt, ...resto) => {
   const sql = typeof stmt === "string" ? stmt : stmt?.sql;
   const m = /^\s*(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE)\s+(fgts|clt|novosaque)_origination\b/i.exec(sql || "");
   if (m) originacaoPossivelmenteAberta[m[1].toLowerCase()] = true;
+  notarEscritaNasFilas(sql);
   return executarOriginal(stmt, ...resto);
 };
+
+// Filas com hora marcada (broadcast, e-mail, retornos, posts): o agendador rodava a cada 20–60 s e cada rodada era uma
+// consulta ao Turso, quase sempre vazia (banda do Render + leituras). Agora guardamos em memória QUANDO está o próximo
+// item devido e só consultamos o banco a partir dessa hora. Qualquer INSERT/UPDATE/DELETE na tabela marca "sujo" e o
+// próximo tick recalcula (1 consulta); sem nada pendente, o custo é zero. A cada 3 h recalcula de qualquer jeito, caso
+// alguém escreva no banco por fora (script local).
+const FILAS = {
+  broadcast: { tabela: "broadcast_agendado", coluna: "agendado_para" },
+  email: { tabela: "emails_agendados", coluna: "agendado_para" },
+  retornos: { tabela: "retornos", coluna: "data_agendada" },
+  posts: { tabela: "posts_agendados", coluna: "agendado_para" },
+};
+const FILA_RECALCULO_MAX_MS = 3 * 60 * 60 * 1000;
+const filaEstado = Object.fromEntries(Object.keys(FILAS).map((n) => [n, { sujo: true, proximo: 0, calculadoEm: 0 }]));
+// Fluxo parado (lembretes): mesma ideia — fica "sujo" quando algum passo do fluxo de uma conversa muda.
+const fluxoLembreteEstado = { sujo: true };
+// Orçamento diário de consultas da fila de e-mail (SELECT/UPDATE; o INSERT do agendamento é ação do usuário, não conta).
+const EMAIL_CONSULTAS_POR_DIA = 1000;
+const emailOrcamento = { dia: "", usadas: 0 };
+
+function diaLocal() {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+}
+
+function contarConsultaEmail() {
+  const dia = diaLocal();
+  if (emailOrcamento.dia !== dia) { emailOrcamento.dia = dia; emailOrcamento.usadas = 0; }
+  emailOrcamento.usadas++;
+}
+
+function notarEscritaNasFilas(sql) {
+  if (!sql) return;
+  const mTab = /^\s*(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE|DELETE\s+FROM)\s+(broadcast_agendado|emails_agendados|retornos|posts_agendados)\b/i.exec(sql);
+  if (mTab) {
+    const nome = Object.keys(FILAS).find((n) => FILAS[n].tabela === mTab[1].toLowerCase());
+    filaEstado[nome].sujo = true;
+    if (nome === "email" && !/^\s*INSERT/i.test(sql)) contarConsultaEmail();
+  } else if (/^\s*SELECT[\s\S]*\bFROM\s+emails_agendados\b/i.test(sql)) {
+    contarConsultaEmail();
+  }
+  if (/^\s*(?:UPDATE\s+conversations\s+SET[\s\S]*\bfluxo_passo\b|INSERT[\s\S]*INTO\s+conversations[\s\S]*\bfluxo_passo\b)/i.test(sql)) {
+    fluxoLembreteEstado.sujo = true;
+  }
+  if (/^\s*(?:INSERT\s+(?:OR\s+\w+\s+)?INTO|UPDATE)\s+site_chat_clt\b/i.test(sql)) siteChatCltEstado.sujo = true;
+}
+
+// Acompanhamento das propostas do chat do site (a cada 60 s): sem escrita em site_chat_clt desde a última consulta vazia,
+// a resposta seria vazia de novo (as janelas de 6 h/12 h só encolhem com o tempo) — então nem consulta.
+const siteChatCltEstado = { sujo: true };
+function siteChatCltConsumirSujo() {
+  const era = siteChatCltEstado.sujo;
+  siteChatCltEstado.sujo = false;
+  return era;
+}
+
+// true = há item devido agora (vale chamar o *ProximoDevido). false = nada a fazer, sem tocar o banco.
+async function filaTemAlgoDevido(nome) {
+  const cfg = FILAS[nome];
+  const e = filaEstado[nome];
+  const agora = Date.now();
+  if (e.sujo || agora - e.calculadoEm > FILA_RECALCULO_MAX_MS) {
+    if (nome === "email") contarConsultaEmail();
+    e.sujo = false; // antes do await: uma escrita durante a consulta volta a marcar sujo
+    e.calculadoEm = agora;
+    try {
+      const r = await executarOriginal({
+        sql: `SELECT MIN(CASE WHEN status = 'pending' THEN ${cfg.coluna} ELSE claimed_at + ? END) AS prox
+              FROM ${cfg.tabela} WHERE status IN ('pending', 'processing')`,
+        args: [PROCESSING_ORFAO_MS],
+      });
+      const prox = r.rows[0]?.prox;
+      e.proximo = prox == null ? Infinity : Number(prox);
+    } catch (err) {
+      e.sujo = true; // falhou: tenta de novo no próximo tick
+      throw err;
+    }
+  }
+  return agora >= e.proximo;
+}
+
+function emailOrcamentoEsgotado() {
+  return emailOrcamento.dia === diaLocal() && emailOrcamento.usadas >= EMAIL_CONSULTAS_POR_DIA;
+}
+
+// true se algum passo de fluxo mudou desde a última leitura (o verificador então relê e recalcula o próximo lembrete).
+function fluxoLembreteConsumirSujo() {
+  const era = fluxoLembreteEstado.sujo;
+  fluxoLembreteEstado.sujo = false;
+  return era;
+}
 
 // Item travado em 'processing' por mais tempo que isso é considerado órfão (servidor caiu ou
 // foi redeployado no meio da publicação) e pode ser reclamado de novo pelo agendador — senão
@@ -3060,6 +3151,35 @@ async function emailProximoDevido() {
   return item;
 }
 
+// Em lote (1 consulta pra reservar até `limite` e-mails devidos, em vez de 2 por e-mail): mantém o orçamento diário de
+// consultas da fila. Mesma regra de devido/órfão do emailProximoDevido.
+async function emailProximosDevidos(limite) {
+  await ready;
+  const agora = Date.now();
+  const result = await client.execute({
+    sql: `UPDATE emails_agendados SET status = 'processing', claimed_at = ?
+          WHERE id IN (
+            SELECT id FROM emails_agendados
+            WHERE (status = 'pending' AND agendado_para <= ?)
+               OR (status = 'processing' AND claimed_at <= ?)
+            ORDER BY agendado_para ASC LIMIT ?
+          )
+          RETURNING *`,
+    args: [agora, agora, agora - PROCESSING_ORFAO_MS, limite],
+  });
+  return result.rows;
+}
+
+// Marca vários e-mails como enviados numa consulta só.
+async function emailMarcarLote(ids) {
+  if (!ids.length) return;
+  await ready;
+  await client.execute({
+    sql: `UPDATE emails_agendados SET status = 'sent', sent_at = ? WHERE id IN (${ids.map(() => "?").join(",")})`,
+    args: [Date.now(), ...ids],
+  });
+}
+
 async function emailMarcarEnviado(id) {
   await ready;
   await client.execute({ sql: `UPDATE emails_agendados SET status = 'sent', sent_at = ? WHERE id = ?`, args: [Date.now(), id] });
@@ -4523,6 +4643,12 @@ async function broadcastReenfileirarErro(businessId, trecho, agora, espacoMs) {
 }
 
 module.exports = {
+  siteChatCltConsumirSujo,
+  filaTemAlgoDevido,
+  emailOrcamentoEsgotado,
+  emailProximosDevidos,
+  emailMarcarLote,
+  fluxoLembreteConsumirSujo,
   hashSenha,
   verificarSenha,
   usuarioCriar,

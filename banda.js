@@ -29,6 +29,20 @@ function mesAtual() {
   return new Date().toISOString().slice(0, 7); // YYYY-MM em UTC
 }
 
+// Totais do mês em memória: lê do banco uma vez por mês (ou após falha) e depois só grava — antes eram 2 leituras + 2 gravações
+// a cada 2 min, e o próprio tráfego dessas consultas realimentava a contagem.
+let cacheMes = null;
+let cacheTotal = 0;
+let cacheHosts = {};
+
+async function carregarMes() {
+  const mes = mesAtual();
+  if (cacheMes === mes) return;
+  cacheTotal = Number(await db.reelsConfigGet(`banda_${mes}`)) || 0;
+  try { cacheHosts = JSON.parse((await db.reelsConfigGet(`banda_hosts_${mes}`)) || "{}"); } catch { cacheHosts = {}; }
+  cacheMes = mes;
+}
+
 async function gravar() {
   if (!db || !pendente) return;
   const delta = pendente;
@@ -36,22 +50,32 @@ async function gravar() {
   pendente = 0;
   pendentePorHost = {};
   try {
-    const chave = `banda_${mesAtual()}`;
-    const atual = Number(await db.reelsConfigGet(chave)) || 0;
-    await db.reelsConfigSet(chave, String(atual + delta));
-    const chaveHosts = `banda_hosts_${mesAtual()}`;
-    const hosts = JSON.parse((await db.reelsConfigGet(chaveHosts)) || "{}");
-    for (const [h, b] of Object.entries(deltaHosts)) hosts[h] = (hosts[h] || 0) + b;
-    await db.reelsConfigSet(chaveHosts, JSON.stringify(hosts));
+    await carregarMes();
+    cacheTotal += delta;
+    for (const [h, b] of Object.entries(deltaHosts)) cacheHosts[h] = (cacheHosts[h] || 0) + b;
+    await db.reelsConfigSet(`banda_${cacheMes}`, String(cacheTotal));
+    await db.reelsConfigSet(`banda_hosts_${cacheMes}`, JSON.stringify(cacheHosts));
   } catch {
     pendente += delta; // tenta de novo no próximo ciclo
     for (const [h, b] of Object.entries(deltaHosts)) pendentePorHost[h] = (pendentePorHost[h] || 0) + b;
+    cacheMes = null; // recarrega do banco na próxima (o cache pode ter ficado adiantado)
   }
 }
 
+// Grava a cada 10 min (madrugada em Brasília, 22h–6h: a cada 30 min).
+function emMadrugada() {
+  const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }).format(new Date())) % 24;
+  return h >= 22 || h < 6;
+}
+let ultimaGravacao = 0;
 function iniciar(dbModulo) {
   db = dbModulo;
-  setInterval(gravar, 2 * 60_000).unref();
+  setInterval(() => {
+    const espera = emMadrugada() ? 30 * 60_000 : 10 * 60_000;
+    if (Date.now() - ultimaGravacao < espera - 60_000) return;
+    ultimaGravacao = Date.now();
+    gravar();
+  }, 5 * 60_000).unref();
 }
 
 async function uso() {

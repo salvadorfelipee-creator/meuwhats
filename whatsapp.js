@@ -486,8 +486,14 @@ function downloadFromUrl(mediaUrl) {
   });
 }
 
-async function downloadMedia(mediaId) {
+async function downloadMedia(mediaId, maxBytes = 0) {
   const info = await getMediaInfo(mediaId);
+  // Limite de tamanho: passando de maxBytes não baixa nem sobe pro R2 (cada MB sobe pelo Render e conta na banda).
+  if (maxBytes && Number(info.file_size) > maxBytes) {
+    const err = new Error(`mídia grande demais (${Math.round(Number(info.file_size) / 1048576)} MB)`);
+    err.codigo = "MIDIA_GRANDE";
+    throw err;
+  }
   const buffer = await downloadFromUrl(info.url);
   return { buffer, mimeType: info.mime_type };
 }

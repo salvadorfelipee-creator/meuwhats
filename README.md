@@ -1989,3 +1989,13 @@ Página estática `felizcred-site/app/` (`index.html`, `app.js`, `app.css`), noi
 
 ## Kit do chat do site para a Especitá (28/10/2026)
 Pasta `kit-chat-site-especita/` (somente leitura para a Especitá): chat do site como canal `"site"` do painel, com código genérico, guias de integração e de isolamento, prompt pronto e teste de fumaça. Sem segredos, IDs ou domínios. Nada foi alterado no projeto da Especitá; a integração é feita na conversa da pasta `whatsapp especita`. Entrada: `kit-chat-site-especita/LEIA-ME.md`.
+
+## Economia de banda do Render (31/10/2026)
+Outubro fechou em 7,81 GB (métrica oficial: API do Render, `GET /v1/metrics/bandwidth`; `RENDER_API_KEY` no `.env`). Cerca de 40% era consumo parado (4–7 MB/h de madrugada) das consultas dos relógios ao Turso. Ajustes:
+- **Filas com hora marcada** (broadcast, e-mail, retornos, posts): `db.filaTemAlgoDevido(nome)` guarda em memória a hora do próximo item e só consulta o banco a partir dela; INSERT/UPDATE/DELETE na tabela marca "sujo" e recalcula; recalcula também a cada 3 h (escrita por script local). Sem item pendente, custo zero. Posts: checam uma vez no boot e só voltam a consultar quando se agenda outro.
+- **E-mail:** tick de 90 s, lote de até 50 por rodada numa consulta (`emailProximosDevidos`/`emailMarcarLote`), orçamento de 1000 consultas/dia (`emailOrcamentoEsgotado`); os disparos saem em rajadas de até 50 por rodada.
+- **Lembretes de fluxo parado:** só relê o banco quando um passo de fluxo muda, quando chega a hora do próximo lembrete calculado ou a cada 10 min.
+- **Acompanhamento Facta do chat do site:** não consulta enquanto a última resposta foi vazia e não houve escrita em `site_chat_clt`; 22h–6h (Brasília) roda a cada 5 min.
+- **banda.js:** totais em memória, grava a cada 10 min (30 min de madrugada); antes lia e gravava a cada 2 min e o próprio tráfego realimentava a contagem.
+- **Mídia de cliente:** `GET /media/:arquivo` redireciona para URL assinada do R2 (1 h), sem passar pelo Render; webhook duplicado da mesma mensagem não baixa/sobe de novo; acima de 25 MB não salva (mensagem "[mídia grande demais...]").
+Conferir depois do deploy: madrugada deve cair de 4–7 MB/h para 1–2 MB/h na métrica do Render.

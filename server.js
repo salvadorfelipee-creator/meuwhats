@@ -1357,6 +1357,9 @@ fs.mkdirSync(MEDIA_DIR, { recursive: true });
 const PUBLICAR_MEDIA_DIR = path.join(MEDIA_DIR, "publicar");
 fs.mkdirSync(PUBLICAR_MEDIA_DIR, { recursive: true });
 
+// Mídia de cliente maior que isso não é salva (cada MB sobe pelo servidor ao R2 e conta na banda do Render).
+const MIDIA_CLIENTE_MAX_BYTES = 25 * 1024 * 1024;
+const midiasRecebidasIds = new Map(); // id da mensagem -> quando começou a ser salva
 const EXT_BY_MIME = {
   "image/jpeg": "jpg",
   "image/png": "png",
@@ -6604,7 +6607,12 @@ async function processarEntry(entry) {
         } else if (tipo === "image" || tipo === "audio" || tipo === "video" || tipo === "document" || tipo === "sticker") {
           const media = msg[tipo];
           try {
-            const { buffer, mimeType } = await wa.downloadMedia(media.id);
+            // A Meta reenvia o webhook quando o servidor demora (vídeo grande): sem isso o mesmo arquivo era baixado e
+            // subido pro R2 duas vezes (foi o pico de 235 MB em 27/10). Já em andamento/gravado = ignora.
+            if (midiasRecebidasIds.has(msg.id) || (await db.mensagemExistePorId(msg.id))) continue;
+            midiasRecebidasIds.set(msg.id, Date.now());
+            for (const [id, t] of midiasRecebidasIds) if (Date.now() - t > 30 * 60_000) midiasRecebidasIds.delete(id);
+            const { buffer, mimeType } = await wa.downloadMedia(media.id, MIDIA_CLIENTE_MAX_BYTES);
             const ext = EXT_BY_MIME[mimeType] || "bin";
             const filename = safeFilename(msg.id, ext);
             // R2 em vez de disco local: o disco do Render é apagado a cada deploy/restart, o
@@ -6619,7 +6627,7 @@ async function processarEntry(entry) {
             });
           } catch (err) {
             console.error("Erro ao baixar mídia:", err.message);
-            await db.insertMessage({ ...base, type: tipo, body: "[mídia indisponível]" });
+            await db.insertMessage({ ...base, type: tipo, body: err.codigo === "MIDIA_GRANDE" ? `[mídia grande demais para salvar: ${err.message}]` : "[mídia indisponível]" });
           }
         } else if (tipo === "location") {
           // body guarda JSON {latitude, longitude, name?, address?} — o painel usa isso pra
@@ -10295,8 +10303,12 @@ const server = http.createServer(async (req, res) => {
       const token = url.searchParams.get("token");
       if (!(token && validarTokenMedia(token)) && !requireAuth(req, res)) return;
       try {
-        const { buffer } = await r2.baixarArquivo(`clientes/${matchMedia[1]}`);
-        return sendMediaBuffer(req, res, buffer, mimeDoArquivo(matchMedia[1]));
+        // Redireciona pro R2 (URL assinada, 1 h) em vez de baixar o arquivo e reenviar: foto/áudio/vídeo vai direto do R2
+        // pro navegador (com Range nativo), sem gastar a banda do Render a cada visualização. O navegador guarda o
+        // redirecionamento por 30 min e o arquivo no cache dele.
+        const urlR2 = await r2.urlAssinada(`clientes/${matchMedia[1]}`, 3600);
+        res.writeHead(302, { Location: urlR2, "Cache-Control": "private, max-age=1800" });
+        return res.end();
       } catch {
         return send(res, 404, "Not found");
       }
@@ -10389,15 +10401,31 @@ setInterval(() => {
     .on("error", (err) => console.error("Auto-ping falhou:", err.message));
 }, 10 * 60 * 1000);
 
+// Madrugada em Brasília (22h–6h): verificadores sem urgência rodam mais espaçados pra poupar banda.
+function emMadrugada() {
+  const h = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "numeric", hour12: false }).format(new Date())) % 24;
+  return h >= 22 || h < 6;
+}
+
 // ─── VERIFICADOR DE FLUXOS PARADOS ───────────────────────────────────────────
 // A cada minuto: quem está aguardando resposta há mais tempo que o limite do
 // passo recebe UM lembrete (marcação atômica no banco evita duplicados).
 // Obs: no plano free do Render o servidor pode hibernar sem tráfego — nesse
 // caso o lembrete sai no próximo despertar (webhook/painel), com atraso.
+// Só relê o banco quando algum passo de fluxo mudou (db.fluxoLembreteConsumirSujo) ou quando chegou a hora do próximo
+// lembrete calculado na leitura anterior (e, por segurança, a cada 10 min). Antes lia TODAS as conversas em fluxo a cada minuto.
+let lembretesProximoMs = 0;
+let lembretesCalculadoEm = 0;
+const LEMBRETES_RELEITURA_MAX_MS = 10 * 60 * 1000;
 setInterval(async () => {
   try {
-    const pendentes = await db.listarFluxosAguardando();
     const agora = Date.now();
+    const sujo = db.fluxoLembreteConsumirSujo();
+    if (!sujo && agora < lembretesProximoMs && agora - lembretesCalculadoEm < LEMBRETES_RELEITURA_MAX_MS) return;
+    lembretesCalculadoEm = agora;
+    lembretesProximoMs = 0; // se algo falhar abaixo, a próxima rodada relê
+    let proximoMs = Infinity;
+    const pendentes = await db.listarFluxosAguardando();
     for (const p of pendentes) {
       const fluxoDoContato = await getFluxo(p.business_number_id, p.phone, p.fluxo_passo);
       const config = fluxoDoContato.lembreteMinutos[p.fluxo_passo];
@@ -10409,7 +10437,8 @@ setInterval(async () => {
       const indice = Number(p.fluxo_lembrete) || 0;
       if (indice >= minutosArray.length) continue;
       const minutos = minutosArray[indice];
-      if (agora - Number(p.fluxo_passo_at) < minutos * 60 * 1000) continue;
+      const venceEm = Number(p.fluxo_passo_at) + minutos * 60 * 1000;
+      if (agora < venceEm) { proximoMs = Math.min(proximoMs, venceEm); continue; }
       if (!(await db.tentarMarcarLembreteEnviado(p.phone, p.business_number_id, indice))) continue;
       try {
         // Passo com handler próprio (ex.: precisa mandar botões, não só texto puro) cuida de
@@ -10429,6 +10458,7 @@ setInterval(async () => {
         console.error("Erro ao enviar lembrete de fluxo:", err.message);
       }
     }
+    lembretesProximoMs = proximoMs;
   } catch (err) {
     console.error("Erro no verificador de fluxos parados:", err.message);
   }
@@ -10537,6 +10567,8 @@ setInterval(async () => {
   try {
     // Agenda de publicações (posts de texto/imagem multi-rede) — cada post tem hora exata
     // própria, sempre ativa (não depende do "pausado" dos Reels, que é outro sistema).
+    // Só consulta o banco quando há post com hora marcada chegando (marca em memória em db.js); sem posts, custo zero.
+    if (!(await db.filaTemAlgoDevido("posts"))) return;
     const agendado = await agenda.publicarProximoDevido();
     if (!agendado.vazio) {
       const links = Object.entries(agendado.resultado)
@@ -10556,6 +10588,7 @@ setInterval(async () => {
 // atraso rápido se o servidor ficou fora do ar.
 setInterval(async () => {
   try {
+    if (!(await db.filaTemAlgoDevido("broadcast"))) return; // sem consulta ao banco enquanto nenhum envio chegou na hora
     for (let i = 0; i < 20; i++) {
       const item = await db.broadcastProximoDevido();
       if (!item) break;
@@ -10579,27 +10612,42 @@ setInterval(async () => {
 // ─── AGENDADOR DE CAMPANHA DE E-MAIL (Brevo) ────────────────────────────────
 // Mesmo desenho do broadcast de WhatsApp acima, só que pra emails_agendados. {{nome}} no
 // assunto/corpo do template é trocado pelo nome do destinatário (ou "Cliente" se não tiver).
+// Orçamento: no máximo ~1000 consultas/dia ao banco (db.emailOrcamentoEsgotado). Por isso a cada 90 s, só quando há e-mail
+// com hora chegada, reserva até 50 e-mails numa consulta só e marca os enviados em lote (antes: 2 consultas por e-mail
+// + 1 vazia a cada 20 s). Os disparos de uma campanha saem em rajadas de até 50 por rodada, em vez de um a um.
+const EMAIL_LOTE_POR_RODADA = 50;
+let enviandoEmailsAgendados = false;
 setInterval(async () => {
+  if (enviandoEmailsAgendados) return;
+  enviandoEmailsAgendados = true;
   try {
-    for (let i = 0; i < 20; i++) {
-      const item = await db.emailProximoDevido();
-      if (!item) break;
+    if (db.emailOrcamentoEsgotado()) return; // retoma sozinho na virada do dia
+    if (!(await db.filaTemAlgoDevido("email"))) return;
+    const itens = await db.emailProximosDevidos(EMAIL_LOTE_POR_RODADA);
+    const enviados = [];
+    const templates = new Map(); // o mesmo modelo serve a campanha inteira: uma leitura só por rodada
+    for (const item of itens) {
       try {
-        const template = await db.emailTemplateObter(item.template_id);
+        if (!templates.has(item.template_id)) templates.set(item.template_id, await db.emailTemplateObter(item.template_id));
+        const template = templates.get(item.template_id);
         if (!template) throw new Error("template de e-mail não existe mais");
         const nome = item.destinatario_nome || "Cliente";
         const assunto = template.assunto.replace(/\{\{nome\}\}/g, nome);
         const html = template.corpo_html.replace(/\{\{nome\}\}/g, nome);
         await enviarEmail({ to: item.destinatario_email, toNome: nome, subject: assunto, html });
-        await db.emailMarcarEnviado(item.id);
+        enviados.push(item.id);
       } catch (err) {
         await db.emailMarcarErro(item.id, err.message);
       }
     }
+    // Se a gravação falhar com os e-mails já enviados, tenta de novo: sem isso eles voltariam como órfãos e sairiam em duplicidade.
+    try { await db.emailMarcarLote(enviados); } catch { await db.emailMarcarLote(enviados); }
   } catch (err) {
     console.error("Erro no agendador de campanha de e-mail:", err.message);
+  } finally {
+    enviandoEmailsAgendados = false;
   }
-}, 20 * 1000);
+}, 90 * 1000);
 
 // ─── AGENDADOR DE RETORNOS (lembrete por conversa — WhatsApp e/ou e-mail) ───────────────────
 // canal 'whatsapp': manda o template aprovado (mesma trava anti-reenvio de enviarUmBroadcast).
@@ -10609,6 +10657,7 @@ setInterval(async () => {
 // publicador da Agenda).
 setInterval(async () => {
   try {
+    if (!(await db.filaTemAlgoDevido("retornos"))) return; // sem consulta ao banco enquanto nenhum retorno chegou na hora
     for (let i = 0; i < 20; i++) {
       const item = await db.retornoProximoDevido();
       if (!item) break;
@@ -10725,11 +10774,18 @@ setInterval(async () => {
 // Mantém propostas iniciadas no chat do site avançando mesmo depois que o cliente fecha a aba.
 // As transições relevantes ficam registradas no histórico para cliente e atendente.
 let verificandoSiteChatFacta = false;
+let siteChatFactaVazio = false; // última consulta voltou vazia: só consulta de novo se houver escrita em site_chat_clt
+let siteChatFactaTicks = 0;
 setInterval(async () => {
   if (verificandoSiteChatFacta) return;
+  // Madrugada (22h–6h): confere a cada 5 min em vez de 1 min.
+  if (emMadrugada() && ++siteChatFactaTicks % 5 !== 0) return;
+  const sujo = db.siteChatCltConsumirSujo();
+  if (siteChatFactaVazio && !sujo) return;
   verificandoSiteChatFacta = true;
   try {
     const propostas = await db.siteChatFactaListarEmAcompanhamento();
+    siteChatFactaVazio = propostas.length === 0;
     for (const proposta of propostas) {
       try {
         await sincronizarSiteChatClt(proposta); // com o plano B dos bancos parceiros quando a Facta não libera
