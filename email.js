@@ -7,6 +7,9 @@ const EMAIL_PARA = process.env.LEAD_EMAIL_TO;
 
 const FELIZCRED_EMAIL_FROM = process.env.FELIZCRED_EMAIL_FROM || "contato@felizcred.com.br";
 const FELIZCRED_EMAIL_FROM_NOME = process.env.FELIZCRED_EMAIL_FROM_NOME || "Felizcred";
+// A caixa contato@felizcred.com.br expirou na Hostinger (plano de e-mail vencido em 25/10/2025): as respostas dos clientes
+// vão para este endereço, que funciona. O remetente continua contato@felizcred.com.br.
+const FELIZCRED_EMAIL_REPLY_TO = process.env.FELIZCRED_EMAIL_REPLY_TO || "salvador.felipee@gmail.com";
 
 function enviarEmail({ to, toNome, subject, html, from, fromNome }) {
   return new Promise((resolve, reject) => {
@@ -15,6 +18,7 @@ function enviarEmail({ to, toNome, subject, html, from, fromNome }) {
 
     const body = JSON.stringify({
       sender: { email: from || EMAIL_FROM, name: fromNome || EMAIL_FROM_NOME },
+      ...(from === FELIZCRED_EMAIL_FROM ? { replyTo: { email: FELIZCRED_EMAIL_REPLY_TO, name: FELIZCRED_EMAIL_FROM_NOME } } : {}),
       to: [{ email: to, name: toNome || to }],
       subject,
       htmlContent: html,
@@ -308,6 +312,7 @@ async function enviarModeloFelizcred({ modelo, email, nome, mensagem }) {
   const primeiroNome = String(nome || "").trim().split(/\s+/)[0] || "tudo bem";
   await brevoApi("POST", "/smtp/email", {
     to: [{ email, name: nome || email }],
+    replyTo: { email: FELIZCRED_EMAIL_REPLY_TO, name: FELIZCRED_EMAIL_FROM_NOME },
     templateId: idsModelos[modelo],
     params: { NOME: primeiroNome, MENSAGEM: escapeHtml(mensagem || "").slice(0, 1500).replace(/\n/g, "<br>") },
   });
