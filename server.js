@@ -212,9 +212,19 @@ function siteChatCltPublicoUnnotech(row) {
     motivoRecusa: blob.motivo_recusa || null,
     categoriaRecusa: blob.categoria || null,
     reconsultas: Number(blob.reconsultas || 0),
-    error: row.error_message || null,
+    error: erroPrazoCltNegada(row, blob) || row.error_message || null,
     trackingUrl: row.tracking_token ? `https://www.felizcred.com.br/app/?t=${encodeURIComponent(row.tracking_token)}` : null,
   };
+}
+
+// CLT que a Facta já negou e a Unno não concluiu: quem volta ao app antes de 30 dias vê o prazo em vez do erro genérico.
+function erroPrazoCltNegada(row, blob) {
+  if (unnoSite.ehFgts(row) || row.etapa !== "erro_consulta" || blob.anterior?.provider !== "facta" || !ETAPAS_NAO_APROVADO.includes(blob.anterior.etapa)) return null;
+  const inicio = Number(row.created_at || 0);
+  const liberaEm = inicio + 30 * 24 * 3600 * 1000;
+  if (!inicio || liberaEm < Date.now()) return null;
+  const fmt = (ms) => new Date(ms).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  return `Sua última simulação de consignado CLT foi em ${fmt(inicio)} e não teve condições. Uma nova consulta só pode ser feita depois de 30 dias, a partir de ${fmt(liberaEm)}.`;
 }
 
 function siteChatCltPublico(row) {
@@ -2052,10 +2062,15 @@ const ETAPAS_NAO_APROVADO = ["sem_margem", "sem_oferta", "nao_elegivel", "politi
 
 async function marcarNaoAprovadoSite(row) {
   try {
-    if (!row || !ETAPAS_NAO_APROVADO.includes(row.etapa)) return;
+    if (!row) return;
+    // Unno que não concluiu (autorização vencida) só conta quando a Facta já tinha negado.
+    const unnoSemConcluir = row.provider === "unnotech" && !unnoSite.ehFgts(row) && row.etapa === "erro_consulta";
+    if (!ETAPAS_NAO_APROVADO.includes(row.etapa) && !unnoSemConcluir) return;
     if (row.provider === "unnotech" && !unnoSite.ehFgts(row)) {
       const par = parseJsonSeguro(row.facta_paralelo_json);
-      if (!["negativa", "indisponivel"].includes(par.estado)) return;
+      const factaAnterior = parseJsonSeguro(row.facta_worker_json).anterior;
+      const factaNegou = ["negativa", "indisponivel"].includes(par.estado) || (factaAnterior?.provider === "facta" && ETAPAS_NAO_APROVADO.includes(factaAnterior.etapa));
+      if (!factaNegou) return;
     }
     const tel = await db.siteChatTelefoneDe(row.conversation_id);
     if (!tel) return;
@@ -7332,6 +7347,12 @@ const server = http.createServer(async (req, res) => {
           if (action === "start") {
             if (await db.siteChatCltObter(id)) return send(res, 409, { error: "A simulação já foi iniciada." }, corsHeaders);
             const cpf = String(body.cpf || "").replace(/\D/g, "");
+            // Nova consulta de CLT só depois de 30 dias da última que não teve condições (a mesma consulta dá o mesmo resultado).
+            const ultimaNegada = novosaque.cpfValido(cpf) ? await db.siteChatCltNegadaRecentePorCpf(cpf, 30) : null;
+            if (ultimaNegada) {
+              const fmt = (ms) => new Date(ms).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+              return send(res, 422, { codigo: "clt_prazo_nova_simulacao", error: `Sua última simulação de consignado CLT foi em ${fmt(ultimaNegada)} e não teve condições. Uma nova consulta só pode ser feita depois de 30 dias, a partir de ${fmt(ultimaNegada + 30 * 24 * 3600 * 1000)}.` }, corsHeaders);
+            }
             const phone = String(body.phone || "").replace(/\D/g, "");
             const fullName = String(body.name || conversation.name || "").trim().replace(/\s+/g, " ").slice(0, 120);
             if (!novosaque.cpfValido(cpf)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);

@@ -4355,6 +4355,22 @@ async function siteChatFgtsSemOfertaPorCpf(cpf) {
   return !!r.rows[0];
 }
 
+// Última simulação de consignado CLT deste CPF que terminou sem condição (recusa dos bancos, ou Facta negada e Unno sem
+// concluir) nos últimos 'dias' dias. Devolve o início dela (ms) ou null. Usada pra bloquear nova consulta antes do prazo.
+async function siteChatCltNegadaRecentePorCpf(cpf, dias = 30) {
+  await ready;
+  const r = await client.execute({
+    sql: `SELECT created_at FROM site_chat_clt
+      WHERE cpf = ? AND created_at > ?
+        AND (facta_worker_json IS NULL OR facta_worker_json NOT LIKE '%"produto":"FGTS"%')
+        AND (etapa IN ('sem_margem','sem_oferta','nao_elegivel','politica_reprovada')
+          OR (etapa = 'erro_consulta' AND facta_worker_json LIKE '%"anterior":{"provider":"facta"%'))
+      ORDER BY created_at DESC LIMIT 1`,
+    args: [cpf, Date.now() - dias * 24 * 3600 * 1000],
+  });
+  return r.rows[0]?.created_at ? Number(r.rows[0].created_at) : null;
+}
+
 // Última mensagem RECEBIDA do cliente nesse número (ms), para saber se a janela de 24h do WhatsApp está aberta.
 async function ultimaMensagemEntrada(phone, businessNumberId) {
   await ready;
@@ -4675,6 +4691,7 @@ module.exports = {
   siteChatTelefoneDe,
   ultimaMensagemEntrada,
   siteChatFgtsSemOfertaPorCpf,
+  siteChatCltNegadaRecentePorCpf,
   definirAoAtualizarClt,
   conversasPorTelefoneTodosCanais,
   importarContato,

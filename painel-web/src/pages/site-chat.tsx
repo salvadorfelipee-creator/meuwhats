@@ -1,4 +1,5 @@
 import * as React from "react"
+import { CorretorBaloes, useCorretor } from "@/lib/corretor"
 import { ArrowLeft, AtSign, Bell, Bot, BellOff, Check, ChevronDown, FileText, Globe2, Landmark, MessageCircle, Mic, Paperclip, Phone, RotateCcw, Search, Send, Smile, UserRound, X } from "lucide-react"
 import { api, PIPELINE_ESTAGIOS, type SiteChatClt, type SiteChatConversation, type SiteChatMessage } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -58,6 +59,8 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
   const [dadosCliente, setDadosCliente] = React.useState<{ rotulo: string; valor: string }[]>([])
   const [busca, setBusca] = React.useState("")
   const [texto, setTexto] = React.useState("")
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+  const { correcoes, corretorErro, aplicarCorrecao } = useCorretor(texto, setTexto, textareaRef)
   const [enviando, setEnviando] = React.useState(false)
   const [carregando, setCarregando] = React.useState(true)
   const [emojiOpen, setEmojiOpen] = React.useState(false)
@@ -217,7 +220,7 @@ export function SiteChatPage({ embedded = false, soConversaId = null }: { embedd
             {emojiOpen && <div className="absolute bottom-12 left-0 z-20 flex gap-2 rounded-xl border bg-background p-2 shadow-lg">{["😊","👍","❤️","😂","🙏","✅"].map((e) => <button key={e} className="text-xl" onClick={() => { setTexto((t) => t + e); setEmojiOpen(false) }}>{e}</button>)}</div>}
             <label><input type="file" className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" onChange={(e) => { const f=e.target.files?.[0]; if(f) enviarArquivo(f); e.target.value="" }} /><Button variant="ghost" size="icon" asChild><span><Paperclip className="h-4 w-4" /></span></Button></label>
             <Button variant="ghost" size="icon" onClick={iniciarAudio} title="Gravar áudio"><Mic className="h-4 w-4" /></Button>
-            <Textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => { if(e.key === "Enter" && !e.shiftKey){e.preventDefault(); enviar()} }} placeholder={selecionada.status === "closed" ? "Reabra a conversa para responder" : "Digite uma mensagem"} disabled={selecionada.status === "closed"} rows={1} className="min-h-10 flex-1 resize-none" />
+            <div className="relative flex-1"><Textarea ref={textareaRef} value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => { if(e.key === "Enter" && !e.shiftKey){e.preventDefault(); enviar()} }} placeholder={selecionada.status === "closed" ? "Reabra a conversa para responder" : "Digite uma mensagem"} disabled={selecionada.status === "closed"} rows={1} className="min-h-10 w-full resize-none" /><CorretorBaloes textareaRef={textareaRef} texto={texto} correcoes={correcoes} onAplicar={aplicarCorrecao} />{corretorErro && <p className="text-[10px] text-muted-foreground">{corretorErro}</p>}</div>
             <Button size="icon" onClick={() => enviar()} disabled={!texto.trim() || enviando || selecionada.status === "closed"}><Send className="h-4 w-4" /></Button>
           </div></div>}
         </>}
