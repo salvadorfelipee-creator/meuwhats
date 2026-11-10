@@ -359,7 +359,10 @@ function montarPayloadKycClt(cpf, dados) {
     gender: dados.genero,
     civil_status: dados.estado_civil,
     scholarity: dados.escolaridade,
-    mothers_name: dados.nome_mae,
+    mothers_name: String(dados.nome_mae || "").trim(),
+    // A Unnotech passou a exigir estes dois campos no KYC do CLT (CUSTOMER_DATA_INCOMPLETE, 10/11/2026).
+    nationality: dados.nacionalidade || "Brasileiro",
+    occupation: dados.profissao || "Empregado CLT",
     rg_number: dados.rg_numero,
     rg_organ: dados.rg_orgao,
     rg_uf: dados.rg_uf,
