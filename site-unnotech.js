@@ -315,7 +315,7 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     const api = apiDe(row);
     // Instabilidade da Unnotech/banco (UPSTREAM_ERROR, 5xx, timeout): tenta de novo sozinho, sempre com a MESMA chave de
     // idempotência (não duplica proposta) e, se não passar, devolve mensagem amigável em vez do JSON cru.
-    const transitorio = (err) => /UPSTREAM_ERROR|INTERNAL|SERVICE_UNAVAILABLE|TIMEOUT|50[0-4]|timed? ?out|tempo limite|ECONNRESET|ETIMEDOUT|fetch failed/i.test(`${err.codigo || ""} ${err.message || ""}`);
+    const transitorio = (err) => /UPSTREAM_ERROR|INTERNAL|SERVICE_UNAVAILABLE|TIMEOUT|\b50[0-4]\b|timed? ?out|tempo limite|ECONNRESET|ETIMEDOUT|fetch failed/i.test(`${err.codigo || ""} ${err.message || ""}`);
     const comRetentativa = async (fn) => {
       let ultimo;
       for (let i = 0; i < 3; i++) {
