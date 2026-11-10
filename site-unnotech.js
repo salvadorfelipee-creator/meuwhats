@@ -313,10 +313,29 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
     try { oferta = JSON.parse(row.facta_offer_json || "null"); } catch {}
     if (!oferta) throw new Error("Escolha uma condição antes de enviar seus dados.");
     const api = apiDe(row);
-    await api.kyc(row.transaction_id, api.payload(row.cpf, dados));
+    // Instabilidade da Unnotech/banco (UPSTREAM_ERROR, 5xx, timeout): tenta de novo sozinho, sempre com a MESMA chave de
+    // idempotência (não duplica proposta) e, se não passar, devolve mensagem amigável em vez do JSON cru.
+    const transitorio = (err) => /UPSTREAM_ERROR|INTERNAL|SERVICE_UNAVAILABLE|TIMEOUT|50[0-4]|timed? ?out|tempo limite|ECONNRESET|ETIMEDOUT|fetch failed/i.test(`${err.codigo || ""} ${err.message || ""}`);
+    const comRetentativa = async (fn) => {
+      let ultimo;
+      for (let i = 0; i < 3; i++) {
+        try { return await fn(); } catch (err) {
+          ultimo = err;
+          if (!transitorio(err)) throw err;
+          console.error(`Unnotech: instabilidade no envio (${row.conversation_id}, tentativa ${i + 1}/3):`, String(err.message || "").slice(0, 400));
+          if (i < 2) await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+        }
+      }
+      const amigavel = new Error("O banco está instável neste momento e não conseguimos gerar sua proposta. Seus dados foram salvos: toque em “Tentar de novo” ou fale com a gente no WhatsApp.");
+      amigavel.transitorio = true; amigavel.original = ultimo;
+      throw amigavel;
+    };
+    await comRetentativa(() => api.kyc(row.transaction_id, api.payload(row.cpf, dados)));
+    const chaveAceite = crypto.randomUUID();
     try {
-      await api.aceitar(row.transaction_id, oferta.offer_id, crypto.randomUUID());
+      await comRetentativa(() => api.aceitar(row.transaction_id, oferta.offer_id, chaveAceite));
     } catch (err) {
+      if (err.transitorio) throw err;
       if (ehFgts(row) && (err.codigo === "OFFER_EXPIRED" || /OFFER_EXPIRED/.test(err.message || ""))) {
         await unnotech.requotar(row.transaction_id, crypto.randomUUID());
         await atualizar(row, { etapa: "fgts_cotando", offers_json: "[]", facta_offer_json: null, authorization_requested_at: Date.now(), error_message: null });

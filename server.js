@@ -7476,7 +7476,14 @@ const server = http.createServer(async (req, res) => {
               const novo = await unnoSite.enviarDados(atual, clienteUnno);
               return send(res, 200, { clt: siteChatCltPublico(novo) }, corsHeaders);
             } catch (err) {
-              return send(res, 400, { error: String(err.message || "Não foi possível gerar a proposta agora.").slice(0, 300) }, corsHeaders);
+              const cru = String(err.message || "");
+              if (err.transitorio) return send(res, 503, { error: cru, transitorio: true }, corsHeaders);
+              // Nunca mostrar JSON/erro técnico da API ao cliente.
+              if (/^Falha ao|\{\s*"error"|UPSTREAM|correlation_id/i.test(cru)) {
+                console.error(`personal-data (${id}):`, cru.slice(0, 500));
+                return send(res, 400, { error: "Não conseguimos gerar sua proposta agora. Confira seus dados e toque em “Tentar de novo”, ou fale com a gente no WhatsApp.", transitorio: true }, corsHeaders);
+              }
+              return send(res, 400, { error: cru.slice(0, 300) || "Não foi possível gerar a proposta agora." }, corsHeaders);
             }
           }
           if (action === "resimulate" && atual.provider === "unnotech") {

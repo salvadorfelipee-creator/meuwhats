@@ -48,7 +48,7 @@
     if (state.session?.token) headers["X-Chat-Token"] = state.session.token;
     const resposta = await fetch(`${API}${path}`, { cache: "no-store", ...opts, headers });
     const dados = await resposta.json().catch(() => ({}));
-    if (!resposta.ok) { const erro = new Error(dados.error || "Não foi possível concluir agora. Tente de novo em instantes."); erro.status = resposta.status; throw erro; }
+    if (!resposta.ok) { const erro = new Error(dados.error || "Não foi possível concluir agora. Tente de novo em instantes."); erro.status = resposta.status; erro.transitorio = !!dados.transitorio; throw erro; }
     return dados;
   }
   const guardar = (s) => { state.session = { ...s, lastSeen: Date.now() }; try { localStorage.setItem(KEY, JSON.stringify(state.session)); } catch {} };
@@ -700,7 +700,7 @@
       try {
         const d = await api(`/conversations/${state.session.id}/clt/personal-data`, { method: "POST", body: JSON.stringify({ customer: cliente }) });
         fecharSheet(); state.assinatura = ""; aplicar(d.clt); window.scrollTo({ top: 0, behavior: "smooth" });
-      } catch (erro) { if (botao) { botao.disabled = false; botao.textContent = "Gerar proposta para revisão"; } faixa.innerHTML = `<div class="erro" style="margin:10px 20px 0">${esc(erro.message)}</div>`; sheet.querySelector(".folha").scrollTo({ top: 0, behavior: "smooth" }); }
+      } catch (erro) { if (botao) { botao.disabled = false; botao.textContent = erro.transitorio ? "Tentar de novo" : "Gerar proposta para revisão"; } const zap = erro.transitorio ? `<a class="ap-btn zap" style="margin-top:10px;display:flex" href="https://wa.me/554792747368?text=${encodeURIComponent("Olá, tentei gerar minha proposta no site e deu instabilidade. Podem me ajudar?")}" target="_blank" rel="noopener">${IC.zap} Falar no WhatsApp</a>` : ""; faixa.innerHTML = `<div class="erro" style="margin:10px 20px 0">${esc(erro.message)}${zap}</div>`; sheet.querySelector(".folha").scrollTo({ top: 0, behavior: "smooth" }); }
     }
   });
   document.addEventListener("visibilitychange", () => { if (!document.hidden) document.title = TITULO; if (!document.hidden && state.session) atualizar(); });
