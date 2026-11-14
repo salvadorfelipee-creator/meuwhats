@@ -2451,6 +2451,8 @@ async function capturarContatoEBoasVindas(de, businessNumberId, nome, email, pre
 // painel (em todos os canais do mesmo telefone); se NÃO está, salva lá (nome do perfil do
 // WhatsApp, ou só o telefone). Ciahot fica de fora — é outro negócio, não mistura com os
 // contatos da Felizcred/Cota Certa. Sem Google configurado/autorizado, não faz nada.
+// Ciahot (número desativado em 14/11/2026, histórico mantido): ID legado só pra proteger as conversas antigas.
+const CIAHOT_NUMBER_ID = "1264737673394463";
 const googleSyncIgnora = (businessNumberId) => businessNumberId === CIAHOT_NUMBER_ID;
 // Regra do CPF: quem digita o CPF e ainda não está no Google Contatos é salvo como
 // "FGTS <nome> <CPF>" (ou "FGTS <CPF>" quando não há nome). Vale pra campanha, site e qualquer entrada.
@@ -4547,120 +4549,6 @@ const COTACERTA_NUMBER_ID = "1337870802740904";
 const REGEX_SITE_COTACAO = /^Ol[áa]!\s*Quero cotar/i;
 const REGEX_SITE_CALLBACK = /^Ol[áa]!\s*Quero receber uma liga[çc][ãa]o/i;
 
-// ─── FLUXO CIAHOT (número "Ciahot") ──────────────────────────────────────────
-// Negócio diferente da Felizcred: CIAHOT é um site de anúncios classificados na região do
-// Vale. O disparo é sempre por campanha de Marketing (template aprovado, mandado pelo
-// broadcast do painel) — o fluxo abaixo só cuida do que acontece DEPOIS que a pessoa
-// responde esse template. Não é um menu (não tem opções pra escolher), é uma sequência
-// linear: aquece, oferece o anúncio grátis com link pro site + botão de atendimento, e
-// cutuca 1x se ninguém tocar em nada em 17 minutos.
-const CIAHOT_NUMBER_ID = "1264737673394463";
-const CIAHOT_SITE_URL = "https://www.ciahot.com.br";
-const CIAHOT_ANUNCIAR_URL = "https://ciahot.com.br/anunciar/";
-
-// Apresentação + objetivo eram 2 mensagens separadas; viraram 1 só em 02/10/2026 — cada
-// mensagem de serviço passou a ser cobrada à parte pela Meta (ver pricing update de 01/10), e
-// esses 2 textos nunca tiveram motivo pra ser balões diferentes (é só a mesma apresentação
-// continuando, sem botão nem pausa proposital entre eles).
-const CIAHOT_TEXTO_BOAS_VINDAS =
-  "Espero que esteja bem! 😊 Meu nome é Felipe, aqui é do escritório do site CIAHOT — um site de " +
-  "anúncios da região do Vale. 📣\n\n" +
-  "Nosso objetivo é criar anúncios premium e gerar mais atendimentos para você, e facilitar a gestão " +
-  "do seu anúncio.";
-
-const CIAHOT_TEXTO_OFERTA =
-  "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes! " +
-  "Te convido a visitar nosso site pra ver como será seu anúncio — se desejar fazer, em 1 min você vê " +
-  "e faz seu anúncio *premium*!";
-
-const CIAHOT_TEXTO_VIP =
-  "Você pode fazer seu anúncio gratuito, sem custo! 🎉 E ainda pode ganhar o selo *VIP* na campanha " +
-  "que está ativa agora. Faça seu anúncio que ele já é liberado pela nossa equipe!";
-
-const CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA =
-  "Ótimo! Agora é só aguardar a liberação, vamos te avisar por aqui. 📌 Já salva esse contato e " +
-  "também nosso e-mail de suporte: contato@ciahot.com.br";
-const CIAHOT_TEXTO_ANUNCIO_AGORA_NAO = "Sem problemas! 😊 Vamos ficar à disposição, pode nos chamar se tiver alguma dúvida.";
-
-// Dispara depois que a pessoa responde o template de campanha (ver dispararInicioFluxo).
-// Espera 15s (tempo de "digitando..." natural) antes de mandar, e só então marca o passo que
-// liga o lembrete de 17min. Tenta de novo 1x (3s depois) antes de desistir — sem isso, um erro
-// passageiro (rede, rate limit momentâneo da Meta) derrubava o envio sem nenhum vestígio na
-// conversa (nada chegava a ser gravado), e só "menu" reabria manualmente.
-async function enviarComUmRetry(fn) {
-  try {
-    await fn();
-  } catch (err) {
-    console.error("Falha ao enviar, tentando 1x de novo em 3s:", err.message);
-    await new Promise((r) => setTimeout(r, 3000));
-    await fn();
-  }
-}
-
-// REDESENHADO em 02/10/2026 a pedido do usuário, pra cortar ao máximo mensagem de serviço
-// cobrada (boa parte do tráfego passa a vir por template, sem a janela grátis de 72h).
-// "Conhecer site" virou link direto de verdade (cta_url) em vez de botão de resposta — a
-// pessoa já cai no site ao tocar, sem precisar de uma 2ª mensagem só pra entregar o link.
-// Só que um clique em cta_url NÃO gera evento de webhook (diferente de botão de resposta), não
-// dá pra saber se/quando a pessoa clicou — por isso a mensagem seguinte (oferta VIP, com o link
-// do anúncio já embutido como texto, mesmo motivo técnico) sai sempre 5s depois, sem esperar
-// clique nenhum. "Falar com atendimento" não cabia na 1ª mensagem (cta_url só aceita 1 botão,
-// não mistura com botão de resposta) — foi pra 2ª, junto com "Fazer anúncio"/"No momento não".
-async function iniciarFluxoCiahot(de, businessNumberId) {
-  setTimeout(async () => {
-    try {
-      await enviarComUmRetry(() =>
-        enviarRespostaAutomatica(
-          businessNumberId,
-          de,
-          `${CIAHOT_TEXTO_BOAS_VINDAS}\n\n${CIAHOT_TEXTO_OFERTA}`,
-          null,
-          null,
-          { buttonText: "Conhecer site", url: CIAHOT_SITE_URL }
-        )
-      );
-      await new Promise((r) => setTimeout(r, 5000));
-      await enviarComUmRetry(() =>
-        enviarRespostaAutomatica(
-          businessNumberId,
-          de,
-          `${CIAHOT_TEXTO_VIP}\nÉ só acessar: ${CIAHOT_ANUNCIAR_URL}`,
-          [
-            { id: "ciahot_anuncio_sim", title: "Anúncio feito" },
-            { id: "ciahot_anuncio_nao", title: "No momento não" },
-          ]
-        )
-      );
-      await db.setFluxoPasso(de, businessNumberId, "ciahot_oferta");
-    } catch (err) {
-      console.error("Erro ao iniciar fluxo Ciahot:", err.message);
-    }
-  }, 15000);
-}
-
-const FLUXO_BOTOES_CIAHOT = {
-  // "Anúncio feito" (antes "Fazer anúncio") — pedido do usuário em 02/10/2026: nome mais fiel
-  // ao que o clique de fato confirma (o link do formulário já veio embutido na mensagem
-  // anterior, ver iniciarFluxoCiahot). "Falar com atendimento" saiu dessa mensagem — não sobrou
-  // nenhum botão apontando pra esse id, tirei do fluxo.
-  ciahot_anuncio_sim: { texto: CIAHOT_TEXTO_ANUNCIO_CONCLUIDO_RESPOSTA },
-  ciahot_anuncio_nao: { texto: CIAHOT_TEXTO_ANUNCIO_AGORA_NAO },
-};
-
-const LEMBRETE_MINUTOS_CIAHOT = {
-  ciahot_oferta: 17,
-};
-
-const LEMBRETE_HANDLERS_CIAHOT = {};
-
-const LEMBRETE_TEXTOS_CIAHOT = {
-  padrao:
-    "O site CIAHOT pode gerar mais contatos para você! 🚀 Não deixe de conferir e fazer seu anúncio " +
-    `de forma gratuita: ${CIAHOT_SITE_URL}`,
-  // Sem manter_janela de propósito — ver semAvisoJanela em FLUXO_CIAHOT: só esse lembrete de
-  // 17min e nada além disso, mesmo perto das 24h de silêncio.
-};
-
 // ─── HORÁRIO COMERCIAL (Cota Certa) ──────────────────────────────────────────
 // Assumido seg-sex 9h-18h, sábado 9h-12h, domingo fechado (não confirmado com o
 // usuário — ajustar aqui se o horário real da equipe for diferente).
@@ -4943,20 +4831,6 @@ const FLUXO_COTACERTA = {
     cc_uso_app: handlerCep,
     cc_outros: handlerOutrosSeguros,
   },
-};
-
-const FLUXO_CIAHOT = {
-  // Sem menuInicial — fluxo linear disparado por campanha, usa aoIniciar no lugar
-  // (ver dispararInicioFluxo).
-  aoIniciar: iniciarFluxoCiahot,
-  fluxoBotoes: FLUXO_BOTOES_CIAHOT,
-  lembreteMinutos: LEMBRETE_MINUTOS_CIAHOT,
-  lembreteTextos: LEMBRETE_TEXTOS_CIAHOT,
-  lembreteHandlers: LEMBRETE_HANDLERS_CIAHOT,
-  capturaTexto: {},
-  // Teto de mensagens automáticas: as 3 iniciais + 1 lembrete (17min) e nada mais — sem o
-  // segundo aviso de manter-janela (20h) que os outros fluxos mandam.
-  semAvisoJanela: true,
 };
 
 // ─── FLUXO CAMPANHA CLT (número "Campanha CLT") ─────────────────────────────
@@ -5543,7 +5417,6 @@ const FLUXO_FGTS_ANUNCIO = {
 // já abertas e usar a entrada híbrida da FelizCred para as novas conversas.
 const FLUXOS_POR_NUMERO = {
   [COTACERTA_NUMBER_ID]: FLUXO_COTACERTA,
-  [CIAHOT_NUMBER_ID]: FLUXO_CIAHOT,
 };
 
 // Divide contato por contato entre a variante 1 (ativa) e a 2 (nova, em teste) da Campanha CLT —

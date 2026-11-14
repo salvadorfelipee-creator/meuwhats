@@ -1061,76 +1061,6 @@ const COTACERTA_ATENDIMENTO: ItemRoteador = {
   ],
 }
 
-// ───────────────────────── Ciahot ─────────────────────────
-
-const CIAHOT_SITE_URL = "https://www.ciahot.com.br"
-const CIAHOT_ANUNCIAR_URL = "https://ciahot.com.br/anunciar/"
-
-const CIAHOT_FLUXO: ItemRoteador = {
-  chave: "ciahot_fluxo_linear",
-  titulo: "Sequência pós-campanha",
-  grupo: "Campanha",
-  canal: "Ciahot",
-  descricao:
-    "Negócio diferente da Felizcred — site de anúncios classificados da região do Vale. Sempre disparado por campanha de Marketing " +
-    "(template aprovado pelo broadcast do painel); este fluxo só cuida do que acontece DEPOIS que a pessoa responde. Não é um menu — é " +
-    "uma sequência linear (aquece, oferece anúncio grátis com link pro site, cutuca 1x em 17min se ninguém tocar em nada). Teto de " +
-    "mensagens automáticas: as 3 iniciais + 1 lembrete e nada mais.",
-  intro: [
-    { tipo: "nota", texto: "dispara 15s depois da pessoa responder ao template de campanha" },
-    {
-      tipo: "bot",
-      texto:
-        "Espero que esteja bem! 😊 Meu nome é Felipe, aqui é do escritório do site CIAHOT — um site de " +
-        "anúncios da região do Vale. 📣\n\n" +
-        "Nosso objetivo é criar anúncios premium e gerar mais atendimentos para você, e facilitar a gestão " +
-        "do seu anúncio.\n\n" +
-        "Estamos liberando um anúncio *gratuito* pra você divulgar seu perfil e conseguir mais clientes! " +
-        "Te convido a visitar nosso site pra ver como será seu anúncio — se desejar fazer, em 1 min você vê " +
-        "e faz seu anúncio *premium*!",
-    },
-    { tipo: "nota", texto: `botão de link "Conhecer site" → ${CIAHOT_SITE_URL}` },
-    { tipo: "nota", texto: "5s depois (sem esperar clique — cta_url não gera webhook)" },
-    {
-      tipo: "bot",
-      texto:
-        `Você pode fazer seu anúncio gratuito, sem custo! 🎉 E ainda pode ganhar o selo *VIP* na campanha ` +
-        `que está ativa agora. Faça seu anúncio que ele já é liberado pela nossa equipe!\nÉ só acessar: ${CIAHOT_ANUNCIAR_URL}`,
-    },
-    { tipo: "nota", texto: 'botões: "Anúncio feito" / "No momento não"' },
-  ],
-  caminhos: [
-    {
-      rotulo: "Anúncio feito",
-      linhas: [
-        { tipo: "eu", texto: "Anúncio feito" },
-        {
-          tipo: "bot",
-          texto:
-            "Ótimo! Agora é só aguardar a liberação, vamos te avisar por aqui. 📌 Já salva esse contato e " +
-            "também nosso e-mail de suporte: contato@ciahot.com.br",
-        },
-      ],
-    },
-    {
-      rotulo: "No momento não",
-      linhas: [
-        { tipo: "eu", texto: "No momento não" },
-        { tipo: "bot", texto: "Sem problemas! 😊 Vamos ficar à disposição, pode nos chamar se tiver alguma dúvida." },
-      ],
-    },
-    {
-      rotulo: "Sem resposta (lembrete 17min)",
-      linhas: [
-        { tipo: "nota", texto: "17 min sem nenhum clique → único lembrete, depois disso o bot fica quieto" },
-        {
-          tipo: "bot",
-          texto: `O site CIAHOT pode gerar mais contatos para você! 🚀 Não deixe de conferir e fazer seu anúncio de forma gratuita: ${CIAHOT_SITE_URL}`,
-        },
-      ],
-    },
-  ],
-}
 
 export const ITENS_ROTEADOR: ItemRoteador[] = [
   FELIZCRED_MENU_PRINCIPAL,
@@ -1153,7 +1083,6 @@ export const ITENS_ROTEADOR: ItemRoteador[] = [
   COTACERTA_CONSORCIO,
   COTACERTA_OUTROS,
   COTACERTA_ATENDIMENTO,
-  CIAHOT_FLUXO,
 ]
 
 // Canais distintos, na ordem em que aparecem acima — usado pelos filtros/pills da tela Fluxos.
