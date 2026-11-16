@@ -81,7 +81,7 @@ const DETALHE = {
 };
 
 function targeting(k, c) {
-  const t = { geo_locations: { countries: ["BR"] }, age_min: Math.min(c.idade[0], 25), age_max: 65, age_range: [c.idade[0], c.idade[1]], targeting_automation: { advantage_audience: 1 }, publisher_platforms: ["facebook", "instagram"] };
+  const t = { geo_locations: { regions: [{ key: "459" }] }, excluded_geo_locations: { cities: [{ key: "243550" }, { key: "245903" }] }, age_min: Math.min(c.idade[0], 25), age_max: 65, age_range: [c.idade[0], c.idade[1]], targeting_automation: { advantage_audience: 1 }, publisher_platforms: ["facebook", "instagram"] };
   if (c.generos === "mulheres") t.genders = [2];
   if (Object.keys(DETALHE[k]).length) t.flexible_spec = [DETALHE[k]];
   return t;
@@ -97,7 +97,7 @@ function targeting(k, c) {
   for (const [k, c] of Object.entries(spec.conjuntos)) {
     if (ids.conjuntos[k]) continue;
     const r = await graph(`${ACT}/adsets`, {
-      name: `Nexus | ${c.nome} | ${c.idade[0]}-${c.idade[1]}${c.generos === "mulheres" ? " F" : ""}`,
+      name: `Nexus SC | ${c.nome} | ${c.idade[0]}-${c.idade[1]}${c.generos === "mulheres" ? " F" : ""}`,
       campaign_id: ids.campanha, status: "PAUSED", daily_budget: String(c.orcamentoDia * 100),
       billing_event: "IMPRESSIONS", optimization_goal: "CONVERSATIONS", destination_type: "WHATSAPP",
       bid_strategy: "LOWEST_COST_WITHOUT_CAP",
@@ -128,7 +128,8 @@ function targeting(k, c) {
       spec_ = { page_id: PAGE, instagram_user_id: IG, video_data: { video_id: vid, image_hash: th, message: a.texto, title: a.titulo, link_description: a.descricao, call_to_action: { type: "WHATSAPP_MESSAGE", value: { app_destination: "WHATSAPP", link } } } };
     }
     let cr;
-    try {
+    if (ids.criativos[a.arquivo]) cr = { id: ids.criativos[a.arquivo] };
+    else try {
       cr = await graph(`${ACT}/adcreatives`, { name: nome, object_story_spec: spec_ });
     } catch (e) {
       if (/instagram/i.test(e.message)) { delete spec_.instagram_user_id; console.log("  sem identidade do Instagram:", e.message.slice(0, 120)); cr = await graph(`${ACT}/adcreatives`, { name: nome, object_story_spec: spec_ }); }
