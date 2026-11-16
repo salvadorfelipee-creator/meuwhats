@@ -224,7 +224,7 @@ function erroPrazoCltNegada(row, blob) {
   const liberaEm = inicio + 30 * 24 * 3600 * 1000;
   if (!inicio || liberaEm < Date.now()) return null;
   const fmt = (ms) => new Date(ms).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-  return `Sua última simulação de consignado CLT foi em ${fmt(inicio)} e não teve condições. Uma nova consulta só pode ser feita depois de 30 dias, a partir de ${fmt(liberaEm)}.`;
+  return `Sua última simulação de consignado CLT foi em ${fmt(inicio)} e não teve condições. Uma nova consulta só pode ser feita depois de 30 dias, a partir de ${fmt(liberaEm)}. Não adianta consultar de novo, o resultado será o mesmo. Se quiser que a gente atualize, entre no aplicativo da Carteira de Trabalho Digital e envie para nós, pelo WhatsApp, o print da sua margem.`;
 }
 
 function siteChatCltPublico(row) {
@@ -7222,7 +7222,7 @@ const server = http.createServer(async (req, res) => {
             const ultimaNegada = novosaque.cpfValido(cpf) ? await db.siteChatCltNegadaRecentePorCpf(cpf, 30) : null;
             if (ultimaNegada) {
               const fmt = (ms) => new Date(ms).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-              return send(res, 422, { codigo: "clt_prazo_nova_simulacao", error: `Sua última simulação de consignado CLT foi em ${fmt(ultimaNegada)} e não teve condições. Uma nova consulta só pode ser feita depois de 30 dias, a partir de ${fmt(ultimaNegada + 30 * 24 * 3600 * 1000)}.` }, corsHeaders);
+              return send(res, 422, { codigo: "clt_prazo_nova_simulacao", error: `Sua última simulação de consignado CLT foi em ${fmt(ultimaNegada)} e não teve condições. Uma nova consulta só pode ser feita depois de 30 dias, a partir de ${fmt(ultimaNegada + 30 * 24 * 3600 * 1000)}. Não adianta consultar de novo, o resultado será o mesmo. Se quiser que a gente atualize, entre no aplicativo da Carteira de Trabalho Digital e envie para nós, pelo WhatsApp, o print da sua margem.` }, corsHeaders);
             }
             const phone = String(body.phone || "").replace(/\D/g, "");
             const fullName = String(body.name || conversation.name || "").trim().replace(/\s+/g, " ").slice(0, 120);
