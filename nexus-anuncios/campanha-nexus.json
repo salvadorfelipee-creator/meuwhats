@@ -1,0 +1,559 @@
+{
+  "campanha": {
+    "nome": "Nexus | Mensagens WhatsApp | Teste 16-19/11",
+    "objetivo": "OUTCOME_ENGAGEMENT (conversas no WhatsApp)",
+    "inicio": "2026-11-16",
+    "fim": "2026-11-19 23:59",
+    "status": "PAUSED"
+  },
+  "whatsapp": {
+    "numero": "+55 47 3180-4984",
+    "phone_number_id": "1512976205221650",
+    "mensagemPronta": "Oi! Vi o anúncio e quero saber mais sobre o site."
+  },
+  "cta": "WHATSAPP_MESSAGE (Enviar mensagem)",
+  "conjuntos": {
+    "odonto": {
+      "orcamentoDia": 15,
+      "idade": [
+        25,
+        55
+      ],
+      "generos": "todos",
+      "cargos": [
+        "Dentista",
+        "Cirurgião-dentista",
+        "Odontologia",
+        "Ortodontia",
+        "Implantodontia"
+      ],
+      "nota": "Dono de clínica odontológica tem faixa ampla; todos os gêneros.",
+      "nome": "Odontologia",
+      "anuncios": 9
+    },
+    "medicina": {
+      "orcamentoDia": 10,
+      "idade": [
+        28,
+        60
+      ],
+      "generos": "todos",
+      "cargos": [
+        "Médico",
+        "Medicina",
+        "Clínico geral",
+        "Dermatologia",
+        "Ginecologia"
+      ],
+      "nota": "Médicos autônomos/consultório próprio; 28+ pela formação.",
+      "nome": "Medicina",
+      "anuncios": 5
+    },
+    "psicologia": {
+      "orcamentoDia": 10,
+      "idade": [
+        25,
+        55
+      ],
+      "generos": "todos",
+      "cargos": [
+        "Psicólogo",
+        "Psicologia",
+        "Psicoterapia",
+        "Terapia cognitivo-comportamental"
+      ],
+      "nota": "Categoria majoritariamente feminina, mas sem restringir: o algoritmo aprende.",
+      "nome": "Psicologia",
+      "anuncios": 6
+    },
+    "psiquiatria": {
+      "orcamentoDia": 10,
+      "idade": [
+        28,
+        60
+      ],
+      "generos": "todos",
+      "cargos": [
+        "Psiquiatra",
+        "Psiquiatria",
+        "Medicina",
+        "Saúde mental"
+      ],
+      "nota": "Formação longa; 28+.",
+      "nome": "Psiquiatria",
+      "anuncios": 6
+    },
+    "harmonizacao": {
+      "orcamentoDia": 15,
+      "idade": [
+        25,
+        50
+      ],
+      "generos": "mulheres",
+      "cargos": [
+        "Harmonização facial",
+        "Estética avançada",
+        "Biomédico",
+        "Cirurgião-dentista",
+        "Esteticista"
+      ],
+      "nota": "Público dominado por mulheres; começa só mulheres e abre se o custo por conversa ficar alto.",
+      "nome": "Harmonização facial",
+      "anuncios": 9
+    },
+    "geral": {
+      "orcamentoDia": 15,
+      "idade": [
+        28,
+        55
+      ],
+      "generos": "todos",
+      "cargos": [
+        "Arquiteto",
+        "Advogado",
+        "Contador",
+        "Designer de interiores",
+        "Autônomo",
+        "Pequenas empresas",
+        "Empreendedorismo"
+      ],
+      "nota": "Mensagens abertas para profissionais liberais e donos de negócios locais; inclui arquitetos.",
+      "nome": "Profissionais liberais e negócios locais",
+      "anuncios": 13
+    }
+  },
+  "anuncios": [
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_odontologia_01_1080x1350.png",
+      "texto": "Quem pesquisa \"dentista perto de mim\" vê poucos nomes. O seu está entre eles?\n\nA decisão começa na busca, antes de qualquer mensagem. Um site com conteúdo da sua cidade e contato direto coloca você nessa conversa.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "busca"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_odontologia_03_1080x1350.png",
+      "texto": "A melhor indicação do mundo termina no Google.\n\nAntes de chamar, o paciente pesquisa seu nome. Se não acha formação, atendimento e contato em um só lugar, a indicação esfria e ele segue para o próximo da lista.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Indicação + ser encontrado",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "indicacao"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_odontologia_05_1080x1350.png",
+      "texto": "Seu trabalho evoluiu. Seu site ficou parado no tempo?\n\nEquipe, estrutura e forma de atender mudam. O site precisa acompanhar para mostrar o consultório que você tem hoje, com identidade própria e não com um modelo genérico.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seu site à altura do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "renova"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_Estilo_01_odontologia_editorial_1080x1350.png",
+      "texto": "Quem pesquisa \"dentista perto de mim\" vê poucos nomes. O seu está entre eles?\n\nA decisão começa na busca, antes de qualquer mensagem. Um site com conteúdo da sua cidade e contato direto coloca você nessa conversa.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "busca"
+    },
+    {
+      "conjunto": "medicina",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_medicina_03_1080x1350.png",
+      "texto": "Quem pesquisa \"médico especialista na minha cidade\" vê poucos nomes. O seu está entre eles?\n\nA decisão começa na busca, antes de qualquer mensagem. Um site com conteúdo da sua cidade e contato direto coloca você nessa conversa.\n\nA Sites Nexus cria o site de médicos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "busca"
+    },
+    {
+      "conjunto": "medicina",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_medicina_04_1080x1350.png",
+      "texto": "3 respostas que seu site precisa dar antes da primeira conversa.\n\nQuem é você, onde e como atende, e como solicitar um horário. Quando essas três respostas estão claras, o contato chega mais preparado.\n\nA Sites Nexus cria o site de médicos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "3 respostas que seu site precisa dar",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "tres"
+    },
+    {
+      "conjunto": "medicina",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_medicina_05_1080x1350.png",
+      "texto": "O paciente decide antes de chamar. E você nem fica sabendo.\n\nEle lê, compara e só então manda mensagem. Um site que explica como é o atendimento, onde fica e como agendar já responde isso por você.\n\nA Sites Nexus cria o site de médicos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Responda antes da primeira conversa",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "esclarece"
+    },
+    {
+      "conjunto": "medicina",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_medicina_21_trajetoria_1080x1350.png",
+      "texto": "Seu trabalho evoluiu. Seu site ficou parado no tempo?\n\nEquipe, estrutura e forma de atender mudam. O site precisa acompanhar para mostrar o consultório que você tem hoje, com identidade própria e não com um modelo genérico.\n\nA Sites Nexus cria o site de médicos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seu site à altura do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "renova"
+    },
+    {
+      "conjunto": "medicina",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_Estilo_03_medicina_jornal_1080x1350.png",
+      "texto": "O paciente decide antes de chamar. E você nem fica sabendo.\n\nEle lê, compara e só então manda mensagem. Um site que explica como é o atendimento, onde fica e como agendar já responde isso por você.\n\nA Sites Nexus cria o site de médicos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Responda antes da primeira conversa",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "esclarece"
+    },
+    {
+      "conjunto": "psicologia",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psicologia_01_1080x1350.png",
+      "texto": "O paciente decide antes de chamar. E você nem fica sabendo.\n\nEle lê, compara e só então manda mensagem. Um site que explica como é o atendimento, onde fica e como agendar já responde isso por você.\n\nA Sites Nexus cria o site de psicólogas e psicólogos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Responda antes da primeira conversa",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "esclarece"
+    },
+    {
+      "conjunto": "psicologia",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psicologia_02_1080x1350.png",
+      "texto": "Seu Instagram atrai. O que convence fora dele?\n\nPostar todo dia não pode ser o único caminho até você. Um site reúne seus serviços, sua forma de trabalhar e o próximo passo em um lugar que o paciente encontra pela busca.\n\nA Sites Nexus cria o site de psicólogas e psicólogos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Vá além do feed",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "feed"
+    },
+    {
+      "conjunto": "psicologia",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psicologia_03_1080x1350.png",
+      "texto": "Seu Instagram atrai. O que convence fora dele?\n\nPostar todo dia não pode ser o único caminho até você. Um site reúne seus serviços, sua forma de trabalhar e o próximo passo em um lugar que o paciente encontra pela busca.\n\nA Sites Nexus cria o site de psicólogas e psicólogos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Vá além do feed",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "feed"
+    },
+    {
+      "conjunto": "psicologia",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psicologia_04_1080x1350.png",
+      "texto": "3 respostas que seu site precisa dar antes da primeira conversa.\n\nQuem é você, onde e como atende, e como solicitar um horário. Quando essas três respostas estão claras, o contato chega mais preparado.\n\nA Sites Nexus cria o site de psicólogas e psicólogos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "3 respostas que seu site precisa dar",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "tres"
+    },
+    {
+      "conjunto": "psicologia",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psicologia_05_1080x1350.png",
+      "texto": "Seu trabalho evoluiu. Seu site ficou parado no tempo?\n\nEquipe, estrutura e forma de atender mudam. O site precisa acompanhar para mostrar o consultório que você tem hoje, com identidade própria e não com um modelo genérico.\n\nA Sites Nexus cria o site de psicólogas e psicólogos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seu site à altura do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "renova"
+    },
+    {
+      "conjunto": "psicologia",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_Estilo_05_psicologia_ilustracao_1080x1350.png",
+      "texto": "Seu trabalho evoluiu. Seu site ficou parado no tempo?\n\nEquipe, estrutura e forma de atender mudam. O site precisa acompanhar para mostrar o consultório que você tem hoje, com identidade própria e não com um modelo genérico.\n\nA Sites Nexus cria o site de psicólogas e psicólogos com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seu site à altura do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "renova"
+    },
+    {
+      "conjunto": "psiquiatria",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psiquiatria_01_1080x1350.png",
+      "texto": "O paciente decide antes de chamar. E você nem fica sabendo.\n\nEle lê, compara e só então manda mensagem. Um site que explica como é o atendimento, onde fica e como agendar já responde isso por você.\n\nA Sites Nexus cria o site de psiquiatras com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Responda antes da primeira conversa",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "esclarece"
+    },
+    {
+      "conjunto": "psiquiatria",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psiquiatria_02_1080x1350.png",
+      "texto": "A melhor indicação do mundo termina no Google.\n\nAntes de chamar, o paciente pesquisa seu nome. Se não acha formação, atendimento e contato em um só lugar, a indicação esfria e ele segue para o próximo da lista.\n\nA Sites Nexus cria o site de psiquiatras com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Indicação + ser encontrado",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "indicacao"
+    },
+    {
+      "conjunto": "psiquiatria",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psiquiatria_03_1080x1350.png",
+      "texto": "Quem pesquisa \"psiquiatra na minha cidade\" vê poucos nomes. O seu está entre eles?\n\nA decisão começa na busca, antes de qualquer mensagem. Um site com conteúdo da sua cidade e contato direto coloca você nessa conversa.\n\nA Sites Nexus cria o site de psiquiatras com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "busca"
+    },
+    {
+      "conjunto": "psiquiatria",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psiquiatria_04_1080x1350.png",
+      "texto": "3 respostas que seu site precisa dar antes da primeira conversa.\n\nQuem é você, onde e como atende, e como solicitar um horário. Quando essas três respostas estão claras, o contato chega mais preparado.\n\nA Sites Nexus cria o site de psiquiatras com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "3 respostas que seu site precisa dar",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "tres"
+    },
+    {
+      "conjunto": "psiquiatria",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_psiquiatria_05_1080x1350.png",
+      "texto": "Seu trabalho evoluiu. Seu site ficou parado no tempo?\n\nEquipe, estrutura e forma de atender mudam. O site precisa acompanhar para mostrar o consultório que você tem hoje, com identidade própria e não com um modelo genérico.\n\nA Sites Nexus cria o site de psiquiatras com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seu site à altura do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "renova"
+    },
+    {
+      "conjunto": "psiquiatria",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_Estilo_04_psiquiatria_navegacao_1080x1350.png",
+      "texto": "A melhor indicação do mundo termina no Google.\n\nAntes de chamar, o paciente pesquisa seu nome. Se não acha formação, atendimento e contato em um só lugar, a indicação esfria e ele segue para o próximo da lista.\n\nA Sites Nexus cria o site de psiquiatras com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Indicação + ser encontrado",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "indicacao"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_harmonizacao_01_1080x1350.png",
+      "texto": "Seu Instagram atrai. O que convence fora dele?\n\nPostar todo dia não pode ser o único caminho até você. Um site reúne seus serviços, sua forma de trabalhar e o próximo passo em um lugar que o paciente encontra pela busca.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Vá além do feed",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "feed"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_harmonizacao_03_1080x1350.png",
+      "texto": "Quem pesquisa \"harmonização facial perto de mim\" vê poucos nomes. O seu está entre eles?\n\nA decisão começa na busca, antes de qualquer mensagem. Um site com conteúdo da sua cidade e contato direto coloca você nessa conversa.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "busca"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_harmonizacao_04_1080x1350.png",
+      "texto": "3 respostas que seu site precisa dar antes da primeira conversa.\n\nQuem é você, onde e como atende, e como solicitar um horário. Quando essas três respostas estão claras, o contato chega mais preparado.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "3 respostas que seu site precisa dar",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "tres"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_harmonizacao_05_1080x1350.png",
+      "texto": "Seu trabalho evoluiu. Seu site ficou parado no tempo?\n\nEquipe, estrutura e forma de atender mudam. O site precisa acompanhar para mostrar o clínica que você tem hoje, com identidade própria e não com um modelo genérico.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seu site à altura do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "renova"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Nexus_Estilo_02_harmonizacao_colagem_1080x1350.png",
+      "texto": "Seu Instagram atrai. O que convence fora dele?\n\nPostar todo dia não pode ser o único caminho até você. Um site reúne seus serviços, sua forma de trabalhar e o próximo passo em um lugar que o paciente encontra pela busca.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Vá além do feed",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "feed"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_01_indicacao_tipografico_1080x1350.png",
+      "texto": "A melhor indicação do mundo termina no Google.\n\nAntes de chamar, o cliente pesquisa seu nome. Se não acha formação, atendimento e contato em um só lugar, a indicação esfria e ele segue para o próximo da lista.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Indicação + ser encontrado",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "indicacao"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_03_instagram_tipografico_1080x1350.png",
+      "texto": "Seu Instagram atrai. O que convence fora dele?\n\nPostar todo dia não pode ser o único caminho até você. Um site reúne seus serviços, sua forma de trabalhar e o próximo passo em um lugar que o cliente encontra pela busca.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Vá além do feed",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "feed"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_05_inauguracao_tipografico_1080x1350.png",
+      "texto": "Seu trabalho evoluiu. Seu site ficou parado no tempo?\n\nEquipe, estrutura e forma de atender mudam. O site precisa acompanhar para mostrar o negócio que você tem hoje, com identidade própria e não com um modelo genérico.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seu site à altura do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "renova"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_06_inauguracao_infografico_1080x1350.png",
+      "texto": "3 respostas que seu site precisa dar antes da primeira conversa.\n\nQuem é você, onde e como atende, e como solicitar um horário. Quando essas três respostas estão claras, o contato chega mais preparado.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "3 respostas que seu site precisa dar",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "tres"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_07_google_tipografico_1080x1350.png",
+      "texto": "Quem pesquisa \"o serviço que você oferece na sua cidade\" vê poucos nomes. O seu está entre eles?\n\nA decisão começa na busca, antes de qualquer mensagem. Um site com conteúdo da sua cidade e contato direto coloca você nessa conversa.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "busca"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_08_google_infografico_1080x1350.png",
+      "texto": "Quem pesquisa \"o serviço que você oferece na sua cidade\" vê poucos nomes. O seu está entre eles?\n\nA decisão começa na busca, antes de qualquer mensagem. Um site com conteúdo da sua cidade e contato direto coloca você nessa conversa.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "busca"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_09_qualificacao_tipografico_1080x1350.png",
+      "texto": "O cliente decide antes de chamar. E você nem fica sabendo.\n\nEle lê, compara e só então manda mensagem. Um site que explica como é o atendimento, onde fica e como agendar já responde isso por você.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Responda antes da primeira conversa",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "esclarece"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_10_qualificacao_infografico_1080x1350.png",
+      "texto": "3 respostas que seu site precisa dar antes da primeira conversa.\n\nQuem é você, onde e como atende, e como solicitar um horário. Quando essas três respostas estão claras, o contato chega mais preparado.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem*, conte sua área e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "3 respostas que seu site precisa dar",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "tres"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Odontologia_V1_visibilidade.mp4",
+      "texto": "Seu concorrente está recebendo seus pacientes?\n\nQuando o paciente pesquisa, a escolha acontece antes de qualquer mensagem. Veja como aparecer nessa busca.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Odontologia_V2_visibilidade.mp4",
+      "texto": "O paciente busca. Quem ele encontra?\n\nGoogle e inteligência artificial já respondem 'qual clínica atende perto de mim'. Sua clínica entra nessa resposta?\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "O paciente busca. Quem ele encontra?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Odontologia_V3_visibilidade.mp4",
+      "texto": "Por que ele aparece antes da sua clínica?\n\nA ordem da busca muda quem recebe a primeira mensagem. Entenda o que fazer para ser encontrado.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Odontologia_V4_visibilidade.mp4",
+      "texto": "O paciente busca. Quem ele encontra?\n\nA escolha começa na pesquisa. Veja como sua clínica pode aparecer quando alguém procura por dentista.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "O paciente busca. Quem ele encontra?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Odontologia_agenda_vazia.mp4",
+      "texto": "Dentista, horários vazios?\n\nQuem procura tratamento pesquisa antes de chamar. Um site profissional com contato direto ajuda a transformar essa busca em conversa.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Dentista, horários vazios?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Harmonizacao_V1_WhatsApp.mp4",
+      "texto": "Por que escolhem a outra clínica?\n\nQuem procura harmonização facial pode estar encontrando outras clínicas antes de conhecer a sua. A escolha começa na busca.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Por que escolhem a outra clínica?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Harmonizacao_V2_WhatsApp.mp4",
+      "texto": "Sua agenda depende de indicação?\n\nQuando as indicações diminuem, a agenda sente. Há pessoas procurando harmonização na sua região. Elas encontram você?\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Sua agenda depende de indicação?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Harmonizacao_V3_WhatsApp.mp4",
+      "texto": "Sua clínica sumiu do Google?\n\nSer encontrada no Google, nas buscas com IA e no Google Meu Negócio é o primeiro passo para abrir novas conversas.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Sua clínica sumiu do Google?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Nexus_Harmonizacao_V4_WhatsApp.mp4",
+      "texto": "Quantas avaliações você perdeu hoje?\n\nQuem já procura seus procedimentos precisa achar você. Veja por onde começar.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Quantas avaliações você perdeu hoje?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_01_indicacao_1080x1920.mp4",
+      "texto": "Só entra cliente por indicação?\n\nSeu negócio pode abrir outro caminho: um site feito para ser encontrado e facilitar o contato.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Só entra cliente por indicação?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_02_instagram_1080x1920.mp4",
+      "texto": "Seguidores curtem. Clientes pesquisam.\n\nDo link da bio ao pedido de orçamento: dê ao cliente um lugar para conhecer seu trabalho.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seguidores curtem. Clientes pesquisam.",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_03_inauguracao_1080x1920.mp4",
+      "texto": "As portas vão abrir. Seu site também?\n\nQuem ouvir seu nome vai procurar você antes de visitar. Esteja pronto desde o primeiro dia.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "As portas vão abrir. Seu site também?",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_04_google_1080x1920.mp4",
+      "texto": "Quem procura na sua cidade encontra sua empresa?\n\nUm site com foco em busca local e contato fácil prepara seu negócio para ser encontrado.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    },
+    {
+      "conjunto": "geral",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_05_qualificacao_1080x1920.mp4",
+      "texto": "Antes de perguntar o preço, o cliente precisa entender o valor.\n\nUm site que explica seus serviços e diferenciais prepara uma conversa melhor.\n\nA Sites Nexus cria o site de profissionais e negócios locais com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e agende um diagnóstico gratuito de 15 minutos com o Felipe.",
+      "titulo": "Seja encontrado na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min",
+      "angulo": "video"
+    }
+  ]
+}
