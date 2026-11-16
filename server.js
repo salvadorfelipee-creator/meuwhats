@@ -709,7 +709,7 @@ async function sincronizarSiteChatFacta(row) {
     return db.siteChatCltAtualizar(row.conversation_id, { etapa: "nao_elegivel", status_novosaque: "INELEGIVEL", error_message: reason || null });
   }
   const primeiro = elegiveis[0];
-  if (numeroFacta(primeiro.valorMargemDisponivel) <= 0) return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_margem", status_novosaque: "SEM_MARGEM", margem_disponivel: 0, facta_worker_json: JSON.stringify(primeiro), error_message: null });
+  if (numeroFacta(primeiro.valorMargemDisponivel) <= 0) return db.siteChatCltAtualizar(row.conversation_id, { etapa: "sem_margem", status_novosaque: "SEM_MARGEM", margem_disponivel: 0, facta_worker_json: JSON.stringify(primeiro), error_message: "Você só poderá simular novamente quando um dos seus contratos terminar. Antes disso, não será possível." });
 
   let worker = primeiro, margem = parcelaMaximaFacta(numeroFacta(primeiro.valorMargemDisponivel)), offers = [], erroOperacoes = null;
   for (const candidato of elegiveis.slice(0, 5)) {
@@ -3006,8 +3006,7 @@ const CLTORIG_TEXTO_TERMINAL = {
     "consulta na Carteira de Trabalho Digital agora. Se quiser, tenta de novo mais tarde ou fala " +
     "com um atendente.",
   sem_margem:
-    "No momento você não tem margem disponível pra consignado CLT. Isso pode mudar mês a mês — " +
-    "se quiser, tenta de novo depois.",
+    "Você só poderá simular novamente quando um dos seus contratos terminar. Antes disso, não será possível.",
   desconhecido:
     "No momento não encontrei condições disponíveis pro seu consignado CLT. Se quiser, tenta de " +
     "novo mais tarde.",
@@ -3890,8 +3889,7 @@ const NOVOSAQUE_ORIGINATION_ATIVO = false;
 
 const NSORIG_TEXTO_TERMINAL = {
   sem_margem:
-    "No momento você não tem margem disponível pra consignado CLT. Isso pode mudar mês a mês — " +
-    "se quiser, tenta de novo depois.",
+    "Você só poderá simular novamente quando um dos seus contratos terminar. Antes disso, não será possível.",
   desconhecido:
     "No momento não encontrei condições disponíveis pro seu consignado CLT. Se quiser, tenta de " +
     "novo mais tarde.",

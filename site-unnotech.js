@@ -196,7 +196,7 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       const url = completa?.authorization?.consent_url;
       if (url) { row = await atualizar(row, { terms_link: url }); await avisarLink(row, url); }
     }
-    if (status.status === "NO_MARGIN") return encerrar(row, "sem_margem", "Nenhum vínculo seu tem margem disponível nos bancos parceiros agora.");
+    if (status.status === "NO_MARGIN") return encerrar(row, "sem_margem", "Você só poderá simular novamente quando um dos seus contratos terminar. Antes disso, não será possível.");
     if (status.authorization_status === "NOT_AVAILABLE") return encerrar(row, "nao_elegivel", "Seu CPF ainda não liberou a consulta no Dataprev (Carteira de Trabalho Digital). Depois que liberar, é só falar com a gente.");
     if (["EXPIRED", "CANCELLED", "FAILED"].includes(status.status)) return encerrar(row, "erro_consulta", "A consulta nos bancos parceiros não foi concluída. Um atendente pode ajudar.");
     if (status.status === "NO_OFFERS") return encerrar(row, "sem_oferta", "Os bancos parceiros não encontraram uma condição agora.");
@@ -213,7 +213,7 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       const margem = await unnotech.consultarMargemClt(row.transaction_id);
       const vinculos = [...(margem.employments || [])].sort((a, b) => Number(b.available_margin || 0) - Number(a.available_margin || 0));
       const vinculo = vinculos[0];
-      if (!vinculo || Number(vinculo.available_margin || 0) <= 0) return encerrar(row, "sem_margem", "Nenhum vínculo seu tem margem disponível nos bancos parceiros agora.");
+      if (!vinculo || Number(vinculo.available_margin || 0) <= 0) return encerrar(row, "sem_margem", "Você só poderá simular novamente quando um dos seus contratos terminar. Antes disso, não será possível.");
       await unnotech.simularClt(row.transaction_id, { employmentId: vinculo.employment_id, basis: "INSTALLMENT", valor: Number(vinculo.available_margin) }, crypto.randomUUID());
       return atualizar(row, {
         etapa: "simulando",
