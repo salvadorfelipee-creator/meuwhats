@@ -5603,9 +5603,23 @@ async function montarFluxoDinamico(fluxoRow) {
     fluxoBotoes[opcao.botao_id] = (de, businessNumberId) =>
       avancarNoFluxoDinamico(opcao.proximo_no_id, de, businessNumberId, fluxoRow.id);
   }
+  // Pergunta em texto livre: nó 'mensagem' SEM botões mas COM proximo_no_id. Ao mandar o texto
+  // dele o contato fica esperando; o que ele digitar vale como resposta (já fica gravado no
+  // histórico como mensagem recebida) e o fluxo segue pro proximo_no_id. Nó sem botões e sem
+  // próximo continua sendo ponto final, como sempre foi.
+  const capturaTexto = {};
+  const nosDoFluxo = await db.fluxoNosDoFluxo(fluxoRow.id);
+  const nosComBotao = new Set(todasOpcoes.map((o) => Number(o.no_id)));
+  for (const no of nosDoFluxo) {
+    if (no.tipo === "mensagem" && no.proximo_no_id && !nosComBotao.has(Number(no.id))) {
+      capturaTexto[`fluxo_dinamico_${no.id}`] = (de, businessNumberId) =>
+        avancarNoFluxoDinamico(no.proximo_no_id, de, businessNumberId, fluxoRow.id);
+    }
+  }
   return {
     aoIniciar: (de, businessNumberId) => avancarNoFluxoDinamico(fluxoRow.no_inicial_id, de, businessNumberId, fluxoRow.id),
     fluxoBotoes,
+    capturaTexto,
     lembreteMinutos: {}, // sem "espera"/lembrete de inatividade ainda — gap conhecido, ver README
     lembreteTextos: {},
     lembreteHandlers: {},
