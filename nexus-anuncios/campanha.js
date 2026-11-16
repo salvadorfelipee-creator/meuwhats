@@ -135,6 +135,7 @@ for (const [arq, [seg, gancho, apoio]] of Object.entries(VID)) {
 
 const out = {
   campanha: { nome: "Nexus | Mensagens WhatsApp | Teste 16-19/11", objetivo: "OUTCOME_ENGAGEMENT (conversas no WhatsApp)", inicio: "2026-11-16", fim: "2026-11-19 23:59", status: "PAUSED" },
+  pagina: { nome: "Sites Nexus", id: "1512388375281177", instagram_id: "17841439718181335" },
   whatsapp: { numero: "+55 47 3180-4984", phone_number_id: "1512976205221650", mensagemPronta: "Oi! Vi o anúncio e quero saber mais sobre o site." },
   cta: "WHATSAPP_MESSAGE (Enviar mensagem)",
   conjuntos: Object.fromEntries(Object.entries(CONJUNTOS).map(([k, v]) => [k, { ...v, nome: SEG[k].nome, anuncios: ads.filter((a) => a.conjunto === k).length }])),
