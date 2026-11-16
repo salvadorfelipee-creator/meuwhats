@@ -81,7 +81,7 @@ const DETALHE = {
 };
 
 function targeting(k, c) {
-  const t = { geo_locations: { countries: ["BR"] }, age_min: c.idade[0], age_max: c.idade[1], targeting_automation: { advantage_audience: 1 }, publisher_platforms: ["facebook", "instagram"] };
+  const t = { geo_locations: { countries: ["BR"] }, age_min: Math.min(c.idade[0], 25), age_max: 65, age_range: [c.idade[0], c.idade[1]], targeting_automation: { advantage_audience: 1 }, publisher_platforms: ["facebook", "instagram"] };
   if (c.generos === "mulheres") t.genders = [2];
   if (Object.keys(DETALHE[k]).length) t.flexible_spec = [DETALHE[k]];
   return t;
@@ -103,6 +103,7 @@ function targeting(k, c) {
       bid_strategy: "LOWEST_COST_WITHOUT_CAP",
       promoted_object: { page_id: PAGE, whatsapp_phone_number: WHATS },
       targeting: targeting(k, c),
+      regional_regulation_identities: { universal_beneficiary: "599219759208171", universal_payer: "599219759208171" },
       start_time: new Date().toISOString(), end_time: "2026-11-19T23:59:00-0200",
     });
     ids.conjuntos[k] = r.id; salvar(); console.log("conjunto", k, r.id);
