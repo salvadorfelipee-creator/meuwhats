@@ -7201,7 +7201,7 @@ const server = http.createServer(async (req, res) => {
             if (!unnotech.cpfValido(cpfFgts)) return send(res, 400, { error: "Digite um CPF válido." }, corsHeaders);
             if (await fgtsJaSemSaldo(cpfFgts, conversation.contact)) {
               await db.siteChatDefinirStatus(id, "closed").catch(() => {});
-              return send(res, 422, { codigo: "fgts_ja_consultado", error: "Seu FGTS já foi consultado e não há valor para antecipar neste ano (a Caixa permite uma antecipação por ano). Você pode simular o Consignado CLT: escolha essa opção acima." }, corsHeaders);
+              return send(res, 422, { codigo: "fgts_ja_consultado", error: "Seu FGTS já foi consultado e não há saldo para antecipar: a Caixa só permite uma antecipação a cada 12 meses, e o seu CPF já usou esse direito. Por isso não é possível simular de novo agora. Você pode simular o Consignado CLT: escolha essa opção acima." }, corsHeaders);
             }
             await salvarDadosSite(id, { cpf: cpfFgts });
             if (!unnoSite.configurado()) return send(res, 503, { error: "A consulta do FGTS está indisponível agora. Fale com o Felipe." }, corsHeaders);

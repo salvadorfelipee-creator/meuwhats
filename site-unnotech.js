@@ -405,7 +405,7 @@ function criarAdaptador({ db, unnotech, mensagemAtendente, notificar = async () 
       console.log(`FGTS sem oferta (${row.conversation_id}): categoria=${categoria} motivo="${String(motivoTexto).slice(0, 200)}"`);
       await atualizar(row, { facta_worker_json: JSON.stringify({ ...blob, motivo_recusa: String(motivoTexto || "").slice(0, 300), categoria }) });
       const texto = categoria === "sem_saldo"
-        ? "Não há saldo do FGTS disponível para antecipar agora. Isso pode mudar, por exemplo depois do mês do seu aniversário."
+        ? "Não há saldo do FGTS para antecipar. A Caixa só permite uma antecipação a cada 12 meses, e o seu CPF já usou esse direito neste período. Por isso não é possível simular de novo agora."
         : "Os bancos não liberaram uma condição para o seu FGTS agora. Um atendente pode conferir o motivo com você.";
       return encerrar(row, "sem_oferta", texto);
     }
