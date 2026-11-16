@@ -1,20 +1,20 @@
 import * as React from "react"
 import { api, type PhoneNumber } from "@/lib/api"
 
-export type CompanyId = "felizcred" | "cotacerta" | "ciahot"
+export type CompanyId = "felizcred" | "cotacerta" | "nexus"
 export type Channel = { id: string; label: string; kind: "whatsapp" | "instagram" | "site"; company: CompanyId }
 
 export function companyForLabel(label: string): CompanyId {
   const value = label.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ")
   if (value.includes("cota certa")) return "cotacerta"
-  if (value.includes("ciahot") || value.includes("cia hot")) return "ciahot"
+  if (value.includes("nexus")) return "nexus"
   return "felizcred"
 }
 
 export const COMPANY_LABELS: Record<CompanyId, string> = {
   felizcred: "FelizCred",
   cotacerta: "Cota Certa Seguros",
-  ciahot: "Cia Hot",
+  nexus: "Sites Nexus",
 }
 
 type ChannelContextValue = {

@@ -188,7 +188,7 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" className="w-[var(--radix-popper-anchor-width)] min-w-64">
-                {(["felizcred", "cotacerta", "ciahot"] as const).map((company, index) => {
+                {(["felizcred", "cotacerta", "nexus"] as const).map((company, index) => {
                   const items = channels.filter((c) => c.company === company)
                   if (!items.length) return null
                   return <React.Fragment key={company}>
