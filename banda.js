@@ -78,9 +78,39 @@ function iniciar(dbModulo) {
   }, 5 * 60_000).unref();
 }
 
+// Calibração com o número OFICIAL do Render (Billing > Included Bandwidth). O contador bruto passa de 2x o que o
+// Render cobra (conta também tráfego que o Render não tarifa, e o overhead de TLS), então o painel mostra:
+//   oficial_na_calibração + (bruto_agora - bruto_na_calibração) * fator
+// `fator` começa pela razão oficial/bruto da 1ª calibração e é reajustado a cada nova calibração com ≥0,5 GB de
+// diferença (aí a razão é medida no intervalo, bem mais precisa). Sem calibração do mês, mostra o bruto como antes.
+const FATOR_PADRAO = 0.35;
+async function lerCalibracao(mes) {
+  try { return JSON.parse((await db.reelsConfigGet(`banda_calib_${mes}`)) || "null"); } catch { return null; }
+}
+async function calibrar(gbOficial) {
+  const mes = mesAtual();
+  await gravar();
+  const bruto = Number(await db.reelsConfigGet(`banda_${mes}`)) || 0;
+  const oficial = Number(gbOficial) * 1024 ** 3;
+  if (!(oficial >= 0) || !bruto) throw new Error("valor inválido");
+  const anterior = await lerCalibracao(mes);
+  let fator = anterior?.fator || oficial / bruto || FATOR_PADRAO;
+  if (anterior && bruto - anterior.bruto >= 0.5 * 1024 ** 3 && oficial > anterior.oficial) {
+    fator = (oficial - anterior.oficial) / (bruto - anterior.bruto);
+  } else if (!anterior) {
+    fator = oficial / bruto;
+  }
+  fator = Math.min(1, Math.max(0.05, fator));
+  await db.reelsConfigSet(`banda_calib_${mes}`, JSON.stringify({ oficial, bruto, fator, em: Date.now() }));
+  return { mes, oficialGb: Number(gbOficial), brutoGb: Math.round((bruto / 1024 ** 3) * 100) / 100, fator: Math.round(fator * 1000) / 1000 };
+}
+
 async function uso() {
   await gravar();
-  const bytes = Number(await db.reelsConfigGet(`banda_${mesAtual()}`)) || 0;
+  const mes = mesAtual();
+  const brutoBytes = Number(await db.reelsConfigGet(`banda_${mes}`)) || 0;
+  const calib = await lerCalibracao(mes);
+  const bytes = calib ? calib.oficial + Math.max(0, brutoBytes - calib.bruto) * calib.fator : brutoBytes;
   const gb = bytes / 1024 ** 3;
   let hosts = {};
   try { hosts = JSON.parse((await db.reelsConfigGet(`banda_hosts_${mesAtual()}`)) || "{}"); } catch { /* sem detalhe */ }
@@ -90,11 +120,13 @@ async function uso() {
     .map(([host, b]) => ({ host, mb: Math.round((b / 1024 ** 2) * 10) / 10 }));
   return {
     porServidor,
-    mes: mesAtual(),
+    mes,
+    calibrado: !!calib,
+    brutoGb: Math.round((brutoBytes / 1024 ** 3) * 100) / 100,
     gb: Math.round(gb * 100) / 100,
     limiteGb: LIMITE_BYTES / 1024 ** 3,
     pct: Math.round((bytes / LIMITE_BYTES) * 1000) / 10,
   };
 }
 
-module.exports = { iniciar, uso };
+module.exports = { iniciar, uso, calibrar };

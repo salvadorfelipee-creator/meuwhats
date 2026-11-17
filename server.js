@@ -9418,6 +9418,17 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       return send(res, 200, await banda.uso());
     }
+    // POST /painel/api/banda/calibrar { gb } — informa o número oficial do Render (Billing > Included Bandwidth)
+    // pra alinhar a estimativa; repetir de tempos em tempos deixa o fator mais preciso.
+    if (req.method === "POST" && path_ === "/painel/api/banda/calibrar") {
+      if (!requireAuth(req, res)) return;
+      const body = await parseBody(req);
+      try {
+        return send(res, 200, await banda.calibrar(Number(String(body.gb).replace(",", "."))));
+      } catch (err) {
+        return send(res, 400, { error: err.message });
+      }
+    }
 
     // GET /painel/api/facta/status — luz do painel: a ligação com a Facta (IP liberado, credenciais e serviço no ar)
     // está funcionando? Faz uma consulta leve só de leitura e guarda o resultado por 45s.
