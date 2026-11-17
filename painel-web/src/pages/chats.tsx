@@ -1648,6 +1648,25 @@ function ChannelChatsPage() {
                         </div>
                       )}
                       <div className="text-[11px] text-[#667781] dark:text-[#8696a0] mt-0.5 flex items-center justify-end gap-1">
+                        {m.media_path?.startsWith("/media/") && (
+                          <button
+                            type="button"
+                            title="Apagar este arquivo do servidor (não dá para desfazer)"
+                            onClick={async () => {
+                              if (!window.confirm("Apagar este arquivo de vez do servidor? Não dá para desfazer.")) return
+                              try {
+                                await api.apagarMidiaMensagem(m.id)
+                                carregarMensagens()
+                              } catch (err) {
+                                window.alert(err instanceof Error ? err.message : "Não foi possível apagar")
+                              }
+                            }}
+                            className="mr-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium text-red-600/80 hover:bg-red-500/10 hover:text-red-600 dark:text-red-400"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Apagar
+                          </button>
+                        )}
                         {m.direction === "out" && <span className="opacity-80">{m.origem || "Automático"} ·</span>}
                         <span>{formatHora(m.created_at)}</span>
                         {m.direction === "out" && <StatusEntrega status={m.status} erro={m.error_message} tamanho={15} />}

@@ -555,6 +555,7 @@ export const api = {
 
   tursoUso: () =>
     request<{ configurado: boolean; ok?: boolean; pct?: number; pctLeituras?: number; leituras?: number; limiteLeituras?: number; pctEscritas?: number; erro?: string }>("/painel/api/turso/uso"),
+  apagarMidiaMensagem: (id: number) => request<{ ok: true }>(`/painel/api/mensagens/${id}/midia`, { method: "DELETE" }),
   bandaUso: () => request<{ mes: string; gb: number; limiteGb: number; pct: number }>("/painel/api/banda/uso"),
   factaStatus: () => request<{ ok: boolean; checadoEm: number; erro?: string }>("/painel/api/facta/status"),
   siteChatConversas: () => request<SiteChatConversation[]>("/painel/api/site-chat/conversations"),

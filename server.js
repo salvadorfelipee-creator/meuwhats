@@ -9418,6 +9418,26 @@ const server = http.createServer(async (req, res) => {
       if (!requireAuth(req, res)) return;
       return send(res, 200, await banda.uso());
     }
+    // DELETE /painel/api/mensagens/:id/midia — apaga de vez o arquivo (foto/vídeo/áudio/documento) que o cliente mandou:
+    // remove do R2 (a chave exata, clientes/<arquivo>) e tira o link da mensagem, que continua no histórico.
+    const matchApagarMidia = path_.match(/^\/painel\/api\/mensagens\/(\d+)\/midia$/);
+    if (req.method === "DELETE" && matchApagarMidia) {
+      if (!requireAuth(req, res)) return;
+      const msgRow = await db.mensagemObterPorId(Number(matchApagarMidia[1]));
+      if (!msgRow) return send(res, 404, { error: "Mensagem não encontrada" });
+      const arquivo = String(msgRow.media_path || "").startsWith("/media/") ? String(msgRow.media_path).slice("/media/".length) : null;
+      if (!arquivo || !/^[A-Za-z0-9._-]+$/.test(arquivo)) return send(res, 400, { error: "Esta mensagem não tem mídia de cliente para apagar" });
+      try {
+        await r2.apagarVideo(`clientes/${arquivo}`);
+      } catch (err) {
+        return send(res, 502, { error: `Não consegui apagar no servidor de arquivos: ${err.message}` });
+      }
+      const nomes = { image: "foto", video: "vídeo", audio: "áudio", document: "documento", sticker: "figurinha" };
+      await db.mensagemLimparMidia(msgRow.id, `[${nomes[msgRow.type] || "mídia"} apagado(a)]`);
+      console.log(`🗑️ Mídia apagada: clientes/${arquivo} (mensagem ${msgRow.id})`);
+      return send(res, 200, { ok: true });
+    }
+
     // POST /painel/api/banda/calibrar { gb } — informa o número oficial do Render (Billing > Included Bandwidth)
     // pra alinhar a estimativa; repetir de tempos em tempos deixa o fator mais preciso.
     if (req.method === "POST" && path_ === "/painel/api/banda/calibrar") {

@@ -2099,6 +2099,18 @@ async function updateStatusByWaId(waMessageId, status, errorMessage = null) {
   }
 }
 
+async function mensagemObterPorId(id) {
+  await ready;
+  const result = await client.execute({ sql: `SELECT id, phone, business_number_id, type, media_path FROM messages WHERE id = ?`, args: [id] });
+  return result.rows[0] || null;
+}
+
+// Depois de apagar o arquivo no R2: a linha da mensagem fica (histórico), só perde o link da mídia.
+async function mensagemLimparMidia(id, rotulo) {
+  await ready;
+  await client.execute({ sql: `UPDATE messages SET media_path = NULL, media_mime = NULL, body = ? WHERE id = ?`, args: [rotulo, id] });
+}
+
 // Usado só quando um status 'failed' chega (ver processarEntry) pra decidir se a conversa pode
 // ser apagada: precisa saber se ERA um template de campanha (não conta resposta de fluxo normal).
 async function getMensagemPorWaId(waMessageId) {
@@ -4754,6 +4766,8 @@ module.exports = {
   siteChatCltCriar,
   siteChatFactaCriar,
   siteChatCltAtualizar,
+  mensagemObterPorId,
+  mensagemLimparMidia,
   fluxoDinamicoCriar,
   fluxoDinamicoAtivo,
   fluxoDinamicoListar,
