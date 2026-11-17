@@ -6233,13 +6233,17 @@ async function processarEntry(entry) {
 
         const conversaAnterior = await db.getConversation(de, businessNumberId);
         // Spam de número desconhecido: guarda a mensagem, marca como "Spam" e finaliza, sem responder nem acionar nenhum fluxo.
-        if (tipo === "text" && pareceSpam(msg.text?.body) && !(await db.ultimasMensagens(de, businessNumberId, 30)).some((m) => m.direction === "out")) {
+        // "unsupported" (o WhatsApp não consegue entregar o conteúdo) de quem nunca falamos é, na prática,
+        // banco/cobrança/robô — mesmo tratamento de spam. Quem já recebeu algo nosso nunca cai aqui.
+        const ehSpamTexto = tipo === "text" && pareceSpam(msg.text?.body);
+        const ehNaoSuportado = tipo === "unsupported";
+        if ((ehSpamTexto || ehNaoSuportado) && !(await db.ultimasMensagens(de, businessNumberId, 30)).some((m) => m.direction === "out")) {
           try {
             await db.upsertConversation(de, businessNumberId, nome, quando);
-            await db.insertMessage({ phone: de, business_number_id: businessNumberId, direction: "in", wa_message_id: msg.id, created_at: quando, status: "received", type: "text", body: msg.text?.body });
+            await db.insertMessage({ phone: de, business_number_id: businessNumberId, direction: "in", wa_message_id: msg.id, created_at: quando, status: "received", type: ehNaoSuportado ? "unsupported" : "text", body: ehNaoSuportado ? null : msg.text?.body });
             const tagId = await db.tagEncontrarOuCriar(businessNumberId, "Spam", "#6B7280");
             await db.adicionarTagConversaSeAusente(businessNumberId, de, tagId, "automatico");
-            await db.atualizarNotaConversa(de, businessNumberId, "Spam: mensagem de propaganda/golpe, não respondida");
+            await db.atualizarNotaConversa(de, businessNumberId, ehNaoSuportado ? "Spam: mensagem não suportada de número desconhecido (provável banco/cobrança/robô), não respondida" : "Spam: mensagem de propaganda/golpe, não respondida");
             await db.atualizarStatusConversa(de, businessNumberId, "resolvido");
             await db.marcarConversaLida(de, businessNumberId);
             console.log(`🚫 Spam ignorado de ${de} (${businessNumberId})`);
