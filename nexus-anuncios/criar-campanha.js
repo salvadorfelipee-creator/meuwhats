@@ -113,7 +113,8 @@ function targeting(k, c) {
   // 3) Criativos + anúncios
   let n = 0;
   for (const a of spec.anuncios) {
-    if (ids.anuncios[a.arquivo]) continue;
+    const recriar = process.argv.includes("--recriar");
+    if (ids.anuncios[a.arquivo] && !recriar) continue;
     if (n >= limite) break;
     n++;
     const nome = `${a.conjunto} | ${path.basename(a.arquivo).replace(/\.(png|mp4)$/, "")}`;
@@ -130,7 +131,7 @@ function targeting(k, c) {
       spec_ = { page_id: PAGE, instagram_user_id: IG, video_data: { video_id: vid, image_hash: th, message: a.texto, title: a.titulo, link_description: a.descricao, call_to_action: { type: "WHATSAPP_MESSAGE", value: { app_destination: "WHATSAPP", link } } } };
     }
     let cr;
-    if (ids.criativos[a.arquivo]) cr = { id: ids.criativos[a.arquivo] };
+    if (ids.criativos[a.arquivo] && !recriar) cr = { id: ids.criativos[a.arquivo] };
     else try {
       cr = await graph(`${ACT}/adcreatives`, { name: nome, object_story_spec: spec_ });
     } catch (e) {
@@ -138,7 +139,9 @@ function targeting(k, c) {
       else throw e;
     }
     ids.criativos[a.arquivo] = cr.id;
-    const ad = await graph(`${ACT}/ads`, { name: nome, adset_id: ids.conjuntos[a.conjunto], creative: { creative_id: cr.id }, status: "PAUSED" });
+    let ad;
+    if (recriar && ids.anuncios[a.arquivo]) { await graph(ids.anuncios[a.arquivo], { creative: { creative_id: cr.id } }); ad = { id: ids.anuncios[a.arquivo] }; }
+    else ad = await graph(`${ACT}/ads`, { name: nome, adset_id: ids.conjuntos[a.conjunto], creative: { creative_id: cr.id }, status: "PAUSED" });
     ids.anuncios[a.arquivo] = ad.id; salvar();
     console.log("anúncio", nome, ad.id);
   }
