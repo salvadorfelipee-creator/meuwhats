@@ -18,6 +18,9 @@ export type Conversation = {
   last_type?: string | null
   last_body?: string | null
   last_direction?: "in" | "out" | null
+  // Estado de entrega da última mensagem (só faz sentido quando last_direction === "out")
+  last_status?: string | null
+  last_error?: string | null
   channel?: "whatsapp" | "instagram" | "site"
   last_inbound_at?: number | null
   last_read_at?: number | null

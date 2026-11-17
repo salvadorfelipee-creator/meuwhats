@@ -2144,6 +2144,8 @@ async function listConversations(businessNumberId, { incluirFinalizadas = false 
         lm.body AS last_body,
         lm.direction AS last_direction,
         lm.origem AS last_origem,
+        lm.status AS last_status,
+        lm.error_message AS last_error,
         (c.last_inbound_at IS NOT NULL AND (c.last_read_at IS NULL OR c.last_inbound_at > c.last_read_at)) AS nao_lida,
         tg.tags_json AS tags_json,
         cf.campos_json AS campos_json

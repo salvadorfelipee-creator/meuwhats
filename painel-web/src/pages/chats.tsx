@@ -35,6 +35,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CardDescription, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { SidebarTrigger } from "@/components/blocks/sidebar"
+import { StatusEntrega } from "@/components/status-entrega"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,6 +100,7 @@ import {
   UserCheck,
   UserX,
   Check,
+  AlertCircle,
   UserRound,
 } from "lucide-react"
 
@@ -1204,9 +1206,12 @@ function ChannelChatsPage() {
                           {rascunhoLista.texto}
                         </p>
                       ) : (
-                      <p className={`truncate min-w-0 flex-1 text-[13px] ${naoLida ? "text-[#111b21] dark:text-[#e9edef]" : "text-[#667781]"}`}>
-                        {c.last_direction === "out" ? (c.last_origem ? "Você: " : "Automático: ") : ""}
-                        {c.last_body || "—"}
+                      <p className={`flex items-center gap-1 min-w-0 flex-1 text-[13px] ${naoLida ? "text-[#111b21] dark:text-[#e9edef]" : "text-[#667781]"}`}>
+                        {c.last_direction === "out" && <StatusEntrega status={c.last_status} erro={c.last_error} tamanho={15} />}
+                        <span className={`truncate min-w-0 ${c.last_direction === "out" && c.last_status === "failed" ? "text-red-600/90 dark:text-red-400" : ""}`}>
+                          {c.last_direction === "out" ? (c.last_origem ? "Você: " : "Automático: ") : ""}
+                          {c.last_body || "—"}
+                        </span>
                       </p>
                       )}
                       {/* Não existe contagem de mensagem não lida por conversa, só um booleano —
@@ -1637,17 +1642,15 @@ function ChannelChatsPage() {
                           ? destacarTexto(m.body, buscaTexto)
                           : m.body)}
                       {m.status === "failed" && (
-                        <div className="text-[11px] mt-1 text-red-600 flex items-start gap-1">
-                          <span>⚠️</span>
+                        <div className="text-[11px] mt-1.5 rounded-md bg-red-500/10 border border-red-500/25 px-2 py-1 text-red-700 dark:text-red-300 flex items-start gap-1.5">
+                          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-px" />
                           <span>Não entregue{m.error_message ? `: ${m.error_message}` : ""}</span>
                         </div>
                       )}
                       <div className="text-[11px] text-[#667781] dark:text-[#8696a0] mt-0.5 flex items-center justify-end gap-1">
                         {m.direction === "out" && <span className="opacity-80">{m.origem || "Automático"} ·</span>}
                         <span>{formatHora(m.created_at)}</span>
-                        {m.direction === "out" && m.status === "read" && <span className="text-[#53bdeb] font-bold tracking-tighter">✓✓</span>}
-                        {m.direction === "out" && m.status === "delivered" && <span className="font-bold tracking-tighter">✓✓</span>}
-                        {m.direction === "out" && m.status === "sent" && <span className="font-bold">✓</span>}
+                        {m.direction === "out" && <StatusEntrega status={m.status} erro={m.error_message} tamanho={15} />}
                       </div>
                     </div>
                     </React.Fragment>
