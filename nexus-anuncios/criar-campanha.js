@@ -23,8 +23,10 @@ async function graph(p, body, multipart) {
   let opts;
   if (multipart) opts = { method: "POST", body: multipart };
   else if (body) opts = { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(Object.fromEntries(Object.entries({ ...body, access_token: T }).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)]))) };
-  else return (await fetch(url + (p.includes("?") ? "&" : "?") + "access_token=" + T)).json();
+  else { const g = await (await fetch(url + (p.includes("?") ? "&" : "?") + "access_token=" + T)).json(); if (g.error && g.error.code === 17 && (graph.tent = (graph.tent || 0) + 1) < 15) { await new Promise((x) => setTimeout(x, 60000)); return graph(p, body, multipart); } graph.tent = 0; return g; }
   const r = await (await fetch(url, opts)).json();
+  if (r.error && r.error.code === 17 && (graph.tent = (graph.tent || 0) + 1) < 15) { console.log("  limite de chamadas da API; aguardando 60s"); await new Promise((x) => setTimeout(x, 60000)); return graph(p, body, multipart); }
+  graph.tent = 0;
   if (r.error) throw new Error(`${p}: ${r.error.message}${r.error.error_user_msg ? " | " + r.error.error_user_msg : ""}`);
   return r;
 }
@@ -113,8 +115,9 @@ function targeting(k, c) {
   // 3) Criativos + anúncios
   let n = 0;
   for (const a of spec.anuncios) {
+    const K = a.chave || a.arquivo; // chave única (a mesma arte pode entrar em 2 conjuntos)
     const recriar = process.argv.includes("--recriar");
-    if (ids.anuncios[a.arquivo] && !recriar) continue;
+    if (ids.anuncios[K] && !recriar) continue;
     if (n >= limite) break;
     n++;
     const nome = `${a.conjunto} | ${path.basename(a.arquivo).replace(/\.(png|mp4)$/, "")}`;
@@ -131,18 +134,18 @@ function targeting(k, c) {
       spec_ = { page_id: PAGE, instagram_user_id: IG, video_data: { video_id: vid, image_hash: th, message: a.texto, title: a.titulo, link_description: a.descricao, call_to_action: { type: "WHATSAPP_MESSAGE", value: { app_destination: "WHATSAPP", link } } } };
     }
     let cr;
-    if (ids.criativos[a.arquivo] && !recriar) cr = { id: ids.criativos[a.arquivo] };
+    if (ids.criativos[K] && !recriar) cr = { id: ids.criativos[K] };
     else try {
       cr = await graph(`${ACT}/adcreatives`, { name: nome, object_story_spec: spec_ });
     } catch (e) {
       if (/instagram/i.test(e.message)) { delete spec_.instagram_user_id; console.log("  sem identidade do Instagram:", e.message.slice(0, 120)); cr = await graph(`${ACT}/adcreatives`, { name: nome, object_story_spec: spec_ }); }
       else throw e;
     }
-    ids.criativos[a.arquivo] = cr.id;
+    ids.criativos[K] = cr.id;
     let ad;
-    if (recriar && ids.anuncios[a.arquivo]) { await graph(ids.anuncios[a.arquivo], { creative: { creative_id: cr.id } }); ad = { id: ids.anuncios[a.arquivo] }; }
-    else ad = await graph(`${ACT}/ads`, { name: nome, adset_id: ids.conjuntos[a.conjunto], creative: { creative_id: cr.id }, status: "PAUSED" });
-    ids.anuncios[a.arquivo] = ad.id; salvar();
+    if (recriar && ids.anuncios[K]) { await graph(ids.anuncios[K], { creative: { creative_id: cr.id } }); ad = { id: ids.anuncios[K] }; }
+    else ad = await graph(`${ACT}/ads`, { name: nome, adset_id: ids.conjuntos[a.conjunto], creative: { creative_id: cr.id }, status: a.status || "PAUSED" });
+    ids.anuncios[K] = ad.id; salvar();
     console.log("anúncio", nome, ad.id);
   }
   console.log("fim. anúncios criados:", Object.keys(ids.anuncios).length, "/", spec.anuncios.length);

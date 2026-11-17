@@ -1,0 +1,375 @@
+{
+  "conjuntos": {},
+  "anuncios": [
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_ia_geral_marca_conversa_1080x1350.png",
+      "chave": "harmonizacao|Novo_ia_geral_marca_conversa_1080x1350",
+      "status": "ACTIVE",
+      "texto": "A IA responde em segundos. Sua clínica está nessa resposta?\n\nNinguém garante a resposta de uma IA, mas serviços, região e contato bem explicados em um site aumentam suas chances de ser compreendida.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que organizar para as IAs também entenderem seu negócio.",
+      "titulo": "Amplie sua presença nas IAs",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_ia_geral_marca_conversa_1080x1350.png",
+      "chave": "odonto|Novo_ia_geral_marca_conversa_1080x1350",
+      "status": "ACTIVE",
+      "texto": "A IA responde em segundos. Sua clínica está nessa resposta?\n\nNinguém garante a resposta de uma IA, mas serviços, região e contato bem explicados em um site aumentam suas chances de ser compreendida.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que organizar para as IAs também entenderem seu negócio.",
+      "titulo": "Amplie sua presença nas IAs",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_ia_geral_proximo_cliente_1080x1350.png",
+      "chave": "harmonizacao|Novo_ia_geral_proximo_cliente_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seu próximo paciente pode nem abrir o Google. Pode perguntar ao ChatGPT.\n\nEle pergunta como escolher uma clínica de harmonização facial. Mostre o que você faz, onde atende e por que vale conhecer, em um site que a IA e a pessoa consigam entender.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que organizar para as IAs também entenderem seu negócio.",
+      "titulo": "Seja fácil de conhecer",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_ia_geral_proximo_cliente_1080x1350.png",
+      "chave": "odonto|Novo_ia_geral_proximo_cliente_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seu próximo paciente pode nem abrir o Google. Pode perguntar ao ChatGPT.\n\nEle pergunta como escolher uma clínica de odontologia. Mostre o que você faz, onde atende e por que vale conhecer, em um site que a IA e a pessoa consigam entender.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que organizar para as IAs também entenderem seu negócio.",
+      "titulo": "Seja fácil de conhecer",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_busca_cliente_1080x1350.png",
+      "chave": "harmonizacao|Novo_geral_busca_cliente_1080x1350",
+      "status": "ACTIVE",
+      "texto": "O paciente mais fácil de conquistar é o que já está procurando.\n\nQuem pesquisa já tem interesse. Falta um lugar claro para ele entender seus procedimentos e dar o próximo passo.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "De uma busca para uma conversa",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_busca_cliente_1080x1350.png",
+      "chave": "odonto|Novo_geral_busca_cliente_1080x1350",
+      "status": "ACTIVE",
+      "texto": "O paciente mais fácil de conquistar é o que já está procurando.\n\nQuem pesquisa já tem interesse. Falta um lugar claro para ele entender seus tratamentos e dar o próximo passo.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "De uma busca para uma conversa",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_indicacao_encontrado_1080x1350.png",
+      "chave": "harmonizacao|Novo_geral_indicacao_encontrado_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Indicação é ótima. Mas quem nunca ouviu falar da sua clínica só chega pela busca.\n\nA indicação traz o contato. A busca traz quem ainda não conhece você. Um site com SEO local abre esse segundo caminho.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Indicação e busca juntas",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_indicacao_encontrado_1080x1350.png",
+      "chave": "odonto|Novo_geral_indicacao_encontrado_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Indicação é ótima. Mas quem nunca ouviu falar da sua clínica só chega pela busca.\n\nA indicação traz o contato. A busca traz quem ainda não conhece você. Um site com SEO local abre esse segundo caminho.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Indicação e busca juntas",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_regiao_procura_1080x1350.png",
+      "chave": "harmonizacao|Novo_geral_regiao_procura_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Todo dia alguém na sua cidade procura harmonização facial. Para onde essa pessoa vai?\n\nPara quem ela encontra. Site, conteúdo local e informações claras trabalham juntos para sua clínica ser achada.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Sua região procura você",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_regiao_procura_1080x1350.png",
+      "chave": "odonto|Novo_geral_regiao_procura_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Todo dia alguém na sua cidade procura dentista. Para onde essa pessoa vai?\n\nPara quem ela encontra. Site, conteúdo local e informações claras trabalham juntos para sua clínica ser achada.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Sua região procura você",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_valor_explicado_1080x1350.png",
+      "chave": "harmonizacao|Novo_geral_valor_explicado_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seu preço não é alto. Seu valor é que está mal explicado.\n\nQuando o paciente não entende o que está incluso, só enxerga o preço. Um site que mostra seus procedimentos e diferenciais muda a conversa antes do orçamento.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Mostre o valor do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_valor_explicado_1080x1350.png",
+      "chave": "odonto|Novo_geral_valor_explicado_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seu preço não é alto. Seu valor é que está mal explicado.\n\nQuando o paciente não entende o que está incluso, só enxerga o preço. Um site que mostra seus tratamentos e diferenciais muda a conversa antes do orçamento.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Mostre o valor do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_concorrente_aparece_1080x1350.png",
+      "chave": "harmonizacao|Novo_geral_concorrente_aparece_1080x1350",
+      "status": "ACTIVE",
+      "texto": "A clínica concorrente não é melhor que a sua. Só está mais fácil de achar.\n\nMuitas vezes a diferença é visibilidade, não qualidade. Um site que explica seus procedimentos e facilita o contato reduz essa diferença.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Seja fácil de achar",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_concorrente_aparece_1080x1350.png",
+      "chave": "odonto|Novo_geral_concorrente_aparece_1080x1350",
+      "status": "ACTIVE",
+      "texto": "A clínica concorrente não é melhor que a sua. Só está mais fácil de achar.\n\nMuitas vezes a diferença é visibilidade, não qualidade. Um site que explica seus tratamentos e facilita o contato reduz essa diferença.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Seja fácil de achar",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_quem_procura_1080x1350.png",
+      "chave": "harmonizacao|Novo_geral_quem_procura_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seu paciente já escolheu antes de chamar. E você nem ficou sabendo.\n\nEle digita o serviço e a cidade no Google e decide entre os primeiros nomes. Um site com conteúdo local ajuda sua clínica a entrar nessa lista.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Seja encontrada na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Novo_geral_quem_procura_1080x1350.png",
+      "chave": "odonto|Novo_geral_quem_procura_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seu paciente já escolheu antes de chamar. E você nem ficou sabendo.\n\nEle digita o serviço e a cidade no Google e decide entre os primeiros nomes. Um site com conteúdo local ajuda sua clínica a entrar nessa lista.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Seja encontrada na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_03_inauguracao_1080x1920.mp4",
+      "chave": "harmonizacao|Video_03_inauguracao_1080x1920",
+      "status": "ACTIVE",
+      "texto": "As portas vão abrir. Seu site também?\n\nQuem ouvir seu nome vai procurar você antes de visitar. Esteja pronta desde o primeiro dia.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Pronta desde o primeiro dia",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_03_inauguracao_1080x1920.mp4",
+      "chave": "odonto|Video_03_inauguracao_1080x1920",
+      "status": "ACTIVE",
+      "texto": "As portas vão abrir. Seu site também?\n\nQuem ouvir seu nome vai procurar você antes de visitar. Esteja pronta desde o primeiro dia.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Pronta desde o primeiro dia",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_01_indicacao_1080x1920.mp4",
+      "chave": "harmonizacao|Video_01_indicacao_1080x1920",
+      "status": "ACTIVE",
+      "texto": "Só entra paciente por indicação?\n\nSua clínica pode abrir outro caminho: um site feito para ser encontrado e facilitar o contato.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Um caminho além da indicação",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_01_indicacao_1080x1920.mp4",
+      "chave": "odonto|Video_01_indicacao_1080x1920",
+      "status": "ACTIVE",
+      "texto": "Só entra paciente por indicação?\n\nSua clínica pode abrir outro caminho: um site feito para ser encontrado e facilitar o contato.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Um caminho além da indicação",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_04_google_1080x1920.mp4",
+      "chave": "harmonizacao|Video_04_google_1080x1920",
+      "status": "ACTIVE",
+      "texto": "Quem procura harmonização facial na sua cidade encontra sua clínica?\n\nUm site com foco em busca local e contato fácil prepara sua clínica para ser encontrada.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Seja encontrada na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_04_google_1080x1920.mp4",
+      "chave": "odonto|Video_04_google_1080x1920",
+      "status": "ACTIVE",
+      "texto": "Quem procura dentista na sua cidade encontra sua clínica?\n\nUm site com foco em busca local e contato fácil prepara sua clínica para ser encontrada.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Seja encontrada na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_02_instagram_1080x1920.mp4",
+      "chave": "harmonizacao|Video_02_instagram_1080x1920",
+      "status": "ACTIVE",
+      "texto": "Seguidores curtem. Pacientes pesquisam.\n\nDo link da bio ao pedido de avaliação: dê ao paciente um lugar para conhecer seu trabalho.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Vá além do Instagram",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_02_instagram_1080x1920.mp4",
+      "chave": "odonto|Video_02_instagram_1080x1920",
+      "status": "ACTIVE",
+      "texto": "Seguidores curtem. Pacientes pesquisam.\n\nDo link da bio ao pedido de avaliação: dê ao paciente um lugar para conhecer seu trabalho.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Vá além do Instagram",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_05_qualificacao_1080x1920.mp4",
+      "chave": "harmonizacao|Video_05_qualificacao_1080x1920",
+      "status": "ACTIVE",
+      "texto": "Antes de perguntar o preço, o paciente precisa entender o valor.\n\nUm site que explica seus serviços e diferenciais prepara uma conversa melhor.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Mostre o valor do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "video",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/vid/Video_05_qualificacao_1080x1920.mp4",
+      "chave": "odonto|Video_05_qualificacao_1080x1920",
+      "status": "ACTIVE",
+      "texto": "Antes de perguntar o preço, o paciente precisa entender o valor.\n\nUm site que explica seus serviços e diferenciais prepara uma conversa melhor.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Mostre o valor do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_08_google_infografico_1080x1350.png",
+      "chave": "odonto|Arte_08_google_infografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seu serviço. Sua cidade. Seu site está preparado?\n\nUma página para cada tratamento, conteúdo relevante para sua região e site conectado ao perfil da empresa no Google ajudam sua clínica a ser encontrada.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Um site preparado para a busca",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_09_qualificacao_tipografico_1080x1350.png",
+      "chave": "harmonizacao|Arte_09_qualificacao_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Antes de perguntar o preço, o paciente precisa entender o valor.\n\nUm site que apresenta seus diferenciais prepara uma conversa melhor, antes do pedido de orçamento.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Mostre o valor do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_09_qualificacao_tipografico_1080x1350.png",
+      "chave": "odonto|Arte_09_qualificacao_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Antes de perguntar o preço, o paciente precisa entender o valor.\n\nUm site que apresenta seus diferenciais prepara uma conversa melhor, antes do pedido de orçamento.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Mostre o valor do seu trabalho",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_07_google_tipografico_1080x1350.png",
+      "chave": "harmonizacao|Arte_07_google_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Quem procura harmonização facial na sua cidade encontra a sua clínica?\n\nUm site com foco em SEO local e contato fácil prepara sua clínica para ser encontrada no Google.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Seja encontrada na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_07_google_tipografico_1080x1350.png",
+      "chave": "odonto|Arte_07_google_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Quem procura dentista na sua cidade encontra a sua clínica?\n\nUm site com foco em SEO local e contato fácil prepara sua clínica para ser encontrada no Google.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Seja encontrada na sua cidade",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_01_indicacao_tipografico_1080x1350.png",
+      "chave": "harmonizacao|Arte_01_indicacao_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Indicação é boa. Mas quem nunca ouviu falar da sua clínica só chega pela busca.\n\nA indicação traz o contato. A busca traz quem ainda não conhece você. Um site pensado para quem procura harmonização facial na cidade abre esse segundo caminho.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Indicação e busca juntas",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_01_indicacao_tipografico_1080x1350.png",
+      "chave": "odonto|Arte_01_indicacao_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Indicação é boa. Mas quem nunca ouviu falar da sua clínica só chega pela busca.\n\nA indicação traz o contato. A busca traz quem ainda não conhece você. Um site pensado para quem procura dentista na cidade abre esse segundo caminho.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Indicação e busca juntas",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_05_inauguracao_tipografico_1080x1350.png",
+      "chave": "harmonizacao|Arte_05_inauguracao_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Sua clínica vai abrir as portas. O paciente vai achar o endereço?\n\nQuem ouvir seu nome vai pesquisar antes de visitar. Um site com serviços, endereço e contato deixa a clínica pronta desde o primeiro dia.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Pronta desde o primeiro dia",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_05_inauguracao_tipografico_1080x1350.png",
+      "chave": "odonto|Arte_05_inauguracao_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Sua clínica vai abrir as portas. O paciente vai achar o endereço?\n\nQuem ouvir seu nome vai pesquisar antes de visitar. Um site com serviços, endereço e contato deixa a clínica pronta desde o primeiro dia.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Pronta desde o primeiro dia",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "harmonizacao",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_03_instagram_tipografico_1080x1350.png",
+      "chave": "harmonizacao|Arte_03_instagram_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seguidores curtem. Pacientes pesquisam.\n\nCurtida não marca consulta. Antes de chamar, o paciente pesquisa e compara. Um site que explica, gera confiança e facilita o contato leva você do feed à conversa.\n\nA Sites Nexus cria o site de profissionais de harmonização facial com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Vá além do Instagram",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    },
+    {
+      "conjunto": "odonto",
+      "tipo": "imagem",
+      "arquivo": "C:/Users/Salvador/Documents/nexus-assets/img/Arte_03_instagram_tipografico_1080x1350.png",
+      "chave": "odonto|Arte_03_instagram_tipografico_1080x1350",
+      "status": "ACTIVE",
+      "texto": "Seguidores curtem. Pacientes pesquisam.\n\nCurtida não marca consulta. Antes de chamar, o paciente pesquisa e compara. Um site que explica, gera confiança e facilita o contato leva você do feed à conversa.\n\nA Sites Nexus cria o site de dentistas com foco em busca local e contato direto.\n\n👉 Toque em *Enviar mensagem* e peça o diagnóstico gratuito de 15 minutos: o Felipe mostra como sua empresa aparece hoje no Google e o que ajustar.",
+      "titulo": "Vá além do Instagram",
+      "descricao": "Diagnóstico gratuito de 15 min"
+    }
+  ]
+}
