@@ -10,7 +10,9 @@ const PAGE = "1512388375281177";
 const IG = "17841439718181335"; // @sitesnexus
 const WHATS = "554731804984";
 const B = "https://graph.facebook.com/v21.0/";
-const spec = require("./campanha-nexus.json");
+// --spec outro.json: cria só os anúncios de outro lote (ex.: novos-anuncios.json) nos conjuntos já existentes
+const specArg = process.argv.includes("--spec") ? process.argv[process.argv.indexOf("--spec") + 1] : "campanha-nexus.json";
+const spec = require("./" + specArg);
 const idsFile = path.join(__dirname, "campanha-ids.json");
 const ids = fs.existsSync(idsFile) ? JSON.parse(fs.readFileSync(idsFile, "utf8")) : { imagens: {}, videos: {}, thumbs: {}, conjuntos: {}, criativos: {}, anuncios: {} };
 const salvar = () => fs.writeFileSync(idsFile, JSON.stringify(ids, null, 2));
