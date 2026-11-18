@@ -6,7 +6,7 @@ const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 // Números que nunca devem receber mensagem nossa (pedido explícito de bloqueio, ex.: reclamação
 // ou pedido pra parar). Checado em TODA função de envio abaixo, então cobre broadcast, lembretes
 // automáticos e respostas manuais do painel — não só um fluxo específico.
-const NUMEROS_BLOQUEADOS = new Set(["5548999166487", "5548988802379"]);
+const NUMEROS_BLOQUEADOS = new Set(["5548999166487", "5548988802379", "5547996699802"]);
 
 function garantirNaoBloqueado(to) {
   const digitos = String(to || "").replace(/\D/g, "");
