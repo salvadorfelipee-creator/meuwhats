@@ -1,0 +1,45 @@
+name: Publica Reels @nexusssites
+
+# Publicador mecânico (sem IA): posta o próximo Reel da fila nexus-reels/ no Instagram e no Threads.
+# 4 por dia, 8h, 12h, 17h e 20h (Brasília).
+on:
+  schedule:
+    - cron: "0 11 * * *"
+    - cron: "0 15 * * *"
+    - cron: "0 20 * * *"
+    - cron: "0 23 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency: nexus-reels
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Instala dependências
+        run: npm ci --omit=dev || npm install --omit=dev
+      - name: Publica o próximo Reel
+        env:
+          SITESNEXUS_IG_TOKEN: ${{ secrets.SITESNEXUS_IG_TOKEN }}
+          SITESNEXUS_IG_ID: ${{ secrets.SITESNEXUS_IG_ID }}
+          SITESNEXUS_THREADS_TOKEN: ${{ secrets.SITESNEXUS_THREADS_TOKEN }}
+          SITESNEXUS_THREADS_USER_ID: ${{ secrets.SITESNEXUS_THREADS_USER_ID }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: node nexus-reels/publicar.js proximo --normal
+      - name: Salva o estado
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add nexus-reels/estado.json
+          git diff --cached --quiet || (git commit -m "nexus reels: estado da fila" && git pull --rebase && git push)

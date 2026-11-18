@@ -18,12 +18,40 @@ const estado = fs.existsSync(estadoFile) ? JSON.parse(fs.readFileSync(estadoFile
 const salvar = () => fs.writeFileSync(estadoFile, JSON.stringify(estado, null, 2));
 const arg = (k) => (process.argv.includes(k) ? process.argv[process.argv.indexOf(k) + 1] : null);
 const chave = (it) => `posts/nexus-reels/${it.video}`;
+const TH_TOKEN = process.env.SITESNEXUS_THREADS_TOKEN;
+const TH_ID = process.env.SITESNEXUS_THREADS_USER_ID;
 const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function graph(p, body) {
   const opts = body ? { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ ...body, access_token: TOKEN }) } : {};
   const url = GRAPH + p + (body ? "" : (p.includes("?") ? "&" : "?") + "access_token=" + TOKEN);
   return (await fetch(url, opts)).json();
+}
+
+// Threads: mesmo vídeo, texto curto (limite 500). Falha aqui não desfaz a publicação do Instagram.
+async function threads(url, body) {
+  const opts = body ? { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ ...body, access_token: TH_TOKEN }) } : {};
+  const u = "https://graph.threads.net/v1.0/" + url + (body ? "" : (url.includes("?") ? "&" : "?") + "access_token=" + TH_TOKEN);
+  return (await fetch(u, opts)).json();
+}
+const textoThreads = (it) => `${it.titulo}
+
+${it.apoio}
+
+Quer ser encontrado no Google quando pesquisarem seu serviço na sua cidade? Peça o diagnóstico gratuito de 15 minutos pelo link do perfil.`.slice(0, 490);
+async function publicarThreads(it) {
+  const videoUrl = await r2.urlAssinada(chave(it), 3600);
+  const c = await threads(`${TH_ID}/threads`, { media_type: "VIDEO", video_url: videoUrl, text: textoThreads(it) });
+  if (c.error) throw new Error("threads container: " + JSON.stringify(c.error));
+  for (let i = 0; i < 60; i++) {
+    const s = await threads(`${c.id}?fields=status,error_message`);
+    if (s.status === "FINISHED") break;
+    if (s.status === "ERROR" || s.status === "EXPIRED") throw new Error("threads processamento: " + JSON.stringify(s));
+    await dorme(5000);
+  }
+  const p = await threads(`${TH_ID}/threads_publish`, { creation_id: c.id });
+  if (p.error) throw new Error("threads publicar: " + JSON.stringify(p.error));
+  return p.id;
 }
 
 async function subir() {
@@ -71,7 +99,15 @@ async function publicarUm(it, normal) {
     estado.publicados[it.n] = await publicarUm(it, process.argv.includes("--normal"));
     salvar();
     console.log("publicado:", JSON.stringify(estado.publicados[it.n]));
+    try { estado.publicados[it.n].threads = await publicarThreads(it); salvar(); console.log("threads:", estado.publicados[it.n].threads); }
+    catch (e) { console.error("THREADS falhou:", e.message); }
     return;
+  }
+  if (cmd === "threads") { // threads --n N : publica no Threads um Reel já postado no Instagram
+    const it = itens.find((x) => x.n === Number(arg("--n")));
+    if (!it || !estado.publicados[it.n]) throw new Error("Reel não publicado no Instagram");
+    if (estado.publicados[it.n].threads) return console.log("já está no Threads");
+    estado.publicados[it.n].threads = await publicarThreads(it); salvar(); return console.log("threads:", estado.publicados[it.n].threads);
   }
   console.log("uso: subir | proximo [--n N] [--dry] [--normal]");
 })().catch((e) => { console.error("ERRO:", e.message); process.exit(1); });

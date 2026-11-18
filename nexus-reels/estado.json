@@ -34,5 +34,41 @@
     "32": "posts/nexus-reels/reel_32.mp4",
     "33": "posts/nexus-reels/reel_33.mp4"
   },
-  "publicados": {}
+  "publicados": {
+    "1": {
+      "id": "18120017279104748",
+      "link": "https://www.instagram.com/reel/Df5AFhcjP4k/",
+      "trial": false,
+      "data": "2026-11-18T17:05:56.391Z",
+      "threads": "18133846945800370"
+    },
+    "2": {
+      "id": "18074432399772637",
+      "link": "https://www.instagram.com/reel/Df5AOWRiWas/",
+      "trial": false,
+      "data": "2026-11-18T17:07:08.600Z",
+      "threads": "18111224297631370"
+    },
+    "3": {
+      "id": "18117797735023572",
+      "link": "https://www.instagram.com/reel/Df48DAqDBzK/",
+      "trial": false,
+      "data": "2026-11-18T16:30:34.297Z",
+      "threads": "18134942986774034"
+    }
+  },
+  "antigos": {
+    "1": {
+      "id": "18639885463029373",
+      "link": "https://www.instagram.com/reel/Df47UCqjwBn/",
+      "trial": false,
+      "data": "2026-11-18T16:24:11.121Z"
+    },
+    "2": {
+      "id": "18115701251166906",
+      "link": "https://www.instagram.com/reel/Df47xvWCcKt/",
+      "trial": false,
+      "data": "2026-11-18T16:28:21.274Z"
+    }
+  }
 }
