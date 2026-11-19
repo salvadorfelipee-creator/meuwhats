@@ -1990,7 +1990,7 @@ function pediuConsignadoClt(texto) {
 }
 
 function pediuPararMensagens(texto) {
-  return /^(parar mensagens|nao quero receber mais|sair|cancelar mensagens|pare)$/i.test(normalizarTexto(texto));
+  return /^(parar mensagens|parar|nao quero receber mais|sair|cancelar mensagens|pare)$/i.test(normalizarTexto(texto));
 }
 
 // Documentos pedidos em garantia/financiamento — mesma lista pros dois (só muda a frase de
@@ -5493,6 +5493,14 @@ async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
   if (no.tipo === "acao") {
     if (no.acao_tipo === "tag") await db.adicionarTagConversa(businessNumberId, de, Number(no.acao_valor));
     else if (no.acao_tipo === "pipeline") await db.atualizarPipelineConversa(de, businessNumberId, no.acao_valor);
+    // 'campo': acao_valor = "Nome do campo|valor" — grava a resposta da pessoa num campo personalizado.
+    else if (no.acao_tipo === "campo") {
+      const [campoNome, ...resto] = String(no.acao_valor || "").split("|");
+      if (campoNome && resto.length) await db.conversationCampoDefinir(businessNumberId, de, await db.campoPersonalizadoEncontrarOuCriar(businessNumberId, campoNome.trim()), resto.join("|").trim());
+    }
+    // 'aviso_lead': monta o resumo "NOVO LEAD QUALIFICADO" com os campos já coletados, grava como nota e
+    // leva a conversa pra atendimento (o envio a outro número/grupo depende de destino definido — ver README).
+    else if (no.acao_tipo === "aviso_lead") await registrarAvisoLeadQualificado(de, businessNumberId);
     if (no.proximo_no_id) return avancarNoFluxoDinamico(no.proximo_no_id, de, businessNumberId, fluxoId);
     await db.setFluxoPasso(de, businessNumberId, null);
     return;
@@ -5551,7 +5559,39 @@ async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
   const botoes = opcoes.length ? opcoes.map((o) => ({ id: o.botao_id, title: o.botao_titulo })) : undefined;
   await enviarRespostaAutomatica(businessNumberId, de, no.texto || "", botoes);
   await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
+  // Nó 'mensagem' com acao_tipo 'bloquear' (ex.: "Agora não"): depois de mandar o texto, a pessoa não recebe mais mensagens
+  // nossas (mesmo efeito de "Parar"). Qualquer outro nó fica esperando a resposta, como sempre.
+  if (no.acao_tipo === "bloquear") {
+    await db.setFluxoPasso(de, businessNumberId, PASSO_OPTOUT_BLOQUEADO);
+    await db.siteChatRegistrarOptOut(de);
+    return;
+  }
   await db.setFluxoPasso(de, businessNumberId, `fluxo_dinamico_${noId}`);
+}
+
+async function registrarAvisoLeadQualificado(de, businessNumberId) {
+  const campos = await db.conversationCamposObter(businessNumberId, de);
+  const v = (nome) => campos.find((c) => c.nome === nome)?.valor || "-";
+  const conv = await db.getConversation(de, businessNumberId);
+  const texto =
+    ["🔔 NOVO LEAD QUALIFICADO", `Nome: ${conv?.name || "-"}`, `Cargo: ${v("Cargo")}`, `Clínica: ${v("Clínica")}`, `Contato: ${de}`,
+      `Problema: ${v("Problema com leads")}`, `Marketing: ${v("Marketing")}`, `Automação: ${v("Automação")}`].join("\n");
+  await db.notaAdicionar(businessNumberId, de, texto);
+  await db.atualizarPipelineConversa(de, businessNumberId, "em_atendimento");
+  console.log(texto);
+}
+
+// Texto livre num nó marcado com acao_tipo 'chamar_humano' (dúvida, preço etc.): avisa a pessoa, pausa o robô nessa
+// conversa por 24h, grava nota e leva pra atendimento. Devolve true se tratou.
+async function chamarHumanoPorTextoLivre(de, businessNumberId, passoAtual, corpo) {
+  if (!String(passoAtual || "").startsWith("fluxo_dinamico_")) return false;
+  const no = await db.fluxoNoObter(Number(passoAtual.slice("fluxo_dinamico_".length)));
+  if (!no || no.acao_tipo !== "chamar_humano") return false;
+  await enviarRespostaAutomatica(businessNumberId, de, "Entendi! Vou chamar o Felipe para te responder. 🙌");
+  await db.pausarBot(de, businessNumberId, Date.now() + 24 * 3600 * 1000);
+  await db.atualizarPipelineConversa(de, businessNumberId, "em_atendimento");
+  await db.notaAdicionar(businessNumberId, de, `🔔 Escreveu em texto livre e aguarda o Felipe: "${String(corpo).slice(0, 300)}"`);
+  return true;
 }
 
 // Resposta do formulário de um nó 'formulario' (flow_token "nxf_<noId>_<uuid>"): grava nome (renomeia o
@@ -6437,6 +6477,12 @@ async function processarEntry(entry) {
                 await handler(de, businessNumberId, corpo);
               } catch (err) {
                 console.error("Erro ao processar captura de texto do fluxo:", err.message);
+              }
+            } else {
+              try {
+                await chamarHumanoPorTextoLivre(de, businessNumberId, conversaAnterior?.fluxo_passo, corpo);
+              } catch (err) {
+                console.error("Erro ao chamar humano por texto livre:", err.message);
               }
             }
           }

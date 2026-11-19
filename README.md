@@ -1999,3 +1999,11 @@ Outubro fechou em 7,81 GB (métrica oficial: API do Render, `GET /v1/metrics/ban
 - **banda.js:** totais em memória, grava a cada 10 min (30 min de madrugada); antes lia e gravava a cada 2 min e o próprio tráfego realimentava a contagem.
 - **Mídia de cliente:** `GET /media/:arquivo` redireciona para URL assinada do R2 (1 h), sem passar pelo Render; webhook duplicado da mesma mensagem não baixa/sobe de novo; acima de 25 MB não salva (mensagem "[mídia grande demais...]").
 Conferir depois do deploy: madrugada deve cair de 4–7 MB/h para 1–2 MB/h na métrica do Render.
+
+### Nexus — fluxo "prospecção ativa" (19/11/2026)
+Fluxo dinâmico id 6 ("Nexus - prospecção ativa", INATIVO) para quem responde aos templates `inicio_bom_dia`/`inicio_boa_tarde`:
+proposta (botões) → formulário (Flow nome/cargo/clínica) → 3 perguntas → encerramento. Criado por `nexus-anuncios/fluxo-prospeccao.js`.
+Usar: conectar a ele na Campanha do painel, ou no contato "Reabrir fluxo" e escolher. Novas ações do motor: nó `acao` com `campo` ("Nome|valor"),
+`aviso_lead` (nota "NOVO LEAD QUALIFICADO" + pipeline em_atendimento); nó `mensagem` com `acao_tipo` `bloquear` (para de mensagear) ou
+`chamar_humano` (texto livre = "vou chamar o Felipe", pausa o robô 24h). "Parar" sozinho também descadastra.
+Pendente: envio do aviso a outro número/grupo e planilha Google Sheets (sem destino/credencial definidos); texto da proposta na versão segura.
