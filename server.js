@@ -5530,11 +5530,50 @@ async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
     return;
   }
 
+  // Nó 'formulario': manda um WhatsApp Flow (formulário nativo) e PARA até a pessoa enviar. O id do Flow
+  // fica em acao_valor; a resposta volta pelo webhook (nfm_reply) e segue pro proximo_no_id
+  // (ver processarSubmissaoFormularioNexus). Hoje só o fluxo do Nexus usa (tela "DADOS": nome/cargo/clínica).
+  if (no.tipo === "formulario") {
+    await wa.sendFlow(businessNumberId, de, {
+      flowId: no.acao_valor,
+      flowToken: `nxf_${noId}_${crypto.randomUUID()}`,
+      bodyText: no.texto || "Toque no botão abaixo para preencher:",
+      ctaText: "Preencher agora",
+      screenId: "DADOS",
+    });
+    await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
+    await db.setFluxoPasso(de, businessNumberId, `fluxo_dinamico_${noId}`);
+    return;
+  }
+
   const opcoes = await db.fluxoOpcoesDoNo(noId);
   const botoes = opcoes.length ? opcoes.map((o) => ({ id: o.botao_id, title: o.botao_titulo })) : undefined;
   await enviarRespostaAutomatica(businessNumberId, de, no.texto || "", botoes);
   await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
   await db.setFluxoPasso(de, businessNumberId, `fluxo_dinamico_${noId}`);
+}
+
+// Resposta do formulário de um nó 'formulario' (flow_token "nxf_<noId>_<uuid>"): grava nome (renomeia o
+// contato), cargo e clínica (campos personalizados + nota) e segue o fluxo. Só vale se o contato está
+// PARADO nesse nó — evita processar reenvio/duplicata ou token de outro ponto do fluxo.
+async function processarSubmissaoFormularioNexus(flowToken, de, businessNumberId, dados) {
+  const m = String(flowToken || "").match(/^nxf_(\d+)_/);
+  if (!m) return;
+  const no = await db.fluxoNoObter(Number(m[1]));
+  if (!no || no.tipo !== "formulario") return;
+  const estado = await db.fluxoEstadoContatoObter(businessNumberId, de);
+  if (!estado || Number(estado.no_atual_id) !== Number(no.id)) return;
+  const limpa = (s) => String(s || "").replace(/\s+/g, " ").trim().slice(0, 120);
+  const nome = limpa(dados.nome), cargo = limpa(dados.cargo), clinica = limpa(dados.clinica);
+  if (nome) await db.renomearConversa(de, businessNumberId, nome);
+  for (const [campo, valor] of [["Cargo", cargo], ["Clínica", clinica]]) {
+    if (!valor) continue;
+    const campoId = await db.campoPersonalizadoEncontrarOuCriar(businessNumberId, campo);
+    await db.conversationCampoDefinir(businessNumberId, de, campoId, valor);
+  }
+  await db.notaAdicionar(businessNumberId, de, `Formulário: ${nome || "-"} · ${cargo || "-"} · ${clinica || "-"}`);
+  if (no.proximo_no_id) await avancarNoFluxoDinamico(no.proximo_no_id, de, businessNumberId, no.fluxo_id);
+  else await db.setFluxoPasso(de, businessNumberId, null);
 }
 
 // Formata um horário ISO (UTC) igual está gravado no evento/slot como "Seg 05/10 14:00" em
@@ -6448,6 +6487,11 @@ async function processarEntry(entry) {
               await processarSubmissaoFormularioNovoSaque(token, de, businessNumberId, dados);
             } catch (err) {
               console.error("Erro ao processar formulário Novo Saque:", err.message);
+            }
+            try {
+              await processarSubmissaoFormularioNexus(token, de, businessNumberId, dados);
+            } catch (err) {
+              console.error("Erro ao processar formulário do fluxo dinâmico:", err.message);
             }
           }
         } else if (tipo === "interactive" && (msg.interactive?.list_reply?.id || "").startsWith("cltorig_vinculo_")) {

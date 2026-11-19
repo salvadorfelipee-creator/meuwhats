@@ -1,0 +1,50 @@
+{
+  "version": "7.2",
+  "screens": [
+    {
+      "id": "DADOS",
+      "title": "Vamos nos conhecer?",
+      "terminal": true,
+      "success": true,
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Conta pra gente um pouquinho 😊" },
+          {
+            "type": "Form",
+            "name": "form",
+            "children": [
+              { "type": "TextInput", "name": "nome", "label": "Seu nome", "input-type": "text", "required": true },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "cargo",
+                "label": "Seu cargo",
+                "required": true,
+                "data-source": [
+                  { "id": "Dono(a) / Sócio(a)", "title": "Dono(a) / Sócio(a)" },
+                  { "id": "Gestor(a) / Gerente", "title": "Gestor(a) / Gerente" },
+                  { "id": "Profissional da clínica", "title": "Profissional da clínica" },
+                  { "id": "Recepção / Comercial", "title": "Recepção / Comercial" },
+                  { "id": "Outro", "title": "Outro" }
+                ]
+              },
+              { "type": "TextInput", "name": "clinica", "label": "Nome da clínica", "input-type": "text", "required": true },
+              {
+                "type": "Footer",
+                "label": "Enviar",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": {
+                    "nome": "${form.nome}",
+                    "cargo": "${form.cargo}",
+                    "clinica": "${form.clinica}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
