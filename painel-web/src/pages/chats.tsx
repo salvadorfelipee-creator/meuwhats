@@ -2766,14 +2766,26 @@ function ContactDetails({
 
   // Mesmo efeito de o cliente mandar "menu" — pra quando o fluxo automático falhou/travou e
   // não dá pra depender de pedir pro cliente digitar algo.
-  async function reabrirFluxo(etapa: "inicio" | "link_simulacao" = "inicio") {
+  async function reabrirFluxo(etapa: "inicio" | "link_simulacao" = "inicio", confirmar = false) {
     setReabrindo(true)
     setReabrirMsg(null)
     try {
-      await api.reabrirFluxo(businessId, conversation.phone, etapa, etapa === "inicio" && fluxoReabrirId ? Number(fluxoReabrirId) : undefined)
+      await api.reabrirFluxo(businessId, conversation.phone, etapa, etapa === "inicio" && fluxoReabrirId ? Number(fluxoReabrirId) : undefined, confirmar)
       setReabrirMsg(etapa === "link_simulacao" ? "Link da simulação enviado! ✅" : "Fluxo reaberto! ✅")
     } catch (err) {
-      setReabrirMsg(err instanceof Error ? err.message : "Erro ao reabrir")
+      const msg = err instanceof Error ? err.message : "Erro ao reabrir"
+      const ja = msg.match(/JA_ENVIADO|(d+)|(.*)$/)
+      if (ja) {
+        const quando = new Date(Number(ja[1])).toLocaleString("pt-BR")
+        setReabrindo(false)
+        if (window.confirm(`Esse contato já recebeu o fluxo "${ja[2]}" em ${quando}. Enviar de novo?`)) {
+          await reabrirFluxo(etapa, true)
+        } else {
+          setReabrirMsg(`Não reenviado — já foi enviado em ${quando}.`)
+        }
+        return
+      }
+      setReabrirMsg(msg)
     } finally {
       setReabrindo(false)
     }

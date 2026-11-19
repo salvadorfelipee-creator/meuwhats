@@ -8492,7 +8492,17 @@ const server = http.createServer(async (req, res) => {
           if (!fd || fd.business_id !== businessId) return send(res, 400, { error: "Fluxo não encontrado nesse número" });
           fluxoEscolhido = await montarFluxoDinamico(fd);
         }
+        // Trava contra clique duplo/acidental: se esse contato já recebeu um fluxo dinâmico nas últimas 24h,
+        // não reenvia sem confirmação (body.confirmar). O painel traduz o prefixo JA_ENVIADO em uma pergunta.
+        const estadoAnterior = await db.fluxoEstadoContatoObter(businessId, phone);
+        if (!body?.confirmar && estadoAnterior && Date.now() - Number(estadoAnterior.updated_at) < 24 * 3600 * 1000) {
+          const fdAnt = await db.fluxoDinamicoObter(estadoAnterior.fluxo_id);
+          return send(res, 409, { error: `JA_ENVIADO|${estadoAnterior.updated_at}|${fdAnt?.nome || "fluxo"}` });
+        }
         await dispararInicioFluxo(fluxoEscolhido || (await getFluxo(businessId, phone)), phone, businessId);
+        try {
+          await db.notaAdicionar(businessId, phone, `Fluxo reaberto pelo painel: ${fluxoEscolhido ? "escolhido manualmente" : "padrão do número"}`);
+        } catch {}
         return send(res, 200, { ok: true });
       } catch (err) {
         console.error("Erro ao reabrir fluxo pelo painel:", err.message);
