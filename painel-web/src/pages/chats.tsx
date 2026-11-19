@@ -2653,6 +2653,12 @@ function ContactDetails({
   const [notaSalva, setNotaSalva] = React.useState(false)
   const [salvando, setSalvando] = React.useState(false)
   const [reabrindo, setReabrindo] = React.useState(false)
+  const [fluxosReabrir, setFluxosReabrir] = React.useState<FluxoDinamico[]>([])
+  const [fluxoReabrirId, setFluxoReabrirId] = React.useState("")
+  React.useEffect(() => {
+    if (businessId === "instagram") return
+    api.fluxos(businessId).then(setFluxosReabrir).catch(() => {})
+  }, [businessId])
   const [reabrirMsg, setReabrirMsg] = React.useState<string | null>(null)
 
   const [todasTags, setTodasTags] = React.useState<Tag[]>([])
@@ -2764,7 +2770,7 @@ function ContactDetails({
     setReabrindo(true)
     setReabrirMsg(null)
     try {
-      await api.reabrirFluxo(businessId, conversation.phone, etapa)
+      await api.reabrirFluxo(businessId, conversation.phone, etapa, etapa === "inicio" && fluxoReabrirId ? Number(fluxoReabrirId) : undefined)
       setReabrirMsg(etapa === "link_simulacao" ? "Link da simulação enviado! ✅" : "Fluxo reaberto! ✅")
     } catch (err) {
       setReabrirMsg(err instanceof Error ? err.message : "Erro ao reabrir")
@@ -3271,6 +3277,19 @@ function ContactDetails({
         <div className="flex flex-col gap-2 pt-1">
           <div className="flex items-center gap-2 flex-wrap">
             <ExportarConversaBotao businessId={businessId} phone={conversation.phone} />
+            {fluxosReabrir.length > 0 && (
+              <select
+                className="h-8 rounded-md border bg-background px-2 text-sm"
+                value={fluxoReabrirId}
+                onChange={(e) => setFluxoReabrirId(e.target.value)}
+                disabled={reabrindo}
+              >
+                <option value="">Fluxo padrão do número</option>
+                {fluxosReabrir.map((f) => (
+                  <option key={f.id} value={f.id}>{f.nome}{f.ativo ? " (ativo)" : ""}</option>
+                ))}
+              </select>
+            )}
             <Button size="sm" variant="outline" onClick={() => reabrirFluxo("inicio")} disabled={reabrindo}>
               {reabrindo ? "Enviando..." : "Reabrir fluxo (do início)"}
             </Button>

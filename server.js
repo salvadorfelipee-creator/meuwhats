@@ -8484,7 +8484,15 @@ const server = http.createServer(async (req, res) => {
           await db.setFluxoPasso(phone, businessId, "consignado_chat");
           return send(res, 200, { ok: true });
         }
-        await dispararInicioFluxo(await getFluxo(businessId, phone), phone, businessId);
+        // fluxoId: o atendente escolheu um fluxo dinâmico específico (ex.: a campanha da assessoria) — inicia
+        // exatamente como o automático. Sem fluxoId, mantém o comportamento antigo (fluxo padrão do número).
+        let fluxoEscolhido = null;
+        if (body?.fluxoId) {
+          const fd = await db.fluxoDinamicoObter(Number(body.fluxoId));
+          if (!fd || fd.business_id !== businessId) return send(res, 400, { error: "Fluxo não encontrado nesse número" });
+          fluxoEscolhido = await montarFluxoDinamico(fd);
+        }
+        await dispararInicioFluxo(fluxoEscolhido || (await getFluxo(businessId, phone)), phone, businessId);
         return send(res, 200, { ok: true });
       } catch (err) {
         console.error("Erro ao reabrir fluxo pelo painel:", err.message);
