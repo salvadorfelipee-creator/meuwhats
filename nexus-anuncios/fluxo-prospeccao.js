@@ -45,9 +45,9 @@ const num = (r) => Number(r.lastInsertRowid);
   const byeTag = await no("acao", null, "tag", tSem, byePipe);
   // "Sim": marca a origem e abre o formulário
   const simTag = await no("acao", null, "tag", tPros, form);
-  // Etapa 1: proposta. Texto na versão SEGURA (não afirma ter analisado a clínica) — ver pendências.
+  // Etapa 1: proposta. Texto original confirmado pelo dono (19/11): a Nexus de fato olha a presença da clínica.
   const ini = await no("mensagem", "Que bom falar com você! 😊\n\nMuitas clínicas perdem pacientes por detalhes simples na presença no Google, e dá para corrigir.\n\nPosso te conectar com um especialista da Nexus para conversar sobre isso?", HUMANO);
-  await op(ini, "nxp_sim", "Sim, pode ser", simTag);
+  await op(ini, "nxp_sim", "Sim, quero a análise", simTag);
   await op(ini, "nxp_nao", "Agora não", byeTag);
   await c.execute({ sql: "UPDATE fluxos_dinamicos SET no_inicial_id=? WHERE id=?", args: [ini, F] });
   console.log("fluxo", F, "nó inicial", ini, "(inativo)");
