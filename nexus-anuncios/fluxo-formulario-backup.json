@@ -1,0 +1,35 @@
+{
+  "no": {
+    "id": 24,
+    "fluxo_id": 5,
+    "tipo": "mensagem",
+    "texto": "Oi! 👋 Aqui é o Felipe, da *Nexus*. Que bom ter você por aqui!\n\nA gente cuida do marketing de clínicas odontológicas, de harmonização e de estética. E neste Black Novembro + Dezembro, os primeiros *30 dias de integração e a criação das campanhas são por nossa conta*. 🎁\n\nPra eu te atender direitinho, me conta: qual é a sua área?",
+    "acao_tipo": null,
+    "acao_valor": null,
+    "proximo_no_id": null,
+    "created_at": 1794831232287
+  },
+  "opcoes": [
+    {
+      "id": 15,
+      "no_id": 24,
+      "botao_id": "nx_a_saude",
+      "botao_titulo": "Odontologia",
+      "proximo_no_id": 33
+    },
+    {
+      "id": 16,
+      "no_id": 24,
+      "botao_id": "nx_a_arq",
+      "botao_titulo": "Harmoniz./Estética",
+      "proximo_no_id": 34
+    },
+    {
+      "id": 17,
+      "no_id": 24,
+      "botao_id": "nx_a_outra",
+      "botao_titulo": "Outra área",
+      "proximo_no_id": 32
+    }
+  ]
+}
