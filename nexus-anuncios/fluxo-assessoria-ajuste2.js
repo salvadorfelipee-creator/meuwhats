@@ -7,7 +7,7 @@ for (const l of fs.readFileSync(path.join(__dirname, "..", ".env"), "utf8").spli
 const { createClient } = require("@libsql/client");
 const c = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
 const BN = "1512976205221650";
-const run = (sql, args) => c.execute({ sql, args });
+const run = (sql, args = []) => c.execute({ sql, args });
 (async () => {
   // textos
   await run("UPDATE fluxo_nos SET texto=? WHERE id=42", ["Que bom! 😊 E hoje, você anuncia em quantas plataformas?\n\n(Instagram, Facebook, Google, TikTok…)"]);
