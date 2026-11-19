@@ -5542,13 +5542,27 @@ async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
   // fica em acao_valor; a resposta volta pelo webhook (nfm_reply) e segue pro proximo_no_id
   // (ver processarSubmissaoFormularioNexus). Hoje só o fluxo do Nexus usa (tela "DADOS": nome/cargo/clínica).
   if (no.tipo === "formulario") {
-    await wa.sendFlow(businessNumberId, de, {
+    const textoForm = no.texto || "Toque no botão abaixo para preencher:";
+    const resFlow = await wa.sendFlow(businessNumberId, de, {
       flowId: no.acao_valor,
       flowToken: `nxf_${noId}_${crypto.randomUUID()}`,
-      bodyText: no.texto || "Toque no botão abaixo para preencher:",
+      bodyText: textoForm,
       ctaText: "Preencher agora",
       screenId: "DADOS",
       semDados: true,
+    });
+    // Registra no histórico do painel (antes o formulário saía mas a conversa ficava vazia, parecendo que o fluxo não rodou).
+    const agoraForm = Date.now();
+    await db.upsertConversation(de, businessNumberId, null, agoraForm);
+    await db.insertMessage({
+      phone: de,
+      business_number_id: businessNumberId,
+      direction: "out",
+      type: "text",
+      body: `${textoForm}\n\n📝 Formulário: Preencher agora`,
+      wa_message_id: resFlow?.messages?.[0]?.id || null,
+      status: "sent",
+      created_at: agoraForm,
     });
     await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
     await db.setFluxoPasso(de, businessNumberId, `fluxo_dinamico_${noId}`);
