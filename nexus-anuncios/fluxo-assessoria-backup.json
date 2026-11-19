@@ -1,0 +1,57 @@
+{
+  "nos": [
+    {
+      "id": 24,
+      "fluxo_id": 5,
+      "tipo": "mensagem",
+      "texto": "Oi! 👋 Aqui é o Felipe, da *Sites Nexus*.\n\nCriamos sites para *dentistas e profissionais de harmonização e estética* serem encontrados no Google, com agenda e atendimento no WhatsApp para não perder paciente.\n\nQual é a sua área?",
+      "acao_tipo": null,
+      "acao_valor": null,
+      "proximo_no_id": null,
+      "created_at": 1794831232287
+    },
+    {
+      "id": 25,
+      "fluxo_id": 5,
+      "tipo": "acao",
+      "texto": null,
+      "acao_tipo": "tag",
+      "acao_valor": "29",
+      "proximo_no_id": 20,
+      "created_at": 1794831234101
+    },
+    {
+      "id": 27,
+      "fluxo_id": 5,
+      "tipo": "acao",
+      "texto": null,
+      "acao_tipo": "tag",
+      "acao_valor": "31",
+      "proximo_no_id": 20,
+      "created_at": 1794831235949
+    }
+  ],
+  "opcoes": [
+    {
+      "id": 15,
+      "no_id": 24,
+      "botao_id": "nx_a_saude",
+      "botao_titulo": "Odontologia",
+      "proximo_no_id": 33
+    },
+    {
+      "id": 16,
+      "no_id": 24,
+      "botao_id": "nx_a_arq",
+      "botao_titulo": "Harmoniz./Estética",
+      "proximo_no_id": 34
+    },
+    {
+      "id": 17,
+      "no_id": 24,
+      "botao_id": "nx_a_outra",
+      "botao_titulo": "Outra área",
+      "proximo_no_id": 32
+    }
+  ]
+}
