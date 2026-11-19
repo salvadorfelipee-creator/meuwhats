@@ -1,0 +1,45 @@
+{
+  "version": "7.2",
+  "screens": [
+    {
+      "id": "DADOS",
+      "title": "Seus dados",
+      "terminal": true,
+      "success": true,
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          { "type": "TextHeading", "text": "Ótimo! Só dois dados 😊" },
+          {
+            "type": "Form",
+            "name": "form",
+            "children": [
+              { "type": "TextInput", "name": "nome", "label": "Seu nome", "input-type": "text", "required": true },
+              {
+                "type": "RadioButtonsGroup",
+                "name": "cargo",
+                "label": "Seu cargo",
+                "required": true,
+                "data-source": [
+                  { "id": "Proprietário(a)", "title": "Proprietário(a)" },
+                  { "id": "Gerente", "title": "Gerente" },
+                  { "id": "Recepção", "title": "Recepção" },
+                  { "id": "Marketing", "title": "Marketing" },
+                  { "id": "Outro", "title": "Outro" }
+                ]
+              },
+              {
+                "type": "Footer",
+                "label": "Enviar",
+                "on-click-action": {
+                  "name": "complete",
+                  "payload": { "nome": "${form.nome}", "cargo": "${form.cargo}" }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

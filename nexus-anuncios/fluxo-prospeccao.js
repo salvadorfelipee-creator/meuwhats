@@ -8,7 +8,7 @@ const path = require("path");
 for (const l of fs.readFileSync(path.join(__dirname, "..", ".env"), "utf8").split(/\r?\n/)) { const m = l.match(/^([A-Z0-9_]+)=(.*)$/); if (m) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
 const { createClient } = require("@libsql/client");
 const c = createClient({ url: process.env.TURSO_DATABASE_URL, authToken: process.env.TURSO_AUTH_TOKEN });
-const BN = "1512976205221650", NOME = "Nexus - prospecção ativa", FLOW_ID = "1131594619780974";
+const BN = "1512976205221650", NOME = "Nexus - prospecção ativa", FLOW_ID = "1896347024686913";
 const agora = () => Date.now();
 const num = (r) => Number(r.lastInsertRowid);
 (async () => {

@@ -1315,7 +1315,7 @@ function resolverTokenParametro(texto, nome) {
 // setInterval do broadcast_agendado, mais abaixo). Retorna { ok, error }, nunca lança.
 // `params` (opcional): lista de textos, 1 por variável {{1}},{{2}}... do template, cada um
 // podendo usar os tokens {{nome}}/{{data}} — sem isso, mantém o padrão antigo (só {{1}}=nome).
-const TEMPLATES_SEM_VARIAVEIS = ["bomdia", "boatarde"];
+const TEMPLATES_SEM_VARIAVEIS = ["bomdia", "boatarde", "inicio_bom_dia", "inicio_boa_tarde"];
 async function enviarUmBroadcast(businessId, { phone, name, template, language, bodyPreview, params, ignorarBloqueio }) {
   const telefoneLimpo = normalizarTelefoneBR(phone);
   const nome = (name || "").trim();
