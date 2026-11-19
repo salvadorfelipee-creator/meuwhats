@@ -5557,7 +5557,13 @@ async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
 
   const opcoes = await db.fluxoOpcoesDoNo(noId);
   const botoes = opcoes.length ? opcoes.map((o) => ({ id: o.botao_id, title: o.botao_titulo })) : undefined;
-  await enviarRespostaAutomatica(businessNumberId, de, no.texto || "", botoes);
+  // {{da_clinica}} no texto: "da <nome da clínica>" se o campo Clínica do contato estiver preenchido (ex.: lista importada), senão "da sua clínica".
+  let textoNo = no.texto || "";
+  if (textoNo.includes("{{da_clinica}}")) {
+    const campoClinica = (await db.conversationCamposObter(businessNumberId, de)).find((c) => c.nome === "Clínica")?.valor;
+    textoNo = textoNo.replaceAll("{{da_clinica}}", campoClinica ? `da ${campoClinica}` : "da sua clínica");
+  }
+  await enviarRespostaAutomatica(businessNumberId, de, textoNo, botoes);
   await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
   // Nó 'mensagem' com acao_tipo 'bloquear' (ex.: "Agora não"): depois de mandar o texto, a pessoa não recebe mais mensagens
   // nossas (mesmo efeito de "Parar"). Qualquer outro nó fica esperando a resposta, como sempre.
