@@ -6674,7 +6674,9 @@ async function processarEntry(entry) {
         const TIPOS_COM_MENU = ["text", "image", "audio", "video", "document", "sticker"];
         if (
           !mensagemJaTratada &&
-          conversaInativa &&
+          // Contato de uma Campanha conectada a um fluxo (aguardando_fluxo_N) entra nele ao responder, mesmo que tenha falado
+          // com a gente há menos de 24h — senão o fluxo escolhido na campanha nunca abriria para quem já conversou.
+          (conversaInativa || String(conversaAnterior?.fluxo_passo || "").startsWith("aguardando_fluxo_")) &&
           TIPOS_COM_MENU.includes(tipo) &&
           conversaAnterior?.fluxo_passo !== PASSO_OPTOUT_BLOQUEADO
         ) {
