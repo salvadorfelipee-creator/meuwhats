@@ -5540,6 +5540,7 @@ async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
       bodyText: no.texto || "Toque no botão abaixo para preencher:",
       ctaText: "Preencher agora",
       screenId: "DADOS",
+      semDados: true,
     });
     await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
     await db.setFluxoPasso(de, businessNumberId, `fluxo_dinamico_${noId}`);

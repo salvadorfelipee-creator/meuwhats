@@ -262,7 +262,7 @@ async function sendCtaUrl(fromPhoneNumberId, to, bodyText, buttonText, url) {
 
 // Envia um formulário nativo do WhatsApp (WhatsApp Flow) — usado pela originação de FGTS
 // (Unnotech) pra coletar os dados de cadastro numa tela só, em vez de mensagem por mensagem.
-async function sendFlow(fromPhoneNumberId, to, { flowId, flowToken, bodyText, ctaText, screenId }) {
+async function sendFlow(fromPhoneNumberId, to, { flowId, flowToken, bodyText, ctaText, screenId, semDados }) {
   garantirNaoBloqueado(to);
   const { status, buffer } = await graphRequest(
     "POST",
@@ -284,7 +284,8 @@ async function sendFlow(fromPhoneNumberId, to, { flowId, flowToken, bodyText, ct
               flow_id: flowId,
               flow_cta: ctaText,
               flow_action: "navigate",
-              flow_action_payload: { screen: screenId, data: {} },
+              // semDados: Flow cuja tela não declara dados dinâmicos — a Meta rejeita `data: {}` (erro 131009).
+              flow_action_payload: semDados ? { screen: screenId } : { screen: screenId, data: {} },
             },
           },
         },
