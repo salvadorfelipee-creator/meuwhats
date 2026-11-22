@@ -10544,6 +10544,7 @@ setInterval(async () => {
 }, 60 * 1000);
 
 // ─── VERIFICADOR DE JANELA DE 24H (KEEP-ALIVE) ──────────────────────────────
+const AVISO_JANELA_20H_DESLIGADO = true;
 // A cada 30 min (era 1 min — a janela de aviso tem 4h, não precisa de precisão de minuto): quem está com um fluxo em aberto e mais de 20h sem responder
 // (mas ainda dentro da janela de 24h pra mensagem livre) recebe UM aviso pra
 // tentar trazer a pessoa de volta antes que a janela feche e vire template.
@@ -10560,6 +10561,8 @@ setInterval(async () => {
       if (fluxoDoContato.semAvisoJanela) continue;
       // Felizcred e Campanha CLT: o aviso "Ainda por aí?" foi retirado (pedido do usuário em 23/10/2026).
       if (NUMEROS_CONSIGNADO.includes(p.business_number_id)) continue;
+      // Retirado para todos os números (pedido do usuário em 22/11/2026): nenhum "Ainda por aí?" é enviado.
+      if (AVISO_JANELA_20H_DESLIGADO) continue;
       if (fluxoDoContato.semAvisoJanelaEmPassos?.includes(p.fluxo_passo)) continue;
       try {
         const manterJanela = fluxoDoContato.lembreteTextos.manter_janela || LEMBRETE_TEXTOS_COTACERTA.manter_janela;
