@@ -4814,7 +4814,9 @@ const FLUXO_FELIZCRED = {
 const FLUXO_COTACERTA = {
   menuInicial: menuInicialCotaCerta,
   fluxoBotoes: FLUXO_BOTOES_COTACERTA,
-  lembreteMinutos: LEMBRETE_MINUTOS_COTACERTA,
+  // Lembrete "Vi que você parou no meio da cotação" desligado (pedido do usuário em 23/11/2026):
+  // só a mensagem inicial é enviada; se a pessoa não responder, nada mais acontece.
+  lembreteMinutos: {},
   lembreteTextos: LEMBRETE_TEXTOS_COTACERTA,
   // Aviso de manter-janela ("sua cotação continua aberta") não faz sentido pra quem nunca
   // passou do menu inicial — a pessoa recebeu o menu e não escolheu nenhuma opção, não hávia
@@ -10590,10 +10592,7 @@ const LEMBRETE_INSTAGRAM_POR_NUMERO = {
     "Enquanto isso, não deixa de nos seguir no Instagram e ativar as notificações — é lá que " +
     "a gente avisa antes de todo mundo sobre novidades e condições especiais 😊\n\n" +
     "📷 https://www.instagram.com/felizcred/\n🌐 https://www.felizcred.com.br",
-  [COTACERTA_NUMBER_ID]:
-    "Enquanto isso, não deixa de nos seguir no Instagram e ativar as notificações — é lá que " +
-    "a gente avisa antes de todo mundo sobre novidades e condições especiais 😊\n\n" +
-    "📷 https://www.instagram.com/cotacertaseguros/\n🌐 https://www.cotacertaseguros.com.br",
+  // Cota Certa removida em 23/11/2026 (pedido do usuário): só a mensagem inicial, nada depois.
 };
 setInterval(async () => {
   try {
