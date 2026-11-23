@@ -5577,7 +5577,10 @@ async function avancarNoFluxoDinamico(noId, de, businessNumberId, fluxoId) {
   let textoNo = no.texto || "";
   if (textoNo.includes("{{da_clinica}}")) {
     const campoClinica = (await db.conversationCamposObter(businessNumberId, de)).find((c) => c.nome === "Clínica")?.valor;
-    textoNo = textoNo.replaceAll("{{da_clinica}}", campoClinica ? `da ${campoClinica}` : "da sua clínica");
+    // O campo vem do título do Google Maps ("Instituto X by Fulana — Harmonização Facial em Florianópolis"): corta no
+    // primeiro separador (— | / " by " " - " vírgula) e, se ainda ficar longo, usa "sua clínica".
+    const nomeCurto = String(campoClinica || "").split(/\s+[—–|·•\-]\s+|\s*[\/|,(]\s*|\s+by\s+/i)[0].trim();
+    textoNo = textoNo.replaceAll("{{da_clinica}}", nomeCurto && nomeCurto.length <= 40 ? `da ${nomeCurto}` : "da sua clínica");
   }
   await enviarRespostaAutomatica(businessNumberId, de, textoNo, botoes);
   await db.fluxoEstadoContatoDefinir(businessNumberId, de, fluxoId, noId);
