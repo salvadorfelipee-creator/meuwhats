@@ -5597,7 +5597,9 @@ async function registrarAvisoLeadQualificado(de, businessNumberId) {
   const conv = await db.getConversation(de, businessNumberId);
   const texto =
     ["🔔 NOVO LEAD QUALIFICADO", `Nome: ${conv?.name || "-"}`, `Cargo: ${v("Cargo")}`, `Clínica: ${v("Clínica")}`, `Contato: ${de}`,
-      `Problema: ${v("Problema com leads")}`, `Marketing: ${v("Marketing")}`, `Automação: ${v("Automação")}`].join("\n");
+      `Problema: ${v("Problema com leads")}`, `Marketing: ${v("Marketing")}`, `Automação: ${v("Automação")}`, `Origem dos pacientes: ${v("Origem dos pacientes")}`]
+      .filter((l) => !/: -$/.test(l) || /^(Nome|Cargo|Clínica)/.test(l))
+      .join("\n");
   await db.notaAdicionar(businessNumberId, de, texto);
   await db.atualizarPipelineConversa(de, businessNumberId, "em_atendimento");
   console.log(texto);
