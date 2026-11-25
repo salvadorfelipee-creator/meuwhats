@@ -5614,7 +5614,8 @@ async function chamarHumanoPorTextoLivre(de, businessNumberId, passoAtual, corpo
   if (!String(passoAtual || "").startsWith("fluxo_dinamico_")) return false;
   const no = await db.fluxoNoObter(Number(passoAtual.slice("fluxo_dinamico_".length)));
   if (!no || no.acao_tipo !== "chamar_humano") return false;
-  await enviarRespostaAutomatica(businessNumberId, de, "Entendi! Vou chamar o Felipe para te responder. 🙌");
+  // O texto da resposta pode ser definido por nó (acao_valor); sem ele, usa o padrão.
+  await enviarRespostaAutomatica(businessNumberId, de, no.acao_valor || "Obrigado! Já te respondo por aqui. 🙏");
   await db.pausarBot(de, businessNumberId, Date.now() + 24 * 3600 * 1000);
   await db.atualizarPipelineConversa(de, businessNumberId, "em_atendimento");
   await db.notaAdicionar(businessNumberId, de, `🔔 Escreveu em texto livre e aguarda o Felipe: "${String(corpo).slice(0, 300)}"`);
