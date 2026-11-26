@@ -2013,5 +2013,6 @@ Pendente: envio do aviso a outro número/grupo e planilha Google Sheets (sem des
 A página `nexussite-br.vercel.app/raio-x/` envia as respostas para `POST /raiox` (`sendBeacon`, texto com JSON, só com essa
 origem; se o site mudar de domínio, trocar `ORIGEM` em `raio-x.js`). Quando chega no número da Nexus a mensagem com
 `Código: RX-XXXXXX`, o painel grava uma nota amarela (`direction="note"`, `type="nota"`, nunca enviada ao cliente), põe a
-tag "Raio-X" e pausa o robô por 24 h. As respostas ficam na tabela `raiox_respostas` por 30 dias; a nota fica na conversa.
+tag "Raio-X", manda uma saudação (única mensagem automática; texto em `saudacao` de `raio-x.js`), pausa o robô por 24 h e
+marca `fluxo_passo="raiox_atendimento"`, que impede o menu da campanha e os lembretes depois disso. As respostas ficam na tabela `raiox_respostas` por 30 dias; a nota fica na conversa.
 Limites da rota pública: 6 KB, 5 envios por minuto por IP e 100 por hora no total.

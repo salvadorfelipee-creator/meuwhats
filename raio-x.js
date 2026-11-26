@@ -3,6 +3,15 @@
 const NUMERO_NEXUS = "1512976205221650";
 const ORIGEM = "https://nexussite-br.vercel.app";
 const REGEX_CODIGO = /\bRX-[A-Z2-9]{6}\b/i;
+// fluxo_passo de quem veio do formulário: sem menu da campanha nem lembrete, mesmo se voltar a escrever depois de 24 h.
+const PASSO = "raiox_atendimento";
+
+/** Única mensagem automática para quem veio do formulário (texto livre, dentro da janela de 24 h: sem custo de template). */
+function saudacao(nome) {
+  const primeiro = String(nome || "").trim().split(/\s+/)[0];
+  const chamado = /^\p{L}{2,20}$/u.test(primeiro) ? `, ${primeiro}` : "";
+  return `Oi${chamado}! 👋 Recebemos o seu Raio-X por aqui. Vamos olhar as suas respostas e já te mandamos a análise completa e as outras 36 mensagens.`;
+}
 
 const texto = (v, max = 80) => String(v ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, max);
 const nota100 = (v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
@@ -77,16 +86,28 @@ function formatarNota(r) {
  * Chamado para cada texto recebido. Devolve true se a mensagem é de um Raio-X (o chamador não deve disparar robô).
  * A nota entra 1 ms antes da mensagem do cliente, para a conversa continuar contando como "aguardando resposta".
  */
-async function tratarMensagem(db, { de, businessNumberId, corpo, quando }) {
+async function tratarMensagem(db, { de, businessNumberId, corpo, quando, enviar }) {
   if (businessNumberId !== NUMERO_NEXUS) return false;
   const achado = String(corpo || "").match(REGEX_CODIGO);
   if (!achado) return false;
+  const codigo = achado[0].toUpperCase();
+  let dados = null;
   try {
-    const codigo = achado[0].toUpperCase();
-    // Primeiro cala o robô: se a nota falhar, a campanha ainda assim não entra em cima da pessoa.
+    dados = await db.raioXObter(codigo);
+  } catch (err) {
+    console.error("Erro ao ler Raio-X:", err.message);
+  }
+  // A saudação sai antes da pausa: o envio automático respeita a pausa, então não repete se a equipe já assumiu ou se
+  // a pessoa reenviar o código. Falha no envio não pode impedir de calar o robô.
+  try {
+    await enviar(saudacao(dados?.nome));
+  } catch (err) {
+    console.error("Erro ao saudar Raio-X:", err.message);
+  }
+  try {
+    // Cala o robô antes da nota: se a nota falhar, a campanha ainda assim não entra em cima da pessoa.
     await db.pausarBot(de, businessNumberId, Date.now() + 24 * 3600 * 1000);
-    await db.setFluxoPasso(de, businessNumberId, null);
-    const dados = await db.raioXObter(codigo);
+    await db.setFluxoPasso(de, businessNumberId, PASSO);
     await db.insertMessage({
       phone: de,
       business_number_id: businessNumberId,
@@ -103,4 +124,4 @@ async function tratarMensagem(db, { de, businessNumberId, corpo, quando }) {
   return true;
 }
 
-module.exports = { ORIGEM, permitir, lerCorpo, limpar, formatarNota, tratarMensagem };
+module.exports = { ORIGEM, PASSO, saudacao, permitir, lerCorpo, limpar, formatarNota, tratarMensagem };

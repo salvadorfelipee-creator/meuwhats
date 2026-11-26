@@ -6416,8 +6416,8 @@ async function processarEntry(entry) {
             } catch (err) {
               console.error("Erro ao registrar saída de mensagens:", err.message);
             }
-          } else if (await raioX.tratarMensagem(db, { de, businessNumberId, corpo, quando })) {
-            // Veio do Raio-X: nota amarela na conversa e nada de robô, a equipe assume.
+          } else if (await raioX.tratarMensagem(db, { de, businessNumberId, corpo, quando, enviar: (texto) => enviarRespostaAutomatica(businessNumberId, de, texto) })) {
+            // Veio do Raio-X: só a saudação e a nota amarela; daí em diante a equipe assume.
             mensagemJaTratada = true;
           } else if (normalizarTexto(corpo) === "menu") {
             try {
@@ -6704,7 +6704,8 @@ async function processarEntry(entry) {
           // com a gente há menos de 24h — senão o fluxo escolhido na campanha nunca abriria para quem já conversou.
           (conversaInativa || String(conversaAnterior?.fluxo_passo || "").startsWith("aguardando_fluxo_")) &&
           TIPOS_COM_MENU.includes(tipo) &&
-          conversaAnterior?.fluxo_passo !== PASSO_OPTOUT_BLOQUEADO
+          conversaAnterior?.fluxo_passo !== PASSO_OPTOUT_BLOQUEADO &&
+          conversaAnterior?.fluxo_passo !== raioX.PASSO
         ) {
           try {
             const podeEnviar = await db.tentarMarcarMenuEnviado(
