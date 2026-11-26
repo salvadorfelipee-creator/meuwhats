@@ -297,8 +297,19 @@ async function sendFlow(fromPhoneNumberId, to, { flowId, flowToken, bodyText, ct
   return json;
 }
 
+// Trava de gasto (pedido do usuário em 26/11/2026): template é mensagem cobrada pela Meta, então só os números
+// liberados podem enviar. Padrão: só a Nexus. Para liberar outros, definir TEMPLATES_NUMEROS_LIBERADOS no Render
+// (phone_number_id separados por vírgula; "*" libera todos).
+function templateLiberado(phoneNumberId) {
+  const liberados = String(process.env.TEMPLATES_NUMEROS_LIBERADOS || "1512976205221650").split(",").map((s) => s.trim());
+  return liberados.includes("*") || liberados.includes(String(phoneNumberId));
+}
+
 async function sendTemplate(fromPhoneNumberId, to, templateName, languageCode, components) {
   garantirNaoBloqueado(to);
+  if (!templateLiberado(fromPhoneNumberId)) {
+    throw new Error("Envio de template bloqueado neste número para não gerar cobrança (só a Nexus está liberada).");
+  }
   const { status, buffer } = await graphRequest(
     "POST",
     "graph.facebook.com",
