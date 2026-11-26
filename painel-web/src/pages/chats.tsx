@@ -1525,7 +1525,9 @@ function ChannelChatsPage() {
                     <div
                       id={`msg-${m.id}`}
                       className={`group relative max-w-[70%] rounded-lg px-2.5 py-1.5 text-sm shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] whitespace-pre-wrap break-words ${
-                        m.direction === "out"
+                        m.direction === "note"
+                          ? "bg-[#fff4c2] text-[#4a3b00] border border-amber-300 self-center w-full dark:bg-amber-950/60 dark:text-amber-100 dark:border-amber-800"
+                          : m.direction === "out"
                           ? "bg-[#d9fdd3] text-[#111b21] rounded-tr-none self-end dark:bg-[#005c4b] dark:text-[#e9edef]"
                           : "bg-white text-[#111b21] rounded-tl-none self-start dark:bg-[#202c33] dark:text-[#e9edef]"
                       } ${
@@ -1537,6 +1539,7 @@ function ChannelChatsPage() {
                         type="button"
                         title="Responder"
                         onClick={() => setReplyTo(m)}
+                        hidden={m.direction === "note"}
                         className={`absolute -top-2.5 ${
                           m.direction === "out" ? "-left-2.5" : "-right-2.5"
                         } h-5 w-5 rounded-full border bg-background shadow-sm flex items-center justify-center text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground`}

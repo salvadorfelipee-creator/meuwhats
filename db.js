@@ -537,6 +537,13 @@ const ready = (async () => {
     PRIMARY KEY (business_id, phone, campo_id)
   )`);
 
+  // Respostas do Raio-X do site, guardadas até a mensagem com o código chegar (ver raio-x.js).
+  await client.execute(`CREATE TABLE IF NOT EXISTS raiox_respostas (
+    codigo TEXT PRIMARY KEY,
+    dados TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`);
+
   await client.execute(`CREATE TABLE IF NOT EXISTS conversation_notas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     business_id TEXT NOT NULL,
@@ -2000,6 +2007,29 @@ async function usuarioDesativar(id) {
   await client.execute({ sql: `UPDATE usuarios SET ativo = 0 WHERE id = ?`, args: [id] });
 }
 
+// São dados pessoais de quem pode nunca mandar a mensagem: apaga com 30 dias (a nota já fica na conversa).
+// Sem relógio próprio — a faxina vai junto do primeiro envio de cada dia.
+const RAIOX_GUARDAR_MS = 30 * 24 * 60 * 60 * 1000;
+let raioXFaxinaEm = 0;
+
+async function raioXSalvar(dados) {
+  await ready;
+  if (Date.now() - raioXFaxinaEm > 24 * 60 * 60 * 1000) {
+    raioXFaxinaEm = Date.now();
+    await client.execute({ sql: `DELETE FROM raiox_respostas WHERE created_at < ?`, args: [Date.now() - RAIOX_GUARDAR_MS] });
+  }
+  await client.execute({
+    sql: `INSERT OR REPLACE INTO raiox_respostas (codigo, dados, created_at) VALUES (?, ?, ?)`,
+    args: [dados.codigo, JSON.stringify(dados), Date.now()],
+  });
+}
+
+async function raioXObter(codigo) {
+  await ready;
+  const r = await client.execute({ sql: `SELECT dados FROM raiox_respostas WHERE codigo = ?`, args: [codigo] });
+  return r.rows[0] ? JSON.parse(r.rows[0].dados) : null;
+}
+
 async function insertMessage(msg) {
   await ready;
   const {
@@ -3415,14 +3445,14 @@ async function analyticsResumo(businessNumberId, desde, ate) {
       SELECT strftime('%Y-%m-%d', (created_at / 1000) - ${TZ_BRASIL_OFFSET_SEGUNDOS}, 'unixepoch') AS dia,
         COUNT(*) AS mensagens, COUNT(DISTINCT phone) AS conversas
       FROM messages
-      WHERE business_number_id = ? AND created_at BETWEEN ? AND ?
+      WHERE business_number_id = ? AND created_at BETWEEN ? AND ? AND direction != 'note'
       GROUP BY dia ORDER BY dia
     `,
     args: [businessNumberId, desde, ate],
   });
 
   const porDirecaoQ = await client.execute({
-    sql: `SELECT direction, COUNT(*) AS total FROM messages WHERE business_number_id = ? AND created_at BETWEEN ? AND ? GROUP BY direction`,
+    sql: `SELECT direction, COUNT(*) AS total FROM messages WHERE business_number_id = ? AND created_at BETWEEN ? AND ? AND direction != 'note' GROUP BY direction`,
     args: [businessNumberId, desde, ate],
   });
 
@@ -3433,7 +3463,7 @@ async function analyticsResumo(businessNumberId, desde, ate) {
       SELECT CAST(strftime('%H', (created_at / 1000) - ${TZ_BRASIL_OFFSET_SEGUNDOS}, 'unixepoch') AS INTEGER) AS hora,
         COUNT(*) AS total
       FROM messages
-      WHERE business_number_id = ? AND created_at BETWEEN ? AND ?
+      WHERE business_number_id = ? AND created_at BETWEEN ? AND ? AND direction != 'note'
       GROUP BY hora ORDER BY hora
     `,
     args: [businessNumberId, desde, ate],
@@ -4691,6 +4721,8 @@ module.exports = {
   respostaProntaAtualizar,
   respostaProntaRegistrarUso,
   tagEncontrarOuCriar,
+  raioXSalvar,
+  raioXObter,
   tagDaConversaDesde,
   campoPersonalizadoEncontrarOuCriar,
   renomearConversa,

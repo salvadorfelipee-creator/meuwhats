@@ -297,7 +297,8 @@ export type Message = {
   id: number
   phone: string
   business_number_id: string
-  direction: "in" | "out"
+  // "note" = caixa amarela que só a equipe vê (ex.: respostas do Raio-X); nunca é enviada ao cliente.
+  direction: "in" | "out" | "note"
   type: string
   body: string | null
   media_path: string | null

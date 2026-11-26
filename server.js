@@ -9,6 +9,7 @@ const { spawn } = require("child_process");
 const ffmpegPath = require("ffmpeg-static");
 
 const db = require("./db");
+const raioX = require("./raio-x");
 const wa = require("./whatsapp");
 const ig = require("./instagram");
 const ads = require("./ads");
@@ -6415,6 +6416,9 @@ async function processarEntry(entry) {
             } catch (err) {
               console.error("Erro ao registrar saída de mensagens:", err.message);
             }
+          } else if (await raioX.tratarMensagem(db, { de, businessNumberId, corpo, quando })) {
+            // Veio do Raio-X: nota amarela na conversa e nada de robô, a equipe assume.
+            mensagemJaTratada = true;
           } else if (normalizarTexto(corpo) === "menu") {
             try {
               await db.pausarBot(de, businessNumberId, null);
@@ -7152,6 +7156,17 @@ const server = http.createServer(async (req, res) => {
       const body = await parseBody(req);
       await processarUpdateTelegram(body);
       return send(res, 200, "OK");
+    }
+
+    // Raio-X do site da Nexus (sendBeacon, corpo text/plain). Só aceita a origem do site; ver raio-x.js.
+    if (req.method === "POST" && path_ === "/raiox") {
+      if (req.headers.origin !== raioX.ORIGEM) return send(res, 403, { error: "Origem não permitida" });
+      const ip = String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "").split(",")[0].trim();
+      if (!raioX.permitir(ip)) { res.writeHead(429); return res.end(); }
+      const dados = raioX.limpar(await raioX.lerCorpo(req));
+      if (dados) await db.raioXSalvar(dados);
+      res.writeHead(dados ? 204 : 400, { "Access-Control-Allow-Origin": raioX.ORIGEM });
+      return res.end();
     }
 
     // Chat próprio do site FelizCred. A parte pública usa um segredo aleatório por conversa;
@@ -8404,7 +8419,7 @@ const server = http.createServer(async (req, res) => {
         "",
         ...mensagens.map((m) => {
           const quando = new Date(m.created_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-          const quem = m.direction === "out" ? "Atendente" : nomeContato;
+          const quem = m.direction === "note" ? "Nota interna" : m.direction === "out" ? "Atendente" : nomeContato;
           const conteudo =
             m.body ||
             (m.media_path ? `[${m.type}] ${m.media_path}` : `[${m.type}]`);
@@ -9845,7 +9860,7 @@ const server = http.createServer(async (req, res) => {
         const nomeContato = conversa?.name || phone;
         const linhas = mensagens.map((m) => {
           const quando = new Date(m.created_at).toLocaleString("pt-BR");
-          const quem = m.direction === "in" ? nomeContato : m.origem ? `Atendente (${m.origem === "humano" ? "painel" : m.origem})` : "Automático";
+          const quem = m.direction === "note" ? "Nota interna" : m.direction === "in" ? nomeContato : m.origem ? `Atendente (${m.origem === "humano" ? "painel" : m.origem})` : "Automático";
           const corpo = (m.body || `[${m.type}]`).replace(/</g, "&lt;").replace(/\n/g, "<br>");
           return `<p style="margin:0 0 10px"><strong>${quem}</strong> <span style="color:#888">${quando}</span><br>${corpo}</p>`;
         });

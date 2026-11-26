@@ -100,7 +100,7 @@ async function chamarGemini(prompt, modelo = GEMINI_MODEL_LITE) {
 function montarPrompt({ mensagens, estagios, campos, valoresAtuais }) {
   const transcricao = mensagens
     .map((m) => {
-      const quem = m.direction === "in" ? "Cliente" : "Atendimento";
+      const quem = m.direction === "in" ? "Cliente" : m.direction === "note" ? "Nota interna da equipe (o cliente não vê)" : "Atendimento";
       const corpo = m.body || `[${m.type || "mídia"}]`;
       return `${quem}: ${corpo}`;
     })
@@ -175,7 +175,7 @@ async function sugerirPipeline({ mensagens, estagios, campos, valoresAtuais }) {
 function montarPromptResposta({ mensagens, campos, valoresAtuais, respostasProntas }) {
   const transcricao = mensagens
     .map((m) => {
-      const quem = m.direction === "in" ? "Cliente" : "Atendimento";
+      const quem = m.direction === "in" ? "Cliente" : m.direction === "note" ? "Nota interna da equipe (o cliente não vê)" : "Atendimento";
       const corpo = m.body || `[${m.type || "mídia"}]`;
       return `${quem}: ${corpo}`;
     })
@@ -236,7 +236,7 @@ async function sugerirResposta({ mensagens, campos, valoresAtuais, respostasPron
 function montarPromptEtapaParada({ mensagens, estagioNome, dias }) {
   const transcricao = mensagens
     .map((m) => {
-      const quem = m.direction === "in" ? "Cliente" : "Atendimento";
+      const quem = m.direction === "in" ? "Cliente" : m.direction === "note" ? "Nota interna da equipe (o cliente não vê)" : "Atendimento";
       const corpo = m.body || `[${m.type || "mídia"}]`;
       return `${quem}: ${corpo}`;
     })

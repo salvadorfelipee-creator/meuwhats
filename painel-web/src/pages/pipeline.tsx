@@ -332,7 +332,9 @@ function PainelConversa({
               <div
                 key={m.id}
                 className={`max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs whitespace-pre-wrap break-words ${
-                  m.direction === "out"
+                  m.direction === "note"
+                    ? "bg-amber-100 text-amber-950 border border-amber-300 self-center w-full"
+                    : m.direction === "out"
                     ? "bg-primary text-primary-foreground self-end"
                     : "bg-secondary text-secondary-foreground self-start"
                 }`}
